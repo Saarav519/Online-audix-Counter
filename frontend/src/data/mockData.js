@@ -28,6 +28,8 @@ export const mockLocations = [
     itemCount: 45,
     isCompleted: false,
     isSubmitted: false,
+    isAssigned: true, // Pre-assigned location
+    autoCreated: false,
     lastUpdated: "2025-07-10T10:30:00"
   },
   {
@@ -38,6 +40,8 @@ export const mockLocations = [
     itemCount: 32,
     isCompleted: true,
     isSubmitted: true,
+    isAssigned: true, // Pre-assigned location
+    autoCreated: false,
     lastUpdated: "2025-07-09T14:20:00"
   },
   {
@@ -48,6 +52,8 @@ export const mockLocations = [
     itemCount: 18,
     isCompleted: false,
     isSubmitted: false,
+    isAssigned: false, // Dynamic location
+    autoCreated: true,
     lastUpdated: "2025-07-08T09:15:00"
   },
   {
@@ -58,6 +64,8 @@ export const mockLocations = [
     itemCount: 67,
     isCompleted: true,
     isSubmitted: false,
+    isAssigned: false, // Dynamic location
+    autoCreated: true,
     lastUpdated: "2025-07-10T11:45:00"
   }
 ];
