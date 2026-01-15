@@ -95,24 +95,38 @@ export const AppProvider = ({ children }) => {
 
     setScannedItems(prev => {
       const locationItems = prev[locationId] || [];
-      
-      // In Single SKU mode: Always create a new entry (each scan = 1 unit, separate entry)
-      // In Non-Single SKU mode: Check if item exists and update quantity
-      if (settings.singleSkuScanning) {
-        // Single SKU Mode - Always add new entry
-        const newItem = {
-          id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          barcode,
-          productName: product ? product.name : `Unknown Product (${barcode})`,
-          quantity: 1, // Always 1 in single SKU mode
-          scannedAt: new Date().toISOString(),
-          isMaster: !!product
-        };
-        return { ...prev, [locationId]: [...locationItems, newItem] };
-      } else {
-        // Non-Single SKU Mode - Check for existing and add quantity
-        const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
+      const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
 
+      if (settings.singleSkuScanning) {
+        // Single SKU Mode: 
+        // - Same barcode stays in ONE line
+        // - Quantity auto-increments by 1 per scan
+        // - NO manual quantity entry allowed
+        if (existingIndex !== -1) {
+          // Update existing item - increment by 1
+          const updated = [...locationItems];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            quantity: updated[existingIndex].quantity + 1,
+            scannedAt: new Date().toISOString()
+          };
+          return { ...prev, [locationId]: updated };
+        } else {
+          // Add new item with quantity 1
+          const newItem = {
+            id: `scan_${Date.now()}`,
+            barcode,
+            productName: product ? product.name : `Unknown Product (${barcode})`,
+            quantity: 1,
+            scannedAt: new Date().toISOString(),
+            isMaster: !!product
+          };
+          return { ...prev, [locationId]: [...locationItems, newItem] };
+        }
+      } else {
+        // Non-Single SKU Mode (Manual Qty Entry):
+        // - Can enter any quantity manually
+        // - Same barcode can have quantity added to existing entry
         if (existingIndex !== -1) {
           // Update existing item quantity
           const updated = [...locationItems];
