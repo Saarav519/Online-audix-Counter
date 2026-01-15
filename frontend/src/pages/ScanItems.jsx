@@ -138,9 +138,16 @@ const ScanItems = () => {
         }
       }, 100);
     } else {
-      setLocationError(result.error);
+      // Check if it's a locked location error
+      if (result.isLocked) {
+        setLocationError(result.error);
+      } else {
+        setLocationError(result.error);
+      }
       setLocationSuccess(null);
       playSound(false);
+      // Clear the input for locked/error cases
+      setLocationInput('');
     }
   };
 
