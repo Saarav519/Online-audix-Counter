@@ -236,7 +236,22 @@ const ScanItems = () => {
   const confirmSubmit = () => {
     submitLocation(selectedLocationId);
     setShowSubmitModal(false);
-    navigate('/locations');
+    
+    // Clear current location and stay on scan page for next scan
+    setSelectedLocationId('');
+    setLocationInput('');
+    setBarcodeInput('');
+    setLastScanResult(null);
+    setLocationSuccess('Location submitted successfully! Ready for next scan.');
+    
+    // Focus on location input for next scan
+    setTimeout(() => {
+      if (locationInputRef.current) {
+        locationInputRef.current.focus();
+      }
+      // Clear success message after 4 seconds
+      setTimeout(() => setLocationSuccess(null), 4000);
+    }, 100);
   };
 
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
