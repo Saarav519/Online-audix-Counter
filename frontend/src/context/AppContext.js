@@ -186,6 +186,24 @@ export const AppProvider = ({ children }) => {
     return newLocation;
   };
 
+  // Delete location
+  const deleteLocation = (locationId) => {
+    setLocations(prev => prev.filter(loc => loc.id !== locationId));
+    setScannedItems(prev => {
+      const newItems = { ...prev };
+      delete newItems[locationId];
+      return newItems;
+    });
+  };
+
+  // Find location by code (for scanner auto-select)
+  const findLocationByCode = (code) => {
+    return locations.find(l => 
+      l.code.toLowerCase() === code.toLowerCase() || 
+      l.name.toLowerCase().includes(code.toLowerCase())
+    );
+  };
+
   // Add product to master list
   const addMasterProduct = (productData) => {
     const newProduct = {
