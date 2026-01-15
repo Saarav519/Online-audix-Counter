@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -25,7 +25,12 @@ import {
   Clock,
   MoreVertical,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Upload,
+  FileSpreadsheet,
+  UserCheck,
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -36,23 +41,42 @@ import {
 } from '../components/ui/dropdown-menu';
 
 const Locations = () => {
-  const { locations, scannedItems, addLocation, deleteLocation, submitLocation, reopenLocation, login } = useApp();
+  const { 
+    locations, 
+    scannedItems, 
+    settings,
+    addLocation, 
+    deleteLocation, 
+    submitLocation, 
+    reopenLocation, 
+    importAssignedLocations,
+    clearAssignedLocations,
+    login 
+  } = useApp();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [newLocation, setNewLocation] = useState({ name: '', code: '' });
   const [authCredentials, setAuthCredentials] = useState({ userId: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
+  const [importResult, setImportResult] = useState(null);
+  
+  const fileInputRef = useRef(null);
 
   const filteredLocations = locations.filter(
     loc =>
       loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loc.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const assignedLocationsCount = locations.filter(loc => loc.isAssigned).length;
+  const isPreAssignedMode = settings.locationScanMode === 'preassigned';
 
   const handleAddLocation = () => {
     if (newLocation.name && newLocation.code) {
@@ -101,6 +125,72 @@ const Locations = () => {
     }
   };
 
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        // Skip header row if it looks like a header
+        const firstLine = lines[0].toLowerCase();
+        const hasHeader = firstLine.includes('code') || firstLine.includes('name') || firstLine.includes('location');
+        const dataLines = hasHeader ? lines.slice(1) : lines;
+        
+        const locationsData = dataLines.map(line => {
+          const parts = line.split(',').map(s => s.trim().replace(/"/g, ''));
+          // Support formats: "code" or "code,name" or "name,code"
+          if (parts.length >= 2) {
+            return { code: parts[0], name: parts[1] };
+          } else {
+            return { code: parts[0], name: parts[0] };
+          }
+        }).filter(loc => loc.code);
+
+        if (locationsData.length === 0) {
+          setImportResult({ success: false, error: 'No valid locations found in CSV file' });
+          return;
+        }
+
+        const count = importAssignedLocations(locationsData);
+        setImportResult({ success: true, count });
+      } catch (error) {
+        setImportResult({ success: false, error: 'Failed to parse CSV file' });
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleClearAssigned = () => {
+    clearAssignedLocations();
+    setImportResult(null);
+  };
+
+  const downloadSampleCSV = () => {
+    const sampleData = `Location Code,Location Name
+WH-A1,Warehouse A - Section 1
+WH-A2,Warehouse A - Section 2
+WH-B1,Warehouse B - Section 1
+STORE-01,Retail Store Front
+COLD-01,Cold Storage Unit 1`;
+    
+    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_locations.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const getLocationStats = (locationId) => {
     const items = scannedItems[locationId] || [];
     return {
@@ -117,14 +207,52 @@ const Locations = () => {
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Locations</h1>
           <p className="text-slate-500 mt-1">Manage your counting zones and areas</p>
         </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Location
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {isPreAssignedMode && (
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Import Locations
+            </Button>
+          )}
+          {!isPreAssignedMode && (
+            <Button
+              onClick={() => setShowAddModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Location
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Mode Info Banner */}
+      {isPreAssignedMode && (
+        <Card className="border-0 shadow-sm bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <UserCheck className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-blue-800">Pre-Assigned Location Mode</h3>
+                <p className="text-sm text-blue-600 mt-1">
+                  Only imported/assigned locations can be scanned. Import locations using CSV file to assign them to employees.
+                </p>
+                {assignedLocationsCount > 0 && (
+                  <Badge className="mt-2 bg-blue-100 text-blue-700 border-0">
+                    {assignedLocationsCount} assigned location(s)
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -156,18 +284,28 @@ const Locations = () => {
                       ? 'bg-emerald-100' 
                       : location.isCompleted 
                         ? 'bg-teal-100'
-                        : 'bg-slate-100'
+                        : location.isAssigned
+                          ? 'bg-blue-100'
+                          : 'bg-slate-100'
                   }`}>
                     <MapPin className={`w-6 h-6 ${
                       location.isSubmitted 
                         ? 'text-emerald-600' 
                         : location.isCompleted 
                           ? 'text-teal-600'
-                          : 'text-slate-600'
+                          : location.isAssigned
+                            ? 'text-blue-600'
+                            : 'text-slate-600'
                     }`} />
                   </div>
                   
                   <div className="flex items-center gap-2">
+                    {location.isAssigned && (
+                      <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">
+                        <UserCheck className="w-3 h-3 mr-1" />
+                        Assigned
+                      </Badge>
+                    )}
                     {location.isSubmitted ? (
                       <Lock className="w-4 h-4 text-emerald-600" />
                     ) : location.isCompleted ? (
@@ -258,6 +396,11 @@ const Locations = () => {
         <div className="text-center py-12">
           <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
           <p className="text-slate-500">No locations found</p>
+          {isPreAssignedMode && (
+            <p className="text-sm text-slate-400 mt-2">
+              Import locations using the "Import Locations" button above
+            </p>
+          )}
         </div>
       )}
 
@@ -297,6 +440,111 @@ const Locations = () => {
             </Button>
             <Button onClick={handleAddLocation} className="bg-emerald-600 hover:bg-emerald-700">
               Add Location
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Locations Modal */}
+      <Dialog open={showImportModal} onOpenChange={(open) => {
+        setShowImportModal(open);
+        if (!open) setImportResult(null);
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-blue-600" />
+              Import Assigned Locations
+            </DialogTitle>
+            <DialogDescription>
+              Import locations from CSV file. Only these locations can be scanned in Pre-Assigned mode.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Current assigned count */}
+            {assignedLocationsCount > 0 && (
+              <div className="p-3 bg-blue-50 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <UserCheck className="w-4 h-4" />
+                  <span className="text-sm font-medium">{assignedLocationsCount} locations currently assigned</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearAssigned}
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Clear All
+                </Button>
+              </div>
+            )}
+
+            {/* CSV Format Info */}
+            <div className="p-4 bg-slate-50 rounded-lg">
+              <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
+              <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
+                Location Code,Location Name<br />
+                WH-A1,Warehouse A - Section 1<br />
+                WH-B1,Warehouse B - Section 1
+              </code>
+              <Button
+                variant="link"
+                size="sm"
+                onClick={downloadSampleCSV}
+                className="text-blue-600 p-0 h-auto mt-2"
+              >
+                <Download className="w-3 h-3 mr-1" />
+                Download Sample CSV
+              </Button>
+            </div>
+
+            {/* File Upload */}
+            <div className="relative">
+              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 transition-colors cursor-pointer">
+                <FileSpreadsheet className="w-10 h-10 text-slate-400 mb-3" />
+                <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
+                <p className="text-xs text-slate-400">CSV files only</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Import Result */}
+            {importResult && (
+              <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                importResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+              }`}>
+                {importResult.success ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : (
+                  <AlertCircle className="w-5 h-5" />
+                )}
+                <span className="text-sm">
+                  {importResult.success 
+                    ? `Successfully imported ${importResult.count} location(s)`
+                    : importResult.error}
+                </span>
+              </div>
+            )}
+
+            {/* Warning */}
+            <div className="p-3 bg-amber-50 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-700">
+                In Pre-Assigned mode, employees can only scan locations that are imported here. 
+                Any other location codes will be rejected.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowImportModal(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
