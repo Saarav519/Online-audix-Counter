@@ -185,5 +185,6 @@ export const mockSettings = {
   singleSkuScanning: false,
   soundEnabled: true,
   autoSubmitOnComplete: false,
-  requireAuthForEdit: true
+  requireAuthForEdit: true,
+  locationScanMode: 'dynamic' // 'preassigned' or 'dynamic'
 };
