@@ -95,28 +95,45 @@ export const AppProvider = ({ children }) => {
 
     setScannedItems(prev => {
       const locationItems = prev[locationId] || [];
-      const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
-
-      if (existingIndex !== -1 && !settings.singleSkuScanning) {
-        // Update existing item quantity
-        const updated = [...locationItems];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + quantity,
-          scannedAt: new Date().toISOString()
-        };
-        return { ...prev, [locationId]: updated };
-      } else {
-        // Add new item
+      
+      // In Single SKU mode: Always create a new entry (each scan = 1 unit, separate entry)
+      // In Non-Single SKU mode: Check if item exists and update quantity
+      if (settings.singleSkuScanning) {
+        // Single SKU Mode - Always add new entry
         const newItem = {
-          id: `scan_${Date.now()}`,
+          id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           barcode,
           productName: product ? product.name : `Unknown Product (${barcode})`,
-          quantity,
+          quantity: 1, // Always 1 in single SKU mode
           scannedAt: new Date().toISOString(),
           isMaster: !!product
         };
         return { ...prev, [locationId]: [...locationItems, newItem] };
+      } else {
+        // Non-Single SKU Mode - Check for existing and add quantity
+        const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
+
+        if (existingIndex !== -1) {
+          // Update existing item quantity
+          const updated = [...locationItems];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            quantity: updated[existingIndex].quantity + quantity,
+            scannedAt: new Date().toISOString()
+          };
+          return { ...prev, [locationId]: updated };
+        } else {
+          // Add new item with specified quantity
+          const newItem = {
+            id: `scan_${Date.now()}`,
+            barcode,
+            productName: product ? product.name : `Unknown Product (${barcode})`,
+            quantity,
+            scannedAt: new Date().toISOString(),
+            isMaster: !!product
+          };
+          return { ...prev, [locationId]: [...locationItems, newItem] };
+        }
       }
     });
 
