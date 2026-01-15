@@ -244,6 +244,8 @@ export const AppProvider = ({ children }) => {
     reopenLocation,
     updateSettings,
     addLocation,
+    deleteLocation,
+    findLocationByCode,
     addMasterProduct,
     importMasterProducts,
     playSound
