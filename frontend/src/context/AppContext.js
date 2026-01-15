@@ -365,6 +365,8 @@ export const AppProvider = ({ children }) => {
     findLocationByCode,
     scanLocation,
     createLocationFromScan,
+    importAssignedLocations,
+    clearAssignedLocations,
     addMasterProduct,
     importMasterProducts,
     playSound
