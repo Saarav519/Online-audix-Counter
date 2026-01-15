@@ -7,13 +7,6 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Label } from '../components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,7 +32,8 @@ import {
   Lock,
   Package,
   MapPin,
-  Save
+  Save,
+  X
 } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 
@@ -53,36 +47,95 @@ const ScanItems = () => {
     addScannedItem, 
     deleteScannedItem,
     updateItemQuantity,
-    submitLocation
+    submitLocation,
+    findLocationByCode,
+    playSound
   } = useApp();
 
   const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get('location') || '');
+  const [locationInput, setLocationInput] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [lastScanResult, setLastScanResult] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
   const [editQuantity, setEditQuantity] = useState('');
+  const [locationError, setLocationError] = useState('');
   
+  const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
 
   const selectedLocation = locations.find(l => l.id === selectedLocationId);
   const locationItems = scannedItems[selectedLocationId] || [];
   const isLocationLocked = selectedLocation?.isSubmitted;
 
+  // Auto-focus location input on mount if no location selected
+  useEffect(() => {
+    if (!selectedLocationId && locationInputRef.current) {
+      locationInputRef.current.focus();
+    }
+  }, []);
+
   // Auto-focus barcode input when location is selected
   useEffect(() => {
-    if (barcodeInputRef.current && selectedLocationId && !isLocationLocked) {
+    if (selectedLocationId && barcodeInputRef.current && !isLocationLocked) {
       barcodeInputRef.current.focus();
     }
   }, [selectedLocationId, isLocationLocked]);
 
-  // Auto-submit barcode on Enter or when barcode is complete (for scanner)
-  const handleBarcodeChange = (e) => {
-    const value = e.target.value;
-    setBarcodeInput(value);
+  // Update location input display when location is selected
+  useEffect(() => {
+    if (selectedLocation) {
+      setLocationInput(`${selectedLocation.name} (${selectedLocation.code})`);
+    }
+  }, [selectedLocation]);
+
+  // Handle location scan/input
+  const handleLocationKeyDown = (e) => {
+    if (e.key === 'Enter' && locationInput.trim()) {
+      handleLocationScan();
+    }
   };
 
-  // Handle barcode scan - auto-add when Enter is pressed or scanner sends complete barcode
+  const handleLocationScan = () => {
+    const input = locationInput.trim();
+    if (!input) return;
+
+    const foundLocation = findLocationByCode(input);
+    
+    if (foundLocation) {
+      if (foundLocation.isSubmitted) {
+        setLocationError('This location is submitted and locked');
+        playSound(false);
+        return;
+      }
+      setSelectedLocationId(foundLocation.id);
+      setLocationInput(`${foundLocation.name} (${foundLocation.code})`);
+      setLocationError('');
+      playSound(true);
+      
+      // Focus barcode input after location is selected
+      setTimeout(() => {
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+      }, 100);
+    } else {
+      setLocationError(`Location "${input}" not found`);
+      playSound(false);
+    }
+  };
+
+  // Clear selected location
+  const clearLocation = () => {
+    setSelectedLocationId('');
+    setLocationInput('');
+    setLocationError('');
+    if (locationInputRef.current) {
+      locationInputRef.current.focus();
+    }
+  };
+
+  // Handle barcode scan - auto-add when Enter is pressed
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
       handleScan();
@@ -145,17 +198,7 @@ const ScanItems = () => {
     navigate('/locations');
   };
 
-  // Handle location change - always allowed
-  const handleLocationChange = (newLocationId) => {
-    setSelectedLocationId(newLocationId);
-    setBarcodeInput('');
-    setLastScanResult(null);
-  };
-
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Filter out submitted locations from dropdown
-  const availableLocations = locations.filter(l => !l.isSubmitted);
 
   return (
     <div className="space-y-6">
@@ -163,7 +206,7 @@ const ScanItems = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Scan Items</h1>
-          <p className="text-slate-500 mt-1">Scan barcodes to count inventory</p>
+          <p className="text-slate-500 mt-1">Scan location code first, then scan product barcodes</p>
         </div>
         {selectedLocationId && !isLocationLocked && locationItems.length > 0 && (
           <Button
@@ -176,83 +219,104 @@ const ScanItems = () => {
         )}
       </div>
 
-      {/* Location Selection & Barcode Input */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Location Selection */}
-        <Card className="border-0 shadow-sm">
+      {/* Location & Barcode Scanner */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Location Scanner */}
+        <Card className={`border-0 shadow-sm ${selectedLocationId ? 'bg-emerald-50/50' : ''}`}>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <MapPin className="w-4 h-4 text-emerald-600" />
-              Select Location
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedLocationId} onValueChange={handleLocationChange}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Choose a location" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {selectedLocation?.isSubmitted && (
-              <div className="mt-3 p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-sm text-amber-700">
-                <Lock className="w-4 h-4" />
-                This location is locked
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Barcode Input - Auto Entry */}
-        <Card className="lg:col-span-2 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ScanBarcode className="w-4 h-4 text-emerald-600" />
-              Barcode Scanner
+              Scan Location
               {selectedLocationId && (
-                <Badge variant="secondary" className="ml-2">
-                  Ready to scan
+                <Badge className="bg-emerald-100 text-emerald-700 border-0 ml-2">
+                  Selected
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <Label htmlFor="barcode" className="text-sm text-slate-600 mb-1.5 block">
-                  Scan or type barcode (Press Enter to add)
-                </Label>
-                <Input
-                  id="barcode"
-                  ref={barcodeInputRef}
-                  placeholder="Scan barcode here..."
-                  value={barcodeInput}
-                  onChange={handleBarcodeChange}
-                  onKeyDown={handleBarcodeKeyDown}
-                  disabled={!selectedLocationId || isLocationLocked}
-                  className="h-14 text-xl font-mono tracking-wider"
-                  autoComplete="off"
-                />
+            <Label className="text-sm text-slate-600 mb-1.5 block">
+              Scan location code (e.g., WH-A1)
+            </Label>
+            <div className="relative">
+              <Input
+                ref={locationInputRef}
+                placeholder="Scan location code here..."
+                value={locationInput}
+                onChange={(e) => {
+                  setLocationInput(e.target.value);
+                  setLocationError('');
+                }}
+                onKeyDown={handleLocationKeyDown}
+                className={`h-12 text-lg font-mono pr-10 ${selectedLocationId ? 'bg-emerald-50 border-emerald-300' : ''}`}
+                autoComplete="off"
+              />
+              {selectedLocationId && (
+                <button
+                  onClick={clearLocation}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            
+            {locationError && (
+              <div className="mt-2 p-2 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {locationError}
               </div>
+            )}
+            
+            {selectedLocation && (
+              <div className="mt-3 p-3 bg-emerald-100 rounded-lg">
+                <p className="font-medium text-emerald-800">{selectedLocation.name}</p>
+                <p className="text-sm text-emerald-600">Code: {selectedLocation.code}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Barcode Scanner */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ScanBarcode className="w-4 h-4 text-emerald-600" />
+              Scan Barcode
+              {selectedLocationId && (
+                <Badge variant="secondary" className="ml-2">
+                  Ready
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Label className="text-sm text-slate-600 mb-1.5 block">
+              Scan product barcode (auto-adds on scan)
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                ref={barcodeInputRef}
+                placeholder={selectedLocationId ? "Scan barcode here..." : "Select location first"}
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                onKeyDown={handleBarcodeKeyDown}
+                disabled={!selectedLocationId || isLocationLocked}
+                className="h-12 text-lg font-mono flex-1"
+                autoComplete="off"
+              />
               <Button
                 onClick={handleScan}
                 disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
-                className="h-14 px-8 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                <Plus className="w-5 h-5 mr-2" />
-                Add
+                <Plus className="w-5 h-5" />
               </Button>
             </div>
 
             {/* Last Scan Result */}
             {lastScanResult && (
-              <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
+              <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
                 lastScanResult.success 
                   ? lastScanResult.isValid 
                     ? 'bg-emerald-50 text-emerald-700' 
@@ -272,7 +336,7 @@ const ScanItems = () => {
                   <p className="text-sm font-medium">
                     {lastScanResult.success 
                       ? lastScanResult.isValid 
-                        ? 'Item added successfully' 
+                        ? 'Added successfully' 
                         : 'Non-master item added'
                       : lastScanResult.error}
                   </p>
@@ -281,10 +345,11 @@ const ScanItems = () => {
               </div>
             )}
 
-            {!selectedLocationId && (
-              <p className="mt-3 text-sm text-slate-500">
-                Please select a location first to start scanning
-              </p>
+            {isLocationLocked && (
+              <div className="mt-3 p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-sm text-amber-700">
+                <Lock className="w-4 h-4" />
+                This location is submitted and locked
+              </div>
             )}
           </CardContent>
         </Card>
@@ -309,7 +374,8 @@ const ScanItems = () => {
           {!selectedLocationId ? (
             <div className="text-center py-12">
               <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">Select a location to view scanned items</p>
+              <p className="text-slate-500">Scan a location code to view items</p>
+              <p className="text-sm text-slate-400 mt-1">e.g., WH-A1, WH-B-CS, RT-SF</p>
             </div>
           ) : locationItems.length === 0 ? (
             <div className="text-center py-12">
