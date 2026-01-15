@@ -285,6 +285,8 @@ export const AppProvider = ({ children }) => {
     addLocation,
     deleteLocation,
     findLocationByCode,
+    scanLocation,
+    createLocationFromScan,
     addMasterProduct,
     importMasterProducts,
     playSound
