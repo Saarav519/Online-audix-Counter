@@ -65,6 +65,8 @@ export const AppProvider = ({ children }) => {
     if (foundUser) {
       setUser(foundUser);
       setIsAuthenticated(true);
+      localStorage.setItem('audix_user', JSON.stringify(foundUser));
+      localStorage.setItem('audix_authenticated', 'true');
       return { success: true, user: foundUser };
     }
     return { success: false, error: 'Invalid credentials' };
@@ -74,6 +76,8 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
+    localStorage.removeItem('audix_user');
+    localStorage.removeItem('audix_authenticated');
   };
 
   // Add scanned item to location
