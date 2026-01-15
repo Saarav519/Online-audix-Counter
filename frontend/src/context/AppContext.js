@@ -12,8 +12,14 @@ export const useApp = () => {
 };
 
 export const AppProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Initialize state from localStorage if available
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('audix_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('audix_authenticated') === 'true';
+  });
   const [locations, setLocations] = useState(mockLocations);
   const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
   const [scannedItems, setScannedItems] = useState(mockScannedItems);
