@@ -204,6 +204,45 @@ export const AppProvider = ({ children }) => {
     );
   };
 
+  // Auto-create location from scanned code (for dynamic mode)
+  const createLocationFromScan = (scannedCode) => {
+    const newLocation = {
+      id: `loc_${Date.now()}`,
+      name: scannedCode,
+      code: scannedCode,
+      status: 'active',
+      itemCount: 0,
+      isCompleted: false,
+      isSubmitted: false,
+      lastUpdated: new Date().toISOString(),
+      autoCreated: true
+    };
+    setLocations(prev => [...prev, newLocation]);
+    setScannedItems(prev => ({ ...prev, [newLocation.id]: [] }));
+    return newLocation;
+  };
+
+  // Scan location - handles both pre-assigned and dynamic modes
+  const scanLocation = (scannedCode) => {
+    const existingLocation = findLocationByCode(scannedCode);
+    
+    if (existingLocation) {
+      if (existingLocation.isSubmitted) {
+        return { success: false, error: 'This location is submitted and locked', location: null };
+      }
+      return { success: true, location: existingLocation, isNew: false };
+    }
+    
+    // Location not found
+    if (settings.locationScanMode === 'preassigned') {
+      return { success: false, error: `Location "${scannedCode}" not found. Only pre-assigned locations can be scanned.`, location: null };
+    }
+    
+    // Dynamic mode - create new location
+    const newLocation = createLocationFromScan(scannedCode);
+    return { success: true, location: newLocation, isNew: true };
+  };
+
   // Add product to master list
   const addMasterProduct = (productData) => {
     const newProduct = {
