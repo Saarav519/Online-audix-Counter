@@ -34,7 +34,8 @@ import {
   MapPin,
   Save,
   X,
-  Sparkles
+  Sparkles,
+  Hash
 } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 
@@ -56,6 +57,7 @@ const ScanItems = () => {
   const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get('location') || '');
   const [locationInput, setLocationInput] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [quantityInput, setQuantityInput] = useState('1');
   const [lastScanResult, setLastScanResult] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState(null);
@@ -65,10 +67,15 @@ const ScanItems = () => {
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
+  const quantityInputRef = useRef(null);
 
   const selectedLocation = locations.find(l => l.id === selectedLocationId);
   const locationItems = scannedItems[selectedLocationId] || [];
   const isLocationLocked = selectedLocation?.isSubmitted;
+
+  // Single SKU mode: scanning only, no manual qty
+  // Non-Single SKU mode: manual qty entry allowed
+  const isSingleSkuMode = settings.singleSkuScanning;
 
   // Auto-focus location input on mount if no location selected
   useEffect(() => {
@@ -90,6 +97,13 @@ const ScanItems = () => {
       setLocationInput(selectedLocation.code);
     }
   }, [selectedLocation]);
+
+  // Reset quantity input when mode changes
+  useEffect(() => {
+    if (isSingleSkuMode) {
+      setQuantityInput('1');
+    }
+  }, [isSingleSkuMode]);
 
   // Handle location scan/input
   const handleLocationKeyDown = (e) => {
@@ -151,15 +165,25 @@ const ScanItems = () => {
   const handleScan = () => {
     if (!barcodeInput.trim() || !selectedLocationId) return;
     
-    const result = addScannedItem(selectedLocationId, barcodeInput.trim(), 1);
+    // In Single SKU mode, always add quantity of 1
+    // In Non-Single SKU mode, use the quantity input value
+    const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
+    
+    const result = addScannedItem(selectedLocationId, barcodeInput.trim(), qty);
     
     setLastScanResult({
       barcode: barcodeInput,
+      quantity: qty,
       ...result
     });
     
     // Clear barcode input immediately after scan
     setBarcodeInput('');
+    
+    // Reset quantity to 1 after adding (for non-single SKU mode)
+    if (!isSingleSkuMode) {
+      setQuantityInput('1');
+    }
     
     // Clear result after 3 seconds
     setTimeout(() => setLastScanResult(null), 3000);
@@ -176,6 +200,8 @@ const ScanItems = () => {
   };
 
   const handleQuantityUpdate = (itemId) => {
+    if (isSingleSkuMode) return; // No manual editing in single SKU mode
+    
     const newQty = parseInt(editQuantity);
     if (newQty > 0) {
       updateItemQuantity(selectedLocationId, itemId, newQty);
@@ -185,10 +211,12 @@ const ScanItems = () => {
   };
 
   const handleQuantityIncrement = (itemId, currentQty) => {
+    if (isSingleSkuMode) return; // No manual editing in single SKU mode
     updateItemQuantity(selectedLocationId, itemId, currentQty + 1);
   };
 
   const handleQuantityDecrement = (itemId, currentQty) => {
+    if (isSingleSkuMode) return; // No manual editing in single SKU mode
     if (currentQty > 1) {
       updateItemQuantity(selectedLocationId, itemId, currentQty - 1);
     }
@@ -218,7 +246,7 @@ const ScanItems = () => {
               : 'Scan pre-assigned location codes only'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Badge 
             variant="outline" 
             className={`${settings.locationScanMode === 'dynamic' 
@@ -226,6 +254,14 @@ const ScanItems = () => {
               : 'bg-blue-50 text-blue-700 border-blue-200'}`}
           >
             {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
+          </Badge>
+          <Badge 
+            variant="outline" 
+            className={`${isSingleSkuMode 
+              ? 'bg-orange-50 text-orange-700 border-orange-200' 
+              : 'bg-teal-50 text-teal-700 border-teal-200'}`}
+          >
+            {isSingleSkuMode ? 'Single SKU (Scan Only)' : 'Manual Qty Entry'}
           </Badge>
           {selectedLocationId && !isLocationLocked && locationItems.length > 0 && (
             <Button
@@ -326,66 +362,144 @@ const ScanItems = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Label className="text-sm text-slate-600 mb-1.5 block">
-              Scan product barcode (auto-adds on scan)
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                ref={barcodeInputRef}
-                placeholder={selectedLocationId ? "Scan barcode here..." : "Select location first"}
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                onKeyDown={handleBarcodeKeyDown}
-                disabled={!selectedLocationId || isLocationLocked}
-                className="h-12 text-lg font-mono flex-1"
-                autoComplete="off"
-              />
-              <Button
-                onClick={handleScan}
-                disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
-                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {/* Last Scan Result */}
-            {lastScanResult && (
-              <div className={`mt-3 p-3 rounded-lg flex items-center gap-2 ${
-                lastScanResult.success 
-                  ? lastScanResult.isValid 
-                    ? 'bg-emerald-50 text-emerald-700' 
-                    : 'bg-amber-50 text-amber-700'
-                  : 'bg-red-50 text-red-700'
-              }`}>
-                {lastScanResult.success ? (
-                  lastScanResult.isValid ? (
-                    <CheckCircle2 className="w-5 h-5" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5" />
-                  )
-                ) : (
-                  <AlertCircle className="w-5 h-5" />
-                )}
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    {lastScanResult.success 
-                      ? lastScanResult.isValid 
-                        ? 'Added successfully' 
-                        : 'Non-master item added'
-                      : lastScanResult.error}
-                  </p>
-                  <p className="text-xs opacity-75 font-mono">{lastScanResult.barcode}</p>
+            <div className="space-y-4">
+              {/* Barcode Input */}
+              <div>
+                <Label className="text-sm text-slate-600 mb-1.5 block">
+                  {isSingleSkuMode 
+                    ? 'Scan barcode (each scan = 1 unit)'
+                    : 'Scan barcode, then enter quantity'}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    ref={barcodeInputRef}
+                    placeholder={selectedLocationId ? "Scan barcode here..." : "Select location first"}
+                    value={barcodeInput}
+                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onKeyDown={handleBarcodeKeyDown}
+                    disabled={!selectedLocationId || isLocationLocked}
+                    className="h-12 text-lg font-mono flex-1"
+                    autoComplete="off"
+                  />
                 </div>
               </div>
-            )}
 
-            {isLocationLocked && (
-              <div className="mt-3 p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-sm text-amber-700">
-                <Lock className="w-4 h-4" />
-                This location is submitted and locked
-              </div>
-            )}
+              {/* Quantity Input - Only shown when Single SKU mode is OFF */}
+              {!isSingleSkuMode && (
+                <div className={`p-4 rounded-xl border-2 border-dashed ${
+                  selectedLocationId && barcodeInput 
+                    ? 'border-teal-300 bg-teal-50' 
+                    : 'border-slate-200 bg-slate-50'
+                }`}>
+                  <Label className="text-sm font-medium text-slate-700 mb-2 block flex items-center gap-2">
+                    <Hash className="w-4 h-4" />
+                    Enter Quantity (Manual Entry)
+                  </Label>
+                  <div className="flex gap-2 items-center">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setQuantityInput(String(Math.max(1, parseInt(quantityInput) - 1)))}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-10 w-10"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <Input
+                      ref={quantityInputRef}
+                      type="number"
+                      min="1"
+                      value={quantityInput}
+                      onChange={(e) => setQuantityInput(e.target.value)}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-10 text-center text-lg font-bold w-24"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setQuantityInput(String(parseInt(quantityInput) + 1))}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-10 w-10"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      onClick={handleScan}
+                      disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                      className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white ml-2"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    Scan barcode once, enter quantity, then click Add
+                  </p>
+                </div>
+              )}
+
+              {/* Add button for Single SKU mode */}
+              {isSingleSkuMode && (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleScan}
+                    disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                    className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <ScanBarcode className="w-5 h-5 mr-2" />
+                    Add (Qty: 1)
+                  </Button>
+                </div>
+              )}
+
+              {/* Mode Info */}
+              {isSingleSkuMode && (
+                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <p className="text-sm text-orange-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <strong>Single SKU Mode:</strong> Each scan adds exactly 1 unit. Manual quantity entry is disabled.
+                  </p>
+                </div>
+              )}
+
+              {/* Last Scan Result */}
+              {lastScanResult && (
+                <div className={`p-3 rounded-lg flex items-center gap-2 ${
+                  lastScanResult.success 
+                    ? lastScanResult.isValid 
+                      ? 'bg-emerald-50 text-emerald-700' 
+                      : 'bg-amber-50 text-amber-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {lastScanResult.success ? (
+                    lastScanResult.isValid ? (
+                      <CheckCircle2 className="w-5 h-5" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5" />
+                    )
+                  ) : (
+                    <AlertCircle className="w-5 h-5" />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">
+                      {lastScanResult.success 
+                        ? lastScanResult.isValid 
+                          ? `Added ${lastScanResult.quantity} unit(s) successfully` 
+                          : `Non-master item added (${lastScanResult.quantity} unit(s))`
+                        : lastScanResult.error}
+                    </p>
+                    <p className="text-xs opacity-75 font-mono">{lastScanResult.barcode}</p>
+                  </div>
+                </div>
+              )}
+
+              {isLocationLocked && (
+                <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-sm text-amber-700">
+                  <Lock className="w-4 h-4" />
+                  This location is submitted and locked
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -420,7 +534,11 @@ const ScanItems = () => {
             <div className="text-center py-12">
               <ScanBarcode className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">No items scanned yet</p>
-              <p className="text-sm text-slate-400 mt-1">Scan a barcode to add items</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {isSingleSkuMode 
+                  ? 'Scan a barcode to add 1 unit at a time'
+                  : 'Scan a barcode and enter quantity to add items'}
+              </p>
             </div>
           ) : (
             <ScrollArea className="h-[400px]">
@@ -442,54 +560,62 @@ const ScanItems = () => {
                         <p className="font-medium">{item.productName}</p>
                       </TableCell>
                       <TableCell className="text-center">
-                        {editingItemId === item.id ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editQuantity}
-                              onChange={(e) => setEditQuantity(e.target.value)}
-                              className="w-20 h-8 text-center"
-                              autoFocus
-                              onKeyPress={(e) => e.key === 'Enter' && handleQuantityUpdate(item.id)}
-                              onBlur={() => handleQuantityUpdate(item.id)}
-                            />
-                          </div>
+                        {/* In Single SKU mode, show quantity as read-only */}
+                        {isSingleSkuMode ? (
+                          <span className="font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded">
+                            {item.quantity}
+                          </span>
                         ) : (
-                          <div className="flex items-center justify-center gap-2">
-                            {!isLocationLocked && (
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleQuantityDecrement(item.id, item.quantity)}
-                                disabled={item.quantity <= 1}
+                          // In Non-Single SKU mode, allow editing
+                          editingItemId === item.id ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={editQuantity}
+                                onChange={(e) => setEditQuantity(e.target.value)}
+                                className="w-20 h-8 text-center"
+                                autoFocus
+                                onKeyPress={(e) => e.key === 'Enter' && handleQuantityUpdate(item.id)}
+                                onBlur={() => handleQuantityUpdate(item.id)}
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2">
+                              {!isLocationLocked && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleQuantityDecrement(item.id, item.quantity)}
+                                  disabled={item.quantity <= 1}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                              )}
+                              <span 
+                                className={`font-medium min-w-[40px] text-center ${!isLocationLocked ? 'cursor-pointer hover:text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded' : ''}`}
+                                onClick={() => {
+                                  if (!isLocationLocked) {
+                                    setEditingItemId(item.id);
+                                    setEditQuantity(String(item.quantity));
+                                  }
+                                }}
                               >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                            )}
-                            <span 
-                              className={`font-medium min-w-[40px] text-center ${!isLocationLocked ? 'cursor-pointer hover:text-emerald-600' : ''}`}
-                              onClick={() => {
-                                if (!isLocationLocked) {
-                                  setEditingItemId(item.id);
-                                  setEditQuantity(String(item.quantity));
-                                }
-                              }}
-                            >
-                              {item.quantity}
-                            </span>
-                            {!isLocationLocked && (
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleQuantityIncrement(item.id, item.quantity)}
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
+                                {item.quantity}
+                              </span>
+                              {!isLocationLocked && (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleQuantityIncrement(item.id, item.quantity)}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
+                          )
                         )}
                       </TableCell>
                       <TableCell className="text-center">
