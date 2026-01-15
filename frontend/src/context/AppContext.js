@@ -244,8 +244,14 @@ export const AppProvider = ({ children }) => {
     const existingLocation = findLocationByCode(scannedCode);
     
     if (existingLocation) {
+      // Check if location is submitted/locked
       if (existingLocation.isSubmitted) {
-        return { success: false, error: 'This location is submitted and locked', location: null };
+        return { 
+          success: false, 
+          error: `Location "${existingLocation.name}" is already scanned and completed. Manual authorization required to reopen.`, 
+          location: null,
+          isLocked: true 
+        };
       }
       return { success: true, location: existingLocation, isNew: false };
     }
