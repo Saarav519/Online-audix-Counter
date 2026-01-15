@@ -69,14 +69,27 @@ const Locations = () => {
   
   const fileInputRef = useRef(null);
 
-  const filteredLocations = locations.filter(
+  const isPreAssignedMode = settings.locationScanMode === 'preassigned';
+
+  // Filter locations based on current mode
+  const modeFilteredLocations = locations.filter(loc => {
+    if (isPreAssignedMode) {
+      // In Pre-Assigned mode, show only assigned/imported locations
+      return loc.isAssigned === true;
+    } else {
+      // In Dynamic mode, show only dynamic/auto-created locations
+      return loc.autoCreated === true || loc.isAssigned === false;
+    }
+  });
+
+  const filteredLocations = modeFilteredLocations.filter(
     loc =>
       loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loc.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const assignedLocationsCount = locations.filter(loc => loc.isAssigned).length;
-  const isPreAssignedMode = settings.locationScanMode === 'preassigned';
+  const dynamicLocationsCount = locations.filter(loc => loc.autoCreated || !loc.isAssigned).length;
 
   const handleAddLocation = () => {
     if (newLocation.name && newLocation.code) {
