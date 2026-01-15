@@ -268,12 +268,23 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Find location by code (for scanner auto-select)
+  // Find location by code (for scanner auto-select) - respects mode separation
   const findLocationByCode = (code) => {
-    return locations.find(l => 
-      l.code.toLowerCase() === code.toLowerCase() || 
-      l.name.toLowerCase().includes(code.toLowerCase())
-    );
+    return locations.find(l => {
+      const codeMatch = l.code.toLowerCase() === code.toLowerCase() || 
+                        l.name.toLowerCase().includes(code.toLowerCase());
+      
+      if (!codeMatch) return false;
+      
+      // Check mode separation
+      if (settings.locationScanMode === 'preassigned') {
+        // In Pre-Assigned mode, only find assigned locations
+        return l.isAssigned === true;
+      } else {
+        // In Dynamic mode, only find dynamic/non-assigned locations
+        return l.autoCreated === true || l.isAssigned === false;
+      }
+    });
   };
 
   // Auto-create location from scanned code (for dynamic mode)
@@ -286,8 +297,9 @@ export const AppProvider = ({ children }) => {
       itemCount: 0,
       isCompleted: false,
       isSubmitted: false,
-      lastUpdated: new Date().toISOString(),
-      autoCreated: true
+      isAssigned: false, // Dynamic locations are not assigned
+      autoCreated: true, // Mark as auto-created for dynamic mode
+      lastUpdated: new Date().toISOString()
     };
     setLocations(prev => [...prev, newLocation]);
     setScannedItems(prev => ({ ...prev, [newLocation.id]: [] }));
