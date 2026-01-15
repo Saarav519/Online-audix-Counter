@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Switch } from '../components/ui/switch';
 import { Separator } from '../components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,10 @@ import {
   User,
   Save,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MapPin,
+  Sparkles,
+  Shield
 } from 'lucide-react';
 
 const Settings = () => {
@@ -107,6 +111,66 @@ const Settings = () => {
               Change Credentials
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Location Scanning Mode */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            Location Scanning Mode
+          </CardTitle>
+          <CardDescription>Choose how location scanning works</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <RadioGroup 
+            value={settings.locationScanMode} 
+            onValueChange={(value) => handleSettingChange('locationScanMode', value)}
+            className="space-y-4"
+          >
+            <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
+              settings.locationScanMode === 'preassigned' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-slate-200 hover:border-slate-300'
+            }`}>
+              <RadioGroupItem value="preassigned" id="preassigned" className="mt-1" />
+              <div className="flex-1">
+                <Label htmlFor="preassigned" className="flex items-center gap-2 text-base font-medium cursor-pointer">
+                  <Shield className="w-5 h-5 text-blue-600" />
+                  Pre-Assigned Location Mode
+                </Label>
+                <p className="text-sm text-slate-500 mt-1">
+                  Only scan locations that are already imported/created in the system. 
+                  New location codes will be rejected with an error.
+                </p>
+                <div className="mt-2 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block">
+                  Best for: Controlled inventory with predefined zones
+                </div>
+              </div>
+            </div>
+
+            <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
+              settings.locationScanMode === 'dynamic' 
+                ? 'border-purple-500 bg-purple-50' 
+                : 'border-slate-200 hover:border-slate-300'
+            }`}>
+              <RadioGroupItem value="dynamic" id="dynamic" className="mt-1" />
+              <div className="flex-1">
+                <Label htmlFor="dynamic" className="flex items-center gap-2 text-base font-medium cursor-pointer">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  Dynamic Location Mode
+                </Label>
+                <p className="text-sm text-slate-500 mt-1">
+                  Scan any location code - if it doesn't exist, it will be automatically 
+                  created and added to the location list.
+                </p>
+                <div className="mt-2 text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded inline-block">
+                  Best for: Flexible scanning where locations are created on-the-fly
+                </div>
+              </div>
+            </div>
+          </RadioGroup>
         </CardContent>
       </Card>
 
