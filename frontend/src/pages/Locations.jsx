@@ -24,7 +24,6 @@ import {
   CheckCircle2,
   Clock,
   MoreVertical,
-  Edit,
   Trash2,
   AlertTriangle
 } from 'lucide-react';
@@ -32,14 +31,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
 const Locations = () => {
-  const { locations, scannedItems, addLocation, submitLocation, reopenLocation, isAuthenticated, login, user } = useApp();
+  const { locations, scannedItems, addLocation, deleteLocation, submitLocation, reopenLocation, login } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [newLocation, setNewLocation] = useState({ name: '', code: '' });
@@ -66,10 +67,21 @@ const Locations = () => {
     setShowReopenModal(true);
   };
 
+  const handleDeleteRequest = (location) => {
+    setSelectedLocation(location);
+    setShowDeleteModal(true);
+  };
+
   const handleReopenConfirm = () => {
     setShowReopenModal(false);
     setPendingAction({ type: 'reopen', locationId: selectedLocation.id });
     setShowAuthModal(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    deleteLocation(selectedLocation.id);
+    setShowDeleteModal(false);
+    setSelectedLocation(null);
   };
 
   const handleAuthSubmit = () => {
@@ -191,6 +203,14 @@ const Locations = () => {
                             Submit & Lock
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteRequest(location)}
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete Location
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -261,13 +281,14 @@ const Locations = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="code">Location Code</Label>
+              <Label htmlFor="code">Location Code (for scanning)</Label>
               <Input
                 id="code"
                 placeholder="e.g., WH-A1"
                 value={newLocation.code}
                 onChange={(e) => setNewLocation({ ...newLocation, code: e.target.value })}
               />
+              <p className="text-xs text-slate-500">This code will be used to scan and select this location</p>
             </div>
           </div>
           <DialogFooter>
@@ -276,6 +297,44 @@ const Locations = () => {
             </Button>
             <Button onClick={handleAddLocation} className="bg-emerald-600 hover:bg-emerald-700">
               Add Location
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Delete Location?
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently delete the location and all its scanned items. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="p-4 bg-red-50 rounded-lg">
+              <p className="font-medium text-slate-800">{selectedLocation?.name}</p>
+              <p className="text-sm text-slate-500">Code: {selectedLocation?.code}</p>
+              {selectedLocation && (
+                <p className="text-sm text-red-600 mt-2">
+                  {getLocationStats(selectedLocation.id).totalItems} items will be deleted
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteConfirm} 
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Location
             </Button>
           </DialogFooter>
         </DialogContent>
