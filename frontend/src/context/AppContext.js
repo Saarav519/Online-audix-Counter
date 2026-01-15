@@ -210,11 +210,52 @@ export const AppProvider = ({ children }) => {
       itemCount: 0,
       isCompleted: false,
       isSubmitted: false,
+      isAssigned: false, // Manual locations are not assigned
       lastUpdated: new Date().toISOString()
     };
     setLocations(prev => [...prev, newLocation]);
     setScannedItems(prev => ({ ...prev, [newLocation.id]: [] }));
     return newLocation;
+  };
+
+  // Import assigned locations (for Pre-Assigned mode)
+  const importAssignedLocations = (locationsData) => {
+    const newLocations = locationsData.map((loc, index) => ({
+      id: `loc_import_${Date.now()}_${index}`,
+      name: loc.name || loc.code,
+      code: loc.code,
+      status: 'active',
+      itemCount: 0,
+      isCompleted: false,
+      isSubmitted: false,
+      isAssigned: true, // Imported locations are assigned
+      lastUpdated: new Date().toISOString()
+    }));
+    
+    setLocations(prev => [...prev, ...newLocations]);
+    
+    // Initialize empty scanned items for each new location
+    setScannedItems(prev => {
+      const newItems = { ...prev };
+      newLocations.forEach(loc => {
+        newItems[loc.id] = [];
+      });
+      return newItems;
+    });
+    
+    return newLocations.length;
+  };
+
+  // Clear all assigned locations (for re-import)
+  const clearAssignedLocations = () => {
+    setLocations(prev => prev.filter(loc => !loc.isAssigned));
+    setScannedItems(prev => {
+      const newItems = { ...prev };
+      locations.filter(loc => loc.isAssigned).forEach(loc => {
+        delete newItems[loc.id];
+      });
+      return newItems;
+    });
   };
 
   // Delete location
