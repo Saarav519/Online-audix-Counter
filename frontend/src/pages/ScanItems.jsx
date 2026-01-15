@@ -33,7 +33,8 @@ import {
   Package,
   MapPin,
   Save,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 
@@ -48,7 +49,7 @@ const ScanItems = () => {
     deleteScannedItem,
     updateItemQuantity,
     submitLocation,
-    findLocationByCode,
+    scanLocation,
     playSound
   } = useApp();
 
@@ -60,6 +61,7 @@ const ScanItems = () => {
   const [editingItemId, setEditingItemId] = useState(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [locationError, setLocationError] = useState('');
+  const [locationSuccess, setLocationSuccess] = useState(null);
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
@@ -85,7 +87,7 @@ const ScanItems = () => {
   // Update location input display when location is selected
   useEffect(() => {
     if (selectedLocation) {
-      setLocationInput(`${selectedLocation.name} (${selectedLocation.code})`);
+      setLocationInput(selectedLocation.code);
     }
   }, [selectedLocation]);
 
@@ -100,18 +102,20 @@ const ScanItems = () => {
     const input = locationInput.trim();
     if (!input) return;
 
-    const foundLocation = findLocationByCode(input);
+    const result = scanLocation(input);
     
-    if (foundLocation) {
-      if (foundLocation.isSubmitted) {
-        setLocationError('This location is submitted and locked');
-        playSound(false);
-        return;
-      }
-      setSelectedLocationId(foundLocation.id);
-      setLocationInput(`${foundLocation.name} (${foundLocation.code})`);
+    if (result.success) {
+      setSelectedLocationId(result.location.id);
+      setLocationInput(result.location.code);
       setLocationError('');
       playSound(true);
+      
+      if (result.isNew) {
+        setLocationSuccess(`New location "${input}" created automatically`);
+        setTimeout(() => setLocationSuccess(null), 4000);
+      } else {
+        setLocationSuccess(null);
+      }
       
       // Focus barcode input after location is selected
       setTimeout(() => {
@@ -120,7 +124,8 @@ const ScanItems = () => {
         }
       }, 100);
     } else {
-      setLocationError(`Location "${input}" not found`);
+      setLocationError(result.error);
+      setLocationSuccess(null);
       playSound(false);
     }
   };
@@ -130,6 +135,7 @@ const ScanItems = () => {
     setSelectedLocationId('');
     setLocationInput('');
     setLocationError('');
+    setLocationSuccess(null);
     if (locationInputRef.current) {
       locationInputRef.current.focus();
     }
@@ -206,17 +212,31 @@ const ScanItems = () => {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Scan Items</h1>
-          <p className="text-slate-500 mt-1">Scan location code first, then scan product barcodes</p>
+          <p className="text-slate-500 mt-1">
+            {settings.locationScanMode === 'dynamic' 
+              ? 'Scan any location code - new locations will be created automatically'
+              : 'Scan pre-assigned location codes only'}
+          </p>
         </div>
-        {selectedLocationId && !isLocationLocked && locationItems.length > 0 && (
-          <Button
-            onClick={handleSubmitLocation}
-            className="bg-emerald-600 hover:bg-emerald-700"
+        <div className="flex items-center gap-3">
+          <Badge 
+            variant="outline" 
+            className={`${settings.locationScanMode === 'dynamic' 
+              ? 'bg-purple-50 text-purple-700 border-purple-200' 
+              : 'bg-blue-50 text-blue-700 border-blue-200'}`}
           >
-            <Save className="w-4 h-4 mr-2" />
-            Submit Location
-          </Button>
-        )}
+            {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
+          </Badge>
+          {selectedLocationId && !isLocationLocked && locationItems.length > 0 && (
+            <Button
+              onClick={handleSubmitLocation}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Submit Location
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Location & Barcode Scanner */}
@@ -232,11 +252,19 @@ const ScanItems = () => {
                   Selected
                 </Badge>
               )}
+              {selectedLocation?.autoCreated && (
+                <Badge className="bg-purple-100 text-purple-700 border-0 ml-1">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Auto-Created
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Label className="text-sm text-slate-600 mb-1.5 block">
-              Scan location code (e.g., WH-A1)
+              {settings.locationScanMode === 'dynamic' 
+                ? 'Scan any location code (auto-creates if new)'
+                : 'Scan pre-assigned location code'}
             </Label>
             <div className="relative">
               <Input
@@ -263,8 +291,15 @@ const ScanItems = () => {
             
             {locationError && (
               <div className="mt-2 p-2 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {locationError}
+              </div>
+            )}
+            
+            {locationSuccess && (
+              <div className="mt-2 p-2 bg-purple-50 text-purple-700 text-sm rounded-lg flex items-center gap-2">
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                {locationSuccess}
               </div>
             )}
             
@@ -375,7 +410,11 @@ const ScanItems = () => {
             <div className="text-center py-12">
               <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">Scan a location code to view items</p>
-              <p className="text-sm text-slate-400 mt-1">e.g., WH-A1, WH-B-CS, RT-SF</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {settings.locationScanMode === 'dynamic' 
+                  ? 'Any location code will work - new ones are created automatically'
+                  : 'Only pre-assigned location codes are allowed'}
+              </p>
             </div>
           ) : locationItems.length === 0 ? (
             <div className="text-center py-12">
