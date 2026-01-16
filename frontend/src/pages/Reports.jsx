@@ -143,6 +143,8 @@ const Reports = () => {
   };
 
   const handleExportCSV = () => {
+    if (reportItems.length === 0) return;
+    
     const headers = ['Location', 'Barcode', 'Product Name', 'SKU', 'Category', 'Price', 'Quantity', 'Scanned At', 'Status'];
     const rows = reportItems.map(item => {
       const masterProduct = getMasterProductDetails(item.barcode);
@@ -165,7 +167,10 @@ const Reports = () => {
     a.href = url;
     const selectionSuffix = isAllSelected ? 'all_locations' : `${selectedLocations.length}_locations`;
     a.download = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
