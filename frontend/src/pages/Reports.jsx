@@ -104,8 +104,11 @@ const Reports = () => {
 
   // Get display text for selected locations
   const getSelectionDisplayText = () => {
-    if (selectedLocations.includes('all') || selectedLocations.length === 0) {
+    if (selectedLocations.includes('all')) {
       return 'All Locations';
+    }
+    if (selectedLocations.length === 0) {
+      return 'Select Locations';
     }
     if (selectedLocations.length === 1) {
       const loc = locations.find(l => l.id === selectedLocations[0]);
