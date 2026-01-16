@@ -247,99 +247,109 @@ COLD-01,Cold Storage Unit 1`;
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[500px]">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50">
-                <TableHead className="w-[50px]">#</TableHead>
-                <TableHead>Location Code</TableHead>
-                <TableHead>Location Name</TableHead>
-                <TableHead className="text-center">Items</TableHead>
-                <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLocations.map((location, index) => {
-                const stats = getLocationStats(location.id);
-                return (
-                  <TableRow 
-                    key={location.id} 
-                    className={`hover:bg-slate-50 ${location.isSubmitted ? 'bg-emerald-50/30' : ''}`}
-                  >
-                    <TableCell className="font-medium text-slate-500">
-                      {index + 1}
-                    </TableCell>
-                    <TableCell className="font-mono font-medium">
-                      {location.code}
-                    </TableCell>
-                    <TableCell>{location.name}</TableCell>
-                    <TableCell className="text-center">{stats.totalItems}</TableCell>
-                    <TableCell className="text-center font-medium">{stats.totalQuantity}</TableCell>
-                    <TableCell className="text-center">
-                      {location.isSubmitted ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-0">
-                          <Lock className="w-3 h-3 mr-1" />
-                          Completed
-                        </Badge>
-                      ) : stats.totalItems > 0 ? (
-                        <Badge className="bg-amber-100 text-amber-700 border-0">
-                          <Clock className="w-3 h-3 mr-1" />
-                          In Progress
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-slate-100 text-slate-600 border-0">
-                          Pending
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleOpenLocation(location)}
-                          className={location.isSubmitted 
-                            ? "bg-amber-500 hover:bg-amber-600" 
-                            : "bg-emerald-600 hover:bg-emerald-700"
-                          }
-                        >
-                          {location.isSubmitted ? (
-                            <>
-                              <Unlock className="w-3 h-3 mr-1" />
-                              Reopen
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="w-3 h-3 mr-1" />
-                              Open
-                            </>
-                          )}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteRequest(location)}
-                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+        {/* Outer container with vertical scroll */}
+        <div 
+          className="overflow-y-auto overflow-x-auto" 
+          style={{ 
+            maxHeight: '500px', 
+            WebkitOverflowScrolling: 'touch' 
+          }}
+        >
+          {/* Inner container with minimum width for horizontal scroll */}
+          <div style={{ minWidth: '800px' }}>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-slate-50">
+                  <TableHead className="w-[50px] sticky top-0 bg-slate-50 z-10">#</TableHead>
+                  <TableHead className="sticky top-0 bg-slate-50 z-10">Location Code</TableHead>
+                  <TableHead className="sticky top-0 bg-slate-50 z-10">Location Name</TableHead>
+                  <TableHead className="text-center sticky top-0 bg-slate-50 z-10">Items</TableHead>
+                  <TableHead className="text-center sticky top-0 bg-slate-50 z-10">Qty</TableHead>
+                  <TableHead className="text-center sticky top-0 bg-slate-50 z-10">Status</TableHead>
+                  <TableHead className="text-right sticky top-0 bg-slate-50 z-10">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLocations.map((location, index) => {
+                  const stats = getLocationStats(location.id);
+                  return (
+                    <TableRow 
+                      key={location.id} 
+                      className={`hover:bg-slate-50 ${location.isSubmitted ? 'bg-emerald-50/30' : ''}`}
+                    >
+                      <TableCell className="font-medium text-slate-500">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell className="font-mono font-medium">
+                        {location.code}
+                      </TableCell>
+                      <TableCell>{location.name}</TableCell>
+                      <TableCell className="text-center">{stats.totalItems}</TableCell>
+                      <TableCell className="text-center font-medium">{stats.totalQuantity}</TableCell>
+                      <TableCell className="text-center">
+                        {location.isSubmitted ? (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                            <Lock className="w-3 h-3 mr-1" />
+                            Completed
+                          </Badge>
+                        ) : stats.totalItems > 0 ? (
+                          <Badge className="bg-amber-100 text-amber-700 border-0">
+                            <Clock className="w-3 h-3 mr-1" />
+                            In Progress
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-100 text-slate-600 border-0">
+                            Pending
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenLocation(location)}
+                            className={location.isSubmitted 
+                              ? "bg-amber-500 hover:bg-amber-600" 
+                              : "bg-emerald-600 hover:bg-emerald-700"
+                            }
+                          >
+                            {location.isSubmitted ? (
+                              <>
+                                <Unlock className="w-3 h-3 mr-1" />
+                                Reopen
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink className="w-3 h-3 mr-1" />
+                                Open
+                              </>
+                            )}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteRequest(location)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
