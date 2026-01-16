@@ -75,6 +75,8 @@ const ScanItems = () => {
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
   const quantityInputRef = useRef(null);
+  const itemsListRef = useRef(null); // Ref for auto-scrolling to last item
+  const itemsListDesktopRef = useRef(null); // Ref for desktop items list
   
   // Refs for fast scanning - avoid re-renders during rapid scanning
   const selectedLocationIdRef = useRef(selectedLocationId);
