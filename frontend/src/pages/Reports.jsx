@@ -140,7 +140,7 @@ const Reports = () => {
     a.href = url;
     
     // Include selection info in filename
-    const selectionSuffix = selectedLocations.includes('all') 
+    const selectionSuffix = isAllSelected
       ? 'all_locations' 
       : `${selectedLocations.length}_locations`;
     a.download = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
