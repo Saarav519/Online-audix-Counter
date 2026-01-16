@@ -262,7 +262,10 @@ const Reports = () => {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          onClick={clearSelections}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearSelections();
+                          }}
                           className="h-7 text-xs text-slate-500 hover:text-slate-700"
                         >
                           <X className="w-3 h-3 mr-1" />
@@ -274,20 +277,21 @@ const Reports = () => {
                   <div className="max-h-[250px] overflow-y-auto p-2">
                     {/* All Locations Option */}
                     <div 
-                      className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded-md cursor-pointer"
-                      onClick={() => handleLocationToggle('all')}
+                      className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleLocationToggle('all');
+                      }}
                     >
                       <Checkbox 
                         id="all-locations"
                         checked={selectedLocations.includes('all')}
-                        onCheckedChange={() => handleLocationToggle('all')}
+                        className="pointer-events-none"
                       />
-                      <label 
-                        htmlFor="all-locations" 
-                        className="text-sm font-medium cursor-pointer flex-1"
-                      >
+                      <span className="text-sm font-medium flex-1">
                         All Locations
-                      </label>
+                      </span>
                       <Badge variant="secondary" className="text-xs">
                         {locations.length}
                       </Badge>
@@ -298,25 +302,33 @@ const Reports = () => {
                     {/* Individual Locations */}
                     {locations.map((loc) => {
                       const itemCount = (scannedItems[loc.id] || []).length;
+                      const isAllSelected = selectedLocations.includes('all');
+                      const isSelected = selectedLocations.includes(loc.id);
+                      
                       return (
                         <div 
                           key={loc.id}
-                          className="flex items-center space-x-2 p-2 hover:bg-slate-50 rounded-md cursor-pointer"
-                          onClick={() => handleLocationToggle(loc.id)}
+                          className={`flex items-center space-x-3 p-2 rounded-md cursor-pointer ${
+                            isAllSelected ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!isAllSelected) {
+                              handleLocationToggle(loc.id);
+                            }
+                          }}
                         >
                           <Checkbox 
                             id={loc.id}
-                            checked={selectedLocations.includes(loc.id) || selectedLocations.includes('all')}
-                            disabled={selectedLocations.includes('all')}
-                            onCheckedChange={() => handleLocationToggle(loc.id)}
+                            checked={isSelected || isAllSelected}
+                            disabled={isAllSelected}
+                            className="pointer-events-none"
                           />
                           <div className="flex-1 min-w-0">
-                            <label 
-                              htmlFor={loc.id} 
-                              className="text-sm cursor-pointer block truncate"
-                            >
+                            <span className="text-sm block truncate">
                               {loc.name}
-                            </label>
+                            </span>
                             <span className="text-xs text-slate-400">{loc.code}</span>
                           </div>
                           <Badge 
@@ -337,7 +349,10 @@ const Reports = () => {
                     <Button 
                       size="sm" 
                       className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      onClick={() => setFilterOpen(false)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFilterOpen(false);
+                      }}
                     >
                       Apply Filter
                     </Button>
