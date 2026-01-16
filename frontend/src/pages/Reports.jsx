@@ -275,8 +275,8 @@ const Reports = () => {
       </div>
 
       {/* Full-Screen Location Selection List */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white">
+      <div className="flex-1 overflow-hidden" style={{ minHeight: '200px' }}>
+        <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* All Locations Option - Sticky at Top */}
           <div 
             className={`sticky top-0 z-10 flex items-center gap-3 p-4 border-b-2 border-slate-200 cursor-pointer transition-colors ${
