@@ -269,7 +269,7 @@ const Reports = () => {
                   <div className="p-2 border-b border-slate-100">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-slate-700">Select Locations</span>
-                      {!selectedLocations.includes('all') && (
+                      {!isAllSelected && selectedLocations.length > 0 && (
                         <Button 
                           variant="ghost" 
                           size="sm" 
