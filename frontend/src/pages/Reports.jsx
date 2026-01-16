@@ -102,7 +102,7 @@ const Reports = () => {
 
   // Get display text for selected locations
   const getSelectionDisplayText = () => {
-    if (selectedLocations.includes('all')) {
+    if (selectedLocations.includes('all') || selectedLocations.length === 0) {
       return 'All Locations';
     }
     if (selectedLocations.length === 1) {
@@ -111,6 +111,9 @@ const Reports = () => {
     }
     return `${selectedLocations.length} locations selected`;
   };
+
+  // Check if "All Locations" should appear checked
+  const isAllSelected = selectedLocations.includes('all') || selectedLocations.length === 0;
 
   const handleExportCSV = () => {
     // Export only data for selected locations
