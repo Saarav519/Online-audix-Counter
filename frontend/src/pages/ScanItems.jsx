@@ -238,21 +238,40 @@ const ScanItems = () => {
     submitLocation(selectedLocationId);
     setShowSubmitModal(false);
     
-    // Clear current location and stay on scan page for next scan
-    setSelectedLocationId('');
-    setLocationInput('');
-    setBarcodeInput('');
-    setLastScanResult(null);
-    setLocationSuccess('Location submitted successfully! Ready for next scan.');
+    // Get next pending location
+    const nextLocation = getNextPendingLocation();
     
-    // Focus on location input for next scan
-    setTimeout(() => {
-      if (locationInputRef.current) {
-        locationInputRef.current.focus();
-      }
-      // Clear success message after 4 seconds
-      setTimeout(() => setLocationSuccess(null), 4000);
-    }, 100);
+    if (nextLocation) {
+      // Auto-navigate to next pending location
+      setSelectedLocationId(nextLocation.id);
+      setLocationInput(nextLocation.code);
+      setBarcodeInput('');
+      setLastScanResult(null);
+      setLocationSuccess(`Location submitted! Now scanning: ${nextLocation.name}`);
+      playSound(true);
+      
+      // Focus barcode input for next scan
+      setTimeout(() => {
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+        setTimeout(() => setLocationSuccess(null), 4000);
+      }, 100);
+    } else {
+      // No more pending locations
+      setSelectedLocationId('');
+      setLocationInput('');
+      setBarcodeInput('');
+      setLastScanResult(null);
+      setLocationSuccess('All locations completed! No more pending locations.');
+      
+      setTimeout(() => {
+        if (locationInputRef.current) {
+          locationInputRef.current.focus();
+        }
+        setTimeout(() => setLocationSuccess(null), 4000);
+      }, 100);
+    }
   };
 
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
