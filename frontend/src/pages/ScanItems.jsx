@@ -36,7 +36,8 @@ import {
   Save,
   X,
   Sparkles,
-  Hash
+  Hash,
+  Send
 } from 'lucide-react';
 import { ScrollArea } from '../components/ui/scroll-area';
 
@@ -338,6 +339,327 @@ const ScanItems = () => {
 
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  // Scanner Mode UI - Optimized for handheld devices
+  if (showScannerMode) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-8rem)]">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-auto pb-4 space-y-3">
+          {/* Compact Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-bold text-slate-800">Scan Items</h1>
+              <div className="flex gap-1 mt-1">
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${settings.locationScanMode === 'dynamic' 
+                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                    : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+                >
+                  {settings.locationScanMode === 'dynamic' ? 'Dynamic' : 'Pre-Assigned'}
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${isSingleSkuMode 
+                    ? 'bg-orange-50 text-orange-700 border-orange-200' 
+                    : 'bg-teal-50 text-teal-700 border-teal-200'}`}
+                >
+                  {isSingleSkuMode ? 'Single SKU' : 'Manual Qty'}
+                </Badge>
+              </div>
+            </div>
+            {selectedLocation && (
+              <div className="text-right">
+                <p className="text-xs text-slate-500">Location</p>
+                <p className="text-sm font-semibold text-emerald-700">{selectedLocation.name}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Location Scanner - Compact */}
+          <Card className={`border-0 shadow-sm ${selectedLocationId ? 'bg-emerald-50/50' : ''}`}>
+            <CardContent className="p-3">
+              <Label className="text-xs text-slate-600 mb-1 block font-medium">
+                <MapPin className="w-3 h-3 inline mr-1" />
+                Location Code
+              </Label>
+              <div className="relative">
+                <Input
+                  ref={locationInputRef}
+                  placeholder="Scan location..."
+                  value={locationInput}
+                  onChange={(e) => {
+                    setLocationInput(e.target.value);
+                    setLocationError('');
+                  }}
+                  onKeyDown={handleLocationKeyDown}
+                  className={`h-11 text-base font-mono pr-10 ${selectedLocationId ? 'bg-emerald-50 border-emerald-300' : ''}`}
+                  autoComplete="off"
+                />
+                {selectedLocationId && (
+                  <button
+                    onClick={clearLocation}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              
+              {locationError && (
+                <div className="mt-2 p-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                  {locationError}
+                </div>
+              )}
+              
+              {locationSuccess && (
+                <div className="mt-2 p-2 bg-purple-50 text-purple-700 text-xs rounded-lg flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 flex-shrink-0" />
+                  {locationSuccess}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Barcode Scanner - Compact */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-3">
+              <Label className="text-xs text-slate-600 mb-1 block font-medium">
+                <ScanBarcode className="w-3 h-3 inline mr-1" />
+                Barcode
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  ref={barcodeInputRef}
+                  placeholder={selectedLocationId ? "Scan barcode..." : "Select location first"}
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyDown={handleBarcodeKeyDown}
+                  disabled={!selectedLocationId || isLocationLocked}
+                  className="h-11 text-base font-mono flex-1"
+                  autoComplete="off"
+                />
+                {!isSingleSkuMode && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setQuantityInput(String(Math.max(1, parseInt(quantityInput) - 1)))}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-11 w-10"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={quantityInput}
+                      onChange={(e) => setQuantityInput(e.target.value)}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-11 text-center text-base font-bold w-14"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setQuantityInput(String(parseInt(quantityInput) + 1))}
+                      disabled={!selectedLocationId || isLocationLocked}
+                      className="h-11 w-10"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Button */}
+              <Button
+                onClick={handleScan}
+                disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Add {isSingleSkuMode ? '(Qty: 1)' : `(Qty: ${quantityInput})`}
+              </Button>
+
+              {/* Last Scan Result */}
+              {lastScanResult && (
+                <div className={`mt-2 p-2 rounded-lg flex items-center gap-2 text-sm ${
+                  lastScanResult.success 
+                    ? lastScanResult.isValid 
+                      ? 'bg-emerald-50 text-emerald-700' 
+                      : 'bg-amber-50 text-amber-700'
+                    : 'bg-red-50 text-red-700'
+                }`}>
+                  {lastScanResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  )}
+                  <span className="flex-1 text-xs">
+                    {lastScanResult.success 
+                      ? `Added ${lastScanResult.quantity} unit(s)` 
+                      : lastScanResult.error}
+                  </span>
+                </div>
+              )}
+
+              {isLocationLocked && (
+                <div className="mt-2 p-2 bg-amber-50 rounded-lg flex items-center gap-2 text-xs text-amber-700">
+                  <Lock className="w-3 h-3" />
+                  Location is submitted and locked
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Scanned Items List - Compact */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-600" />
+                Items
+                {selectedLocationId && (
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {locationItems.length} items • {totalQuantity} qty
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              {!selectedLocationId ? (
+                <div className="text-center py-6">
+                  <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-slate-500 text-sm">Scan location first</p>
+                </div>
+              ) : locationItems.length === 0 ? (
+                <div className="text-center py-6">
+                  <ScanBarcode className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-slate-500 text-sm">No items scanned</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                  {locationItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.productName}</p>
+                        <p className="text-xs text-slate-500 font-mono">{item.barcode}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
+                        {!isSingleSkuMode && !isLocationLocked && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleQuantityDecrement(item.id, item.quantity)}
+                              disabled={item.quantity <= 1}
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                        <span className="font-bold text-sm min-w-[24px] text-center">{item.quantity}</span>
+                        {!isSingleSkuMode && !isLocationLocked && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleQuantityIncrement(item.id, item.quantity)}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {!isLocationLocked && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-slate-400 hover:text-red-600"
+                            onClick={() => handleDelete(item.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Fixed Bottom Action Bar - Always visible */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg z-40">
+          <div className="flex gap-2">
+            {/* Clear Location Button */}
+            {selectedLocationId && !isLocationLocked && (
+              <Button
+                variant="outline"
+                onClick={clearLocation}
+                className="flex-1 h-12 text-slate-600 border-slate-300"
+              >
+                <X className="w-5 h-5 mr-2" />
+                Clear
+              </Button>
+            )}
+            
+            {/* Submit Button - Main action */}
+            <Button
+              onClick={handleSubmitLocation}
+              disabled={!selectedLocationId || isLocationLocked || locationItems.length === 0}
+              className={`flex-1 h-12 text-base font-semibold ${
+                selectedLocationId && !isLocationLocked && locationItems.length > 0
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'bg-slate-200 text-slate-400'
+              }`}
+            >
+              <Send className="w-5 h-5 mr-2" />
+              Submit Location
+            </Button>
+          </div>
+          
+          {/* Status Bar */}
+          {selectedLocationId && (
+            <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
+              <span>Location: <strong className="text-slate-700">{selectedLocation?.name}</strong></span>
+              <span>{locationItems.length} items • {totalQuantity} qty</span>
+            </div>
+          )}
+        </div>
+
+        {/* Submit Confirmation Modal */}
+        <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
+          <DialogContent className="max-w-[90vw] rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-emerald-600" />
+                Submit Location?
+              </DialogTitle>
+              <DialogDescription>
+                Once submitted, this location will be locked.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-3 space-y-1">
+              <p className="text-sm"><strong>Location:</strong> {selectedLocation?.name}</p>
+              <p className="text-sm"><strong>Items:</strong> {locationItems.length}</p>
+              <p className="text-sm"><strong>Total Qty:</strong> {totalQuantity}</p>
+            </div>
+            <DialogFooter className="flex-row gap-2">
+              <Button variant="outline" onClick={() => setShowSubmitModal(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button onClick={confirmSubmit} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                Submit & Lock
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // Desktop/Tablet UI - Standard layout
   return (
     <div className="space-y-6">
       {/* Header */}
