@@ -275,3 +275,88 @@ textarea:focus-visible {
     }
 }
 
+/* ===== ANDROID 7.0 (NOUGAT) SPECIFIC FIXES ===== */
+
+/* Ensure proper touch handling for older Android WebView */
+html, body {
+    -webkit-overflow-scrolling: touch;
+    overflow-scrolling: touch;
+}
+
+/* Fix for position:fixed on older Android */
+.fixed-header {
+    position: -webkit-sticky;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+}
+
+/* Prevent 300ms tap delay on older browsers */
+a, button, input, select, textarea {
+    touch-action: manipulation;
+}
+
+/* Ensure proper rendering of gradients */
+.bg-gradient {
+    background: -webkit-linear-gradient(left, #10b981, #14b8a6);
+    background: linear-gradient(to right, #10b981, #14b8a6);
+}
+
+/* Fix for box-shadow rendering on older Android */
+.shadow-fix {
+    -webkit-box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Ensure animations work on older Android */
+@-webkit-keyframes spin {
+    from { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+@keyframes spin {
+    from { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+/* CipherLab RS31 specific - larger touch targets */
+@media (max-width: 480px) {
+    button, a, .touch-target {
+        min-height: 48px;
+        min-width: 48px;
+    }
+    
+    /* Increase font size for better readability */
+    body {
+        font-size: 17px;
+    }
+    
+    /* Make inputs larger */
+    input, select {
+        height: 48px;
+        font-size: 16px;
+        padding: 12px;
+    }
+}
+
+/* Hide non-essential elements on very small screens */
+@media (max-height: 500px) {
+    .hide-on-small-height {
+        display: none;
+    }
+}
+
+/* Ensure buttons are easily tappable */
+.tap-button {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: rgba(16, 185, 129, 0.3);
+}
+
