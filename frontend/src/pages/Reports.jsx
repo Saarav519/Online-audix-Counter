@@ -4,6 +4,16 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import {
   Download,
   Mail,
@@ -12,21 +22,27 @@ import {
   CheckCircle2,
   BarChart3,
   Check,
-  X
+  X,
+  Trash2,
+  AlertTriangle,
+  Lock
 } from 'lucide-react';
 
 const Reports = () => {
-  const { locations, scannedItems, currentSession, masterProducts } = useApp();
+  const { locations, scannedItems, currentSession, masterProducts, deleteLocationData, verifyAuthorizationCredentials } = useApp();
   const [selectedLocations, setSelectedLocations] = useState(['all']);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
 
-  // Check if "All Locations" is selected
   const isAllSelected = selectedLocations.includes('all');
 
-  // Handle location selection
   const handleLocationToggle = (locationId) => {
     if (locationId === 'all') {
       if (isAllSelected) {
-        // Switch to first location when unchecking "All"
         if (locations.length > 0) {
           setSelectedLocations([locations[0].id]);
         }
@@ -36,7 +52,6 @@ const Reports = () => {
     } else {
       setSelectedLocations(prev => {
         const newSelection = prev.filter(id => id !== 'all');
-        
         if (newSelection.includes(locationId)) {
           const filtered = newSelection.filter(id => id !== locationId);
           return filtered.length === 0 ? ['all'] : filtered;
@@ -47,19 +62,17 @@ const Reports = () => {
     }
   };
 
-  // Select all locations individually
   const selectAllLocations = () => {
     setSelectedLocations(['all']);
   };
 
-  // Clear all selections (select none)
   const clearSelections = () => {
     if (locations.length > 0) {
       setSelectedLocations([locations[0].id]);
     }
   };
 
-  // Get items for selected locations (for export)
+  // Get items for selected locations
   const getLocationItems = useMemo(() => {
     if (isAllSelected) {
       return Object.entries(scannedItems).flatMap(([locId, items]) => {
@@ -67,17 +80,11 @@ const Reports = () => {
         return items.map(item => ({ ...item, locationName: loc?.name || 'Unknown', locationId: locId }));
       });
     }
-    
-    if (selectedLocations.length === 0) {
-      return [];
-    }
-    
+    if (selectedLocations.length === 0) return [];
     return selectedLocations.flatMap(locId => {
       const loc = locations.find(l => l.id === locId);
       return (scannedItems[locId] || []).map(item => ({ 
-        ...item, 
-        locationName: loc?.name || 'Unknown',
-        locationId: locId 
+        ...item, locationName: loc?.name || 'Unknown', locationId: locId 
       }));
     });
   }, [selectedLocations, scannedItems, locations, isAllSelected]);
@@ -86,24 +93,53 @@ const Reports = () => {
   const totalQuantity = reportItems.reduce((sum, item) => sum + item.quantity, 0);
   const uniqueProducts = new Set(reportItems.map(item => item.barcode)).size;
 
-  // Get master product details by barcode
-  const getMasterProductDetails = (barcode) => {
-    return masterProducts.find(p => p.barcode === barcode) || null;
-  };
+  const getMasterProductDetails = (barcode) => masterProducts.find(p => p.barcode === barcode) || null;
 
-  // Get selection display text
   const getSelectionDisplayText = () => {
-    if (isAllSelected) {
-      return 'All Locations';
-    }
-    if (selectedLocations.length === 0) {
-      return 'No locations selected';
-    }
+    if (isAllSelected) return 'All Locations';
+    if (selectedLocations.length === 0) return 'No locations selected';
     if (selectedLocations.length === 1) {
       const loc = locations.find(l => l.id === selectedLocations[0]);
       return loc?.name || '1 location';
     }
     return `${selectedLocations.length} locations selected`;
+  };
+
+  // Get locations to delete
+  const getLocationsToDelete = () => {
+    if (isAllSelected) return locations.map(l => l.id);
+    return selectedLocations;
+  };
+
+  // Handle delete button click - show confirmation first
+  const handleDeleteClick = () => {
+    if (reportItems.length === 0) return;
+    setShowDeleteModal(true);
+  };
+
+  // Handle delete confirmation - show auth modal
+  const handleDeleteConfirm = () => {
+    setShowDeleteModal(false);
+    setShowAuthModal(true);
+    setAuthUsername('');
+    setAuthPassword('');
+    setAuthError('');
+  };
+
+  // Handle authentication and delete
+  const handleAuthSubmit = () => {
+    const result = verifyAuthorizationCredentials(authUsername, authPassword);
+    if (result.success) {
+      const locationsToDelete = getLocationsToDelete();
+      deleteLocationData(locationsToDelete);
+      setShowAuthModal(false);
+      setDeleteSuccess(true);
+      setTimeout(() => setDeleteSuccess(false), 3000);
+      // Reset to all locations after delete
+      setSelectedLocations(['all']);
+    } else {
+      setAuthError('Invalid credentials. Please try again.');
+    }
   };
 
   const handleExportCSV = () => {
@@ -122,25 +158,19 @@ const Reports = () => {
         item.isMaster !== false ? 'Master' : 'Non-Master'
       ];
     });
-    
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
-    const selectionSuffix = isAllSelected
-      ? 'all_locations' 
-      : `${selectedLocations.length}_locations`;
+    const selectionSuffix = isAllSelected ? 'all_locations' : `${selectedLocations.length}_locations`;
     a.download = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
   const handleEmailReport = () => {
-    const locationInfo = isAllSelected
-      ? 'All Locations' 
-      : `${selectedLocations.length} Selected Locations`;
+    const locationInfo = isAllSelected ? 'All Locations' : `${selectedLocations.length} Selected Locations`;
     const subject = encodeURIComponent(`Stock Count Report - ${currentSession?.name || 'Audix'}`);
     const body = encodeURIComponent(
       `Stock Count Report\n\nSession: ${currentSession?.name}\nLocations: ${locationInfo}\nTotal Items: ${reportItems.length}\nTotal Quantity: ${totalQuantity}\nUnique Products: ${uniqueProducts}\n\nPlease find the detailed report attached.`
@@ -150,13 +180,13 @@ const Reports = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header with Export Buttons */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl lg:text-2xl font-bold text-slate-800">Reports</h1>
-          <p className="text-sm text-slate-500">Select locations to export</p>
+          <p className="text-sm text-slate-500">Select locations to export or delete</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={handleExportCSV}
@@ -164,7 +194,7 @@ const Reports = () => {
             disabled={reportItems.length === 0}
           >
             <Download className="w-4 h-4 mr-2" />
-            Export CSV
+            Export
           </Button>
           <Button
             variant="outline"
@@ -175,10 +205,27 @@ const Reports = () => {
             <Mail className="w-4 h-4 mr-2" />
             Email
           </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteClick}
+            disabled={reportItems.length === 0}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </Button>
         </div>
       </div>
 
-      {/* Stats Cards - Compact */}
+      {/* Success Message */}
+      {deleteSuccess && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="font-medium">Data deleted successfully!</span>
+        </div>
+      )}
+
+      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-3">
@@ -190,9 +237,7 @@ const Reports = () => {
                 <p className="text-lg font-bold text-slate-800">
                   {isAllSelected ? locations.length : selectedLocations.length}
                 </p>
-                <p className="text-xs text-slate-500">
-                  {isAllSelected ? 'Total' : 'Selected'}
-                </p>
+                <p className="text-xs text-slate-500">{isAllSelected ? 'Total' : 'Selected'}</p>
               </div>
             </div>
           </CardContent>
@@ -243,53 +288,34 @@ const Reports = () => {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700">{getSelectionDisplayText()}</span>
           {!isAllSelected && selectedLocations.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {selectedLocations.length} of {locations.length}
-            </Badge>
+            <Badge variant="secondary" className="text-xs">{selectedLocations.length} of {locations.length}</Badge>
           )}
         </div>
         <div className="flex gap-2">
           {!isAllSelected && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={selectAllLocations}
-              className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-            >
-              <Check className="w-3 h-3 mr-1" />
-              Select All
+            <Button variant="ghost" size="sm" onClick={selectAllLocations} className="h-7 text-xs text-emerald-600">
+              <Check className="w-3 h-3 mr-1" />Select All
             </Button>
           )}
           {!isAllSelected && selectedLocations.length > 1 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={clearSelections}
-              className="h-7 text-xs text-slate-500 hover:text-slate-700"
-            >
-              <X className="w-3 h-3 mr-1" />
-              Clear
+            <Button variant="ghost" size="sm" onClick={clearSelections} className="h-7 text-xs text-slate-500">
+              <X className="w-3 h-3 mr-1" />Clear
             </Button>
           )}
         </div>
       </div>
 
-      {/* Full-Screen Location Selection List */}
+      {/* Location List */}
       <div className="flex-1 overflow-hidden" style={{ minHeight: '200px' }}>
         <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* All Locations Option - Sticky at Top */}
+          {/* All Locations */}
           <div 
             className={`sticky top-0 z-10 flex items-center gap-3 p-4 border-b-2 border-slate-200 cursor-pointer transition-colors ${
-              isAllSelected 
-                ? 'bg-emerald-50' 
-                : 'bg-white hover:bg-slate-50'
+              isAllSelected ? 'bg-emerald-50' : 'bg-white hover:bg-slate-50'
             }`}
             onClick={() => handleLocationToggle('all')}
           >
-            <Checkbox 
-              checked={isAllSelected}
-              className="pointer-events-none h-5 w-5"
-            />
+            <Checkbox checked={isAllSelected} className="pointer-events-none h-5 w-5" />
             <div className="flex-1">
               <span className="text-base font-semibold text-slate-800">All Locations</span>
               <p className="text-xs text-slate-500">Select all {locations.length} locations</p>
@@ -311,23 +337,12 @@ const Reports = () => {
                 <div 
                   key={loc.id}
                   className={`flex items-center gap-3 p-4 cursor-pointer transition-colors ${
-                    isDisabled 
-                      ? 'opacity-50 cursor-not-allowed bg-slate-50' 
-                      : isSelected 
-                        ? 'bg-blue-50 hover:bg-blue-100' 
-                        : 'bg-white hover:bg-slate-50'
+                    isDisabled ? 'opacity-50 cursor-not-allowed bg-slate-50' 
+                      : isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'bg-white hover:bg-slate-50'
                   }`}
-                  onClick={() => {
-                    if (!isDisabled) {
-                      handleLocationToggle(loc.id);
-                    }
-                  }}
+                  onClick={() => !isDisabled && handleLocationToggle(loc.id)}
                 >
-                  <Checkbox 
-                    checked={isSelected || isAllSelected}
-                    disabled={isDisabled}
-                    className="pointer-events-none h-5 w-5"
-                  />
+                  <Checkbox checked={isSelected || isAllSelected} disabled={isDisabled} className="pointer-events-none h-5 w-5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`text-base font-medium truncate ${isSelected ? 'text-blue-700' : 'text-slate-800'}`}>
@@ -335,13 +350,7 @@ const Reports = () => {
                       </span>
                       {loc.isSubmitted && (
                         <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Submitted
-                        </Badge>
-                      )}
-                      {loc.autoCreated && (
-                        <Badge variant="outline" className="text-xs border-purple-200 text-purple-600">
-                          Auto
+                          <CheckCircle2 className="w-3 h-3 mr-1" />Submitted
                         </Badge>
                       )}
                     </div>
@@ -356,38 +365,26 @@ const Reports = () => {
             })}
           </div>
 
-          {/* Empty State */}
           {locations.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16">
               <MapPin className="w-12 h-12 text-slate-300 mb-4" />
               <p className="text-slate-500 font-medium">No locations available</p>
-              <p className="text-sm text-slate-400">Start scanning to create locations</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Selected Locations Summary (if individual selections) */}
+      {/* Selected Locations Summary */}
       {!isAllSelected && selectedLocations.length > 0 && (
         <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-xs text-blue-700 mb-2 font-medium">Selected for Export:</p>
+          <p className="text-xs text-blue-700 mb-2 font-medium">Selected for Export/Delete:</p>
           <div className="flex flex-wrap gap-1">
             {selectedLocations.map(locId => {
               const loc = locations.find(l => l.id === locId);
               return (
-                <Badge 
-                  key={locId} 
-                  variant="secondary"
-                  className="text-xs bg-white border border-blue-200 pr-1"
-                >
+                <Badge key={locId} variant="secondary" className="text-xs bg-white border border-blue-200 pr-1">
                   {loc?.name}
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLocationToggle(locId);
-                    }}
-                    className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
-                  >
+                  <button onClick={(e) => { e.stopPropagation(); handleLocationToggle(locId); }} className="ml-1 hover:bg-blue-200 rounded-full p-0.5">
                     <X className="w-3 h-3" />
                   </button>
                 </Badge>
@@ -396,6 +393,84 @@ const Reports = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Confirm Delete
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete data for the selected locations? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2 bg-red-50 rounded-lg p-3">
+            <p className="text-sm"><strong>Locations:</strong> {isAllSelected ? 'All Locations' : `${selectedLocations.length} selected`}</p>
+            <p className="text-sm"><strong>Items to delete:</strong> {reportItems.length}</p>
+            <p className="text-sm"><strong>Total quantity:</strong> {totalQuantity}</p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Authentication Modal */}
+      <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Authorization Required
+            </DialogTitle>
+            <DialogDescription>
+              Enter your credentials to confirm this delete action.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="auth-username">User ID</Label>
+              <Input
+                id="auth-username"
+                type="text"
+                value={authUsername}
+                onChange={(e) => { setAuthUsername(e.target.value); setAuthError(''); }}
+                placeholder="Enter your user ID"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="auth-password">Password</Label>
+              <Input
+                id="auth-password"
+                type="password"
+                value={authPassword}
+                onChange={(e) => { setAuthPassword(e.target.value); setAuthError(''); }}
+                placeholder="Enter your password"
+                className="mt-1"
+                onKeyPress={(e) => e.key === 'Enter' && handleAuthSubmit()}
+              />
+            </div>
+            {authError && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4" />
+                {authError}
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowAuthModal(false)}>Cancel</Button>
+            <Button onClick={handleAuthSubmit} disabled={!authUsername || !authPassword} className="bg-red-600 hover:bg-red-700">
+              Delete Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
