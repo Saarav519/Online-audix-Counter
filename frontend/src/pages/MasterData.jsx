@@ -163,20 +163,10 @@ const MasterData = () => {
   const handleExport = () => {
     const headers = ['Barcode', 'Name', 'SKU', 'Category', 'Price'];
     const rows = masterProducts.map(p => 
-      [p.barcode, p.name, p.sku, p.category, p.price].join(',')
+      [p.barcode, `"${p.name}"`, p.sku, `"${p.category}"`, p.price].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'master_products.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    downloadCSV(csv, 'master_products.csv');
   };
 
   const downloadSampleProductCSV = () => {
@@ -185,16 +175,7 @@ const MasterData = () => {
 8901234567891,Whole Wheat Flour 1kg,WH-FLOUR-1K,Food & Groceries,65
 8901234567892,Premium Olive Oil 500ml,OLV-OIL-500,Cooking Oil,850`;
     
-    const blob = new Blob([sampleData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_products.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    downloadCSV(sampleData, 'sample_products.csv');
   };
 
   const downloadSampleUserCSV = () => {
@@ -203,16 +184,7 @@ auth_user1,pass123
 auth_user2,pass456
 supervisor1,super789`;
     
-    const blob = new Blob([sampleData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_authorization_users.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    downloadCSV(sampleData, 'sample_authorization_users.csv');
   };
 
   const categories = [...new Set(masterProducts.map(p => p.category))];
