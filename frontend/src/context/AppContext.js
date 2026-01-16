@@ -117,9 +117,11 @@ export const AppProvider = ({ children }) => {
 
   // Verify authorization credentials - uses ONLY imported users
   // For actions like: delete location, reopen locked location
+  // Verify credentials for authorization actions (delete, reopen, etc.)
+  // Uses SAME credentials as Main Screen login
   const verifyAuthorizationCredentials = (userId, password) => {
-    const authUsers = getAuthorizationUsers();
-    const foundUser = authUsers.find(
+    const loginUsers = getLoginUsers();
+    const foundUser = loginUsers.find(
       u => u.userId === userId && u.password === password
     );
     return { success: !!foundUser, user: foundUser };
