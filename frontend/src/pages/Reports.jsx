@@ -197,10 +197,10 @@ const Reports = () => {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-800">
-                  {selectedLocations.includes('all') ? locations.length : selectedLocations.length}
+                  {isAllSelected ? locations.length : selectedLocations.length}
                 </p>
                 <p className="text-sm text-slate-500">
-                  {selectedLocations.includes('all') ? 'Total' : 'Selected'} Locations
+                  {isAllSelected ? 'Total' : 'Selected'} Locations
                 </p>
               </div>
             </div>
