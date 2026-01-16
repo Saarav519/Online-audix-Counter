@@ -1150,7 +1150,9 @@ const ScanItems = () => {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+              {/* Bottom spacer to ensure last item is fully visible */}
+              <div className="h-4" />
+            </div>
           )}
         </CardContent>
       </Card>
