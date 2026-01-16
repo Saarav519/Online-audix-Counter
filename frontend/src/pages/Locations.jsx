@@ -217,7 +217,10 @@ COLD-01,Cold Storage Unit 1`;
     const a = document.createElement('a');
     a.href = url;
     a.download = 'sample_locations.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
