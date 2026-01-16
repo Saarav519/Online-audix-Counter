@@ -129,3 +129,149 @@ textarea:focus-visible {
 .pulse-animation {
     animation: pulse 2s ease-in-out infinite;
 }
+
+/* ===== ANDROID SCANNER OPTIMIZATIONS ===== */
+
+/* Touch-friendly styles for scanner devices */
+@media (max-width: 800px), (max-height: 600px) {
+    /* Increase touch target sizes */
+    button, 
+    a,
+    input,
+    select,
+    .touch-target {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Larger text for readability */
+    body {
+        font-size: 16px;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    /* Prevent zoom on input focus (Android) */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+
+    /* Improve tap highlight */
+    button, a {
+        -webkit-tap-highlight-color: rgba(16, 185, 129, 0.2);
+    }
+
+    /* Touch manipulation for smoother scrolling */
+    * {
+        touch-action: manipulation;
+    }
+}
+
+/* Scanner device specific - bottom navigation height */
+.scanner-bottom-nav {
+    height: 72px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent text selection on buttons (scanner devices) */
+.no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Active state for touch feedback */
+.touch-active:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+/* Safe area padding for notched devices */
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+.safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Hardware keyboard hint - hidden on touch-only devices */
+@media (hover: none) and (pointer: coarse) {
+    .keyboard-hint {
+        display: none;
+    }
+}
+
+/* Larger inputs for scanner devices */
+@media (max-width: 800px) {
+    .scanner-input {
+        height: 56px;
+        font-size: 18px;
+        padding: 12px 16px;
+    }
+
+    .scanner-button {
+        height: 56px;
+        font-size: 16px;
+        font-weight: 600;
+    }
+}
+
+/* Scan result feedback - more prominent on small screens */
+@media (max-width: 800px) {
+    .scan-success {
+        background-color: #10b981;
+        color: white;
+        padding: 16px;
+        border-radius: 12px;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .scan-error {
+        background-color: #ef4444;
+        color: white;
+        padding: 16px;
+        border-radius: 12px;
+        font-weight: 600;
+        text-align: center;
+    }
+}
+
+/* Improve table readability on small screens */
+@media (max-width: 800px) {
+    table {
+        font-size: 14px;
+    }
+
+    th, td {
+        padding: 8px 6px;
+    }
+}
+
+/* Android 7+ compatibility - avoid flexbox bugs */
+.flex-compat {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
+    display: flex;
+}
+
+/* Grid fallback for older Android */
+@supports not (display: grid) {
+    .grid-fallback {
+        display: -webkit-box;
+        display: -webkit-flex;
+        display: flex;
+        -webkit-flex-wrap: wrap;
+        flex-wrap: wrap;
+    }
+
+    .grid-fallback > * {
+        -webkit-box-flex: 0;
+        -webkit-flex: 0 0 50%;
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
