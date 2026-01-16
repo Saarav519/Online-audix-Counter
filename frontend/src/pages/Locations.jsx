@@ -63,7 +63,7 @@ const Locations = () => {
     reopenLocation, 
     importAssignedLocations,
     clearAssignedLocations,
-    login 
+    verifyAuthorizationCredentials 
   } = useApp();
   
   const [searchTerm, setSearchTerm] = useState('');
