@@ -373,7 +373,11 @@ const Reports = () => {
                       >
                         {loc?.name}
                         <button 
-                          onClick={() => handleLocationToggle(locId)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleLocationToggle(locId);
+                          }}
                           className="ml-1 hover:bg-slate-300 rounded-full p-0.5"
                         >
                           <X className="w-3 h-3" />
