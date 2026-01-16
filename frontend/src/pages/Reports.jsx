@@ -430,7 +430,7 @@ const Reports = () => {
               <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500">No data to display</p>
               <p className="text-sm text-slate-400 mt-1">
-                {selectedLocations.includes('all') 
+                {isAllSelected 
                   ? 'Start scanning items to generate reports'
                   : 'No items found for selected locations'}
               </p>
