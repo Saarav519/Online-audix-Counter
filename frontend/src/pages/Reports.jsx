@@ -71,7 +71,8 @@ const Reports = () => {
 
   // Get items for selected locations
   const getLocationItems = useMemo(() => {
-    if (selectedLocations.includes('all')) {
+    // If 'all' is selected OR no specific locations selected, show all items
+    if (selectedLocations.includes('all') || selectedLocations.length === 0) {
       return Object.entries(scannedItems).flatMap(([locId, items]) => {
         const loc = locations.find(l => l.id === locId);
         return items.map(item => ({ ...item, locationName: loc?.name || 'Unknown', locationId: locId }));
