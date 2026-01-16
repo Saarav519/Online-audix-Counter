@@ -78,6 +78,14 @@ const ScanItems = () => {
   // Non-Single SKU mode: manual qty entry allowed
   const isSingleSkuMode = settings.singleSkuScanning;
 
+  // In Pre-Assigned mode, redirect to Locations page if no location is selected
+  // Scan Items should only be accessed by opening a location from the Locations page
+  useEffect(() => {
+    if (settings.locationScanMode === 'preassigned' && !searchParams.get('location')) {
+      navigate('/locations');
+    }
+  }, [settings.locationScanMode, searchParams, navigate]);
+
   // Auto-focus location input on mount if no location selected
   useEffect(() => {
     if (!selectedLocationId && locationInputRef.current) {
