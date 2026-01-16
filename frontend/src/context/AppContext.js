@@ -390,27 +390,78 @@ export const AppProvider = ({ children }) => {
     return newProducts.length;
   };
 
-  // Import users from CSV data
-  const importUsers = (usersData) => {
-    // This would typically update a users state, but for now we'll store in localStorage
+  // Import users from CSV data - FOR AUTHORIZATION ONLY
+  // These users can only authorize actions like delete/reopen, NOT login
+  const importAuthorizationUsers = (usersData) => {
     const importedUsers = usersData.map((u, index) => ({
-      id: `user_import_${Date.now()}_${index}`,
+      id: `auth_user_${Date.now()}_${index}`,
       userId: u.userId || u.username,
       password: u.password,
       name: u.name || u.userId || u.username,
-      role: u.role || 'scanner',
+      role: 'authorizer', // Mark as authorizer role
       createdAt: new Date().toISOString()
     }));
     
-    // Store imported users (in real app, this would go to backend)
-    localStorage.setItem('audix_imported_users', JSON.stringify(importedUsers));
+    // Store authorization users separately
+    localStorage.setItem('audix_authorization_users', JSON.stringify(importedUsers));
     return importedUsers.length;
   };
 
-  // Get all users (mock + imported)
+  // Get login users (mock users only - can be updated)
+  const getLoginUsers = () => {
+    // Check for updated mock users in localStorage
+    const updatedMockUsers = localStorage.getItem('audix_login_users');
+    if (updatedMockUsers) {
+      return JSON.parse(updatedMockUsers);
+    }
+    return [...mockUsers];
+  };
+
+  // Get authorization users (imported users only) - for authorization actions
+  const getAuthorizationUsers = () => {
+    return JSON.parse(localStorage.getItem('audix_authorization_users') || '[]');
+  };
+
+  // Get all users (for display purposes)
   const getAllUsers = () => {
-    const importedUsers = JSON.parse(localStorage.getItem('audix_imported_users') || '[]');
-    return [...mockUsers, ...importedUsers];
+    const loginUsers = getLoginUsers();
+    const authUsers = getAuthorizationUsers();
+    return [...loginUsers, ...authUsers];
+  };
+
+  // Update user credentials (for logged-in user)
+  // Updates apply to both main login and settings
+  const updateUserCredentials = (currentPassword, newUserId, newPassword) => {
+    // Verify current password
+    if (user?.password !== currentPassword) {
+      return { success: false, error: 'Current password is incorrect' };
+    }
+
+    // Get current login users
+    const loginUsers = getLoginUsers();
+    const userIndex = loginUsers.findIndex(u => u.id === user.id);
+    
+    if (userIndex === -1) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Update user credentials
+    const updatedUser = {
+      ...loginUsers[userIndex],
+      userId: newUserId || loginUsers[userIndex].userId,
+      password: newPassword,
+    };
+    
+    loginUsers[userIndex] = updatedUser;
+    
+    // Save updated users to localStorage
+    localStorage.setItem('audix_login_users', JSON.stringify(loginUsers));
+    
+    // Update current user session
+    setUser(updatedUser);
+    localStorage.setItem('audix_user', JSON.stringify(updatedUser));
+    
+    return { success: true, user: updatedUser };
   };
 
   // Get next pending location (for auto-navigation after submit)
