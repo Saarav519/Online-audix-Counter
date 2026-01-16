@@ -395,6 +395,19 @@ export const AppProvider = ({ children }) => {
     return [...mockUsers, ...importedUsers];
   };
 
+  // Get next pending location (for auto-navigation after submit)
+  const getNextPendingLocation = () => {
+    const pendingLocations = locations.filter(loc => {
+      // Filter by mode
+      if (settings.locationScanMode === 'preassigned') {
+        return loc.isAssigned === true && !loc.isSubmitted;
+      } else {
+        return (loc.autoCreated === true || loc.isAssigned === false) && !loc.isSubmitted;
+      }
+    });
+    return pendingLocations.length > 0 ? pendingLocations[0] : null;
+  };
+
   const value = {
     user,
     isAuthenticated,
@@ -406,6 +419,7 @@ export const AppProvider = ({ children }) => {
     currentSession,
     login,
     logout,
+    verifyCredentials,
     addScannedItem,
     deleteScannedItem,
     updateItemQuantity,
@@ -421,6 +435,9 @@ export const AppProvider = ({ children }) => {
     clearAssignedLocations,
     addMasterProduct,
     importMasterProducts,
+    importUsers,
+    getAllUsers,
+    getNextPendingLocation,
     playSound
   };
 
