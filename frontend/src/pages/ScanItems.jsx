@@ -613,47 +613,55 @@ const ScanItems = () => {
                   {locationItems.map((item) => (
                     <div 
                       key={item.id} 
-                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-1"
+                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2"
                     >
-                      {/* Barcode & Description - takes available space but can shrink */}
-                      <div className="flex-1 min-w-0 overflow-hidden" style={{ maxWidth: isSingleSkuMode ? '75%' : '50%' }}>
+                      {/* Barcode & Description - takes most of the space */}
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         {/* Barcode on TOP */}
                         <p className="text-xs text-slate-600 font-mono font-semibold truncate">{item.barcode}</p>
                         {/* Description BELOW */}
                         <p className="text-xs text-slate-500 truncate">{item.productName}</p>
                       </div>
-                      {/* Quantity controls - fixed width, don't shrink */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {!isSingleSkuMode && !isLocationLocked && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handleQuantityDecrement(item.id, item.quantity)}
-                            disabled={item.quantity <= 1}
+                      {/* Quantity & Delete - compact, no +/- buttons */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Quantity - clickable for editing when Single SKU mode is OFF */}
+                        {editingItemId === item.id ? (
+                          <Input
+                            type="number"
+                            min="1"
+                            value={editQuantity}
+                            onChange={(e) => setEditQuantity(e.target.value)}
+                            className="w-14 h-7 text-center text-sm font-bold p-1"
+                            autoFocus
+                            onKeyPress={(e) => e.key === 'Enter' && handleQuantityUpdate(item.id)}
+                            onBlur={() => handleQuantityUpdate(item.id)}
+                          />
+                        ) : (
+                          <span 
+                            className={`font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded ${
+                              !isSingleSkuMode && !isLocationLocked 
+                                ? 'bg-emerald-100 text-emerald-700 cursor-pointer active:bg-emerald-200' 
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                            onClick={() => {
+                              if (!isSingleSkuMode && !isLocationLocked) {
+                                setEditingItemId(item.id);
+                                setEditQuantity(String(item.quantity));
+                              }
+                            }}
                           >
-                            <Minus className="w-3 h-3" />
-                          </Button>
+                            {item.quantity}
+                          </span>
                         )}
-                        <span className="font-bold text-sm w-8 text-center">{item.quantity}</span>
-                        {!isSingleSkuMode && !isLocationLocked && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handleQuantityIncrement(item.id, item.quantity)}
-                          >
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        )}
+                        {/* Delete button */}
                         {!isLocationLocked && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
                             onClick={() => handleDelete(item.id)}
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
                       </div>
