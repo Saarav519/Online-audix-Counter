@@ -73,12 +73,17 @@ const Reports = () => {
 
   // Get items for selected locations
   const getLocationItems = useMemo(() => {
-    // If 'all' is selected OR no specific locations selected, show all items
-    if (selectedLocations.includes('all') || selectedLocations.length === 0) {
+    // If 'all' is selected, show all items
+    if (selectedLocations.includes('all')) {
       return Object.entries(scannedItems).flatMap(([locId, items]) => {
         const loc = locations.find(l => l.id === locId);
         return items.map(item => ({ ...item, locationName: loc?.name || 'Unknown', locationId: locId }));
       });
+    }
+    
+    // If no locations selected, show empty (user needs to select)
+    if (selectedLocations.length === 0) {
+      return [];
     }
     
     // Get items only for selected locations
