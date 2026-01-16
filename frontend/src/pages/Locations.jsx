@@ -755,13 +755,13 @@ COLD-01,Cold Storage Unit 1`;
         </DialogContent>
       </Dialog>
 
-      {/* Authentication Modal */}
+      {/* Authentication Modal for Authorization Actions */}
       <Dialog open={showAuthModal} onOpenChange={setShowAuthModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Authentication Required</DialogTitle>
+            <DialogTitle>Authorization Required</DialogTitle>
             <DialogDescription>
-              Enter your credentials to proceed
+              Enter authorization credentials to proceed (from Master Data → Import Users)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -770,11 +770,14 @@ COLD-01,Cold Storage Unit 1`;
                 {authError}
               </div>
             )}
+            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+              <strong>Note:</strong> Use credentials from "Import Users" in Master Data, not your login credentials.
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="auth-userId">User ID</Label>
+              <Label htmlFor="auth-userId">Authorization User ID</Label>
               <Input
                 id="auth-userId"
-                placeholder="Enter your user ID"
+                placeholder="Enter authorization user ID"
                 value={authCredentials.userId}
                 onChange={(e) => setAuthCredentials({ ...authCredentials, userId: e.target.value })}
               />
@@ -784,7 +787,7 @@ COLD-01,Cold Storage Unit 1`;
               <Input
                 id="auth-password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder="Enter password"
                 value={authCredentials.password}
                 onChange={(e) => setAuthCredentials({ ...authCredentials, password: e.target.value })}
               />
@@ -799,7 +802,7 @@ COLD-01,Cold Storage Unit 1`;
               Cancel
             </Button>
             <Button onClick={handleAuthSubmit} className="bg-emerald-600 hover:bg-emerald-700">
-              Authenticate
+              Authorize
             </Button>
           </DialogFooter>
         </DialogContent>
