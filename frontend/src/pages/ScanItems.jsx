@@ -59,7 +59,14 @@ const ScanItems = () => {
     getNextPendingLocation
   } = useApp();
 
-  const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get('location') || '');
+  // Initialize selectedLocationId from URL param or localStorage
+  const [selectedLocationId, setSelectedLocationId] = useState(() => {
+    const urlLocation = searchParams.get('location');
+    if (urlLocation) return urlLocation;
+    // Restore from localStorage if no URL param
+    const savedLocation = localStorage.getItem('audix_current_scan_location');
+    return savedLocation || '';
+  });
   const [locationInput, setLocationInput] = useState('');
   const [barcodeInput, setBarcodeInput] = useState('');
   const [quantityInput, setQuantityInput] = useState('1');
@@ -69,7 +76,12 @@ const ScanItems = () => {
   const [editQuantity, setEditQuantity] = useState('');
   const [locationError, setLocationError] = useState('');
   const [locationSuccess, setLocationSuccess] = useState(null);
-  const [waitingForLocationScan, setWaitingForLocationScan] = useState(!searchParams.get('location'));
+  const [waitingForLocationScan, setWaitingForLocationScan] = useState(() => {
+    const urlLocation = searchParams.get('location');
+    if (urlLocation) return false;
+    const savedLocation = localStorage.getItem('audix_current_scan_location');
+    return !savedLocation;
+  });
   const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
   
   const locationInputRef = useRef(null);
@@ -85,6 +97,15 @@ const ScanItems = () => {
   const quantityInputRef2 = useRef(quantityInput);
   const lastScanTimeRef = useRef(0);
   const scanResultTimeoutRef = useRef(null);
+
+  // Persist current location to localStorage whenever it changes
+  useEffect(() => {
+    if (selectedLocationId) {
+      localStorage.setItem('audix_current_scan_location', selectedLocationId);
+    } else {
+      localStorage.removeItem('audix_current_scan_location');
+    }
+  }, [selectedLocationId]);
 
   // Keep refs in sync with state
   useEffect(() => {
