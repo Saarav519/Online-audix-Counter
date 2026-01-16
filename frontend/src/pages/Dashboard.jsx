@@ -133,21 +133,21 @@ const Dashboard = () => {
 
         {/* Large Navigation Buttons for Scanner Devices */}
         <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2 pt-4 px-4">
+          <CardHeader className="pb-2 pt-3 px-4">
             <CardTitle className="text-base font-semibold text-slate-800">Quick Navigation</CardTitle>
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="p-3 pt-0">
+            <div className="grid grid-cols-2 gap-2">
               {scannerNavItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link key={item.path} to={item.path} className="block">
                     <Button 
-                      className={`w-full h-20 flex flex-col items-center justify-center gap-2 text-white ${item.color} shadow-lg active:scale-95 transition-transform`}
+                      className={`w-full h-16 flex flex-col items-center justify-center gap-1 text-white ${item.color} shadow-md active:scale-95 transition-transform touch-manipulation`}
                       data-testid={`nav-btn-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                     >
-                      <Icon className="w-7 h-7" />
-                      <span className="text-sm font-medium">{item.label}</span>
+                      <Icon className="w-6 h-6" />
+                      <span className="text-xs font-medium">{item.label}</span>
                     </Button>
                   </Link>
                 );
