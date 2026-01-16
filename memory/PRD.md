@@ -123,6 +123,42 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 - `/app/frontend/src/pages/MasterData.jsx`
 - `/app/frontend/src/pages/Locations.jsx`
 
+### Fix #6: Android Scanner Compatibility
+**Problem**: App needed to work on Android 7 (Nougat) to latest, with hardware scanner key support.
+
+**Solution**:
+1. Created `useDeviceDetection` hook to detect Android devices and screen sizes
+2. Created `useHardwareScanner` hook to capture hardware scanner key events
+3. Added touch-friendly CSS styles in App.css
+4. Compatible with enterprise scanners (Zebra, Honeywell, Datalogic, etc.)
+
+**Files Changed**: 
+- `/app/frontend/src/hooks/useDeviceDetection.js` (new file)
+- `/app/frontend/src/App.css`
+- `/app/frontend/src/pages/ScanItems.jsx`
+
+### Fix #7: Dashboard - Remove Recent Locations
+**Problem**: User wanted to remove the "Recent Locations" column from Dashboard.
+
+**Solution**: Removed the Recent Locations section entirely, replaced with Quick Actions grid.
+
+**Files Changed**: `/app/frontend/src/pages/Dashboard.jsx`
+
+### Fix #8: Scanner Device Layout (Large Buttons)
+**Problem**: On scanner devices, navigation should be large, visible buttons - not hidden in a menu.
+
+**Solution**:
+1. Created scanner mode UI that activates on small screens (≤800px width or ≤600px height)
+2. Dashboard shows "Quick Navigation" with 6 large buttons (80px height) in 2-column grid
+3. Added fixed bottom navigation bar with 5 items
+4. All touch targets are minimum 44px for easy one-handed operation
+5. Login page has larger inputs (56px height) on scanner devices
+
+**Files Changed**: 
+- `/app/frontend/src/components/Layout.jsx`
+- `/app/frontend/src/pages/Dashboard.jsx`
+- `/app/frontend/src/pages/Login.jsx`
+
 ---
 
 ## Architecture
