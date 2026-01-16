@@ -61,10 +61,11 @@ export const AppProvider = ({ children }) => {
     }, isValid ? 150 : 300);
   };
 
-  // Login function - checks both mock and imported users
+  // Login function - checks ONLY mock users (not imported users)
+  // Imported users are for authorization actions only
   const login = (userId, password) => {
-    const allUsers = getAllUsers();
-    const foundUser = allUsers.find(
+    const loginUsers = getLoginUsers();
+    const foundUser = loginUsers.find(
       u => u.userId === userId && u.password === password
     );
     if (foundUser) {
@@ -77,10 +78,20 @@ export const AppProvider = ({ children }) => {
     return { success: false, error: 'Invalid credentials' };
   };
 
-  // Verify credentials without logging in
+  // Verify credentials for Settings - uses SAME credentials as login (mock users only)
   const verifyCredentials = (userId, password) => {
-    const allUsers = getAllUsers();
-    const foundUser = allUsers.find(
+    const loginUsers = getLoginUsers();
+    const foundUser = loginUsers.find(
+      u => u.userId === userId && u.password === password
+    );
+    return { success: !!foundUser, user: foundUser };
+  };
+
+  // Verify authorization credentials - uses ONLY imported users
+  // For actions like: delete location, reopen locked location
+  const verifyAuthorizationCredentials = (userId, password) => {
+    const authUsers = getAuthorizationUsers();
+    const foundUser = authUsers.find(
       u => u.userId === userId && u.password === password
     );
     return { success: !!foundUser, user: foundUser };
