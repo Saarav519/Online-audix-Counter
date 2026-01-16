@@ -124,6 +124,20 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 
 **Files Changed**: `/app/frontend/public/index.html`
 
+### Fix #13: Previous Location Retention After Submit
+**Problem**: In Dynamic mode, after submitting a location, the previously scanned location was still visible in the Location field. This caused confusion as users expected a fresh start.
+
+**Solution**:
+1. After successful submission in Dynamic mode, the system now:
+   - Clears the location ID completely
+   - Clears the location input field
+   - Clears the barcode input
+   - Shows success message: "Location submitted successfully! Scan a new location to continue."
+   - Auto-focuses the location input for immediate new scan
+2. System is fully reset and ready for a fresh location scan
+
+**Files Changed**: `/app/frontend/src/pages/ScanItems.jsx`
+
 ### Fix #1: Post-Submission Navigation Issue
 **Problem**: In Pre-Assigned mode, after submitting a location, the system stayed on the Scan Items page instead of navigating to the next location.
 
