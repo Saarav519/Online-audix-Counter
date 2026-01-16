@@ -544,7 +544,7 @@ const Settings = () => {
           <DialogHeader>
             <DialogTitle>Change Credentials</DialogTitle>
             <DialogDescription>
-              Update your user ID and password
+              Update your login credentials (applies to both main login and settings)
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -557,9 +557,12 @@ const Settings = () => {
             {passwordSuccess && (
               <div className="p-3 bg-emerald-50 text-emerald-600 text-sm rounded-lg flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
-                Credentials updated successfully!
+                Credentials updated successfully! This applies to all logins.
               </div>
             )}
+            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+              <strong>Note:</strong> Changing your credentials here will update them for both the main login screen and settings access.
+            </div>
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current Password</Label>
               <Input
@@ -575,7 +578,7 @@ const Settings = () => {
               <Label htmlFor="newUserId">New User ID (optional)</Label>
               <Input
                 id="newUserId"
-                placeholder="Enter new user ID"
+                placeholder={`Current: ${user?.userId}`}
                 value={passwordForm.newUserId}
                 onChange={(e) => setPasswordForm({ ...passwordForm, newUserId: e.target.value })}
               />
@@ -608,6 +611,7 @@ const Settings = () => {
             <Button 
               onClick={handlePasswordChange} 
               className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
             >
               <Save className="w-4 h-4 mr-2" />
               Update Credentials
