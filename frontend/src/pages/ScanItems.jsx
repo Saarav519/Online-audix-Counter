@@ -1042,10 +1042,18 @@ const ScanItems = () => {
               </p>
             </div>
           ) : (
-            <ScrollArea className="h-[400px]">
+            <div 
+              ref={itemsListDesktopRef}
+              className="overflow-y-auto pb-4" 
+              style={{ 
+                maxHeight: '400px', 
+                scrollBehavior: 'smooth',
+                WebkitOverflowScrolling: 'touch'
+              }}
+            >
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="sticky top-0 bg-white z-10">
                     <TableHead className="w-[180px]">Barcode</TableHead>
                     <TableHead>Product</TableHead>
                     <TableHead className="text-center w-[180px]">Quantity</TableHead>
@@ -1054,8 +1062,8 @@ const ScanItems = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {locationItems.map((item) => (
-                    <TableRow key={item.id}>
+                  {locationItems.map((item, index) => (
+                    <TableRow key={item.id} className={index === locationItems.length - 1 ? 'last-item' : ''}>
                       <TableCell className="font-mono text-sm">{item.barcode}</TableCell>
                       <TableCell>
                         <p className="font-medium">{item.productName}</p>
