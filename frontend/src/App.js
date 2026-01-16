@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
@@ -12,6 +12,40 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import { Toaster } from "./components/ui/sonner";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+
+// Route Persistence Hook - saves current route to localStorage
+const useRoutePersistence = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    // Save current path and search params to localStorage
+    const fullPath = location.pathname + location.search;
+    // Don't save login page
+    if (location.pathname !== '/login') {
+      localStorage.setItem('audix_last_route', fullPath);
+    }
+  }, [location]);
+};
+
+// Route Restoration Component - restores last route on app load
+const RouteRestorer = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated } = useApp();
+  
+  useEffect(() => {
+    // Only restore if authenticated and currently on home page
+    if (isAuthenticated && location.pathname === '/') {
+      const lastRoute = localStorage.getItem('audix_last_route');
+      // If there's a saved route and it's not the home page, navigate to it
+      if (lastRoute && lastRoute !== '/' && lastRoute !== '/login') {
+        navigate(lastRoute, { replace: true });
+      }
+    }
+  }, [isAuthenticated, location.pathname, navigate]);
+  
+  return null;
+};
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
