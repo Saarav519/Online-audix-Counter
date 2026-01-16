@@ -225,6 +225,22 @@ const ScanItems = () => {
     }
   }, [isSingleSkuMode]);
 
+  // Auto-scroll to last item when items are added
+  useEffect(() => {
+    // Auto-scroll mobile list
+    if (itemsListRef.current && locationItems.length > 0) {
+      setTimeout(() => {
+        itemsListRef.current.scrollTop = itemsListRef.current.scrollHeight;
+      }, 100);
+    }
+    // Auto-scroll desktop list
+    if (itemsListDesktopRef.current && locationItems.length > 0) {
+      setTimeout(() => {
+        itemsListDesktopRef.current.scrollTop = itemsListDesktopRef.current.scrollHeight;
+      }, 100);
+    }
+  }, [locationItems.length]);
+
   // Handle location scan/input
   const handleLocationKeyDown = (e) => {
     if (e.key === 'Enter' && locationInput.trim()) {
