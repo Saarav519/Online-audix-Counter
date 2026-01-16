@@ -51,7 +51,8 @@ const ScanItems = () => {
     updateItemQuantity,
     submitLocation,
     scanLocation,
-    playSound
+    playSound,
+    getNextPendingLocation
   } = useApp();
 
   const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get('location') || '');
