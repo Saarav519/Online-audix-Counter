@@ -530,18 +530,34 @@ admin1,admin123,Admin User,admin`;
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              Import User Credentials
+              Import Authorization Users
             </DialogTitle>
             <DialogDescription>
-              Upload user IDs and passwords to avoid manual password changes on each scanner
+              Upload User IDs and Passwords for authorization actions only
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
+            {/* Important Notice */}
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Important:</strong> These credentials are used ONLY for authorization actions:
+              </p>
+              <ul className="text-sm text-blue-600 mt-1 ml-4 list-disc">
+                <li>Location deletion</li>
+                <li>Reopening scanned/locked locations</li>
+                <li>Other protected actions</li>
+              </ul>
+              <p className="text-xs text-blue-500 mt-2">
+                These credentials will NOT work for main login or settings access.
+              </p>
+            </div>
+
             <div className="p-4 bg-slate-50 rounded-lg">
-              <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
+              <p className="text-sm font-medium text-slate-700 mb-2">CSV Format (only UserID & Password required):</p>
               <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
-                UserID,Password,Name,Role<br />
-                scanner1,pass123,Scanner 1,scanner
+                UserID,Password<br />
+                auth_user1,pass123<br />
+                auth_user2,pass456
               </code>
               <Button
                 variant="link"
@@ -554,15 +570,15 @@ admin1,admin123,Admin User,admin`;
               </Button>
             </div>
 
-            {/* Current imported users */}
-            {importedUsers.length > 0 && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-blue-700 mb-2">
-                  {importedUsers.length} user(s) currently imported:
+            {/* Current authorization users */}
+            {authorizationUsers.length > 0 && (
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <p className="text-sm font-medium text-purple-700 mb-2">
+                  {authorizationUsers.length} authorization user(s) configured:
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {importedUsers.map(u => (
-                    <Badge key={u.id} variant="outline" className="border-blue-200 text-blue-700">
+                  {authorizationUsers.map(u => (
+                    <Badge key={u.id} variant="outline" className="border-purple-200 text-purple-700">
                       {u.userId}
                     </Badge>
                   ))}
@@ -573,7 +589,7 @@ admin1,admin123,Admin User,admin`;
             <div className="relative">
               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 transition-colors cursor-pointer">
                 <Users className="w-10 h-10 text-slate-400 mb-3" />
-                <p className="text-sm text-slate-500 mb-2">Click to upload user credentials</p>
+                <p className="text-sm text-slate-500 mb-2">Click to upload authorization credentials</p>
                 <p className="text-xs text-slate-400">CSV files only</p>
                 <input
                   ref={userFileInputRef}
@@ -596,18 +612,11 @@ admin1,admin123,Admin User,admin`;
                 )}
                 <span className="text-sm">
                   {userImportResult.success 
-                    ? `Successfully imported ${userImportResult.count} user(s)`
+                    ? `Successfully imported ${userImportResult.count} authorization user(s)`
                     : userImportResult.error}
                 </span>
               </div>
             )}
-
-            <div className="p-3 bg-slate-100 rounded-lg">
-              <p className="text-xs text-slate-600">
-                <strong>Note:</strong> Imported users can log in using their credentials. 
-                This avoids the need to manually change passwords on each scanner device.
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUserImportModal(false)}>
