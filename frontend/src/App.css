@@ -37,20 +37,24 @@
 
 /* ===== PWA INSTALLED MODE STYLES ===== */
 
-/* Hide browser UI elements when running as PWA */
-body.pwa-installed {
-    /* Ensure full screen usage */
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    overflow: hidden;
-}
+/* 
+ * IMPORTANT: Do NOT use position:fixed or overflow:hidden on body
+ * This was causing the scroll issue on installed PWA
+ */
 
 /* Hide Emergent badge when installed as PWA */
 body.pwa-installed #emergent-badge {
     display: none !important;
+}
+
+/* Ensure root element allows scrolling in PWA mode */
+body.pwa-installed,
+body.pwa-installed #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* PWA Install Prompt */
