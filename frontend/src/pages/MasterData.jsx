@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { downloadCSV } from '../utils/fileDownload';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
