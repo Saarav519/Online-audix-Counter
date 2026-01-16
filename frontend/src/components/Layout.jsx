@@ -123,8 +123,8 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Main Content - Adjusted for smaller header and bottom nav */}
-        <main className="flex-1 pt-12 pb-20 overflow-auto">
-          <div className="p-3">
+        <main className="flex-1 pt-12 pb-20 overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div className="p-3 min-h-full">
             {children}
           </div>
         </main>
