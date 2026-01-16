@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useDeviceDetection } from '../hooks/useDeviceDetection';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -11,14 +12,18 @@ import {
   ScanBarcode,
   CheckCircle2,
   Clock,
-  AlertCircle,
-  ArrowRight,
-  TrendingUp,
+  Settings,
+  FileSpreadsheet,
+  LayoutDashboard,
   BarChart3
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { locations, scannedItems, currentSession, masterProducts } = useApp();
+  const { locations, scannedItems, currentSession, masterProducts, settings } = useApp();
+  const { isScanner, isSmallScreen, isMobile } = useDeviceDetection();
+
+  // Determine if we should show scanner mode UI
+  const showScannerMode = isScanner || isSmallScreen;
 
   // Calculate stats
   const totalLocations = locations.length;
@@ -35,23 +40,141 @@ const Dashboard = () => {
     ? Math.round((completedLocations / totalLocations) * 100) 
     : 0;
 
+  // Navigation items for scanner mode
+  const scannerNavItems = [
+    { path: '/', icon: LayoutDashboard, label: 'Dashboard', color: 'bg-slate-600 hover:bg-slate-700' },
+    { path: '/locations', icon: MapPin, label: 'Locations', color: 'bg-blue-600 hover:bg-blue-700' },
+    { path: '/scan', icon: ScanBarcode, label: 'Scan Items', color: 'bg-emerald-600 hover:bg-emerald-700', hideInPreAssigned: true },
+    { path: '/master-data', icon: Package, label: 'Master Data', color: 'bg-purple-600 hover:bg-purple-700' },
+    { path: '/reports', icon: FileSpreadsheet, label: 'Reports', color: 'bg-orange-600 hover:bg-orange-700' },
+    { path: '/settings', icon: Settings, label: 'Settings', color: 'bg-gray-600 hover:bg-gray-700' },
+  ].filter(item => !(settings?.locationScanMode === 'preassigned' && item.hideInPreAssigned));
+
   const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
     <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300">
-      <CardContent className="p-6">
+      <CardContent className={`${showScannerMode ? 'p-4' : 'p-6'}`}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">{title}</p>
-            <p className="text-3xl font-bold text-slate-800 mt-1">{value}</p>
+            <p className={`font-medium text-slate-500 ${showScannerMode ? 'text-xs' : 'text-sm'}`}>{title}</p>
+            <p className={`font-bold text-slate-800 mt-1 ${showScannerMode ? 'text-2xl' : 'text-3xl'}`}>{value}</p>
             {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
           </div>
-          <div className={`p-3 rounded-xl ${color}`}>
-            <Icon className="w-6 h-6 text-white" />
+          <div className={`rounded-xl ${color} ${showScannerMode ? 'p-2' : 'p-3'}`}>
+            <Icon className={`text-white ${showScannerMode ? 'w-5 h-5' : 'w-6 h-6'}`} />
           </div>
         </div>
       </CardContent>
     </Card>
   );
 
+  // Scanner Mode UI - Large buttons, optimized for one-handed operation
+  if (showScannerMode) {
+    return (
+      <div className="space-y-4 pb-4">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">Dashboard</h1>
+            <p className="text-xs text-slate-500">Stock Overview</p>
+          </div>
+          <Badge variant="outline" className="text-xs">
+            {settings?.locationScanMode === 'preassigned' ? 'Pre-Assigned' : 'Dynamic'}
+          </Badge>
+        </div>
+
+        {/* Current Session - Compact */}
+        {currentSession && (
+          <Card className="border-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Badge className="bg-white/20 text-white border-0 text-xs mb-1">
+                    Active Session
+                  </Badge>
+                  <h2 className="text-base font-semibold">{currentSession.name}</h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold">{completedLocations}/{totalLocations}</p>
+                  <p className="text-emerald-100 text-xs">Locations</p>
+                </div>
+              </div>
+              <Progress value={completionPercentage} className="h-1.5 bg-white/20 mt-3" />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats Grid - Compact */}
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            title="Locations"
+            value={totalLocations}
+            icon={MapPin}
+            color="bg-blue-500"
+          />
+          <StatCard
+            title="Items"
+            value={totalScannedItems}
+            icon={Package}
+            color="bg-emerald-500"
+          />
+          <StatCard
+            title="Completed"
+            value={completedLocations}
+            icon={CheckCircle2}
+            color="bg-teal-500"
+          />
+          <StatCard
+            title="Pending"
+            value={pendingLocations}
+            icon={Clock}
+            color="bg-amber-500"
+          />
+        </div>
+
+        {/* Large Navigation Buttons for Scanner Devices */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-base font-semibold text-slate-800">Quick Navigation</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="grid grid-cols-2 gap-3">
+              {scannerNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.path} to={item.path} className="block">
+                    <Button 
+                      className={`w-full h-20 flex flex-col items-center justify-center gap-2 text-white ${item.color} shadow-lg active:scale-95 transition-transform`}
+                      data-testid={`nav-btn-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Icon className="w-7 h-7" />
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </Button>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Master Products Count */}
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-purple-100 rounded-xl">
+                <BarChart3 className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-slate-800">{masterProducts.length}</p>
+                <p className="text-xs text-slate-500">Master Products</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Desktop/Tablet UI - Standard layout
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -129,107 +252,57 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Recent Locations & Quick Actions */}
+      {/* Quick Actions & Master Products */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Locations */}
+        {/* Quick Actions */}
         <Card className="lg:col-span-2 border-0 shadow-sm">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold text-slate-800">Recent Locations</CardTitle>
-              <Link to="/locations">
-                <Button variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-700">
-                  View All <ArrowRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
-            </div>
+            <CardTitle className="text-lg font-semibold text-slate-800">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {locations.slice(0, 4).map((location) => {
-                const locationItems = scannedItems[location.id] || [];
-                const itemCount = locationItems.reduce((sum, i) => sum + i.quantity, 0);
-                
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {scannerNavItems.filter(item => item.path !== '/').map((item) => {
+                const Icon = item.icon;
                 return (
-                  <div
-                    key={location.id}
-                    className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2.5 rounded-lg ${
-                        location.isSubmitted 
-                          ? 'bg-emerald-100 text-emerald-600' 
-                          : location.isCompleted 
-                            ? 'bg-teal-100 text-teal-600'
-                            : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        <MapPin className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800">{location.name}</p>
-                        <p className="text-sm text-slate-500">{location.code} • {itemCount} items</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {location.isSubmitted ? (
-                        <Badge className="bg-emerald-100 text-emerald-700 border-0">Submitted</Badge>
-                      ) : location.isCompleted ? (
-                        <Badge className="bg-teal-100 text-teal-700 border-0">Completed</Badge>
-                      ) : (
-                        <Badge className="bg-amber-100 text-amber-700 border-0">In Progress</Badge>
-                      )}
-                    </div>
-                  </div>
+                  <Link key={item.path} to={item.path} className="block">
+                    <Button 
+                      variant="outline" 
+                      className={`w-full h-24 flex flex-col items-center justify-center gap-2 border-slate-200 hover:border-slate-300 transition-all`}
+                      data-testid={`quick-action-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Icon className="w-6 h-6 text-slate-600" />
+                      <span className="text-sm font-medium text-slate-700">{item.label}</span>
+                    </Button>
+                  </Link>
                 );
               })}
             </div>
           </CardContent>
         </Card>
 
-        {/* Quick Actions & Stats */}
-        <div className="space-y-4">
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold text-slate-800">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link to="/scan" className="block">
-                <Button variant="outline" className="w-full justify-start h-12 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200">
-                  <ScanBarcode className="w-5 h-5 mr-3" />
-                  Start New Scan
-                </Button>
-              </Link>
-              <Link to="/locations" className="block">
-                <Button variant="outline" className="w-full justify-start h-12 border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200">
-                  <MapPin className="w-5 h-5 mr-3" />
-                  Manage Locations
-                </Button>
-              </Link>
-              <Link to="/master-data" className="block">
-                <Button variant="outline" className="w-full justify-start h-12 border-slate-200 hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200">
-                  <Package className="w-5 h-5 mr-3" />
-                  Master Data
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold text-slate-800">Master Products</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <BarChart3 className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-800">{masterProducts.length}</p>
-                  <p className="text-sm text-slate-500">Products in database</p>
-                </div>
+        {/* Master Products */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-semibold text-slate-800">Master Products</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-100 rounded-xl">
+                <BarChart3 className="w-6 h-6 text-purple-600" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-800">{masterProducts.length}</p>
+                <p className="text-sm text-slate-500">Products in database</p>
+              </div>
+            </div>
+            <Link to="/master-data" className="block mt-4">
+              <Button variant="outline" className="w-full border-slate-200">
+                <Package className="w-4 h-4 mr-2" />
+                Manage Master Data
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
