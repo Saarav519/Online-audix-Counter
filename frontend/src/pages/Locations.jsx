@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -14,6 +14,15 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { ScrollArea } from '../components/ui/scroll-area';
 import {
   MapPin,
   Plus,
@@ -30,7 +39,9 @@ import {
   FileSpreadsheet,
   UserCheck,
   AlertCircle,
-  Download
+  Download,
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,6 +52,7 @@ import {
 } from '../components/ui/dropdown-menu';
 
 const Locations = () => {
+  const navigate = useNavigate();
   const { 
     locations, 
     scannedItems, 
@@ -74,10 +86,8 @@ const Locations = () => {
   // Filter locations based on current mode
   const modeFilteredLocations = locations.filter(loc => {
     if (isPreAssignedMode) {
-      // In Pre-Assigned mode, show only assigned/imported locations
       return loc.isAssigned === true;
     } else {
-      // In Dynamic mode, show only dynamic/auto-created locations
       return loc.autoCreated === true || loc.isAssigned === false;
     }
   });
@@ -89,13 +99,22 @@ const Locations = () => {
   );
 
   const assignedLocationsCount = locations.filter(loc => loc.isAssigned).length;
-  const dynamicLocationsCount = locations.filter(loc => loc.autoCreated || !loc.isAssigned).length;
+  const pendingLocationsCount = filteredLocations.filter(loc => !loc.isSubmitted).length;
+  const completedLocationsCount = filteredLocations.filter(loc => loc.isSubmitted).length;
 
   const handleAddLocation = () => {
     if (newLocation.name && newLocation.code) {
       addLocation(newLocation);
       setNewLocation({ name: '', code: '' });
       setShowAddModal(false);
+    }
+  };
+
+  const handleOpenLocation = (location) => {
+    if (location.isSubmitted) {
+      handleReopenRequest(location);
+    } else {
+      navigate(`/scan?location=${location.id}`);
     }
   };
 
@@ -148,14 +167,12 @@ const Locations = () => {
         const text = e.target.result;
         const lines = text.split('\n').filter(line => line.trim());
         
-        // Skip header row if it looks like a header
         const firstLine = lines[0].toLowerCase();
         const hasHeader = firstLine.includes('code') || firstLine.includes('name') || firstLine.includes('location');
         const dataLines = hasHeader ? lines.slice(1) : lines;
         
         const locationsData = dataLines.map(line => {
           const parts = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          // Support formats: "code" or "code,name" or "name,code"
           if (parts.length >= 2) {
             return { code: parts[0], name: parts[1] };
           } else {
@@ -176,7 +193,6 @@ const Locations = () => {
     };
     reader.readAsText(file);
     
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -211,6 +227,246 @@ COLD-01,Cold Storage Unit 1`;
       totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0)
     };
   };
+
+  // Render List View for Pre-Assigned Mode
+  const renderListView = () => (
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-blue-600" />
+            Assigned Locations
+            <Badge variant="secondary" className="ml-2">
+              {pendingLocationsCount} pending • {completedLocationsCount} completed
+            </Badge>
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[500px]">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-50">
+                <TableHead className="w-[50px]">#</TableHead>
+                <TableHead>Location Code</TableHead>
+                <TableHead>Location Name</TableHead>
+                <TableHead className="text-center">Items</TableHead>
+                <TableHead className="text-center">Qty</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredLocations.map((location, index) => {
+                const stats = getLocationStats(location.id);
+                return (
+                  <TableRow 
+                    key={location.id} 
+                    className={`hover:bg-slate-50 ${location.isSubmitted ? 'bg-emerald-50/30' : ''}`}
+                  >
+                    <TableCell className="font-medium text-slate-500">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="font-mono font-medium">
+                      {location.code}
+                    </TableCell>
+                    <TableCell>{location.name}</TableCell>
+                    <TableCell className="text-center">{stats.totalItems}</TableCell>
+                    <TableCell className="text-center font-medium">{stats.totalQuantity}</TableCell>
+                    <TableCell className="text-center">
+                      {location.isSubmitted ? (
+                        <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                          <Lock className="w-3 h-3 mr-1" />
+                          Completed
+                        </Badge>
+                      ) : stats.totalItems > 0 ? (
+                        <Badge className="bg-amber-100 text-amber-700 border-0">
+                          <Clock className="w-3 h-3 mr-1" />
+                          In Progress
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-slate-100 text-slate-600 border-0">
+                          Pending
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleOpenLocation(location)}
+                          className={location.isSubmitted 
+                            ? "bg-amber-500 hover:bg-amber-600" 
+                            : "bg-emerald-600 hover:bg-emerald-700"
+                          }
+                        >
+                          {location.isSubmitted ? (
+                            <>
+                              <Unlock className="w-3 h-3 mr-1" />
+                              Reopen
+                            </>
+                          ) : (
+                            <>
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Open
+                            </>
+                          )}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteRequest(location)}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
+
+  // Render Card View for Dynamic Mode
+  const renderCardView = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {filteredLocations.map((location) => {
+        const stats = getLocationStats(location.id);
+        
+        return (
+          <Card 
+            key={location.id} 
+            className={`border-0 shadow-sm hover:shadow-md transition-all duration-300 ${
+              location.isSubmitted ? 'bg-emerald-50/50' : location.isCompleted ? 'bg-teal-50/50' : 'bg-white'
+            }`}
+          >
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-3 rounded-xl ${
+                  location.isSubmitted 
+                    ? 'bg-emerald-100' 
+                    : location.isCompleted 
+                      ? 'bg-teal-100'
+                      : location.autoCreated
+                        ? 'bg-purple-100'
+                        : 'bg-slate-100'
+                }`}>
+                  <MapPin className={`w-6 h-6 ${
+                    location.isSubmitted 
+                      ? 'text-emerald-600' 
+                      : location.isCompleted 
+                        ? 'text-teal-600'
+                        : location.autoCreated
+                          ? 'text-purple-600'
+                          : 'text-slate-600'
+                  }`} />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {location.autoCreated && (
+                    <Badge className="bg-purple-100 text-purple-700 border-0 text-xs">
+                      Dynamic
+                    </Badge>
+                  )}
+                  {location.isSubmitted ? (
+                    <Lock className="w-4 h-4 text-emerald-600" />
+                  ) : location.isCompleted ? (
+                    <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                  ) : (
+                    <Clock className="w-4 h-4 text-amber-500" />
+                  )}
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {!location.isSubmitted && (
+                        <DropdownMenuItem asChild>
+                          <Link to={`/scan?location=${location.id}`} className="flex items-center">
+                            <ScanBarcode className="w-4 h-4 mr-2" />
+                            Scan Items
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      {location.isSubmitted && (
+                        <DropdownMenuItem onClick={() => handleReopenRequest(location)}>
+                          <Unlock className="w-4 h-4 mr-2" />
+                          Reopen Location
+                        </DropdownMenuItem>
+                      )}
+                      {!location.isSubmitted && location.isCompleted && (
+                        <DropdownMenuItem onClick={() => submitLocation(location.id)}>
+                          <Lock className="w-4 h-4 mr-2" />
+                          Submit & Lock
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteRequest(location)}
+                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Location
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              <h3 className="font-semibold text-slate-800 mb-1">{location.name}</h3>
+              <p className="text-sm text-slate-500 mb-4">{location.code}</p>
+
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <span className="text-slate-500">Items: </span>
+                  <span className="font-medium text-slate-700">{stats.totalItems}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Qty: </span>
+                  <span className="font-medium text-slate-700">{stats.totalQuantity}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                {location.isSubmitted ? (
+                  <Badge className="bg-emerald-100 text-emerald-700 border-0 w-full justify-center py-1">
+                    <Lock className="w-3 h-3 mr-1" /> Submitted & Locked
+                  </Badge>
+                ) : location.isCompleted ? (
+                  <Badge className="bg-teal-100 text-teal-700 border-0 w-full justify-center py-1">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
+                  </Badge>
+                ) : (
+                  <Link to={`/scan?location=${location.id}`}>
+                    <Button variant="outline" className="w-full border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200">
+                      <ScanBarcode className="w-4 h-4 mr-2" />
+                      Continue Scanning
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -254,13 +510,19 @@ COLD-01,Cold Storage Unit 1`;
               <div className="flex-1">
                 <h3 className="font-semibold text-blue-800">Pre-Assigned Location Mode</h3>
                 <p className="text-sm text-blue-600 mt-1">
-                  Only imported/assigned locations can be scanned. Import locations using CSV file to assign them to employees.
+                  Scan assigned locations in order. After completing one, the next pending location will be ready.
                 </p>
-                {assignedLocationsCount > 0 && (
-                  <Badge className="mt-2 bg-blue-100 text-blue-700 border-0">
-                    {assignedLocationsCount} assigned location(s)
+                <div className="flex gap-2 mt-2">
+                  <Badge className="bg-blue-100 text-blue-700 border-0">
+                    {assignedLocationsCount} assigned
                   </Badge>
-                )}
+                  <Badge className="bg-amber-100 text-amber-700 border-0">
+                    {pendingLocationsCount} pending
+                  </Badge>
+                  <Badge className="bg-emerald-100 text-emerald-700 border-0">
+                    {completedLocationsCount} completed
+                  </Badge>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -278,132 +540,8 @@ COLD-01,Cold Storage Unit 1`;
         />
       </div>
 
-      {/* Locations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredLocations.map((location) => {
-          const stats = getLocationStats(location.id);
-          
-          return (
-            <Card 
-              key={location.id} 
-              className={`border-0 shadow-sm hover:shadow-md transition-all duration-300 ${
-                location.isSubmitted ? 'bg-emerald-50/50' : location.isCompleted ? 'bg-teal-50/50' : 'bg-white'
-              }`}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-xl ${
-                    location.isSubmitted 
-                      ? 'bg-emerald-100' 
-                      : location.isCompleted 
-                        ? 'bg-teal-100'
-                        : location.isAssigned
-                          ? 'bg-blue-100'
-                          : 'bg-slate-100'
-                  }`}>
-                    <MapPin className={`w-6 h-6 ${
-                      location.isSubmitted 
-                        ? 'text-emerald-600' 
-                        : location.isCompleted 
-                          ? 'text-teal-600'
-                          : location.isAssigned
-                            ? 'text-blue-600'
-                            : 'text-slate-600'
-                    }`} />
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {location.isAssigned && (
-                      <Badge className="bg-blue-100 text-blue-700 border-0 text-xs">
-                        <UserCheck className="w-3 h-3 mr-1" />
-                        Assigned
-                      </Badge>
-                    )}
-                    {location.isSubmitted ? (
-                      <Lock className="w-4 h-4 text-emerald-600" />
-                    ) : location.isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4 text-teal-600" />
-                    ) : (
-                      <Clock className="w-4 h-4 text-amber-500" />
-                    )}
-                    
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {!location.isSubmitted && (
-                          <DropdownMenuItem asChild>
-                            <Link to={`/scan?location=${location.id}`} className="flex items-center">
-                              <ScanBarcode className="w-4 h-4 mr-2" />
-                              Scan Items
-                            </Link>
-                          </DropdownMenuItem>
-                        )}
-                        {location.isSubmitted && (
-                          <DropdownMenuItem onClick={() => handleReopenRequest(location)}>
-                            <Unlock className="w-4 h-4 mr-2" />
-                            Reopen Location
-                          </DropdownMenuItem>
-                        )}
-                        {!location.isSubmitted && location.isCompleted && (
-                          <DropdownMenuItem onClick={() => submitLocation(location.id)}>
-                            <Lock className="w-4 h-4 mr-2" />
-                            Submit & Lock
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteRequest(location)}
-                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete Location
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                <h3 className="font-semibold text-slate-800 mb-1">{location.name}</h3>
-                <p className="text-sm text-slate-500 mb-4">{location.code}</p>
-
-                <div className="flex items-center justify-between text-sm">
-                  <div>
-                    <span className="text-slate-500">Items: </span>
-                    <span className="font-medium text-slate-700">{stats.totalItems}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Qty: </span>
-                    <span className="font-medium text-slate-700">{stats.totalQuantity}</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  {location.isSubmitted ? (
-                    <Badge className="bg-emerald-100 text-emerald-700 border-0 w-full justify-center py-1">
-                      <Lock className="w-3 h-3 mr-1" /> Submitted & Locked
-                    </Badge>
-                  ) : location.isCompleted ? (
-                    <Badge className="bg-teal-100 text-teal-700 border-0 w-full justify-center py-1">
-                      <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
-                    </Badge>
-                  ) : (
-                    <Link to={`/scan?location=${location.id}`}>
-                      <Button variant="outline" className="w-full border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200">
-                        <ScanBarcode className="w-4 h-4 mr-2" />
-                        Continue Scanning
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Locations Display - List View for Pre-Assigned, Card View for Dynamic */}
+      {isPreAssignedMode ? renderListView() : renderCardView()}
 
       {filteredLocations.length === 0 && (
         <div className="text-center py-12">
@@ -444,7 +582,6 @@ COLD-01,Cold Storage Unit 1`;
                 value={newLocation.code}
                 onChange={(e) => setNewLocation({ ...newLocation, code: e.target.value })}
               />
-              <p className="text-xs text-slate-500">This code will be used to scan and select this location</p>
             </div>
           </div>
           <DialogFooter>
@@ -470,16 +607,15 @@ COLD-01,Cold Storage Unit 1`;
               Import Assigned Locations
             </DialogTitle>
             <DialogDescription>
-              Import locations from CSV file. Only these locations can be scanned in Pre-Assigned mode.
+              Import locations from CSV file for scanning
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            {/* Current assigned count */}
             {assignedLocationsCount > 0 && (
               <div className="p-3 bg-blue-50 rounded-lg flex items-center justify-between">
                 <div className="flex items-center gap-2 text-blue-700">
                   <UserCheck className="w-4 h-4" />
-                  <span className="text-sm font-medium">{assignedLocationsCount} locations currently assigned</span>
+                  <span className="text-sm font-medium">{assignedLocationsCount} locations assigned</span>
                 </div>
                 <Button
                   variant="outline"
@@ -493,13 +629,10 @@ COLD-01,Cold Storage Unit 1`;
               </div>
             )}
 
-            {/* CSV Format Info */}
             <div className="p-4 bg-slate-50 rounded-lg">
               <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
               <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
-                Location Code,Location Name<br />
-                WH-A1,Warehouse A - Section 1<br />
-                WH-B1,Warehouse B - Section 1
+                Location Code,Location Name
               </code>
               <Button
                 variant="link"
@@ -512,11 +645,10 @@ COLD-01,Cold Storage Unit 1`;
               </Button>
             </div>
 
-            {/* File Upload */}
             <div className="relative">
               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 transition-colors cursor-pointer">
                 <FileSpreadsheet className="w-10 h-10 text-slate-400 mb-3" />
-                <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
+                <p className="text-sm text-slate-500 mb-2">Click to upload</p>
                 <p className="text-xs text-slate-400">CSV files only</p>
                 <input
                   ref={fileInputRef}
@@ -528,7 +660,6 @@ COLD-01,Cold Storage Unit 1`;
               </div>
             </div>
 
-            {/* Import Result */}
             {importResult && (
               <div className={`p-3 rounded-lg flex items-center gap-2 ${
                 importResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
@@ -545,15 +676,6 @@ COLD-01,Cold Storage Unit 1`;
                 </span>
               </div>
             )}
-
-            {/* Warning */}
-            <div className="p-3 bg-amber-50 rounded-lg flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-amber-700">
-                In Pre-Assigned mode, employees can only scan locations that are imported here. 
-                Any other location codes will be rejected.
-              </p>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowImportModal(false)}>
@@ -572,7 +694,7 @@ COLD-01,Cold Storage Unit 1`;
               Delete Location?
             </DialogTitle>
             <DialogDescription>
-              This will permanently delete the location and all its scanned items. This action cannot be undone.
+              This will permanently delete the location and all its scanned items.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -595,7 +717,7 @@ COLD-01,Cold Storage Unit 1`;
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Delete Location
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -610,7 +732,7 @@ COLD-01,Cold Storage Unit 1`;
               Reopen Location?
             </DialogTitle>
             <DialogDescription>
-              This location has been submitted. Reopening will allow editing of scanned items.
+              This location has been completed. Reopening will allow editing.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -618,7 +740,7 @@ COLD-01,Cold Storage Unit 1`;
               <strong>Location:</strong> {selectedLocation?.name}
             </p>
             <p className="text-sm text-slate-500 mt-2">
-              You will need to authenticate to proceed with this action.
+              You will need to authenticate to proceed.
             </p>
           </div>
           <DialogFooter>
@@ -638,7 +760,7 @@ COLD-01,Cold Storage Unit 1`;
           <DialogHeader>
             <DialogTitle>Authentication Required</DialogTitle>
             <DialogDescription>
-              Please enter your credentials to proceed
+              Enter your credentials to proceed
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
