@@ -115,7 +115,7 @@ const Reports = () => {
   };
 
   // Check if "All Locations" should appear checked
-  const isAllSelected = selectedLocations.includes('all') || selectedLocations.length === 0;
+  const isAllSelected = selectedLocations.includes('all');
 
   const handleExportCSV = () => {
     // Export only data for selected locations
