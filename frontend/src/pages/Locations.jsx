@@ -141,7 +141,8 @@ const Locations = () => {
   };
 
   const handleAuthSubmit = () => {
-    const result = login(authCredentials.userId, authCredentials.password);
+    // Use authorization credentials for reopen/delete actions
+    const result = verifyAuthorizationCredentials(authCredentials.userId, authCredentials.password);
     if (result.success) {
       setAuthError('');
       setShowAuthModal(false);
@@ -153,7 +154,7 @@ const Locations = () => {
       setPendingAction(null);
       setAuthCredentials({ userId: '', password: '' });
     } else {
-      setAuthError('Invalid credentials. Please try again.');
+      setAuthError('Invalid authorization credentials. Use credentials from "Import Users" in Master Data.');
     }
   };
 
