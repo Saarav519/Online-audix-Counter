@@ -105,19 +105,19 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('audix_authenticated');
   };
 
-  // Add scanned item to location
+  // Add scanned item to location - OPTIMIZED FOR FAST SCANNING
   const addScannedItem = (locationId, barcode, quantity = 1) => {
     const product = masterProducts.find(p => p.barcode === barcode);
     const isValidBarcode = product !== undefined;
     
     // Check if non-master products are allowed
     if (!isValidBarcode && !settings.allowNonMasterProducts) {
-      playSound(false);
       return { success: false, error: 'Barcode not in master list', isValid: false };
     }
 
-    playSound(true);
-
+    // Use functional update to avoid stale state issues during rapid scanning
+    let newItem = null;
+    
     setScannedItems(prev => {
       const locationItems = prev[locationId] || [];
       const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
@@ -126,7 +126,6 @@ export const AppProvider = ({ children }) => {
         // Single SKU Mode: 
         // - Same barcode stays in ONE line
         // - Quantity auto-increments by 1 per scan
-        // - NO manual quantity entry allowed
         if (existingIndex !== -1) {
           // Update existing item - increment by 1
           const updated = [...locationItems];
@@ -135,13 +134,14 @@ export const AppProvider = ({ children }) => {
             quantity: updated[existingIndex].quantity + 1,
             scannedAt: new Date().toISOString()
           };
+          newItem = updated[existingIndex];
           return { ...prev, [locationId]: updated };
         } else {
           // Add new item with quantity 1
-          const newItem = {
-            id: `scan_${Date.now()}`,
+          newItem = {
+            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             barcode,
-            productName: product ? product.name : `Unknown Product (${barcode})`,
+            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
             quantity: 1,
             scannedAt: new Date().toISOString(),
             isMaster: !!product
@@ -149,9 +149,7 @@ export const AppProvider = ({ children }) => {
           return { ...prev, [locationId]: [...locationItems, newItem] };
         }
       } else {
-        // Non-Single SKU Mode (Manual Qty Entry):
-        // - Can enter any quantity manually
-        // - Same barcode can have quantity added to existing entry
+        // Non-Single SKU Mode (Manual Qty Entry)
         if (existingIndex !== -1) {
           // Update existing item quantity
           const updated = [...locationItems];
@@ -160,13 +158,14 @@ export const AppProvider = ({ children }) => {
             quantity: updated[existingIndex].quantity + quantity,
             scannedAt: new Date().toISOString()
           };
+          newItem = updated[existingIndex];
           return { ...prev, [locationId]: updated };
         } else {
           // Add new item with specified quantity
-          const newItem = {
-            id: `scan_${Date.now()}`,
+          newItem = {
+            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             barcode,
-            productName: product ? product.name : `Unknown Product (${barcode})`,
+            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
             quantity,
             scannedAt: new Date().toISOString(),
             isMaster: !!product
@@ -176,7 +175,7 @@ export const AppProvider = ({ children }) => {
       }
     });
 
-    return { success: true, isValid: isValidBarcode, product };
+    return { success: true, isValid: isValidBarcode, product, item: newItem };
   };
 
   // Delete scanned item from specific location only
