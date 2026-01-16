@@ -83,7 +83,7 @@ const Layout = ({ children }) => {
   // Scanner Device Layout - Bottom navigation with large buttons
   if (showScannerMode) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="min-h-screen min-h-[-webkit-fill-available] bg-slate-50 flex flex-col overflow-hidden">
         {/* Compact Header for Scanner Devices */}
         <header className="fixed top-0 left-0 right-0 h-12 bg-white border-b border-slate-200 z-50 px-3 flex items-center justify-between shadow-sm">
           {/* Logo moved to corner - smaller and non-interactive to avoid accidental clicks */}
