@@ -531,6 +531,7 @@ export const AppProvider = ({ children }) => {
     updateUserCredentials,
     addScannedItem,
     deleteScannedItem,
+    deleteLocationData,
     updateItemQuantity,
     submitLocation,
     reopenLocation,
