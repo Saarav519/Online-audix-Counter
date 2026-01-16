@@ -1,5 +1,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ===== GLOBAL SCROLL FIX FOR PWA & ANDROID ===== */
+
+html, body {
+    height: 100%;
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#root {
+    min-height: 100%;
+    min-height: -webkit-fill-available;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Ensure all scrollable containers work properly */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-scroll {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-scrolling: touch !important;
+}
+
+/* Fix for Android WebView scroll issues */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .App-logo {
     height: 40vmin;
     pointer-events: none;
