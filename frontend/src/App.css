@@ -35,6 +35,99 @@
     }
 }
 
+/* ===== PWA INSTALLED MODE STYLES ===== */
+
+/* Hide browser UI elements when running as PWA */
+body.pwa-installed {
+    /* Ensure full screen usage */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+}
+
+/* Hide Emergent badge when installed as PWA */
+body.pwa-installed #emergent-badge {
+    display: none !important;
+}
+
+/* PWA Install Prompt */
+.pwa-install-prompt {
+    position: fixed;
+    bottom: 80px;
+    left: 16px;
+    right: 16px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+    z-index: 1000;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.pwa-install-prompt h3 {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.pwa-install-prompt p {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.pwa-install-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.pwa-install-buttons button {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.pwa-install-btn {
+    background: white;
+    color: #10b981;
+}
+
+.pwa-dismiss-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Safe area padding for notched devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+    body.pwa-installed {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+}
+
+
 /* Global Styles */
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
