@@ -86,6 +86,40 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 - `/app/frontend/src/pages/ScanItems.jsx`
 - `/app/frontend/src/context/AppContext.js`
 
+### Fix #3: Master Data Columns in Report Export
+**Problem**: Reports export was missing master data columns (SKU, Category, Price).
+
+**Solution**: Added SKU, Category, and Price columns to both the Reports table display and CSV export.
+
+**Files Changed**: `/app/frontend/src/pages/Reports.jsx`
+
+### Fix #4: Main Screen & Settings Authentication Sync
+**Problem**: User wanted main login and settings to use the same credentials, with changes applying to both.
+
+**Solution**: 
+1. Login uses only mock users (not imported users)
+2. Settings uses same credentials as main login
+3. Change Credentials in Settings updates credentials for both screens
+4. Added `updateUserCredentials()` function to persist changes
+
+**Files Changed**: 
+- `/app/frontend/src/context/AppContext.js`
+- `/app/frontend/src/pages/Settings.jsx`
+
+### Fix #5: Separate Authorization Users
+**Problem**: User Import was being used for login, but should only be for authorization actions.
+
+**Solution**:
+1. Renamed "Import Users" to "Import Authorization Users"
+2. Authorization users can ONLY be used for: location deletion, reopening locked locations
+3. Authorization users CANNOT login or access settings
+4. Clear UI messaging about the separation
+
+**Files Changed**: 
+- `/app/frontend/src/context/AppContext.js` (added `verifyAuthorizationCredentials()`, `importAuthorizationUsers()`)
+- `/app/frontend/src/pages/MasterData.jsx`
+- `/app/frontend/src/pages/Locations.jsx`
+
 ---
 
 ## Architecture
