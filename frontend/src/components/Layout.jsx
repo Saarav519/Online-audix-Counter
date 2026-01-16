@@ -122,8 +122,8 @@ const Layout = ({ children }) => {
           </DropdownMenu>
         </header>
 
-        {/* Main Content - Adjusted for header and bottom nav */}
-        <main className="flex-1 pt-14 pb-20 overflow-auto">
+        {/* Main Content - Adjusted for smaller header and bottom nav */}
+        <main className="flex-1 pt-12 pb-20 overflow-auto">
           <div className="p-3">
             {children}
           </div>
