@@ -64,12 +64,16 @@
     "production": [
       ">0.2%",
       "not dead",
-      "not op_mini all"
+      "not op_mini all",
+      "Android >= 7",
+      "Chrome >= 60",
+      "ChromeAndroid >= 60"
     ],
     "development": [
       "last 1 chrome version",
       "last 1 firefox version",
-      "last 1 safari version"
+      "last 1 safari version",
+      "Android >= 7"
     ]
   },
   "devDependencies": {
