@@ -402,6 +402,9 @@ const ScanItems = () => {
     submitLocation(selectedLocationId);
     setShowSubmitModal(false);
     
+    // Clear the current scan location from localStorage since it's submitted
+    localStorage.removeItem('audix_current_scan_location');
+    
     // Check if we're in Pre-Assigned mode
     if (settings.locationScanMode === 'preassigned') {
       // In Pre-Assigned mode, navigate back to Locations page
