@@ -99,6 +99,31 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 - `/app/frontend/src/hooks/useDeviceDetection.js`
 - `/app/frontend/src/App.css`
 
+### Fix #11: Submit Button Missing in Dynamic Mode (Scanner UI)
+**Problem**: In Dynamic mode, the Submit option was missing from the Scan Item screen on scanner devices. Users couldn't submit locations.
+
+**Solution**:
+1. Added **Fixed Bottom Action Bar** on Scan Items page for scanner mode containing:
+   - Clear button (to clear current location)
+   - Submit Location button (green when items are scanned)
+   - Status bar showing current location and item count
+2. The bottom action bar stays visible while scrolling
+3. Top navigation menu (Home, Locations, Scan, Reports, Settings) remains fixed at top
+4. Redesigned scanner mode UI for better usability on handheld devices
+
+**Files Changed**: `/app/frontend/src/pages/ScanItems.jsx`
+
+### Fix #12: Emergent Logo Position
+**Problem**: Emergent "Made with Emergent" badge was at the bottom of the screen, interfering with navigation.
+
+**Solution**:
+1. Moved the badge to top-right corner of the screen
+2. Made badge smaller and less intrusive (smaller font, reduced padding)
+3. Lowered z-index to avoid blocking important UI elements
+4. Badge is now visible but not interfering with user actions
+
+**Files Changed**: `/app/frontend/public/index.html`
+
 ### Fix #1: Post-Submission Navigation Issue
 **Problem**: In Pre-Assigned mode, after submitting a location, the system stayed on the Scan Items page instead of navigating to the next location.
 
