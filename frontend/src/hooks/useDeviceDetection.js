@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Custom hook to detect device type and scanner capabilities
@@ -89,39 +89,81 @@ export const useDeviceDetection = () => {
 };
 
 /**
- * Custom hook to handle hardware scanner key events
- * Compatible with most enterprise Android scanners
+ * HIGH-PERFORMANCE Hardware Scanner Hook
+ * Optimized for rapid continuous scanning without lag
+ * 
+ * Features:
+ * - Scan queue to handle rapid consecutive scans
+ * - No React state updates during scanning (uses refs)
+ * - Debounced processing to prevent overwrites
+ * - Compatible with most enterprise Android scanners
  */
 export const useHardwareScanner = (onScan, isEnabled = true) => {
   const [scanBuffer, setScanBuffer] = useState('');
-  const [lastKeyTime, setLastKeyTime] = useState(0);
+  
+  // Use refs to avoid re-renders during fast scanning
+  const bufferRef = useRef('');
+  const lastKeyTimeRef = useRef(0);
+  const timeoutRef = useRef(null);
+  const scanQueueRef = useRef([]);
+  const processingRef = useRef(false);
+  const onScanRef = useRef(onScan);
+  
+  // Keep onScan ref updated
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  // Process scan queue - handles rapid consecutive scans
+  const processQueue = useCallback(() => {
+    if (processingRef.current || scanQueueRef.current.length === 0) return;
+    
+    processingRef.current = true;
+    
+    // Process all queued scans
+    while (scanQueueRef.current.length > 0) {
+      const barcode = scanQueueRef.current.shift();
+      if (barcode && onScanRef.current) {
+        onScanRef.current(barcode);
+      }
+    }
+    
+    processingRef.current = false;
+  }, []);
+
+  // Add scan to queue and process
+  const queueScan = useCallback((barcode) => {
+    if (!barcode || barcode.trim().length === 0) return;
+    
+    scanQueueRef.current.push(barcode.trim());
+    
+    // Process immediately using microtask to avoid blocking
+    queueMicrotask(processQueue);
+  }, [processQueue]);
 
   useEffect(() => {
     if (!isEnabled) return;
 
-    let buffer = '';
-    let timeout = null;
-    
     const handleKeyDown = (e) => {
       const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTimeRef.current;
       
-      // Hardware scanners typically send input very fast (< 50ms between keys)
-      // Regular keyboard input is much slower
-      const timeDiff = currentTime - lastKeyTime;
-      
-      // If it's been more than 100ms since last key, reset buffer
+      // Reset buffer if too much time has passed (> 100ms between keys)
+      // Hardware scanners typically send input < 50ms between keys
       if (timeDiff > 100) {
-        buffer = '';
+        bufferRef.current = '';
       }
       
-      setLastKeyTime(currentTime);
+      lastKeyTimeRef.current = currentTime;
       
       // Handle Enter key (most scanners send Enter after barcode)
       if (e.key === 'Enter') {
-        if (buffer.length > 0) {
-          e.preventDefault();
-          onScan?.(buffer);
-          buffer = '';
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (bufferRef.current.length > 0) {
+          queueScan(bufferRef.current);
+          bufferRef.current = '';
           setScanBuffer('');
         }
         return;
@@ -129,10 +171,12 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
       
       // Handle Tab key (some scanners use Tab as suffix)
       if (e.key === 'Tab') {
-        if (buffer.length > 0) {
-          e.preventDefault();
-          onScan?.(buffer);
-          buffer = '';
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (bufferRef.current.length > 0) {
+          queueScan(bufferRef.current);
+          bufferRef.current = '';
           setScanBuffer('');
         }
         return;
@@ -140,49 +184,98 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
       
       // Only capture printable characters
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        buffer += e.key;
-        setScanBuffer(buffer);
+        bufferRef.current += e.key;
         
-        // Clear buffer after 500ms of inactivity
-        if (timeout) clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          buffer = '';
-          setScanBuffer('');
-        }, 500);
+        // Update display buffer (debounced to avoid excessive re-renders)
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+          setScanBuffer(bufferRef.current);
+        }, 50);
       }
     };
 
     // Handle hardware scan button events (for Zebra, Honeywell, etc.)
     const handleScanButton = (e) => {
-      // Some devices dispatch custom events for hardware buttons
       if (e.type === 'scanbutton' || e.type === 'hardwarescan') {
         const barcode = e.detail?.barcode || e.data;
         if (barcode) {
-          onScan?.(barcode);
+          queueScan(barcode);
         }
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    // Handle Zebra DataWedge messages
+    const handleMessage = (e) => {
+      if (e.data && typeof e.data === 'object' && e.data.barcode) {
+        queueScan(e.data.barcode);
+      }
+    };
+
+    // Use capture phase for faster response
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('scanbutton', handleScanButton);
     document.addEventListener('hardwarescan', handleScanButton);
-    
-    // For Zebra DataWedge
-    window.addEventListener('message', (e) => {
-      if (e.data && typeof e.data === 'object' && e.data.barcode) {
-        onScan?.(e.data.barcode);
-      }
-    });
+    window.addEventListener('message', handleMessage);
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true });
       document.removeEventListener('scanbutton', handleScanButton);
       document.removeEventListener('hardwarescan', handleScanButton);
-      if (timeout) clearTimeout(timeout);
+      window.removeEventListener('message', handleMessage);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [onScan, isEnabled, lastKeyTime]);
+  }, [isEnabled, queueScan]);
 
   return { scanBuffer };
+};
+
+/**
+ * Ultra-fast barcode input hook for direct input field scanning
+ * Use this when you want the barcode to go directly into an input field
+ * and be processed on Enter
+ */
+export const useFastBarcodeInput = (inputRef, onBarcodeScanned, isEnabled = true) => {
+  const lastInputTimeRef = useRef(0);
+  const scanModeRef = useRef(false);
+  
+  useEffect(() => {
+    if (!isEnabled || !inputRef.current) return;
+    
+    const input = inputRef.current;
+    
+    const handleInput = (e) => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastInputTimeRef.current;
+      
+      // If input is coming very fast (< 50ms), it's likely from a scanner
+      if (timeDiff < 50) {
+        scanModeRef.current = true;
+      } else if (timeDiff > 200) {
+        scanModeRef.current = false;
+      }
+      
+      lastInputTimeRef.current = currentTime;
+    };
+    
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const value = input.value.trim();
+        if (value && onBarcodeScanned) {
+          onBarcodeScanned(value);
+          input.value = '';
+        }
+      }
+    };
+    
+    input.addEventListener('input', handleInput);
+    input.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      input.removeEventListener('input', handleInput);
+      input.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [inputRef, onBarcodeScanned, isEnabled]);
 };
 
 export default useDeviceDetection;
