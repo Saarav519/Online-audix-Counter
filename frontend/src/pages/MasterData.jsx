@@ -146,7 +146,7 @@ const MasterData = () => {
           return;
         }
 
-        const count = importUsers(users);
+        const count = importAuthorizationUsers(users);
         setUserImportResult({ success: true, count });
       } catch (error) {
         setUserImportResult({ success: false, error: 'Failed to parse CSV file' });
