@@ -11,6 +11,7 @@ import MasterData from "./pages/MasterData";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import { Toaster } from "./components/ui/sonner";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -104,6 +105,7 @@ function App() {
       <BrowserRouter>
         <AppRoutes />
         <Toaster position="top-right" />
+        <PWAInstallPrompt />
       </BrowserRouter>
     </AppProvider>
   );
