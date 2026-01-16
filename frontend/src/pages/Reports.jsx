@@ -1,92 +1,77 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '../components/ui/popover';
-import {
-  FileSpreadsheet,
   Download,
   Mail,
   MapPin,
   Package,
   CheckCircle2,
   BarChart3,
-  ChevronDown,
+  Check,
   X
 } from 'lucide-react';
 
 const Reports = () => {
   const { locations, scannedItems, currentSession, masterProducts } = useApp();
-  const [selectedLocations, setSelectedLocations] = useState(['all']); // Multiple selection
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedLocations, setSelectedLocations] = useState(['all']);
+
+  // Check if "All Locations" is selected
+  const isAllSelected = selectedLocations.includes('all');
 
   // Handle location selection
   const handleLocationToggle = (locationId) => {
     if (locationId === 'all') {
-      // Toggle All Locations
-      if (selectedLocations.includes('all')) {
-        // If "All" is selected, clicking it should allow individual selection
-        // We'll select the first location to enable the individual selection mode
+      if (isAllSelected) {
+        // Switch to first location when unchecking "All"
         if (locations.length > 0) {
           setSelectedLocations([locations[0].id]);
         }
       } else {
-        // Select "All Locations"
         setSelectedLocations(['all']);
       }
     } else {
       setSelectedLocations(prev => {
-        // Remove 'all' if it was selected
         const newSelection = prev.filter(id => id !== 'all');
         
         if (newSelection.includes(locationId)) {
-          // Remove location if already selected
           const filtered = newSelection.filter(id => id !== locationId);
-          // If no locations selected, default to 'all'
           return filtered.length === 0 ? ['all'] : filtered;
         } else {
-          // Add location to selection
           return [...newSelection, locationId];
         }
       });
     }
   };
 
-  // Clear all selections
-  const clearSelections = () => {
+  // Select all locations individually
+  const selectAllLocations = () => {
     setSelectedLocations(['all']);
   };
 
-  // Get items for selected locations
+  // Clear all selections (select none)
+  const clearSelections = () => {
+    if (locations.length > 0) {
+      setSelectedLocations([locations[0].id]);
+    }
+  };
+
+  // Get items for selected locations (for export)
   const getLocationItems = useMemo(() => {
-    // If 'all' is selected, show all items
-    if (selectedLocations.includes('all')) {
+    if (isAllSelected) {
       return Object.entries(scannedItems).flatMap(([locId, items]) => {
         const loc = locations.find(l => l.id === locId);
         return items.map(item => ({ ...item, locationName: loc?.name || 'Unknown', locationId: locId }));
       });
     }
     
-    // If no locations selected, show empty (user needs to select)
     if (selectedLocations.length === 0) {
       return [];
     }
     
-    // Get items only for selected locations
     return selectedLocations.flatMap(locId => {
       const loc = locations.find(l => l.id === locId);
       return (scannedItems[locId] || []).map(item => ({ 
@@ -95,10 +80,9 @@ const Reports = () => {
         locationId: locId 
       }));
     });
-  }, [selectedLocations, scannedItems, locations]);
+  }, [selectedLocations, scannedItems, locations, isAllSelected]);
 
   const reportItems = getLocationItems;
-
   const totalQuantity = reportItems.reduce((sum, item) => sum + item.quantity, 0);
   const uniqueProducts = new Set(reportItems.map(item => item.barcode)).size;
 
@@ -107,26 +91,22 @@ const Reports = () => {
     return masterProducts.find(p => p.barcode === barcode) || null;
   };
 
-  // Get display text for selected locations
+  // Get selection display text
   const getSelectionDisplayText = () => {
-    if (selectedLocations.includes('all')) {
+    if (isAllSelected) {
       return 'All Locations';
     }
     if (selectedLocations.length === 0) {
-      return 'Select Locations';
+      return 'No locations selected';
     }
     if (selectedLocations.length === 1) {
       const loc = locations.find(l => l.id === selectedLocations[0]);
-      return loc?.name || 'Select Location';
+      return loc?.name || '1 location';
     }
     return `${selectedLocations.length} locations selected`;
   };
 
-  // Check if "All Locations" should appear checked
-  const isAllSelected = selectedLocations.includes('all');
-
   const handleExportCSV = () => {
-    // Export only data for selected locations
     const headers = ['Location', 'Barcode', 'Product Name', 'SKU', 'Category', 'Price', 'Quantity', 'Scanned At', 'Status'];
     const rows = reportItems.map(item => {
       const masterProduct = getMasterProductDetails(item.barcode);
@@ -149,7 +129,6 @@ const Reports = () => {
     const a = document.createElement('a');
     a.href = url;
     
-    // Include selection info in filename
     const selectionSuffix = isAllSelected
       ? 'all_locations' 
       : `${selectedLocations.length}_locations`;
@@ -170,18 +149,19 @@ const Reports = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    <div className="flex flex-col h-full">
+      {/* Header with Export Buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Reports</h1>
-          <p className="text-slate-500 mt-1">View and export your inventory reports</p>
+          <h1 className="text-xl lg:text-2xl font-bold text-slate-800">Reports</h1>
+          <p className="text-sm text-slate-500">Select locations to export</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={handleExportCSV}
             className="border-slate-200"
+            disabled={reportItems.length === 0}
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -190,321 +170,232 @@ const Reports = () => {
             variant="outline"
             onClick={handleEmailReport}
             className="border-slate-200"
+            disabled={reportItems.length === 0}
           >
             <Mail className="w-4 h-4 mr-2" />
-            Email Report
+            Email
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards - Compact */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-100 rounded-lg">
-                <MapPin className="w-5 h-5 text-emerald-600" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <MapPin className="w-4 h-4 text-emerald-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">
+                <p className="text-lg font-bold text-slate-800">
                   {isAllSelected ? locations.length : selectedLocations.length}
                 </p>
-                <p className="text-sm text-slate-500">
-                  {isAllSelected ? 'Total' : 'Selected'} Locations
+                <p className="text-xs text-slate-500">
+                  {isAllSelected ? 'Total' : 'Selected'}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <Package className="w-5 h-5 text-blue-600" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Package className="w-4 h-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{reportItems.length}</p>
-                <p className="text-sm text-slate-500">Line Items</p>
+                <p className="text-lg font-bold text-slate-800">{reportItems.length}</p>
+                <p className="text-xs text-slate-500">Items</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-100 rounded-lg">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <BarChart3 className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{totalQuantity}</p>
-                <p className="text-sm text-slate-500">Total Quantity</p>
+                <p className="text-lg font-bold text-slate-800">{totalQuantity}</p>
+                <p className="text-xs text-slate-500">Quantity</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-teal-100 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-teal-600" />
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-teal-100 rounded-lg">
+                <CheckCircle2 className="w-4 h-4 text-teal-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{uniqueProducts}</p>
-                <p className="text-sm text-slate-500">Unique Products</p>
+                <p className="text-lg font-bold text-slate-800">{uniqueProducts}</p>
+                <p className="text-xs text-slate-500">Unique</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filter - Multiple Location Selection */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+      {/* Selection Info Bar */}
+      <div className="flex items-center justify-between bg-slate-50 rounded-lg px-4 py-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700">{getSelectionDisplayText()}</span>
+          {!isAllSelected && selectedLocations.length > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {selectedLocations.length} of {locations.length}
+            </Badge>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {!isAllSelected && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={selectAllLocations}
+              className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+            >
+              <Check className="w-3 h-3 mr-1" />
+              Select All
+            </Button>
+          )}
+          {!isAllSelected && selectedLocations.length > 1 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearSelections}
+              className="h-7 text-xs text-slate-500 hover:text-slate-700"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Full-Screen Location Selection List */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white">
+          {/* All Locations Option - Sticky at Top */}
+          <div 
+            className={`sticky top-0 z-10 flex items-center gap-3 p-4 border-b-2 border-slate-200 cursor-pointer transition-colors ${
+              isAllSelected 
+                ? 'bg-emerald-50' 
+                : 'bg-white hover:bg-slate-50'
+            }`}
+            onClick={() => handleLocationToggle('all')}
+          >
+            <Checkbox 
+              checked={isAllSelected}
+              className="pointer-events-none h-5 w-5"
+            />
             <div className="flex-1">
-              <label className="text-sm font-medium text-slate-700 mb-1.5 block">
-                Filter by Location (Multiple Selection)
-              </label>
-              <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-between h-10 border-slate-200"
-                  >
-                    <span className="truncate">{getSelectionDisplayText()}</span>
-                    <ChevronDown className="w-4 h-4 ml-2 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <div className="p-2 border-b border-slate-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-slate-700">Select Locations</span>
-                      {!isAllSelected && selectedLocations.length > 0 && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearSelections();
-                          }}
-                          className="h-7 text-xs text-slate-500 hover:text-slate-700"
-                        >
-                          <X className="w-3 h-3 mr-1" />
-                          Clear
-                        </Button>
+              <span className="text-base font-semibold text-slate-800">All Locations</span>
+              <p className="text-xs text-slate-500">Select all {locations.length} locations</p>
+            </div>
+            <Badge className="bg-emerald-100 text-emerald-700 border-0">
+              {Object.values(scannedItems).flat().length} items
+            </Badge>
+          </div>
+
+          {/* Individual Locations */}
+          <div className="divide-y divide-slate-100">
+            {locations.map((loc) => {
+              const itemCount = (scannedItems[loc.id] || []).length;
+              const locQuantity = (scannedItems[loc.id] || []).reduce((sum, item) => sum + item.quantity, 0);
+              const isSelected = selectedLocations.includes(loc.id);
+              const isDisabled = isAllSelected;
+              
+              return (
+                <div 
+                  key={loc.id}
+                  className={`flex items-center gap-3 p-4 cursor-pointer transition-colors ${
+                    isDisabled 
+                      ? 'opacity-50 cursor-not-allowed bg-slate-50' 
+                      : isSelected 
+                        ? 'bg-blue-50 hover:bg-blue-100' 
+                        : 'bg-white hover:bg-slate-50'
+                  }`}
+                  onClick={() => {
+                    if (!isDisabled) {
+                      handleLocationToggle(loc.id);
+                    }
+                  }}
+                >
+                  <Checkbox 
+                    checked={isSelected || isAllSelected}
+                    disabled={isDisabled}
+                    className="pointer-events-none h-5 w-5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-base font-medium truncate ${isSelected ? 'text-blue-700' : 'text-slate-800'}`}>
+                        {loc.name}
+                      </span>
+                      {loc.isSubmitted && (
+                        <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Submitted
+                        </Badge>
+                      )}
+                      {loc.autoCreated && (
+                        <Badge variant="outline" className="text-xs border-purple-200 text-purple-600">
+                          Auto
+                        </Badge>
                       )}
                     </div>
+                    <p className="text-xs text-slate-500 font-mono">{loc.code}</p>
                   </div>
-                  <div className="max-h-[250px] overflow-y-auto p-2">
-                    {/* All Locations Option */}
-                    <div 
-                      className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleLocationToggle('all');
-                      }}
-                    >
-                      <Checkbox 
-                        id="all-locations"
-                        checked={isAllSelected}
-                        className="pointer-events-none"
-                      />
-                      <span className="text-sm font-medium flex-1">
-                        All Locations
-                      </span>
-                      <Badge variant="secondary" className="text-xs">
-                        {locations.length}
-                      </Badge>
-                    </div>
-                    
-                    <div className="my-2 border-t border-slate-100" />
-                    
-                    {/* Individual Locations */}
-                    {locations.map((loc) => {
-                      const itemCount = (scannedItems[loc.id] || []).length;
-                      const isLocationSelected = selectedLocations.includes(loc.id);
-                      
-                      return (
-                        <div 
-                          key={loc.id}
-                          className={`flex items-center space-x-3 p-2 rounded-md cursor-pointer ${
-                            isAllSelected ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50'
-                          }`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!isAllSelected) {
-                              handleLocationToggle(loc.id);
-                            }
-                          }}
-                        >
-                          <Checkbox 
-                            id={loc.id}
-                            checked={isLocationSelected || isAllSelected}
-                            disabled={isAllSelected}
-                            className="pointer-events-none"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm block truncate">
-                              {loc.name}
-                            </span>
-                            <span className="text-xs text-slate-400">{loc.code}</span>
-                          </div>
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs shrink-0 ${
-                              loc.isSubmitted 
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
-                                : 'border-slate-200'
-                            }`}
-                          >
-                            {itemCount} items
-                          </Badge>
-                        </div>
-                      );
-                    })}
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-slate-700">{itemCount} items</p>
+                    <p className="text-xs text-slate-500">{locQuantity} qty</p>
                   </div>
-                  <div className="p-2 border-t border-slate-100 bg-slate-50">
-                    <Button 
-                      size="sm" 
-                      className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFilterOpen(false);
-                      }}
-                    >
-                      Apply Filter
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              
-              {/* Selected locations badges */}
-              {!isAllSelected && selectedLocations.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {selectedLocations.map(locId => {
-                    const loc = locations.find(l => l.id === locId);
-                    return (
-                      <Badge 
-                        key={locId} 
-                        variant="secondary"
-                        className="text-xs pr-1"
-                      >
-                        {loc?.name}
-                        <button 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleLocationToggle(locId);
-                          }}
-                          className="ml-1 hover:bg-slate-300 rounded-full p-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
                 </div>
-              )}
-            </div>
-            <div className="flex items-start">
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <p className="text-xs text-slate-500">Session</p>
-                <p className="text-sm font-medium text-slate-700">{currentSession?.name}</p>
-              </div>
-            </div>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Report Table - Horizontal AND Vertical Scrolling */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            Inventory Report
-            <Badge variant="secondary" className="ml-2">
-              {reportItems.length} items
-            </Badge>
-            {!isAllSelected && selectedLocations.length > 0 && (
-              <Badge variant="outline" className="ml-1 text-xs">
-                {selectedLocations.length} location(s)
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {reportItems.length === 0 ? (
-            <div className="text-center py-12">
-              <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500">No data to display</p>
-              <p className="text-sm text-slate-400 mt-1">
-                {isAllSelected 
-                  ? 'Start scanning items to generate reports'
-                  : 'No items found for selected locations'}
-              </p>
-            </div>
-          ) : (
-            // Scrollable container - both horizontal and vertical
-            <div className="overflow-auto max-h-[500px] relative">
-              <Table className="min-w-[900px]">
-                <TableHeader className="sticky top-0 bg-white z-10">
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="min-w-[120px]">Location</TableHead>
-                    <TableHead className="min-w-[130px]">Barcode</TableHead>
-                    <TableHead className="min-w-[150px]">Product Name</TableHead>
-                    <TableHead className="min-w-[100px]">SKU</TableHead>
-                    <TableHead className="min-w-[100px]">Category</TableHead>
-                    <TableHead className="text-right min-w-[80px]">Price</TableHead>
-                    <TableHead className="text-center min-w-[70px]">Qty</TableHead>
-                    <TableHead className="min-w-[150px]">Scanned At</TableHead>
-                    <TableHead className="text-center min-w-[90px]">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportItems.map((item, index) => {
-                    const masterProduct = getMasterProductDetails(item.barcode);
-                    return (
-                      <TableRow key={`${item.id}-${index}`} className="hover:bg-slate-50">
-                        <TableCell>
-                          <Badge variant="outline" className="border-slate-200 text-xs">
-                            {item.locationName}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{item.barcode}</TableCell>
-                        <TableCell className="font-medium">{item.productName}</TableCell>
-                        <TableCell className="text-slate-500 text-sm">{masterProduct?.sku || '-'}</TableCell>
-                        <TableCell>
-                          {masterProduct?.category ? (
-                            <Badge variant="outline" className="border-slate-200 text-xs">
-                              {masterProduct.category}
-                            </Badge>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell className="text-right text-sm">
-                          {masterProduct?.price ? `₹${masterProduct.price.toFixed(2)}` : '-'}
-                        </TableCell>
-                        <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                        <TableCell className="text-slate-500 text-sm">
-                          {new Date(item.scannedAt).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {item.isMaster !== false ? (
-                            <Badge className="bg-emerald-100 text-emerald-700 border-0 text-xs">Master</Badge>
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-700 border-0 text-xs">Non-Master</Badge>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+          {/* Empty State */}
+          {locations.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <MapPin className="w-12 h-12 text-slate-300 mb-4" />
+              <p className="text-slate-500 font-medium">No locations available</p>
+              <p className="text-sm text-slate-400">Start scanning to create locations</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Selected Locations Summary (if individual selections) */}
+      {!isAllSelected && selectedLocations.length > 0 && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-xs text-blue-700 mb-2 font-medium">Selected for Export:</p>
+          <div className="flex flex-wrap gap-1">
+            {selectedLocations.map(locId => {
+              const loc = locations.find(l => l.id === locId);
+              return (
+                <Badge 
+                  key={locId} 
+                  variant="secondary"
+                  className="text-xs bg-white border border-blue-200 pr-1"
+                >
+                  {loc?.name}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleLocationToggle(locId);
+                    }}
+                    className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
