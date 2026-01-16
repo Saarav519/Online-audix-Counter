@@ -171,7 +171,10 @@ const MasterData = () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'master_products.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
@@ -186,7 +189,10 @@ const MasterData = () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'sample_products.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
@@ -201,7 +207,10 @@ supervisor1,super789`;
     const a = document.createElement('a');
     a.href = url;
     a.download = 'sample_authorization_users.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   };
 
