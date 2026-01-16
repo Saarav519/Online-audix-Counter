@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 
 const MasterData = () => {
-  const { masterProducts, addMasterProduct, importMasterProducts, importUsers, getAllUsers } = useApp();
+  const { masterProducts, addMasterProduct, importMasterProducts, importAuthorizationUsers, getAuthorizationUsers } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
