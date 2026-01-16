@@ -124,17 +124,26 @@ const Settings = () => {
     setPasswordError('');
     setPasswordSuccess(false);
 
+    // Validate passwords match
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError('New passwords do not match');
       return;
     }
 
+    // Validate minimum password length
     if (passwordForm.newPassword.length < 6) {
       setPasswordError('Password must be at least 6 characters');
       return;
     }
 
-    setTimeout(() => {
+    // Update credentials using the context function
+    const result = updateUserCredentials(
+      passwordForm.currentPassword,
+      passwordForm.newUserId || user?.userId,
+      passwordForm.newPassword
+    );
+
+    if (result.success) {
       setPasswordSuccess(true);
       setPasswordForm({
         currentPassword: '',
@@ -142,7 +151,14 @@ const Settings = () => {
         newPassword: '',
         confirmPassword: ''
       });
-    }, 500);
+      // Close modal after success
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setPasswordSuccess(false);
+      }, 1500);
+    } else {
+      setPasswordError(result.error || 'Failed to update credentials');
+    }
   };
 
   // Show authentication modal if not authenticated
