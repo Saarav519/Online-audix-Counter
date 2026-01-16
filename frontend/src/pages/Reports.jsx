@@ -37,8 +37,15 @@ const Reports = () => {
   // Handle location selection
   const handleLocationToggle = (locationId) => {
     if (locationId === 'all') {
-      // If "All" is selected, clear other selections
-      setSelectedLocations(['all']);
+      // Toggle All Locations
+      if (selectedLocations.includes('all')) {
+        // If "All" is already selected, uncheck it (select nothing, which defaults back to showing all)
+        // But to allow individual selection, we'll keep it empty temporarily
+        setSelectedLocations([]);
+      } else {
+        // Select "All Locations"
+        setSelectedLocations(['all']);
+      }
     } else {
       setSelectedLocations(prev => {
         // Remove 'all' if it was selected
