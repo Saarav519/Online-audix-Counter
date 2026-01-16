@@ -162,6 +162,29 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 - `/app/frontend/src/pages/ScanItems.jsx`
 - `/app/frontend/src/context/AppContext.js`
 
+### Fix #15: Reports Section Improvements
+**Problem**: Reports section had three issues:
+1. Session History was not needed and should be removed
+2. Inventory Report only supported horizontal scrolling
+3. Filter by Location only allowed single selection
+
+**Solution**:
+1. **Removed Session History** - Completely removed the Session History section from Reports page in both Dynamic and Pre-Assigned modes
+2. **Added Both Scrolling Directions** - Inventory Report now supports both horizontal AND vertical scrolling with:
+   - Max height of 500px for vertical scrolling
+   - Min-width of 900px for horizontal scrolling
+   - Sticky header that stays visible while scrolling vertically
+3. **Multiple Location Selection** - Replaced single Select with multi-select dropdown:
+   - Checkboxes for each location
+   - "All Locations" option to select/deselect all
+   - Selected locations shown as badges below the filter
+   - Clear button to reset selection
+   - Apply Filter button to confirm selection
+   - Export CSV only includes data for selected locations
+   - Email report mentions selected locations count
+
+**Files Changed**: `/app/frontend/src/pages/Reports.jsx`
+
 ### Fix #1: Post-Submission Navigation Issue
 **Problem**: In Pre-Assigned mode, after submitting a location, the system stayed on the Scan Items page instead of navigating to the next location.
 
