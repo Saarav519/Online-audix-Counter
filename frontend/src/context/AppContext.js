@@ -344,15 +344,45 @@ export const AppProvider = ({ children }) => {
     return newProduct;
   };
 
-  // Import master products from CSV data
-  const importMasterProducts = (products) => {
+  // Import master products from CSV data - replaces old data
+  const importMasterProducts = (products, replaceExisting = true) => {
     const newProducts = products.map((p, index) => ({
       id: `prod_import_${Date.now()}_${index}`,
       ...p,
       isMaster: true
     }));
-    setMasterProducts(prev => [...prev, ...newProducts]);
+    
+    if (replaceExisting) {
+      // Replace all existing master products
+      setMasterProducts(newProducts);
+    } else {
+      // Append to existing
+      setMasterProducts(prev => [...prev, ...newProducts]);
+    }
     return newProducts.length;
+  };
+
+  // Import users from CSV data
+  const importUsers = (usersData) => {
+    // This would typically update a users state, but for now we'll store in localStorage
+    const importedUsers = usersData.map((u, index) => ({
+      id: `user_import_${Date.now()}_${index}`,
+      userId: u.userId || u.username,
+      password: u.password,
+      name: u.name || u.userId || u.username,
+      role: u.role || 'scanner',
+      createdAt: new Date().toISOString()
+    }));
+    
+    // Store imported users (in real app, this would go to backend)
+    localStorage.setItem('audix_imported_users', JSON.stringify(importedUsers));
+    return importedUsers.length;
+  };
+
+  // Get all users (mock + imported)
+  const getAllUsers = () => {
+    const importedUsers = JSON.parse(localStorage.getItem('audix_imported_users') || '[]');
+    return [...mockUsers, ...importedUsers];
   };
 
   const value = {
