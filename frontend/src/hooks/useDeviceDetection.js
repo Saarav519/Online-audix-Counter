@@ -183,8 +183,6 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
         }
         return;
       }
-        return;
-      }
       
       // Only capture printable characters
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
