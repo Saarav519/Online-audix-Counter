@@ -232,34 +232,51 @@ const Reports = () => {
                     <TableHead>Location</TableHead>
                     <TableHead>Barcode</TableHead>
                     <TableHead>Product Name</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
                     <TableHead className="text-center">Quantity</TableHead>
                     <TableHead>Scanned At</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {reportItems.map((item, index) => (
-                    <TableRow key={`${item.id}-${index}`} className="hover:bg-slate-50">
-                      <TableCell>
-                        <Badge variant="outline" className="border-slate-200">
-                          {item.locationName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">{item.barcode}</TableCell>
-                      <TableCell className="font-medium">{item.productName}</TableCell>
-                      <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                      <TableCell className="text-slate-500 text-sm">
-                        {new Date(item.scannedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {item.isMaster !== false ? (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-0">Master</Badge>
-                        ) : (
-                          <Badge className="bg-amber-100 text-amber-700 border-0">Non-Master</Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {reportItems.map((item, index) => {
+                    const masterProduct = getMasterProductDetails(item.barcode);
+                    return (
+                      <TableRow key={`${item.id}-${index}`} className="hover:bg-slate-50">
+                        <TableCell>
+                          <Badge variant="outline" className="border-slate-200">
+                            {item.locationName}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{item.barcode}</TableCell>
+                        <TableCell className="font-medium">{item.productName}</TableCell>
+                        <TableCell className="text-slate-500 text-sm">{masterProduct?.sku || '-'}</TableCell>
+                        <TableCell>
+                          {masterProduct?.category ? (
+                            <Badge variant="outline" className="border-slate-200 text-xs">
+                              {masterProduct.category}
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {masterProduct?.price ? `₹${masterProduct.price.toFixed(2)}` : '-'}
+                        </TableCell>
+                        <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                        <TableCell className="text-slate-500 text-sm">
+                          {new Date(item.scannedAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {item.isMaster !== false ? (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-0">Master</Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-700 border-0">Non-Master</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </ScrollArea>
