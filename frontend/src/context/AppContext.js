@@ -57,9 +57,10 @@ export const AppProvider = ({ children }) => {
     }, isValid ? 150 : 300);
   };
 
-  // Login function
+  // Login function - checks both mock and imported users
   const login = (userId, password) => {
-    const foundUser = mockUsers.find(
+    const allUsers = getAllUsers();
+    const foundUser = allUsers.find(
       u => u.userId === userId && u.password === password
     );
     if (foundUser) {
@@ -70,6 +71,15 @@ export const AppProvider = ({ children }) => {
       return { success: true, user: foundUser };
     }
     return { success: false, error: 'Invalid credentials' };
+  };
+
+  // Verify credentials without logging in
+  const verifyCredentials = (userId, password) => {
+    const allUsers = getAllUsers();
+    const foundUser = allUsers.find(
+      u => u.userId === userId && u.password === password
+    );
+    return { success: !!foundUser, user: foundUser };
   };
 
   // Logout function
