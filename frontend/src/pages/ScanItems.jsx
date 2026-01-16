@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useDeviceDetection, useHardwareScanner } from '../hooks/useDeviceDetection';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -42,6 +43,9 @@ import { ScrollArea } from '../components/ui/scroll-area';
 const ScanItems = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isScanner, isSmallScreen } = useDeviceDetection();
+  const showScannerMode = isScanner || isSmallScreen;
+  
   const { 
     locations, 
     scannedItems, 
@@ -65,6 +69,7 @@ const ScanItems = () => {
   const [editQuantity, setEditQuantity] = useState('');
   const [locationError, setLocationError] = useState('');
   const [locationSuccess, setLocationSuccess] = useState(null);
+  const [waitingForLocationScan, setWaitingForLocationScan] = useState(!searchParams.get('location'));
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
@@ -77,6 +82,47 @@ const ScanItems = () => {
   // Single SKU mode: scanning only, no manual qty
   // Non-Single SKU mode: manual qty entry allowed
   const isSingleSkuMode = settings.singleSkuScanning;
+
+  // Hardware scanner callback
+  const handleHardwareScan = useCallback((scannedValue) => {
+    if (!scannedValue) return;
+    
+    // If no location selected, treat scan as location code
+    if (!selectedLocationId || waitingForLocationScan) {
+      setLocationInput(scannedValue);
+      // Simulate location scan
+      const result = scanLocation(scannedValue);
+      if (result.success) {
+        setSelectedLocationId(result.location.id);
+        setLocationError('');
+        setLocationSuccess(`Location: ${result.location.name}`);
+        setWaitingForLocationScan(false);
+        playSound(true);
+        setTimeout(() => setLocationSuccess(null), 3000);
+      } else {
+        setLocationError(result.error);
+        playSound(false);
+      }
+    } else {
+      // Treat scan as barcode
+      setBarcodeInput(scannedValue);
+      // Auto-add the scanned barcode
+      const result = addScannedItem(selectedLocationId, scannedValue, isSingleSkuMode ? 1 : parseInt(quantityInput) || 1);
+      if (result.success) {
+        setLastScanResult({ success: true, message: `Added: ${result.item.productName}`, item: result.item });
+        setBarcodeInput('');
+        setQuantityInput('1');
+        playSound(true);
+      } else {
+        setLastScanResult({ success: false, message: result.error });
+        playSound(false);
+      }
+      setTimeout(() => setLastScanResult(null), 3000);
+    }
+  }, [selectedLocationId, waitingForLocationScan, scanLocation, addScannedItem, isSingleSkuMode, quantityInput, playSound]);
+
+  // Enable hardware scanner hook
+  useHardwareScanner(handleHardwareScan, !isLocationLocked);
 
   // In Pre-Assigned mode, redirect to Locations page if no location is selected
   // Scan Items should only be accessed by opening a location from the Locations page
