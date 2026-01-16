@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -29,11 +29,30 @@ import {
   AlertCircle,
   MapPin,
   Sparkles,
-  Shield
+  Shield,
+  LogIn
 } from 'lucide-react';
 
 const Settings = () => {
-  const { settings, updateSettings, user, playSound } = useApp();
+  const { settings, updateSettings, user, playSound, verifyCredentials } = useApp();
+  
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(true);
+  const [authCredentials, setAuthCredentials] = useState({ userId: '', password: '' });
+  const [authError, setAuthError] = useState('');
+  
+  // Pending settings changes
+  const [pendingSettings, setPendingSettings] = useState({ ...settings });
+  const [hasChanges, setHasChanges] = useState(false);
+  
+  // Save confirmation
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveCredentials, setSaveCredentials] = useState({ userId: '', password: '' });
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Password change modal
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -44,8 +63,57 @@ const Settings = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  const handleSettingChange = (key, value) => {
-    updateSettings({ [key]: value });
+  // Check for changes
+  useEffect(() => {
+    const changed = JSON.stringify(pendingSettings) !== JSON.stringify(settings);
+    setHasChanges(changed);
+  }, [pendingSettings, settings]);
+
+  // Handle initial authentication
+  const handleAuthenticate = () => {
+    const result = verifyCredentials(authCredentials.userId, authCredentials.password);
+    if (result.success) {
+      setIsAuthenticated(true);
+      setShowAuthModal(false);
+      setAuthError('');
+      setPendingSettings({ ...settings });
+    } else {
+      setAuthError('Invalid credentials. Please try again.');
+    }
+  };
+
+  // Handle pending setting change (not applied yet)
+  const handlePendingSettingChange = (key, value) => {
+    setPendingSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Handle save with confirmation
+  const handleSaveClick = () => {
+    setShowSaveModal(true);
+    setSaveCredentials({ userId: '', password: '' });
+    setSaveError('');
+    setSaveSuccess(false);
+  };
+
+  const handleConfirmSave = () => {
+    const result = verifyCredentials(saveCredentials.userId, saveCredentials.password);
+    if (result.success) {
+      updateSettings(pendingSettings);
+      setSaveSuccess(true);
+      setSaveError('');
+      setHasChanges(false);
+      setTimeout(() => {
+        setShowSaveModal(false);
+        setSaveSuccess(false);
+      }, 1500);
+    } else {
+      setSaveError('Invalid credentials. Changes not saved.');
+    }
+  };
+
+  const handleCancelChanges = () => {
+    setPendingSettings({ ...settings });
+    setHasChanges(false);
   };
 
   const testSound = (isValid) => {
@@ -66,7 +134,6 @@ const Settings = () => {
       return;
     }
 
-    // Mock password change
     setTimeout(() => {
       setPasswordSuccess(true);
       setPasswordForm({
@@ -78,13 +145,94 @@ const Settings = () => {
     }, 500);
   };
 
+  // Show authentication modal if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Card className="w-full max-w-md border-0 shadow-lg">
+          <CardHeader className="text-center">
+            <div className="mx-auto p-3 bg-emerald-100 rounded-full w-fit mb-4">
+              <Lock className="w-8 h-8 text-emerald-600" />
+            </div>
+            <CardTitle className="text-xl">Settings Access</CardTitle>
+            <CardDescription>
+              Enter your credentials to access settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {authError && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {authError}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="auth-userId">User ID</Label>
+              <Input
+                id="auth-userId"
+                placeholder="Enter your user ID"
+                value={authCredentials.userId}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, userId: e.target.value })}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuthenticate()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="auth-password">Password</Label>
+              <Input
+                id="auth-password"
+                type="password"
+                placeholder="Enter your password"
+                value={authCredentials.password}
+                onChange={(e) => setAuthCredentials({ ...authCredentials, password: e.target.value })}
+                onKeyPress={(e) => e.key === 'Enter' && handleAuthenticate()}
+              />
+            </div>
+            <Button 
+              onClick={handleAuthenticate} 
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              <LogIn className="w-4 h-4 mr-2" />
+              Access Settings
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Settings</h1>
-        <p className="text-slate-500 mt-1">Configure your scanning preferences</p>
+      {/* Header with Save Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Settings</h1>
+          <p className="text-slate-500 mt-1">Configure your scanning preferences</p>
+        </div>
+        <div className="flex gap-2">
+          {hasChanges && (
+            <>
+              <Button variant="outline" onClick={handleCancelChanges}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveClick}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Unsaved Changes Warning */}
+      {hasChanges && (
+        <div className="p-3 bg-amber-50 rounded-lg flex items-center gap-2 text-amber-700">
+          <AlertCircle className="w-4 h-4" />
+          <span className="text-sm">You have unsaved changes. Click "Save Changes" to apply.</span>
+        </div>
+      )}
 
       {/* User Info */}
       <Card className="border-0 shadow-sm">
@@ -125,12 +273,12 @@ const Settings = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <RadioGroup 
-            value={settings.locationScanMode} 
-            onValueChange={(value) => handleSettingChange('locationScanMode', value)}
+            value={pendingSettings.locationScanMode} 
+            onValueChange={(value) => handlePendingSettingChange('locationScanMode', value)}
             className="space-y-4"
           >
             <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
-              settings.locationScanMode === 'preassigned' 
+              pendingSettings.locationScanMode === 'preassigned' 
                 ? 'border-blue-500 bg-blue-50' 
                 : 'border-slate-200 hover:border-slate-300'
             }`}>
@@ -141,17 +289,13 @@ const Settings = () => {
                   Pre-Assigned Location Mode
                 </Label>
                 <p className="text-sm text-slate-500 mt-1">
-                  Only scan locations that are already imported/created in the system. 
-                  New location codes will be rejected with an error.
+                  Only scan locations that are already imported/created in the system.
                 </p>
-                <div className="mt-2 text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded inline-block">
-                  Best for: Controlled inventory with predefined zones
-                </div>
               </div>
             </div>
 
             <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
-              settings.locationScanMode === 'dynamic' 
+              pendingSettings.locationScanMode === 'dynamic' 
                 ? 'border-purple-500 bg-purple-50' 
                 : 'border-slate-200 hover:border-slate-300'
             }`}>
@@ -162,12 +306,8 @@ const Settings = () => {
                   Dynamic Location Mode
                 </Label>
                 <p className="text-sm text-slate-500 mt-1">
-                  Scan any location code - if it doesn't exist, it will be automatically 
-                  created and added to the location list.
+                  Scan any location code - new locations created automatically.
                 </p>
-                <div className="mt-2 text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded inline-block">
-                  Best for: Flexible scanning where locations are created on-the-fly
-                </div>
               </div>
             </div>
           </RadioGroup>
@@ -188,12 +328,12 @@ const Settings = () => {
             <div className="space-y-0.5">
               <Label className="text-base">Single SKU Scanning Mode</Label>
               <p className="text-sm text-slate-500">
-                Each scan creates a new entry instead of incrementing quantity
+                Each scan auto-increments quantity (no manual entry)
               </p>
             </div>
             <Switch
-              checked={settings.singleSkuScanning}
-              onCheckedChange={(checked) => handleSettingChange('singleSkuScanning', checked)}
+              checked={pendingSettings.singleSkuScanning}
+              onCheckedChange={(checked) => handlePendingSettingChange('singleSkuScanning', checked)}
             />
           </div>
           <Separator />
@@ -205,8 +345,8 @@ const Settings = () => {
               </p>
             </div>
             <Switch
-              checked={settings.allowNonMasterProducts}
-              onCheckedChange={(checked) => handleSettingChange('allowNonMasterProducts', checked)}
+              checked={pendingSettings.allowNonMasterProducts}
+              onCheckedChange={(checked) => handlePendingSettingChange('allowNonMasterProducts', checked)}
             />
           </div>
         </CardContent>
@@ -216,7 +356,7 @@ const Settings = () => {
       <Card className="border-0 shadow-sm">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            {settings.soundEnabled ? (
+            {pendingSettings.soundEnabled ? (
               <Volume2 className="w-5 h-5 text-emerald-600" />
             ) : (
               <VolumeX className="w-5 h-5 text-slate-400" />
@@ -234,12 +374,12 @@ const Settings = () => {
               </p>
             </div>
             <Switch
-              checked={settings.soundEnabled}
-              onCheckedChange={(checked) => handleSettingChange('soundEnabled', checked)}
+              checked={pendingSettings.soundEnabled}
+              onCheckedChange={(checked) => handlePendingSettingChange('soundEnabled', checked)}
             />
           </div>
           
-          {settings.soundEnabled && (
+          {pendingSettings.soundEnabled && (
             <div className="p-4 bg-slate-50 rounded-xl space-y-3">
               <p className="text-sm font-medium text-slate-700">Test Sounds</p>
               <div className="flex gap-3">
@@ -285,8 +425,8 @@ const Settings = () => {
               </p>
             </div>
             <Switch
-              checked={settings.requireAuthForEdit}
-              onCheckedChange={(checked) => handleSettingChange('requireAuthForEdit', checked)}
+              checked={pendingSettings.requireAuthForEdit}
+              onCheckedChange={(checked) => handlePendingSettingChange('requireAuthForEdit', checked)}
             />
           </div>
           <Separator />
@@ -298,12 +438,77 @@ const Settings = () => {
               </p>
             </div>
             <Switch
-              checked={settings.autoSubmitOnComplete}
-              onCheckedChange={(checked) => handleSettingChange('autoSubmitOnComplete', checked)}
+              checked={pendingSettings.autoSubmitOnComplete}
+              onCheckedChange={(checked) => handlePendingSettingChange('autoSubmitOnComplete', checked)}
             />
           </div>
         </CardContent>
       </Card>
+
+      {/* Save Confirmation Modal */}
+      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-emerald-600" />
+              Confirm Save
+            </DialogTitle>
+            <DialogDescription>
+              Enter your credentials to save the settings changes
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {saveError && (
+              <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {saveError}
+              </div>
+            )}
+            {saveSuccess && (
+              <div className="p-3 bg-emerald-50 text-emerald-600 text-sm rounded-lg flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                Settings saved successfully!
+              </div>
+            )}
+            {!saveSuccess && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="save-userId">User ID</Label>
+                  <Input
+                    id="save-userId"
+                    placeholder="Enter your user ID"
+                    value={saveCredentials.userId}
+                    onChange={(e) => setSaveCredentials({ ...saveCredentials, userId: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="save-password">Password</Label>
+                  <Input
+                    id="save-password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={saveCredentials.password}
+                    onChange={(e) => setSaveCredentials({ ...saveCredentials, password: e.target.value })}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            {!saveSuccess && (
+              <>
+                <Button variant="outline" onClick={() => setShowSaveModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleConfirmSave} className="bg-emerald-600 hover:bg-emerald-700">
+                  <Save className="w-4 h-4 mr-2" />
+                  Confirm & Save
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Change Password Modal */}
       <Dialog open={showPasswordModal} onOpenChange={(open) => {
