@@ -24,7 +24,11 @@ export const AppProvider = ({ children }) => {
   const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
   const [scannedItems, setScannedItems] = useState(mockScannedItems);
   const [sessions, setSessions] = useState(mockSessions);
-  const [settings, setSettings] = useState(mockSettings);
+  const [settings, setSettings] = useState(() => {
+    // Load settings from localStorage if available
+    const savedSettings = localStorage.getItem('audix_settings');
+    return savedSettings ? JSON.parse(savedSettings) : mockSettings;
+  });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
 
   // Play sound for scan feedback
