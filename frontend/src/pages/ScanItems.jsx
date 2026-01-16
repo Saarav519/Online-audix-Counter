@@ -71,10 +71,36 @@ const ScanItems = () => {
   const [locationError, setLocationError] = useState('');
   const [locationSuccess, setLocationSuccess] = useState(null);
   const [waitingForLocationScan, setWaitingForLocationScan] = useState(!searchParams.get('location'));
+  const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
   const quantityInputRef = useRef(null);
+  
+  // Refs for fast scanning - avoid re-renders during rapid scanning
+  const selectedLocationIdRef = useRef(selectedLocationId);
+  const waitingForLocationScanRef = useRef(waitingForLocationScan);
+  const isSingleSkuModeRef = useRef(settings.singleSkuScanning);
+  const quantityInputRef2 = useRef(quantityInput);
+  const lastScanTimeRef = useRef(0);
+  const scanResultTimeoutRef = useRef(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedLocationIdRef.current = selectedLocationId;
+  }, [selectedLocationId]);
+  
+  useEffect(() => {
+    waitingForLocationScanRef.current = waitingForLocationScan;
+  }, [waitingForLocationScan]);
+  
+  useEffect(() => {
+    isSingleSkuModeRef.current = settings.singleSkuScanning;
+  }, [settings.singleSkuScanning]);
+  
+  useEffect(() => {
+    quantityInputRef2.current = quantityInput;
+  }, [quantityInput]);
 
   const selectedLocation = locations.find(l => l.id === selectedLocationId);
   const locationItems = scannedItems[selectedLocationId] || [];
@@ -84,14 +110,18 @@ const ScanItems = () => {
   // Non-Single SKU mode: manual qty entry allowed
   const isSingleSkuMode = settings.singleSkuScanning;
 
-  // Hardware scanner callback
+  // HIGH-PERFORMANCE Hardware scanner callback
+  // Uses refs instead of state to avoid re-render delays during fast scanning
   const handleHardwareScan = useCallback((scannedValue) => {
     if (!scannedValue) return;
     
+    const currentTime = Date.now();
+    const timeSinceLastScan = currentTime - lastScanTimeRef.current;
+    lastScanTimeRef.current = currentTime;
+    
     // If no location selected, treat scan as location code
-    if (!selectedLocationId || waitingForLocationScan) {
+    if (!selectedLocationIdRef.current || waitingForLocationScanRef.current) {
       setLocationInput(scannedValue);
-      // Simulate location scan
       const result = scanLocation(scannedValue);
       if (result.success) {
         setSelectedLocationId(result.location.id);
@@ -105,22 +135,55 @@ const ScanItems = () => {
         playSound(false);
       }
     } else {
-      // Treat scan as barcode
-      setBarcodeInput(scannedValue);
-      // Auto-add the scanned barcode
-      const result = addScannedItem(selectedLocationId, scannedValue, isSingleSkuMode ? 1 : parseInt(quantityInput) || 1);
+      // FAST BARCODE PROCESSING
+      // Process immediately without waiting for state updates
+      const qty = isSingleSkuModeRef.current ? 1 : (parseInt(quantityInputRef2.current) || 1);
+      const result = addScannedItem(selectedLocationIdRef.current, scannedValue, qty);
+      
       if (result.success) {
-        setLastScanResult({ success: true, message: `Added: ${result.item.productName}`, item: result.item });
+        // Update scan count for feedback
+        setScanCount(prev => prev + 1);
+        
+        // Show brief feedback (shorter timeout for rapid scanning)
+        // Clear any pending timeout to avoid stale results
+        if (scanResultTimeoutRef.current) {
+          clearTimeout(scanResultTimeoutRef.current);
+        }
+        
+        setLastScanResult({ 
+          success: true, 
+          message: `✓ ${result.item.productName}`, 
+          item: result.item,
+          isValid: result.isValid,
+          barcode: scannedValue,
+          quantity: qty,
+          scanTime: timeSinceLastScan
+        });
+        
+        // Clear barcode input immediately for next scan
         setBarcodeInput('');
-        setQuantityInput('1');
-        playSound(true);
+        
+        // Play sound (non-blocking)
+        requestAnimationFrame(() => playSound(true));
+        
+        // Clear result after short delay (faster for rapid scanning)
+        scanResultTimeoutRef.current = setTimeout(() => {
+          setLastScanResult(null);
+        }, timeSinceLastScan < 500 ? 1000 : 2000);
       } else {
-        setLastScanResult({ success: false, message: result.error });
+        setLastScanResult({ 
+          success: false, 
+          message: result.error,
+          barcode: scannedValue
+        });
         playSound(false);
+        
+        scanResultTimeoutRef.current = setTimeout(() => {
+          setLastScanResult(null);
+        }, 3000);
       }
-      setTimeout(() => setLastScanResult(null), 3000);
     }
-  }, [selectedLocationId, waitingForLocationScan, scanLocation, addScannedItem, isSingleSkuMode, quantityInput, playSound]);
+  }, [scanLocation, addScannedItem, playSound]);
 
   // Enable hardware scanner hook
   useHardwareScanner(handleHardwareScan, !isLocationLocked);
