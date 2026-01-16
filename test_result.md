@@ -101,3 +101,124 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  Problems Faced in Pre-Assigned & Reports Modules:
+  1. Pre-Assigned Mode Location Scroll Issue - Horizontal and vertical scrolling not working
+  2. Sample Download & Data Export Not Working - Sample files not downloading, exports not working
+  3. Reports Location-Wise Export Not Working - Single and multiple location export not working
+
+backend:
+  - task: "Backend API health check"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Basic backend API is working"
+
+frontend:
+  - task: "Pre-Assigned Mode Location List Scrolling"
+    implemented: true
+    working: "NA"
+    file: "pages/Locations.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed scrolling by replacing ScrollArea with native overflow-y-auto and overflow-x-auto div containers with minWidth for horizontal scroll. Added sticky headers."
+
+  - task: "Sample CSV Download - Locations"
+    implemented: true
+    working: "NA"
+    file: "pages/Locations.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed download by appending anchor to document.body before clicking, then removing it"
+
+  - task: "Sample CSV Download - Master Data Products"
+    implemented: true
+    working: "NA"
+    file: "pages/MasterData.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed download by appending anchor to document.body before clicking, then removing it"
+
+  - task: "Sample CSV Download - Authorization Users"
+    implemented: true
+    working: "NA"
+    file: "pages/MasterData.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed download by appending anchor to document.body before clicking, then removing it"
+
+  - task: "Master Data Export CSV"
+    implemented: true
+    working: "NA"
+    file: "pages/MasterData.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed export by appending anchor to document.body before clicking, then removing it"
+
+  - task: "Reports Export CSV - Location-Wise"
+    implemented: true
+    working: "NA"
+    file: "pages/Reports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed export by appending anchor to document.body before clicking. Added early return if no items. Export works for all locations, single location, and multiple locations."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Pre-Assigned Mode Location List Scrolling"
+    - "Sample CSV Download - Locations"
+    - "Sample CSV Download - Master Data Products"
+    - "Reports Export CSV - Location-Wise"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Fixed the three reported issues:
+      1. Pre-Assigned Mode Scrolling: Replaced ScrollArea with native div containers with overflow-y-auto and overflow-x-auto. Added minWidth: 800px for horizontal scroll support and sticky table headers.
+      2. Sample Download: Fixed all download functions (Locations, MasterData products, MasterData users) by appending anchor element to document.body before clicking, then removing it after.
+      3. Reports Export: Fixed CSV export function with same anchor append/remove pattern. Export now properly filters by selected locations (single, multiple, or all).
+      
+      Testing agent should verify:
+      - Scroll horizontally and vertically in Pre-Assigned locations list
+      - Download sample CSV files from Locations and Master Data pages
+      - Export reports with single location, multiple locations, and all locations selected
