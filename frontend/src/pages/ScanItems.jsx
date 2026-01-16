@@ -387,9 +387,9 @@ const ScanItems = () => {
   // Scanner Mode UI - Optimized for handheld devices
   if (showScannerMode) {
     return (
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-auto pb-4 space-y-3">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Compact Header */}
           <div className="flex items-center justify-between">
             <div>
