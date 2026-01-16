@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 const Reports = () => {
-  const { locations, scannedItems, sessions, currentSession } = useApp();
+  const { locations, scannedItems, sessions, currentSession, masterProducts } = useApp();
   const [selectedLocation, setSelectedLocation] = useState('all');
 
   const getLocationItems = (locationId) => {
@@ -51,16 +51,28 @@ const Reports = () => {
   const totalQuantity = reportItems.reduce((sum, item) => sum + item.quantity, 0);
   const uniqueProducts = new Set(reportItems.map(item => item.barcode)).size;
 
+  // Get master product details by barcode
+  const getMasterProductDetails = (barcode) => {
+    return masterProducts.find(p => p.barcode === barcode) || null;
+  };
+
   const handleExportCSV = () => {
-    const headers = ['Location', 'Barcode', 'Product Name', 'Quantity', 'Scanned At', 'Status'];
-    const rows = reportItems.map(item => [
-      item.locationName,
-      item.barcode,
-      item.productName,
-      item.quantity,
-      new Date(item.scannedAt).toLocaleString(),
-      item.isMaster !== false ? 'Master' : 'Non-Master'
-    ]);
+    // Include all master data columns in export
+    const headers = ['Location', 'Barcode', 'Product Name', 'SKU', 'Category', 'Price', 'Quantity', 'Scanned At', 'Status'];
+    const rows = reportItems.map(item => {
+      const masterProduct = getMasterProductDetails(item.barcode);
+      return [
+        `"${item.locationName}"`,
+        item.barcode,
+        `"${item.productName}"`,
+        masterProduct?.sku || '',
+        `"${masterProduct?.category || 'Unknown'}"`,
+        masterProduct?.price?.toFixed(2) || '0.00',
+        item.quantity,
+        new Date(item.scannedAt).toLocaleString(),
+        item.isMaster !== false ? 'Master' : 'Non-Master'
+      ];
+    });
     
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
