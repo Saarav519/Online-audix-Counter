@@ -69,6 +69,36 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 
 ## Bug Fixes (January 2026)
 
+### Fix #9: Logo Position and Accidental Click Prevention
+**Problem**: Logo image in the header was causing accidental clicks when trying to tap navigation buttons on scanner devices.
+
+**Solution**: 
+1. Replaced logo image with text "AUDIX" in scanner mode
+2. Added `pointer-events: none` and `select-none` to make logo non-interactive
+3. Reduced header height from h-14 to h-12 for more content space
+4. Reduced navigation button height from h-20 to h-16 for better fit
+
+**Files Changed**: 
+- `/app/frontend/src/components/Layout.jsx`
+- `/app/frontend/src/pages/Dashboard.jsx`
+
+### Fix #10: Android 7.0+ (Nougat) Compatibility
+**Problem**: App needed to run on CipherLab RS31 scanner with Android 7.0.
+
+**Solution**:
+1. Updated `browserslist` in package.json to include Android >= 7 and Chrome >= 60
+2. Added CipherLab-specific model identifiers (RS31, RS30, RS50, RS51, CP, RK, 9700, 8000, 8200) to device detection
+3. Added extensive CSS vendor prefixes for -webkit compatibility
+4. Added proper viewport meta tags for mobile web app capability
+5. Added touch-action manipulation to prevent 300ms tap delay
+6. Added specific styles for small screens (≤480px width)
+
+**Files Changed**: 
+- `/app/frontend/package.json`
+- `/app/frontend/public/index.html`
+- `/app/frontend/src/hooks/useDeviceDetection.js`
+- `/app/frontend/src/App.css`
+
 ### Fix #1: Post-Submission Navigation Issue
 **Problem**: In Pre-Assigned mode, after submitting a location, the system stayed on the Scan Items page instead of navigating to the next location.
 
