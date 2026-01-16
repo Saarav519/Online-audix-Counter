@@ -613,34 +613,34 @@ const ScanItems = () => {
                   {locationItems.map((item) => (
                     <div 
                       key={item.id} 
-                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-1"
                     >
-                      <div className="flex-1 min-w-0">
+                      {/* Barcode & Description - takes available space but can shrink */}
+                      <div className="flex-1 min-w-0 overflow-hidden" style={{ maxWidth: isSingleSkuMode ? '75%' : '50%' }}>
                         {/* Barcode on TOP */}
-                        <p className="text-xs text-slate-600 font-mono font-semibold">{item.barcode}</p>
+                        <p className="text-xs text-slate-600 font-mono font-semibold truncate">{item.barcode}</p>
                         {/* Description BELOW */}
-                        <p className="text-sm text-slate-500 truncate">{item.productName}</p>
+                        <p className="text-xs text-slate-500 truncate">{item.productName}</p>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        {!isSingleSkuMode && !isLocationLocked && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleQuantityDecrement(item.id, item.quantity)}
-                              disabled={item.quantity <= 1}
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                          </>
-                        )}
-                        <span className="font-bold text-sm min-w-[24px] text-center">{item.quantity}</span>
+                      {/* Quantity controls - fixed width, don't shrink */}
+                      <div className="flex items-center gap-1 flex-shrink-0">
                         {!isSingleSkuMode && !isLocationLocked && (
                           <Button
                             variant="outline"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-6 w-6 p-0"
+                            onClick={() => handleQuantityDecrement(item.id, item.quantity)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <span className="font-bold text-sm w-8 text-center">{item.quantity}</span>
+                        {!isSingleSkuMode && !isLocationLocked && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6 p-0"
                             onClick={() => handleQuantityIncrement(item.id, item.quantity)}
                           >
                             <Plus className="w-3 h-3" />
@@ -650,7 +650,7 @@ const ScanItems = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-slate-400 hover:text-red-600"
+                            className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
                             onClick={() => handleDelete(item.id)}
                           >
                             <Trash2 className="w-3 h-3" />
