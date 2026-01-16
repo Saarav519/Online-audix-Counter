@@ -39,7 +39,6 @@ import {
   Hash,
   Send
 } from 'lucide-react';
-import { ScrollArea } from '../components/ui/scroll-area';
 
 const ScanItems = () => {
   const [searchParams] = useSearchParams();
