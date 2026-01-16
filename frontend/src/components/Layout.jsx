@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
@@ -24,19 +24,30 @@ import {
 } from './ui/dropdown-menu';
 
 const Layout = ({ children }) => {
-  const { user, logout, isAuthenticated } = useApp();
+  const { user, logout, isAuthenticated, settings } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/locations', icon: MapPin, label: 'Locations' },
-    { path: '/scan', icon: ScanBarcode, label: 'Scan Items' },
-    { path: '/master-data', icon: Package, label: 'Master Data' },
-    { path: '/reports', icon: FileSpreadsheet, label: 'Reports' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
-  ];
+  // Filter nav items based on mode
+  // In Pre-Assigned mode, hide Scan Items from sidebar - it should only be accessed via opening a location
+  const navItems = useMemo(() => {
+    const baseItems = [
+      { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+      { path: '/locations', icon: MapPin, label: 'Locations' },
+      { path: '/scan', icon: ScanBarcode, label: 'Scan Items', hideInPreAssigned: true },
+      { path: '/master-data', icon: Package, label: 'Master Data' },
+      { path: '/reports', icon: FileSpreadsheet, label: 'Reports' },
+      { path: '/settings', icon: Settings, label: 'Settings' },
+    ];
+    
+    // Filter out Scan Items in Pre-Assigned mode
+    if (settings?.locationScanMode === 'preassigned') {
+      return baseItems.filter(item => !item.hideInPreAssigned);
+    }
+    
+    return baseItems;
+  }, [settings?.locationScanMode]);
 
   const handleLogout = () => {
     logout();

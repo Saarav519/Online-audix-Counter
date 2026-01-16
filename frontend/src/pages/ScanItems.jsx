@@ -238,7 +238,15 @@ const ScanItems = () => {
     submitLocation(selectedLocationId);
     setShowSubmitModal(false);
     
-    // Get next pending location
+    // Check if we're in Pre-Assigned mode
+    if (settings.locationScanMode === 'preassigned') {
+      // In Pre-Assigned mode, navigate back to Locations page
+      // This will show the list view with next pending location ready to open
+      navigate('/locations');
+      return;
+    }
+    
+    // Dynamic mode - stay on scan page and auto-navigate to next pending location
     const nextLocation = getNextPendingLocation();
     
     if (nextLocation) {
