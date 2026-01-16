@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useDeviceDetection } from '../hooks/useDeviceDetection';
 import {
   LayoutDashboard,
   MapPin,
@@ -28,6 +29,10 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { isScanner, isSmallScreen, isMobile } = useDeviceDetection();
+
+  // Determine if we should show scanner mode UI
+  const showScannerMode = isScanner || isSmallScreen;
 
   // Filter nav items based on mode
   // In Pre-Assigned mode, hide Scan Items from sidebar - it should only be accessed via opening a location
@@ -49,6 +54,23 @@ const Layout = ({ children }) => {
     return baseItems;
   }, [settings?.locationScanMode]);
 
+  // Bottom nav items for scanner mode (limited to 5 for better UX)
+  const bottomNavItems = useMemo(() => {
+    const items = [
+      { path: '/', icon: LayoutDashboard, label: 'Home' },
+      { path: '/locations', icon: MapPin, label: 'Locations' },
+      { path: '/scan', icon: ScanBarcode, label: 'Scan', hideInPreAssigned: true },
+      { path: '/reports', icon: FileSpreadsheet, label: 'Reports' },
+      { path: '/settings', icon: Settings, label: 'Settings' },
+    ];
+    
+    if (settings?.locationScanMode === 'preassigned') {
+      return items.filter(item => !item.hideInPreAssigned);
+    }
+    
+    return items;
+  }, [settings?.locationScanMode]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -58,6 +80,89 @@ const Layout = ({ children }) => {
     return <>{children}</>;
   }
 
+  // Scanner Device Layout - Bottom navigation with large buttons
+  if (showScannerMode) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        {/* Compact Header for Scanner Devices */}
+        <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-50 px-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <img 
+              src="https://customer-assets.emergentagent.com/job_c33ba7c5-d7d2-4a99-9a90-28a1ecab4f0f/artifacts/dgmrmi4u_Audix%20Logo.png" 
+              alt="Audix" 
+              className="h-7"
+            />
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="p-1.5 h-auto">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 text-sm">
+                    {user?.name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-medium">{user?.name}</p>
+                <p className="text-xs text-slate-500">{user?.role}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/master-data" className="cursor-pointer">
+                  <Package className="w-4 h-4 mr-2" />
+                  Master Data
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </header>
+
+        {/* Main Content - Adjusted for header and bottom nav */}
+        <main className="flex-1 pt-14 pb-20 overflow-auto">
+          <div className="p-3">
+            {children}
+          </div>
+        </main>
+
+        {/* Large Bottom Navigation for Scanner Devices */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
+          <div className="grid grid-cols-5 h-18">
+            {bottomNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex flex-col items-center justify-center py-2 transition-colors touch-manipulation ${
+                    isActive
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'text-slate-500 hover:bg-slate-50 active:bg-slate-100'
+                  }`}
+                  data-testid={`bottom-nav-${item.label.toLowerCase()}`}
+                >
+                  <Icon className={`w-6 h-6 ${isActive ? 'text-emerald-600' : ''}`} />
+                  <span className={`text-xs mt-1 font-medium ${isActive ? 'text-emerald-700' : ''}`}>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+    );
+  }
+
+  // Standard Desktop/Tablet Layout
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Mobile Header */}
