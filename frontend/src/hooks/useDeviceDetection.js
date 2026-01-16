@@ -158,27 +158,31 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
       
       // Handle Enter key (most scanners send Enter after barcode)
       if (e.key === 'Enter') {
-        e.preventDefault();
-        e.stopPropagation();
-        
+        // IMPORTANT: Only intercept if we have buffered scanner input
+        // This allows normal form submissions to work
         if (bufferRef.current.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          queueScan(bufferRef.current);
+          bufferRef.current = '';
+          setScanBuffer('');
+        }
+        // If no buffer, let the Enter key pass through to input fields
+        return;
+      }
+      
+      // Handle Tab key (some scanners use Tab as suffix)
+      if (e.key === 'Tab') {
+        // Only intercept if we have buffered scanner input
+        if (bufferRef.current.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
           queueScan(bufferRef.current);
           bufferRef.current = '';
           setScanBuffer('');
         }
         return;
       }
-      
-      // Handle Tab key (some scanners use Tab as suffix)
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (bufferRef.current.length > 0) {
-          queueScan(bufferRef.current);
-          bufferRef.current = '';
-          setScanBuffer('');
-        }
         return;
       }
       
