@@ -22,7 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table';
-import { ScrollArea } from '../components/ui/scroll-area';
 import {
   MapPin,
   Plus,
