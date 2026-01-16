@@ -149,7 +149,7 @@ const Reports = () => {
   };
 
   const handleEmailReport = () => {
-    const locationInfo = selectedLocations.includes('all') 
+    const locationInfo = isAllSelected
       ? 'All Locations' 
       : `${selectedLocations.length} Selected Locations`;
     const subject = encodeURIComponent(`Stock Count Report - ${currentSession?.name || 'Audix'}`);
