@@ -191,16 +191,16 @@ const MasterData = () => {
   };
 
   const downloadSampleUserCSV = () => {
-    const sampleData = `UserID,Password,Name,Role
-scanner1,pass123,Scanner User 1,scanner
-scanner2,pass456,Scanner User 2,scanner
-admin1,admin123,Admin User,admin`;
+    const sampleData = `UserID,Password
+auth_user1,pass123
+auth_user2,pass456
+supervisor1,super789`;
     
     const blob = new Blob([sampleData], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sample_users.csv';
+    a.download = 'sample_authorization_users.csv';
     a.click();
     window.URL.revokeObjectURL(url);
   };
