@@ -85,13 +85,10 @@ const Layout = ({ children }) => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
         {/* Compact Header for Scanner Devices */}
-        <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-slate-200 z-50 px-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <img 
-              src="https://customer-assets.emergentagent.com/job_c33ba7c5-d7d2-4a99-9a90-28a1ecab4f0f/artifacts/dgmrmi4u_Audix%20Logo.png" 
-              alt="Audix" 
-              className="h-7"
-            />
+        <header className="fixed top-0 left-0 right-0 h-12 bg-white border-b border-slate-200 z-50 px-3 flex items-center justify-between shadow-sm">
+          {/* Logo moved to corner - smaller and non-interactive to avoid accidental clicks */}
+          <div className="flex items-center pointer-events-none select-none">
+            <span className="text-sm font-bold text-emerald-700">AUDIX</span>
           </div>
 
           <DropdownMenu>
