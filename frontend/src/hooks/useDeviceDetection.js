@@ -44,10 +44,12 @@ export const useDeviceDetection = () => {
     
     // Detect enterprise scanner devices
     // Common enterprise scanner user agents contain these identifiers
+    // Added RS31 and CipherLab specific identifiers for compatibility
     const scannerKeywords = [
       'zebra', 'symbol', 'honeywell', 'datalogic', 'cipherlab',
       'bluebird', 'unitech', 'chainway', 'urovo', 'newland',
-      'scanner', 'pda', 'handheld', 'mobile computer'
+      'scanner', 'pda', 'handheld', 'mobile computer',
+      'rs31', 'rs30', 'rs50', 'rs51', 'cp', 'rk', '9700', '8000', '8200'
     ];
     
     const isScanner = scannerKeywords.some(keyword => 
