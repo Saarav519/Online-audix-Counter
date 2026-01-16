@@ -212,16 +212,7 @@ WH-B1,Warehouse B - Section 1
 STORE-01,Retail Store Front
 COLD-01,Cold Storage Unit 1`;
     
-    const blob = new Blob([sampleData], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_locations.csv';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    downloadCSV(sampleData, 'sample_locations.csv');
   };
 
   const getLocationStats = (locationId) => {
