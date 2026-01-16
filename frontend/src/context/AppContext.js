@@ -20,9 +20,25 @@ export const AppProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('audix_authenticated') === 'true';
   });
-  const [locations, setLocations] = useState(mockLocations);
-  const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
-  const [scannedItems, setScannedItems] = useState(mockScannedItems);
+  
+  // Load locations from localStorage or use mock data
+  const [locations, setLocations] = useState(() => {
+    const savedLocations = localStorage.getItem('audix_locations');
+    return savedLocations ? JSON.parse(savedLocations) : mockLocations;
+  });
+  
+  // Load master products from localStorage or use mock data
+  const [masterProducts, setMasterProducts] = useState(() => {
+    const savedProducts = localStorage.getItem('audix_master_products');
+    return savedProducts ? JSON.parse(savedProducts) : mockMasterProducts;
+  });
+  
+  // Load scanned items from localStorage or use mock data
+  const [scannedItems, setScannedItems] = useState(() => {
+    const savedItems = localStorage.getItem('audix_scanned_items');
+    return savedItems ? JSON.parse(savedItems) : mockScannedItems;
+  });
+  
   const [sessions, setSessions] = useState(mockSessions);
   const [settings, setSettings] = useState(() => {
     // Load settings from localStorage if available
@@ -30,6 +46,21 @@ export const AppProvider = ({ children }) => {
     return savedSettings ? JSON.parse(savedSettings) : mockSettings;
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
+
+  // Persist locations to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('audix_locations', JSON.stringify(locations));
+  }, [locations]);
+
+  // Persist scanned items to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+  }, [scannedItems]);
+
+  // Persist master products to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
+  }, [masterProducts]);
 
   // Play sound for scan feedback - OPTIMIZED for fast scanning
   // Uses a shared AudioContext to avoid creating new contexts for each scan
