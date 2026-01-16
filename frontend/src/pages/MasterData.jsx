@@ -285,8 +285,8 @@ admin1,admin123,Admin User,admin`;
                 <Users className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-800">{importedUsers.length}</p>
-                <p className="text-sm text-slate-500">Imported Users</p>
+                <p className="text-2xl font-bold text-slate-800">{authorizationUsers.length}</p>
+                <p className="text-sm text-slate-500">Authorization Users</p>
               </div>
             </div>
           </CardContent>
