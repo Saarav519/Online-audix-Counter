@@ -1,0 +1,8 @@
+{
+  "appId": "com.audix.stockmanagement",
+  "appName": "Audix",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  }
+}
