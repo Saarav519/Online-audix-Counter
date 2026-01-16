@@ -215,6 +215,17 @@ export const AppProvider = ({ children }) => {
     });
   };
 
+  // Delete all scanned items for specific locations
+  const deleteLocationData = (locationIds) => {
+    setScannedItems(prev => {
+      const updated = { ...prev };
+      locationIds.forEach(locId => {
+        updated[locId] = [];
+      });
+      return updated;
+    });
+  };
+
   // Update item quantity
   const updateItemQuantity = (locationId, itemId, newQuantity) => {
     setScannedItems(prev => {
