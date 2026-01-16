@@ -602,23 +602,24 @@ const ScanItems = () => {
               ) : (
                 <div 
                   ref={itemsListRef}
-                  className="space-y-2 overflow-y-auto pb-4" 
+                  className="space-y-2 overflow-y-auto" 
                   style={{ 
-                    maxHeight: '250px', 
+                    maxHeight: '220px', 
+                    paddingBottom: '60px',
                     WebkitOverflowScrolling: 'touch',
                     scrollBehavior: 'smooth'
                   }}
                 >
-                  {locationItems.map((item, index) => (
+                  {locationItems.map((item) => (
                     <div 
                       key={item.id} 
-                      className={`flex items-center justify-between p-2 bg-slate-50 rounded-lg ${
-                        index === locationItems.length - 1 ? 'mb-2' : ''
-                      }`}
+                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.productName}</p>
-                        <p className="text-xs text-slate-500 font-mono">{item.barcode}</p>
+                        {/* Barcode on TOP */}
+                        <p className="text-xs text-slate-600 font-mono font-semibold">{item.barcode}</p>
+                        {/* Description BELOW */}
+                        <p className="text-sm text-slate-500 truncate">{item.productName}</p>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
                         {!isSingleSkuMode && !isLocationLocked && (
@@ -658,6 +659,8 @@ const ScanItems = () => {
                       </div>
                     </div>
                   ))}
+                  {/* Extra spacer to ensure last item is fully visible */}
+                  <div style={{ height: '20px', minHeight: '20px' }}></div>
                 </div>
               )}
             </CardContent>
