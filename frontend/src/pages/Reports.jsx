@@ -371,7 +371,7 @@ const Reports = () => {
               </Popover>
               
               {/* Selected locations badges */}
-              {!selectedLocations.includes('all') && selectedLocations.length > 0 && (
+              {!isAllSelected && selectedLocations.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {selectedLocations.map(locId => {
                     const loc = locations.find(l => l.id === locId);
