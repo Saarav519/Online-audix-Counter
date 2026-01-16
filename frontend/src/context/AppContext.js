@@ -31,35 +31,63 @@ export const AppProvider = ({ children }) => {
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
 
-  // Play sound for scan feedback
-  const playSound = (isValid) => {
+  // Play sound for scan feedback - OPTIMIZED for fast scanning
+  // Uses a shared AudioContext to avoid creating new contexts for each scan
+  const audioContextRef = React.useRef(null);
+  
+  const playSound = React.useCallback((isValid) => {
     if (!settings.soundEnabled) return;
     
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    if (isValid) {
-      // Pleasant high-pitched beep for valid
-      oscillator.frequency.value = 880;
-      oscillator.type = 'sine';
-      gainNode.gain.value = 0.3;
-    } else {
-      // Low buzzer for invalid
-      oscillator.frequency.value = 220;
-      oscillator.type = 'square';
-      gainNode.gain.value = 0.2;
-    }
-    
-    oscillator.start();
-    setTimeout(() => {
-      oscillator.stop();
-      audioContext.close();
-    }, isValid ? 150 : 300);
-  };
+    // Use requestAnimationFrame to avoid blocking the main thread
+    requestAnimationFrame(() => {
+      try {
+        // Reuse audio context or create new one
+        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        const audioContext = audioContextRef.current;
+        
+        // Resume if suspended (browser autoplay policy)
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        if (isValid) {
+          // Short pleasant beep for valid scan
+          oscillator.frequency.value = 1200;
+          oscillator.type = 'sine';
+          gainNode.gain.value = 0.2;
+        } else {
+          // Quick low tone for invalid
+          oscillator.frequency.value = 300;
+          oscillator.type = 'square';
+          gainNode.gain.value = 0.15;
+        }
+        
+        const duration = isValid ? 0.08 : 0.15; // Shorter sounds for faster feedback
+        const startTime = audioContext.currentTime;
+        
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+        
+        // Cleanup oscillator after it stops
+        oscillator.onended = () => {
+          oscillator.disconnect();
+          gainNode.disconnect();
+        };
+      } catch (e) {
+        // Silently fail if audio not supported
+        console.warn('Audio playback failed:', e);
+      }
+    });
+  }, [settings.soundEnabled]);
 
   // Login function - checks ONLY mock users (not imported users)
   // Imported users are for authorization actions only
