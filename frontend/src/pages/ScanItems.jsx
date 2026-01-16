@@ -696,14 +696,6 @@ const ScanItems = () => {
               Submit Location
             </Button>
           </div>
-          
-          {/* Status Bar */}
-          {selectedLocationId && (
-            <div className="flex justify-between items-center mt-2 text-xs text-slate-500">
-              <span>Location: <strong className="text-slate-700">{selectedLocation?.name}</strong></span>
-              <span>{locationItems.length} items • {totalQuantity} qty</span>
-            </div>
-          )}
         </div>
 
         {/* Submit Confirmation Modal */}
