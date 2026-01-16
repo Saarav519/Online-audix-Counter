@@ -227,17 +227,25 @@ const ScanItems = () => {
 
   // Auto-scroll to last item when items are added
   useEffect(() => {
-    // Auto-scroll mobile list
-    if (itemsListRef.current && locationItems.length > 0) {
-      setTimeout(() => {
-        itemsListRef.current.scrollTop = itemsListRef.current.scrollHeight;
-      }, 100);
-    }
-    // Auto-scroll desktop list
-    if (itemsListDesktopRef.current && locationItems.length > 0) {
-      setTimeout(() => {
-        itemsListDesktopRef.current.scrollTop = itemsListDesktopRef.current.scrollHeight;
-      }, 100);
+    if (locationItems.length > 0) {
+      // Auto-scroll mobile list
+      const mobileList = itemsListRef.current;
+      if (mobileList) {
+        setTimeout(() => {
+          if (mobileList && mobileList.scrollHeight) {
+            mobileList.scrollTop = mobileList.scrollHeight;
+          }
+        }, 100);
+      }
+      // Auto-scroll desktop list
+      const desktopList = itemsListDesktopRef.current;
+      if (desktopList) {
+        setTimeout(() => {
+          if (desktopList && desktopList.scrollHeight) {
+            desktopList.scrollTop = desktopList.scrollHeight;
+          }
+        }, 100);
+      }
     }
   }, [locationItems.length]);
 
