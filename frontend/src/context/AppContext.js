@@ -212,7 +212,10 @@ export const AppProvider = ({ children }) => {
 
   // Update settings
   const updateSettings = (newSettings) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    const updatedSettings = { ...settings, ...newSettings };
+    setSettings(updatedSettings);
+    // Persist to localStorage
+    localStorage.setItem('audix_settings', JSON.stringify(updatedSettings));
   };
 
   // Add new location
