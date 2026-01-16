@@ -61,6 +61,9 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 | Reports: Master Data Columns (SKU, Category, Price) | Done | Jan 2026 |
 | Auth Sync: Main Login & Settings | Done | Jan 2026 |
 | Separate Authorization Users | Done | Jan 2026 |
+| Android Scanner Compatibility | Done | Jan 2026 |
+| Dashboard: Remove Recent Locations | Done | Jan 2026 |
+| Scanner Device Layout (Large Buttons) | Done | Jan 2026 |
 
 ---
 
