@@ -417,7 +417,7 @@ const Reports = () => {
             <Badge variant="secondary" className="ml-2">
               {reportItems.length} items
             </Badge>
-            {!selectedLocations.includes('all') && (
+            {!isAllSelected && selectedLocations.length > 0 && (
               <Badge variant="outline" className="ml-1 text-xs">
                 {selectedLocations.length} location(s)
               </Badge>
