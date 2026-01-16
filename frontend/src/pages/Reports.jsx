@@ -39,9 +39,11 @@ const Reports = () => {
     if (locationId === 'all') {
       // Toggle All Locations
       if (selectedLocations.includes('all')) {
-        // If "All" is already selected, uncheck it (select nothing, which defaults back to showing all)
-        // But to allow individual selection, we'll keep it empty temporarily
-        setSelectedLocations([]);
+        // If "All" is selected, clicking it should allow individual selection
+        // We'll select the first location to enable the individual selection mode
+        if (locations.length > 0) {
+          setSelectedLocations([locations[0].id]);
+        }
       } else {
         // Select "All Locations"
         setSelectedLocations(['all']);
