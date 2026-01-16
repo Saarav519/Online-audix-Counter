@@ -58,6 +58,9 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 | Pre-Assigned: Scan Items Sidebar Hidden | Done | Jan 2026 |
 | Pre-Assigned: Post-Submit Navigation | Done | Jan 2026 |
 | Pre-Assigned: Direct /scan Redirect | Done | Jan 2026 |
+| Reports: Master Data Columns (SKU, Category, Price) | Done | Jan 2026 |
+| Auth Sync: Main Login & Settings | Done | Jan 2026 |
+| Separate Authorization Users | Done | Jan 2026 |
 
 ---
 
