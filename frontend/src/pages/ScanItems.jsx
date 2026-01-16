@@ -301,40 +301,22 @@ const ScanItems = () => {
       return;
     }
     
-    // Dynamic mode - stay on scan page and auto-navigate to next pending location
-    const nextLocation = getNextPendingLocation();
+    // Dynamic mode - ALWAYS clear the location after submission
+    // User should start fresh with a new location scan
+    setSelectedLocationId('');
+    setLocationInput('');
+    setBarcodeInput('');
+    setLastScanResult(null);
+    setLocationSuccess('Location submitted successfully! Scan a new location to continue.');
+    playSound(true);
     
-    if (nextLocation) {
-      // Auto-navigate to next pending location
-      setSelectedLocationId(nextLocation.id);
-      setLocationInput(nextLocation.code);
-      setBarcodeInput('');
-      setLastScanResult(null);
-      setLocationSuccess(`Location submitted! Now scanning: ${nextLocation.name}`);
-      playSound(true);
-      
-      // Focus barcode input for next scan
-      setTimeout(() => {
-        if (barcodeInputRef.current) {
-          barcodeInputRef.current.focus();
-        }
-        setTimeout(() => setLocationSuccess(null), 4000);
-      }, 100);
-    } else {
-      // No more pending locations
-      setSelectedLocationId('');
-      setLocationInput('');
-      setBarcodeInput('');
-      setLastScanResult(null);
-      setLocationSuccess('All locations completed! No more pending locations.');
-      
-      setTimeout(() => {
-        if (locationInputRef.current) {
-          locationInputRef.current.focus();
-        }
-        setTimeout(() => setLocationSuccess(null), 4000);
-      }, 100);
-    }
+    // Focus location input for next scan
+    setTimeout(() => {
+      if (locationInputRef.current) {
+        locationInputRef.current.focus();
+      }
+      setTimeout(() => setLocationSuccess(null), 4000);
+    }, 100);
   };
 
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
