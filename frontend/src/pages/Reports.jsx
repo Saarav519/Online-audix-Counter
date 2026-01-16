@@ -297,7 +297,7 @@ const Reports = () => {
                     >
                       <Checkbox 
                         id="all-locations"
-                        checked={selectedLocations.includes('all')}
+                        checked={isAllSelected}
                         className="pointer-events-none"
                       />
                       <span className="text-sm font-medium flex-1">
@@ -313,8 +313,7 @@ const Reports = () => {
                     {/* Individual Locations */}
                     {locations.map((loc) => {
                       const itemCount = (scannedItems[loc.id] || []).length;
-                      const isAllSelected = selectedLocations.includes('all');
-                      const isSelected = selectedLocations.includes(loc.id);
+                      const isLocationSelected = selectedLocations.includes(loc.id);
                       
                       return (
                         <div 
@@ -332,7 +331,7 @@ const Reports = () => {
                         >
                           <Checkbox 
                             id={loc.id}
-                            checked={isSelected || isAllSelected}
+                            checked={isLocationSelected || isAllSelected}
                             disabled={isAllSelected}
                             className="pointer-events-none"
                           />
