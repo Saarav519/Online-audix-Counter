@@ -64,7 +64,7 @@ const MasterData = () => {
       p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const importedUsers = getAllUsers().filter(u => u.id?.startsWith('user_import'));
+  const authorizationUsers = getAuthorizationUsers();
 
   const handleAddProduct = () => {
     if (newProduct.barcode && newProduct.name) {
