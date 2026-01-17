@@ -4,13 +4,11 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="theme-color" content="#10b981" />
-        <meta name="description" content="Audix Stock Management - Enterprise Stock Count Application for Android Scanners" />
+        <meta name="description" content="Audix Stock Management - Works Offline" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Audix" />
-        
-        <!-- Android Chrome specific -->
         <meta name="format-detection" content="telephone=no" />
         <meta name="HandheldFriendly" content="true" />
         
@@ -19,54 +17,12 @@
         
         <!-- App Icons -->
         <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="%PUBLIC_URL%/icons/icon-512x512.png" />
         <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
-        <link rel="shortcut icon" href="%PUBLIC_URL%/icons/icon-96x96.png" />
         
-        <!-- Splash Screen Colors -->
-        <meta name="msapplication-TileColor" content="#10b981" />
-        <meta name="msapplication-TileImage" content="%PUBLIC_URL%/icons/icon-144x144.png" />
-        
-        <title>Audix Stock Management</title>
+        <title>Audix</title>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
-        
-        <!-- Service Worker Registration for OFFLINE Support -->
-        <script>
-            // Safe service worker registration - handles offline gracefully
-            (function() {
-                if (!('serviceWorker' in navigator)) {
-                    console.log('[Audix] Service Workers not supported');
-                    return;
-                }
-                
-                // Function to register service worker
-                function registerSW() {
-                    navigator.serviceWorker.register('/service-worker.js')
-                        .then(function(registration) {
-                            console.log('[Audix] Service Worker registered successfully');
-                        })
-                        .catch(function(error) {
-                            // Silently ignore registration errors (happens when offline)
-                            console.log('[Audix] Service Worker registration skipped (offline mode)');
-                        });
-                }
-                
-                // Only try to register when page loads and we might be online
-                if (document.readyState === 'complete') {
-                    registerSW();
-                } else {
-                    window.addEventListener('load', registerSW);
-                }
-                
-                // Re-register when coming back online
-                window.addEventListener('online', function() {
-                    console.log('[Audix] Back online - checking service worker');
-                    registerSW();
-                });
-            })();
-        </script>
     </body>
 </html>
