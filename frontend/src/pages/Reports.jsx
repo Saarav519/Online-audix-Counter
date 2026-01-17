@@ -133,7 +133,17 @@ const Reports = () => {
     const result = verifyAuthorizationCredentials(authUsername, authPassword);
     if (result.success) {
       const locationsToDelete = getLocationsToDelete();
-      deleteLocationData(locationsToDelete);
+      
+      if (deleteType === 'location') {
+        // Delete locations completely (from both Reports and Locations)
+        locationsToDelete.forEach(locId => {
+          deleteLocationFromReports(locId);
+        });
+      } else {
+        // Delete only the scanned items (keep locations)
+        deleteLocationData(locationsToDelete);
+      }
+      
       setShowAuthModal(false);
       setDeleteSuccess(true);
       setTimeout(() => setDeleteSuccess(false), 3000);
