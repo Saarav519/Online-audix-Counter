@@ -32,14 +32,19 @@ const RouteRestorer = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useApp();
+  const hasRestoredRef = React.useRef(false);
   
   useEffect(() => {
-    // Only restore if authenticated and currently on home page
-    if (isAuthenticated && location.pathname === '/') {
+    // Only restore once, when authenticated and on home page
+    if (isAuthenticated && location.pathname === '/' && !hasRestoredRef.current) {
+      hasRestoredRef.current = true;
       const lastRoute = localStorage.getItem('audix_last_route');
-      // If there's a saved route and it's not the home page, navigate to it
+      // If there's a saved route and it's not the home page or login, navigate to it
       if (lastRoute && lastRoute !== '/' && lastRoute !== '/login') {
-        navigate(lastRoute, { replace: true });
+        // Use setTimeout to avoid navigation during render
+        setTimeout(() => {
+          navigate(lastRoute, { replace: true });
+        }, 0);
       }
     }
   }, [isAuthenticated, location.pathname, navigate]);
