@@ -43,56 +43,94 @@ export const downloadCSV = async (csvContent, filename) => {
   const content = BOM + csvContent;
   const mimeType = 'text/csv';
   
-  // For Android - always try Web Share API first (most reliable)
-  if (isAndroid() || isCapacitor()) {
-    try {
-      // Create a Blob and File
-      const blob = new Blob([content], { type: mimeType });
-      const file = new File([blob], filename, { type: mimeType, lastModified: Date.now() });
-      
-      // Check if Web Share API with files is supported
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename,
-        });
-        return { success: true, method: 'share' };
+  // Create blob and file for sharing
+  const blob = new Blob([content], { type: mimeType });
+  const file = new File([blob], filename, { type: mimeType, lastModified: Date.now() });
+  
+  // For Android/Capacitor - try Web Share API (shows native share dialog)
+  if (isAndroid() || isCapacitor() || isMobile()) {
+    
+    // Method 1: Web Share API with file (Best option - native share dialog)
+    if (navigator.share && navigator.canShare) {
+      try {
+        const shareData = { files: [file] };
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return { success: true, method: 'share' };
+        }
+      } catch (err) {
+        // User cancelled or share failed - try next method
+        if (err.name !== 'AbortError') {
+          console.log('Share failed:', err.message);
+        } else {
+          // User cancelled - that's okay
+          return { success: true, method: 'cancelled' };
+        }
       }
-    } catch (err) {
-      console.log('Share API failed:', err.message);
     }
     
-    // Fallback: Create blob URL and open in new window
+    // Method 2: Download via anchor with data URL
     try {
-      const blob = new Blob([content], { type: mimeType });
+      const reader = new FileReader();
+      return new Promise((resolve) => {
+        reader.onload = function() {
+          const dataUrl = reader.result;
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = filename;
+          link.style.cssText = 'position:fixed;left:-9999px';
+          document.body.appendChild(link);
+          
+          // Try click
+          link.click();
+          
+          setTimeout(() => {
+            document.body.removeChild(link);
+            resolve({ success: true, method: 'dataurl' });
+          }, 1000);
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.log('Data URL method failed:', err.message);
+    }
+    
+    // Method 3: Blob URL download
+    try {
       const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(link);
+      link.click();
       
-      // Try opening in a new window/tab
-      const newWindow = window.open(url, '_blank');
-      if (newWindow) {
-        // Show instructions
-        setTimeout(() => {
-          alert(`File ready!\n\nTap the 3-dot menu (⋮) and select "Download" to save the file.`);
-        }, 500);
-        
-        // Cleanup after delay
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        return { success: true, method: 'window' };
-      }
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 1000);
+      
+      return { success: true, method: 'blob' };
     } catch (err) {
-      console.log('Window open failed:', err.message);
+      console.log('Blob URL method failed:', err.message);
     }
     
-    // Last resort: Show content for manual copy
-    alert(`Unable to download automatically.\n\nThe file will open in a new tab. Use long-press to save or copy the content.`);
-    const dataUri = 'data:' + mimeType + ';charset=utf-8,' + encodeURIComponent(content);
-    window.open(dataUri, '_blank');
-    return { success: false, method: 'manual' };
+    // Method 4: Last resort - copy to clipboard
+    try {
+      await navigator.clipboard.writeText(csvContent);
+      alert(`File copied to clipboard!\n\nYou can paste it into a text file or spreadsheet app.`);
+      return { success: true, method: 'clipboard' };
+    } catch (err) {
+      console.log('Clipboard failed:', err.message);
+    }
+    
+    // All methods failed
+    alert(`Export failed. Please try again or use a different device.`);
+    return { success: false, method: 'failed' };
   }
   
-  // Desktop/other browsers - standard download
+  // Desktop browsers - standard download
   try {
-    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -115,7 +153,6 @@ export const downloadCSV = async (csvContent, filename) => {
  */
 export const getCSVAcceptTypes = () => {
   // Be very permissive for Android compatibility
-  // Android file pickers often have issues with specific MIME types
   return '.csv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel,*/*';
 };
 
