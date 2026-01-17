@@ -215,11 +215,7 @@ const Layout = ({ children }) => {
       >
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <img 
-              src="https://customer-assets.emergentagent.com/job_c33ba7c5-d7d2-4a99-9a90-28a1ecab4f0f/artifacts/dgmrmi4u_Audix%20Logo.png" 
-              alt="Audix" 
-              className="h-10"
-            />
+            <span className="text-xl font-bold text-emerald-700">AUDIX</span>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
