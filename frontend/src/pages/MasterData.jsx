@@ -467,11 +467,11 @@ supervisor1,super789`;
               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-400 transition-colors cursor-pointer">
                 <Upload className="w-10 h-10 text-slate-400 mb-3" />
                 <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
-                <p className="text-xs text-slate-400">CSV files only</p>
+                <p className="text-xs text-slate-400">CSV or TXT files</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept={getCSVAcceptTypes()}
                   onChange={handleFileUpload}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
