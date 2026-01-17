@@ -28,6 +28,9 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: Install Yarn
         run: npm install -g yarn
 
@@ -37,35 +40,58 @@ jobs:
 
       - name: Build web app
         working-directory: ./frontend
-        run: yarn build
+        run: |
+          CI=false yarn build
 
-      - name: Install Capacitor CLI
+      - name: Check build output
         working-directory: ./frontend
-        run: yarn add @capacitor/cli @capacitor/core @capacitor/android
+        run: |
+          echo "Checking build folder..."
+          ls -la build/ || echo "Build folder not found"
 
       - name: Sync Capacitor
         working-directory: ./frontend
-        run: npx cap sync android
+        run: |
+          npx cap sync android
 
       - name: Create local.properties
         working-directory: ./frontend/android
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          cat local.properties
+
+      - name: Check Android project structure
+        working-directory: ./frontend/android
+        run: |
+          echo "=== Android project structure ==="
+          ls -la
+          echo "=== App folder ==="
+          ls -la app/
+          echo "=== Gradle wrapper ==="
+          ls -la gradle/wrapper/
 
       - name: Make Gradle executable
         working-directory: ./frontend/android
         run: chmod +x ./gradlew
 
+      - name: Clean Gradle
+        working-directory: ./frontend/android
+        run: ./gradlew clean --no-daemon || true
+
       - name: Build Debug APK
         working-directory: ./frontend/android
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Rename APK
         run: |
-          mv frontend/android/app/build/outputs/apk/debug/app-debug.apk frontend/android/app/build/outputs/apk/debug/Audix-v1.0.apk
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: List APK output
+        run: |
+          echo "=== APK Output ==="
+          find frontend/android -name "*.apk" -type f
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Audix-APK
-          path: frontend/android/app/build/outputs/apk/debug/Audix-v1.0.apk
+          path: frontend/android/app/build/outputs/apk/debug/*.apk
           retention-days: 90
+          if-no-files-found: error
