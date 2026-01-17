@@ -3,34 +3,30 @@ import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
 
-// Safe Service Worker registration - handles offline gracefully
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // Wrap in try-catch to prevent uncaught errors
-    try {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then((registration) => {
-          console.log('[Audix] Service Worker registered');
-        })
-        .catch(() => {
-          // Silently ignore - app works offline with existing cache
-          console.log('[Audix] Service Worker update skipped (offline)');
-        });
-    } catch (e) {
-      // Ignore any errors during SW registration
-      console.log('[Audix] Running in offline mode');
-    }
-  });
-}
-
-// Detect if running as installed PWA
+// Detect if running as installed PWA or Capacitor app
+const isCapacitor = window.Capacitor !== undefined;
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                      window.navigator.standalone || 
-                     document.referrer.includes('android-app://');
+                     document.referrer.includes('android-app://') ||
+                     isCapacitor;
 
 if (isStandalone) {
-  console.log('[Audix] Running as installed PWA');
+  console.log('[Audix] Running as installed app');
   document.body.classList.add('pwa-installed');
+}
+
+// Only register service worker for web (not Capacitor)
+// Capacitor apps load from local files, don't need SW
+if ('serviceWorker' in navigator && !isCapacitor) {
+  window.addEventListener('load', () => {
+    try {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(() => console.log('[Audix] Service Worker registered'))
+        .catch(() => console.log('[Audix] Service Worker skipped'));
+    } catch (e) {
+      // Ignore
+    }
+  });
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
