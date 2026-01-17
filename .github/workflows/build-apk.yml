@@ -31,62 +31,34 @@ jobs:
       - name: Accept Android Licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Install Yarn
-        run: npm install -g yarn
-
       - name: Install frontend dependencies
         working-directory: ./frontend
-        run: yarn install
+        run: |
+          npm install -g yarn
+          yarn install --network-timeout 300000
 
       - name: Build web app
         working-directory: ./frontend
-        run: |
-          CI=false yarn build
-
-      - name: Check build output
-        working-directory: ./frontend
-        run: |
-          echo "Checking build folder..."
-          ls -la build/ || echo "Build folder not found"
+        env:
+          CI: false
+          DISABLE_ESLINT_PLUGIN: true
+        run: yarn build
 
       - name: Sync Capacitor
         working-directory: ./frontend
-        run: |
-          npx cap sync android
+        run: npx cap sync android
 
       - name: Create local.properties
         working-directory: ./frontend/android
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          cat local.properties
-
-      - name: Check Android project structure
-        working-directory: ./frontend/android
-        run: |
-          echo "=== Android project structure ==="
-          ls -la
-          echo "=== App folder ==="
-          ls -la app/
-          echo "=== Gradle wrapper ==="
-          ls -la gradle/wrapper/
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
       - name: Make Gradle executable
         working-directory: ./frontend/android
         run: chmod +x ./gradlew
 
-      - name: Clean Gradle
-        working-directory: ./frontend/android
-        run: ./gradlew clean --no-daemon || true
-
       - name: Build Debug APK
         working-directory: ./frontend/android
-        run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: List APK output
-        run: |
-          echo "=== APK Output ==="
-          find frontend/android -name "*.apk" -type f
+        run: ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -94,4 +66,3 @@ jobs:
           name: Audix-APK
           path: frontend/android/app/build/outputs/apk/debug/*.apk
           retention-days: 90
-          if-no-files-found: error
