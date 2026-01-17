@@ -412,13 +412,51 @@ const Reports = () => {
               Confirm Delete
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete data for the selected locations? This action cannot be undone.
+              Choose what to delete for the selected locations.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-2 bg-red-50 rounded-lg p-3">
-            <p className="text-sm"><strong>Locations:</strong> {isAllSelected ? 'All Locations' : `${selectedLocations.length} selected`}</p>
-            <p className="text-sm"><strong>Items to delete:</strong> {reportItems.length}</p>
-            <p className="text-sm"><strong>Total quantity:</strong> {totalQuantity}</p>
+          <div className="py-4 space-y-3">
+            {/* Delete Type Selection */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Delete Option:</Label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    name="deleteType"
+                    value="items"
+                    checked={deleteType === 'items'}
+                    onChange={() => setDeleteType('items')}
+                    className="w-4 h-4 text-red-600"
+                  />
+                  <div>
+                    <p className="font-medium text-sm">Delete Scanned Items Only</p>
+                    <p className="text-xs text-slate-500">Keep locations, remove scanned data</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 border-red-200 bg-red-50">
+                  <input
+                    type="radio"
+                    name="deleteType"
+                    value="location"
+                    checked={deleteType === 'location'}
+                    onChange={() => setDeleteType('location')}
+                    className="w-4 h-4 text-red-600"
+                  />
+                  <div>
+                    <p className="font-medium text-sm text-red-700">Delete Locations Completely</p>
+                    <p className="text-xs text-red-600">Remove locations from both Reports AND Locations list</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            
+            {/* Summary */}
+            <div className="bg-slate-50 rounded-lg p-3 space-y-1">
+              <p className="text-sm"><strong>Locations:</strong> {isAllSelected ? 'All Locations' : `${selectedLocations.length} selected`}</p>
+              <p className="text-sm"><strong>Items to delete:</strong> {reportItems.length}</p>
+              <p className="text-sm"><strong>Total quantity:</strong> {totalQuantity}</p>
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
