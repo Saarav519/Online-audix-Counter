@@ -5,14 +5,16 @@
   "bundledWebRuntime": false,
   "android": {
     "allowMixedContent": false,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#ffffff"
   },
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
       "backgroundColor": "#10b981",
       "showSpinner": false,
-      "androidSpinnerStyle": "small"
+      "androidSpinnerStyle": "small",
+      "launchShowDuration": 500
     }
   }
 }
