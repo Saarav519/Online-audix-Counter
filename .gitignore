@@ -92,3 +92,7 @@ frontend/android/capacitor-cordova-android-plugins/build/
 # Environment files
 *.env
 *.env.*
+-e 
+# Environment files
+*.env
+*.env.*
