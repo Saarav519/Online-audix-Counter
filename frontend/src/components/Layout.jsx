@@ -172,11 +172,7 @@ const Layout = ({ children }) => {
         </button>
         
         <div className="flex items-center gap-2">
-          <img 
-            src="https://customer-assets.emergentagent.com/job_c33ba7c5-d7d2-4a99-9a90-28a1ecab4f0f/artifacts/dgmrmi4u_Audix%20Logo.png" 
-            alt="Audix" 
-            className="h-8"
-          />
+          <span className="text-xl font-bold text-emerald-700">AUDIX</span>
         </div>
 
         <DropdownMenu>
