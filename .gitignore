@@ -64,3 +64,7 @@ frontend/android/capacitor-cordova-android-plugins/build/
 # frontend/android/gradlew
 # frontend/android/gradlew.bat
 # frontend/android/app/src/
+-e 
+# Environment files
+*.env
+*.env.*
