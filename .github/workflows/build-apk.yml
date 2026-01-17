@@ -52,6 +52,12 @@ jobs:
         working-directory: ./frontend/android
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
+      - name: Download Gradle Wrapper JAR
+        working-directory: ./frontend/android
+        run: |
+          mkdir -p gradle/wrapper
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.0.2/gradle/wrapper/gradle-wrapper.jar
+
       - name: Make Gradle executable
         working-directory: ./frontend/android
         run: chmod +x ./gradlew
