@@ -601,6 +601,8 @@ export const AppProvider = ({ children }) => {
     updateSettings,
     addLocation,
     deleteLocation,
+    deleteLocationFromReports,
+    clearLocationItems,
     findLocationByCode,
     scanLocation,
     createLocationFromScan,
