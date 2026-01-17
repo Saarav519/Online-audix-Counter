@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 const Reports = () => {
-  const { locations, scannedItems, currentSession, masterProducts, deleteLocationData, verifyAuthorizationCredentials } = useApp();
+  const { locations, scannedItems, currentSession, masterProducts, deleteLocationData, deleteLocationFromReports, verifyAuthorizationCredentials } = useApp();
   const [selectedLocations, setSelectedLocations] = useState(['all']);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -38,6 +38,7 @@ const Reports = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [deleteSuccess, setDeleteSuccess] = useState(false);
+  const [deleteType, setDeleteType] = useState('items'); // 'items' or 'location'
 
   const isAllSelected = selectedLocations.includes('all');
 
