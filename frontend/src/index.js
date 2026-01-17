@@ -3,21 +3,23 @@ import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
 
-// Register Service Worker for PWA functionality
+// Safe Service Worker registration - handles offline gracefully
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        console.log('[Audix] Service Worker registered:', registration.scope);
-        
-        // Check for updates periodically
-        setInterval(() => {
-          registration.update();
-        }, 60000); // Check every minute
-      })
-      .catch((error) => {
-        console.log('[Audix] Service Worker registration failed:', error);
-      });
+    // Wrap in try-catch to prevent uncaught errors
+    try {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then((registration) => {
+          console.log('[Audix] Service Worker registered');
+        })
+        .catch(() => {
+          // Silently ignore - app works offline with existing cache
+          console.log('[Audix] Service Worker update skipped (offline)');
+        });
+    } catch (e) {
+      // Ignore any errors during SW registration
+      console.log('[Audix] Running in offline mode');
+    }
   });
 }
 
