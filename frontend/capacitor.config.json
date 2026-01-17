@@ -2,19 +2,17 @@
   "appId": "com.audix.stockmanagement",
   "appName": "Audix",
   "webDir": "build",
-  "server": {
-    "androidScheme": "https",
-    "cleartext": true
-  },
+  "bundledWebRuntime": false,
   "android": {
-    "allowMixedContent": true,
+    "allowMixedContent": false,
     "webContentsDebuggingEnabled": false
   },
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
       "backgroundColor": "#10b981",
-      "showSpinner": false
+      "showSpinner": false,
+      "androidSpinnerStyle": "small"
     }
   }
 }
