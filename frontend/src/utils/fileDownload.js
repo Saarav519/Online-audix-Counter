@@ -1,9 +1,7 @@
 /**
  * Cross-platform file download utility
- * Saves directly to Downloads folder on Android with success popup
+ * Uses Web Share API for Android - shows native share dialog
  */
-
-import { Filesystem, Directory } from '@capacitor/filesystem';
 
 /**
  * Detect if running on Android device
@@ -28,75 +26,68 @@ export const isMobile = () => {
 };
 
 /**
- * Download CSV file - Saves to Downloads folder on Android
- * @param {string} csvContent - CSV content string
- * @param {string} filename - Name of the file (should end with .csv)
- * @returns {Promise<{success: boolean, message: string}>}
+ * Download CSV file
+ * On Android: Shows Share dialog to save file
+ * On Desktop: Direct download
  */
 export const downloadCSV = async (csvContent, filename) => {
-  // Add BOM for Excel compatibility with UTF-8
+  // Add BOM for Excel compatibility
   const BOM = '\uFEFF';
   const content = BOM + csvContent;
+  const blob = new Blob([content], { type: 'text/csv' });
+  const file = new File([blob], filename, { type: 'text/csv', lastModified: Date.now() });
   
-  // For Capacitor/Android - Save directly to Downloads folder
-  if (isCapacitor()) {
-    try {
-      // Save to Downloads directory
-      const result = await Filesystem.writeFile({
-        path: filename,
-        data: content,
-        directory: Directory.Documents,
-        encoding: 'utf8',
-      });
-      
-      // Show success popup
-      alert(`✅ File Saved Successfully!\n\nFile: ${filename}\nLocation: Documents folder\n\nYou can find this file in your device's file manager.`);
-      
-      return { success: true, message: 'File saved to Documents folder' };
-    } catch (err) {
-      console.log('Capacitor Filesystem failed:', err);
-      
-      // Try external storage as fallback
-      try {
-        await Filesystem.writeFile({
-          path: 'Download/' + filename,
-          data: content,
-          directory: Directory.ExternalStorage,
-          encoding: 'utf8',
-        });
-        
-        alert(`✅ File Saved Successfully!\n\nFile: ${filename}\nLocation: Downloads folder\n\nYou can find this file in your Downloads.`);
-        
-        return { success: true, message: 'File saved to Downloads folder' };
-      } catch (err2) {
-        console.log('External storage failed:', err2);
-      }
-    }
-  }
-  
-  // For Android browser or Web - use Web Share API or download
-  if (isMobile() || isAndroid()) {
-    const blob = new Blob([content], { type: 'text/csv' });
-    const file = new File([blob], filename, { type: 'text/csv' });
-    
-    // Try Web Share API
+  // For Android/Mobile - Use Web Share API
+  if (isAndroid() || isCapacitor() || isMobile()) {
+    // Check if Web Share API is available
     if (navigator.share && navigator.canShare) {
       try {
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file] });
-          return { success: true, message: 'File shared' };
+        const shareData = { files: [file] };
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          // Show success message after share dialog closes
+          alert('✅ Export Successful!\n\nFile: ' + filename + '\n\nSelect "Save to Files" or "Downloads" from the share menu to save the file.');
+          return { success: true };
         }
       } catch (err) {
         if (err.name === 'AbortError') {
-          return { success: true, message: 'Cancelled' };
+          // User cancelled - that's ok
+          return { success: true, cancelled: true };
         }
+        console.log('Share failed:', err);
       }
+    }
+    
+    // Fallback: Try direct download
+    try {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      alert('✅ Export Successful!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
+      return { success: true };
+    } catch (err) {
+      console.log('Download failed:', err);
+    }
+    
+    // Last fallback: Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(csvContent);
+      alert('📋 Content Copied!\n\nFile download not available.\nContent has been copied to clipboard.\nPaste it into a text file or spreadsheet.');
+      return { success: true };
+    } catch (err) {
+      alert('❌ Export Failed\n\nPlease try again.');
+      return { success: false };
     }
   }
   
-  // Desktop/Web fallback - standard download
+  // Desktop - Standard download
   try {
-    const blob = new Blob([content], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -105,13 +96,11 @@ export const downloadCSV = async (csvContent, filename) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
-    alert(`✅ File Downloaded!\n\nFile: ${filename}\n\nCheck your Downloads folder.`);
-    
-    return { success: true, message: 'File downloaded' };
+    alert('✅ File Downloaded!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
+    return { success: true };
   } catch (err) {
-    alert(`❌ Export Failed\n\nPlease try again.`);
-    return { success: false, message: err.message };
+    alert('❌ Download Failed\n\nPlease try again.');
+    return { success: false };
   }
 };
 
@@ -120,18 +109,6 @@ export const downloadCSV = async (csvContent, filename) => {
  */
 export const getCSVAcceptTypes = () => {
   return '.csv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel,*/*';
-};
-
-/**
- * Read CSV file content
- */
-export const readCSVFile = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(e);
-    reader.readAsText(file);
-  });
 };
 
 /**
@@ -149,6 +126,5 @@ export default {
   isMobile, 
   isCapacitor,
   getCSVAcceptTypes,
-  readCSVFile,
   isValidCSV
 };
