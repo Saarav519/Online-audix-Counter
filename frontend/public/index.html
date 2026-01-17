@@ -35,48 +35,38 @@
         
         <!-- Service Worker Registration for OFFLINE Support -->
         <script>
-            // Register service worker immediately for offline support
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
+            // Safe service worker registration - handles offline gracefully
+            (function() {
+                if (!('serviceWorker' in navigator)) {
+                    console.log('[Audix] Service Workers not supported');
+                    return;
+                }
+                
+                // Function to register service worker
+                function registerSW() {
                     navigator.serviceWorker.register('/service-worker.js')
                         .then(function(registration) {
-                            console.log('[Audix] Service Worker registered for OFFLINE support');
-                            
-                            // Check for updates
-                            registration.addEventListener('updatefound', function() {
-                                const newWorker = registration.installing;
-                                newWorker.addEventListener('statechange', function() {
-                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                        // New version available - activate immediately
-                                        newWorker.postMessage({ type: 'SKIP_WAITING' });
-                                    }
-                                });
-                            });
-                            
-                            // Pre-cache all app pages
-                            if (registration.active) {
-                                registration.active.postMessage({ type: 'CACHE_ALL' });
-                            }
+                            console.log('[Audix] Service Worker registered successfully');
                         })
                         .catch(function(error) {
-                            console.error('[Audix] Service Worker registration failed:', error);
+                            // Silently ignore registration errors (happens when offline)
+                            console.log('[Audix] Service Worker registration skipped (offline mode)');
                         });
-                    
-                    // Refresh when new service worker takes over
-                    navigator.serviceWorker.addEventListener('controllerchange', function() {
-                        console.log('[Audix] New service worker activated');
-                    });
+                }
+                
+                // Only try to register when page loads and we might be online
+                if (document.readyState === 'complete') {
+                    registerSW();
+                } else {
+                    window.addEventListener('load', registerSW);
+                }
+                
+                // Re-register when coming back online
+                window.addEventListener('online', function() {
+                    console.log('[Audix] Back online - checking service worker');
+                    registerSW();
                 });
-            }
-            
-            // Notify user about offline/online status
-            window.addEventListener('online', function() {
-                console.log('[Audix] App is ONLINE');
-            });
-            
-            window.addEventListener('offline', function() {
-                console.log('[Audix] App is OFFLINE - continuing with cached data');
-            });
+            })();
         </script>
     </body>
 </html>
