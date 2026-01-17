@@ -367,6 +367,36 @@ export const AppProvider = ({ children }) => {
     });
   };
 
+  // Delete location from reports - also removes from Locations if no scanned items
+  const deleteLocationFromReports = (locationId) => {
+    // First, remove the scanned items for this location
+    setScannedItems(prev => {
+      const newItems = { ...prev };
+      delete newItems[locationId];
+      return newItems;
+    });
+    
+    // Then, remove the location from the locations list
+    // (since reports are tied to locations, deleting from reports means deleting the location)
+    setLocations(prev => prev.filter(loc => loc.id !== locationId));
+  };
+
+  // Clear scanned items for a location (keeps the location, removes items)
+  const clearLocationItems = (locationId) => {
+    setScannedItems(prev => ({
+      ...prev,
+      [locationId]: []
+    }));
+    // Update location to reset submission status
+    setLocations(prev =>
+      prev.map(loc =>
+        loc.id === locationId
+          ? { ...loc, isSubmitted: false, itemCount: 0, lastUpdated: new Date().toISOString() }
+          : loc
+      )
+    );
+  };
+
   // Find location by code (for scanner auto-select) - respects mode separation
   const findLocationByCode = (code) => {
     return locations.find(l => {
