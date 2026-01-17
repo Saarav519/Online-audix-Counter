@@ -1,6 +1,6 @@
 /**
- * Cross-platform file download utility
- * Works on Desktop browsers, Android browsers, and Android WebViews (Capacitor)
+ * Cross-platform file download/upload utility
+ * Optimized for Android WebViews and Capacitor apps
  */
 
 /**
@@ -27,102 +27,134 @@ export const isMobile = () => {
 };
 
 /**
- * Download file using multiple fallback methods
- * @param {string} content - File content (string)
- * @param {string} filename - Name of the file to download
- * @param {string} mimeType - MIME type of the file (default: text/csv)
+ * Detect if running in Capacitor
  */
-export const downloadFile = async (content, filename, mimeType = 'text/csv') => {
-  // Try multiple methods in order of preference
+export const isCapacitor = () => {
+  return window.Capacitor !== undefined;
+};
+
+/**
+ * Download CSV file - Android optimized
+ * Uses Web Share API as primary method for Android
+ */
+export const downloadCSV = async (csvContent, filename) => {
+  // Add BOM for Excel compatibility with UTF-8
+  const BOM = '\uFEFF';
+  const content = BOM + csvContent;
+  const mimeType = 'text/csv';
   
-  // Method 1: Try Web Share API for mobile (allows saving/sharing file)
-  if (isMobile() && navigator.share && navigator.canShare) {
+  // For Android - always try Web Share API first (most reliable)
+  if (isAndroid() || isCapacitor()) {
     try {
-      const file = new File([content], filename, { type: mimeType });
-      if (navigator.canShare({ files: [file] })) {
+      // Create a Blob and File
+      const blob = new Blob([content], { type: mimeType });
+      const file = new File([blob], filename, { type: mimeType, lastModified: Date.now() });
+      
+      // Check if Web Share API with files is supported
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: filename,
-          text: `Download ${filename}`
         });
-        return true;
+        return { success: true, method: 'share' };
       }
     } catch (err) {
-      console.log('Web Share API failed, trying fallback:', err.message);
+      console.log('Share API failed:', err.message);
     }
-  }
-
-  // Method 2: Try using Data URI (more compatible with mobile)
-  if (isMobile()) {
+    
+    // Fallback: Create blob URL and open in new window
     try {
-      const dataUri = 'data:' + mimeType + ';charset=utf-8,' + encodeURIComponent(content);
-      const link = document.createElement('a');
-      link.setAttribute('href', dataUri);
-      link.setAttribute('download', filename);
-      link.setAttribute('target', '_blank');
-      link.style.display = 'none';
-      document.body.appendChild(link);
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
       
-      // Use setTimeout to ensure the link is in the DOM
-      setTimeout(() => {
-        link.click();
-        document.body.removeChild(link);
-      }, 100);
-      
-      return true;
+      // Try opening in a new window/tab
+      const newWindow = window.open(url, '_blank');
+      if (newWindow) {
+        // Show instructions
+        setTimeout(() => {
+          alert(`File ready!\n\nTap the 3-dot menu (⋮) and select "Download" to save the file.`);
+        }, 500);
+        
+        // Cleanup after delay
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return { success: true, method: 'window' };
+      }
     } catch (err) {
-      console.log('Data URI method failed, trying blob:', err.message);
+      console.log('Window open failed:', err.message);
     }
+    
+    // Last resort: Show content for manual copy
+    alert(`Unable to download automatically.\n\nThe file will open in a new tab. Use long-press to save or copy the content.`);
+    const dataUri = 'data:' + mimeType + ';charset=utf-8,' + encodeURIComponent(content);
+    window.open(dataUri, '_blank');
+    return { success: false, method: 'manual' };
   }
-
-  // Method 3: Standard Blob download (works best on desktop)
+  
+  // Desktop/other browsers - standard download
   try {
     const blob = new Blob([content], { type: mimeType });
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = filename;
     link.style.display = 'none';
     document.body.appendChild(link);
-    
-    // Small delay for mobile browsers
-    setTimeout(() => {
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    }, 100);
-    
-    return true;
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return { success: true, method: 'download' };
   } catch (err) {
-    console.error('Blob download failed:', err.message);
+    console.error('Download failed:', err);
+    return { success: false, method: 'error' };
   }
-
-  // Method 4: Open in new window as last resort
-  try {
-    const dataUri = 'data:' + mimeType + ';charset=utf-8,' + encodeURIComponent(content);
-    const newWindow = window.open(dataUri, '_blank');
-    if (newWindow) {
-      alert(`File "${filename}" opened in new tab. Please use your browser's save/download option to save it.`);
-      return true;
-    }
-  } catch (err) {
-    console.error('New window method failed:', err.message);
-  }
-
-  // All methods failed
-  alert(`Unable to download file automatically. Please copy the data manually or try on a different device.`);
-  return false;
 };
 
 /**
- * Download CSV file with proper handling
- * @param {string} csvContent - CSV content string
- * @param {string} filename - Name of the file (should end with .csv)
+ * Get accepted file types for CSV input
+ * Returns string for input accept attribute - broad to work on Android
  */
-export const downloadCSV = (csvContent, filename) => {
-  // Add BOM for Excel compatibility with UTF-8
-  const BOM = '\uFEFF';
-  return downloadFile(BOM + csvContent, filename, 'text/csv;charset=utf-8');
+export const getCSVAcceptTypes = () => {
+  // Be very permissive for Android compatibility
+  // Android file pickers often have issues with specific MIME types
+  return '.csv,.txt,text/csv,text/plain,application/csv,application/vnd.ms-excel,*/*';
 };
 
-export default { downloadFile, downloadCSV, isAndroid, isIOS, isMobile };
+/**
+ * Read CSV file content
+ */
+export const readCSVFile = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = (e) => reject(e);
+    reader.readAsText(file);
+  });
+};
+
+/**
+ * Validate if file is a valid CSV
+ */
+export const isValidCSV = (file) => {
+  if (!file) return false;
+  const name = file.name.toLowerCase();
+  const type = file.type.toLowerCase();
+  
+  // Check by extension
+  if (name.endsWith('.csv') || name.endsWith('.txt')) return true;
+  
+  // Check by MIME type
+  if (type.includes('csv') || type.includes('text') || type === '') return true;
+  
+  return false;
+};
+
+export default { 
+  downloadCSV, 
+  isAndroid, 
+  isIOS, 
+  isMobile, 
+  isCapacitor,
+  getCSVAcceptTypes,
+  readCSVFile,
+  isValidCSV
+};
