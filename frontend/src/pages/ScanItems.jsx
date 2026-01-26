@@ -246,29 +246,62 @@ const ScanItems = () => {
     }
   }, [isSingleSkuMode]);
 
-  // Auto-scroll to last item when items are added
+  // Auto-scroll to TOP when items are added (newest items appear at top)
   useEffect(() => {
     if (locationItems.length > 0) {
-      // Auto-scroll mobile list
+      // Auto-scroll mobile list to top
       const mobileList = itemsListRef.current;
       if (mobileList) {
         setTimeout(() => {
-          if (mobileList && mobileList.scrollHeight) {
-            mobileList.scrollTop = mobileList.scrollHeight;
+          if (mobileList) {
+            mobileList.scrollTop = 0;
           }
         }, 100);
       }
-      // Auto-scroll desktop list
+      // Auto-scroll desktop list to top
       const desktopList = itemsListDesktopRef.current;
       if (desktopList) {
         setTimeout(() => {
-          if (desktopList && desktopList.scrollHeight) {
-            desktopList.scrollTop = desktopList.scrollHeight;
+          if (desktopList) {
+            desktopList.scrollTop = 0;
           }
         }, 100);
       }
     }
   }, [locationItems.length]);
+
+  // Keep focus on barcode input - prevent focus loss on touch (Mobile only)
+  useEffect(() => {
+    if (!showScannerMode || !selectedLocationId || isLocationLocked) return;
+    
+    const keepFocusOnBarcode = (e) => {
+      // Don't interfere if user is editing quantity or clicking buttons
+      const target = e.target;
+      const isButton = target.closest('button');
+      const isInput = target.tagName === 'INPUT';
+      const isQuantityEdit = editingItemId !== null;
+      
+      // If user clicked on a button or is editing quantity, allow it
+      if (isButton || isQuantityEdit) return;
+      
+      // If user clicked on another input (like quantity), allow it
+      if (isInput && target !== barcodeInputRef.current) return;
+      
+      // Otherwise, refocus barcode input after a short delay
+      setTimeout(() => {
+        if (barcodeInputRef.current && !isLocationLocked && selectedLocationId) {
+          barcodeInputRef.current.focus();
+        }
+      }, 50);
+    };
+
+    // Add touchend listener to refocus after touch
+    document.addEventListener('touchend', keepFocusOnBarcode);
+    
+    return () => {
+      document.removeEventListener('touchend', keepFocusOnBarcode);
+    };
+  }, [showScannerMode, selectedLocationId, isLocationLocked, editingItemId]);
 
   // Handle location scan/input
   const handleLocationKeyDown = (e) => {
