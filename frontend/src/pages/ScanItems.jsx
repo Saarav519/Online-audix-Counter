@@ -363,8 +363,8 @@ const ScanItems = () => {
     // Clear result after 3 seconds
     setTimeout(() => setLastScanResult(null), 3000);
     
-    // Only auto-focus on desktop (not mobile/scanner) to prevent keyboard popup
-    if (!showScannerMode && barcodeInputRef.current) {
+    // Keep focus on barcode input for continuous scanning
+    if (barcodeInputRef.current) {
       barcodeInputRef.current.focus();
     }
   };
