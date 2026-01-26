@@ -372,7 +372,13 @@ const ScanItems = () => {
   const handleDelete = (itemId) => {
     if (isLocationLocked) return;
     deleteScannedItem(selectedLocationId, itemId);
-    // NOTE: Removed auto-focus to prevent keyboard from opening automatically
+    
+    // Keep focus on barcode input after deletion (mobile)
+    if (showScannerMode && barcodeInputRef.current) {
+      setTimeout(() => {
+        barcodeInputRef.current.focus();
+      }, 50);
+    }
   };
 
   const handleQuantityUpdate = (itemId) => {
