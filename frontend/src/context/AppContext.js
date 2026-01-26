@@ -167,6 +167,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Add scanned item to location - OPTIMIZED FOR FAST SCANNING
+  // When duplicate barcode is scanned, it moves to the END of array (appears at TOP when reversed)
   const addScannedItem = (locationId, barcode, quantity = 1) => {
     const product = masterProducts.find(p => p.barcode === barcode);
     const isValidBarcode = product !== undefined;
@@ -187,16 +188,17 @@ export const AppProvider = ({ children }) => {
         // Single SKU Mode: 
         // - Same barcode stays in ONE line
         // - Quantity auto-increments by 1 per scan
+        // - Re-scanned item MOVES TO END (appears at TOP when reversed)
         if (existingIndex !== -1) {
-          // Update existing item - increment by 1
-          const updated = [...locationItems];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + 1,
+          // Remove existing item and add updated version to END
+          const existingItem = locationItems[existingIndex];
+          const filteredItems = locationItems.filter((_, idx) => idx !== existingIndex);
+          newItem = {
+            ...existingItem,
+            quantity: existingItem.quantity + 1,
             scannedAt: new Date().toISOString()
           };
-          newItem = updated[existingIndex];
-          return { ...prev, [locationId]: updated };
+          return { ...prev, [locationId]: [...filteredItems, newItem] };
         } else {
           // Add new item with quantity 1
           newItem = {
@@ -211,16 +213,17 @@ export const AppProvider = ({ children }) => {
         }
       } else {
         // Non-Single SKU Mode (Manual Qty Entry)
+        // - Re-scanned item MOVES TO END (appears at TOP when reversed)
         if (existingIndex !== -1) {
-          // Update existing item quantity
-          const updated = [...locationItems];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + quantity,
+          // Remove existing item and add updated version to END
+          const existingItem = locationItems[existingIndex];
+          const filteredItems = locationItems.filter((_, idx) => idx !== existingIndex);
+          newItem = {
+            ...existingItem,
+            quantity: existingItem.quantity + quantity,
             scannedAt: new Date().toISOString()
           };
-          newItem = updated[existingIndex];
-          return { ...prev, [locationId]: updated };
+          return { ...prev, [locationId]: [...filteredItems, newItem] };
         } else {
           // Add new item with specified quantity
           newItem = {
