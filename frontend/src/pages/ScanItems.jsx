@@ -434,105 +434,167 @@ const ScanItems = () => {
   const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Scanner Mode UI - Optimized for handheld devices
+  // TWO-STEP FLOW: Step 1 = Location Selection, Step 2 = Barcode Scanning
   if (showScannerMode) {
-    return (
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* Compact Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-bold text-slate-800">Scan Items</h1>
-              <div className="flex gap-1 mt-1">
+    // STEP 1: Location Selection Screen (Mobile)
+    if (!selectedLocationId) {
+      return (
+        <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+            {/* Header */}
+            <div className="text-center pt-4">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MapPin className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h1 className="text-xl font-bold text-slate-800">Select Location</h1>
+              <p className="text-slate-500 text-sm mt-1">
+                {settings.locationScanMode === 'dynamic' 
+                  ? 'Scan or enter any location code'
+                  : 'Scan pre-assigned location code'}
+              </p>
+              <div className="flex gap-2 justify-center mt-3">
                 <Badge 
                   variant="outline" 
                   className={`text-xs ${settings.locationScanMode === 'dynamic' 
                     ? 'bg-purple-50 text-purple-700 border-purple-200' 
                     : 'bg-blue-50 text-blue-700 border-blue-200'}`}
                 >
-                  {settings.locationScanMode === 'dynamic' ? 'Dynamic' : 'Pre-Assigned'}
-                </Badge>
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs ${isSingleSkuMode 
-                    ? 'bg-orange-50 text-orange-700 border-orange-200' 
-                    : 'bg-teal-50 text-teal-700 border-teal-200'}`}
-                >
-                  {isSingleSkuMode ? 'Single SKU' : 'Manual Qty'}
+                  {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
                 </Badge>
               </div>
             </div>
-            {selectedLocation && (
-              <div className="text-right">
-                <p className="text-xs text-slate-500">Location</p>
-                <p className="text-sm font-semibold text-emerald-700">{selectedLocation.name}</p>
-              </div>
-            )}
-          </div>
 
-          {/* Location Scanner - Compact */}
-          <Card className={`border-0 shadow-sm ${selectedLocationId ? 'bg-emerald-50/50' : ''}`}>
-            <CardContent className="p-3">
-              <Label className="text-xs text-slate-600 mb-1 block font-medium">
-                <MapPin className="w-3 h-3 inline mr-1" />
-                Location Code
-              </Label>
-              <div className="relative">
+            {/* Location Scanner Card */}
+            <Card className="border-0 shadow-md mx-2">
+              <CardContent className="p-4">
+                <Label className="text-sm text-slate-600 mb-2 block font-medium">
+                  <MapPin className="w-4 h-4 inline mr-2" />
+                  Location Code
+                </Label>
                 <Input
                   ref={locationInputRef}
-                  placeholder="Scan location..."
+                  placeholder="Scan or type location code..."
                   value={locationInput}
                   onChange={(e) => {
                     setLocationInput(e.target.value);
                     setLocationError('');
                   }}
                   onKeyDown={handleLocationKeyDown}
-                  className={`h-11 text-base font-mono pr-10 ${selectedLocationId ? 'bg-emerald-50 border-emerald-300' : ''}`}
+                  className="h-14 text-lg font-mono text-center"
                   autoComplete="off"
+                  autoFocus
                 />
-                {selectedLocationId && (
-                  <button
-                    onClick={clearLocation}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                
+                {/* Confirm Button */}
+                <Button
+                  onClick={handleLocationScan}
+                  disabled={!locationInput.trim()}
+                  className="w-full h-14 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold"
+                >
+                  <CheckCircle2 className="w-6 h-6 mr-2" />
+                  Confirm Location
+                </Button>
+                
+                {locationError && (
+                  <div className="mt-3 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {locationError}
+                  </div>
                 )}
+                
+                {locationSuccess && (
+                  <div className="mt-3 p-3 bg-purple-50 text-purple-700 text-sm rounded-lg flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 flex-shrink-0" />
+                    {locationSuccess}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Help Text */}
+            <div className="text-center px-4">
+              <p className="text-xs text-slate-400">
+                {settings.locationScanMode === 'dynamic' 
+                  ? 'New location codes will be created automatically'
+                  : 'Only pre-imported locations are allowed'}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // STEP 2: Barcode Scanning Screen (Mobile) - Only shown after location is selected
+    return (
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {/* Location Info Header - Shows selected location with change option */}
+          <Card className="border-0 shadow-sm bg-emerald-50">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-emerald-600 font-medium">Current Location</p>
+                    <p className="text-base font-bold text-emerald-800">{selectedLocation?.name}</p>
+                    <p className="text-xs text-emerald-600 font-mono">{selectedLocation?.code}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearLocation}
+                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Change
+                </Button>
               </div>
-              
-              {locationError && (
-                <div className="mt-2 p-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                  {locationError}
-                </div>
-              )}
-              
-              {locationSuccess && (
-                <div className="mt-2 p-2 bg-purple-50 text-purple-700 text-xs rounded-lg flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 flex-shrink-0" />
-                  {locationSuccess}
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {/* Barcode Scanner - Compact */}
+          {/* Mode Badges */}
+          <div className="flex gap-2 px-1">
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${settings.locationScanMode === 'dynamic' 
+                ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+            >
+              {settings.locationScanMode === 'dynamic' ? 'Dynamic' : 'Pre-Assigned'}
+            </Badge>
+            <Badge 
+              variant="outline" 
+              className={`text-xs ${isSingleSkuMode 
+                ? 'bg-orange-50 text-orange-700 border-orange-200' 
+                : 'bg-teal-50 text-teal-700 border-teal-200'}`}
+            >
+              {isSingleSkuMode ? 'Single SKU' : 'Manual Qty'}
+            </Badge>
+          </div>
+
+          {/* Barcode Scanner */}
           <Card className="border-0 shadow-sm">
             <CardContent className="p-3">
               <Label className="text-xs text-slate-600 mb-1 block font-medium">
                 <ScanBarcode className="w-3 h-3 inline mr-1" />
-                Barcode
+                Scan Barcode
               </Label>
               <div className="flex gap-2">
                 <Input
                   ref={barcodeInputRef}
-                  placeholder={selectedLocationId ? "Scan barcode..." : "Select location first"}
+                  placeholder="Scan barcode..."
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyDown={handleBarcodeKeyDown}
-                  disabled={!selectedLocationId || isLocationLocked}
+                  disabled={isLocationLocked}
                   className="h-11 text-base font-mono flex-1"
                   autoComplete="off"
+                  autoFocus
                 />
                 {!isSingleSkuMode && (
                   <div className="flex items-center gap-1">
@@ -540,7 +602,7 @@ const ScanItems = () => {
                       variant="outline"
                       size="icon"
                       onClick={() => setQuantityInput(String(Math.max(1, parseInt(quantityInput) - 1)))}
-                      disabled={!selectedLocationId || isLocationLocked}
+                      disabled={isLocationLocked}
                       className="h-11 w-10"
                     >
                       <Minus className="w-4 h-4" />
@@ -550,14 +612,14 @@ const ScanItems = () => {
                       min="1"
                       value={quantityInput}
                       onChange={(e) => setQuantityInput(e.target.value)}
-                      disabled={!selectedLocationId || isLocationLocked}
+                      disabled={isLocationLocked}
                       className="h-11 text-center text-base font-bold w-14"
                     />
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={() => setQuantityInput(String(parseInt(quantityInput) + 1))}
-                      disabled={!selectedLocationId || isLocationLocked}
+                      disabled={isLocationLocked}
                       className="h-11 w-10"
                     >
                       <Plus className="w-4 h-4" />
@@ -569,7 +631,7 @@ const ScanItems = () => {
               {/* Add Button */}
               <Button
                 onClick={handleScan}
-                disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                disabled={!barcodeInput.trim() || isLocationLocked}
                 className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -607,29 +669,23 @@ const ScanItems = () => {
             </CardContent>
           </Card>
 
-          {/* Scanned Items List - Compact */}
+          {/* Scanned Items List */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="p-3 pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Package className="w-4 h-4 text-emerald-600" />
-                Items
-                {selectedLocationId && (
-                  <Badge variant="secondary" className="ml-auto text-xs">
-                    {locationItems.length} items • {totalQuantity} qty
-                  </Badge>
-                )}
+                Scanned Items
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {locationItems.length} items • {totalQuantity} qty
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-              {!selectedLocationId ? (
-                <div className="text-center py-6">
-                  <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-slate-500 text-sm">Scan location first</p>
-                </div>
-              ) : locationItems.length === 0 ? (
+              {locationItems.length === 0 ? (
                 <div className="text-center py-6">
                   <ScanBarcode className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-slate-500 text-sm">No items scanned</p>
+                  <p className="text-slate-500 text-sm">No items scanned yet</p>
+                  <p className="text-slate-400 text-xs mt-1">Start scanning barcodes</p>
                 </div>
               ) : (
                 <div 
@@ -647,16 +703,13 @@ const ScanItems = () => {
                       key={item.id} 
                       className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2"
                     >
-                      {/* Barcode & Description - takes most of the space */}
+                      {/* Barcode & Description */}
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        {/* Barcode on TOP */}
                         <p className="text-xs text-slate-600 font-mono font-semibold truncate">{item.barcode}</p>
-                        {/* Description BELOW */}
                         <p className="text-xs text-slate-500 truncate">{item.productName}</p>
                       </div>
-                      {/* Quantity & Delete - compact, no +/- buttons */}
+                      {/* Quantity & Delete */}
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* Quantity - clickable for editing when Single SKU mode is OFF */}
                         {editingItemId === item.id ? (
                           <Input
                             type="number"
@@ -685,7 +738,6 @@ const ScanItems = () => {
                             {item.quantity}
                           </span>
                         )}
-                        {/* Delete button */}
                         {!isLocationLocked && (
                           <Button
                             variant="ghost"
@@ -699,7 +751,6 @@ const ScanItems = () => {
                       </div>
                     </div>
                   ))}
-                  {/* Extra spacer to ensure last item is fully visible */}
                   <div style={{ height: '20px', minHeight: '20px' }}></div>
                 </div>
               )}
@@ -707,27 +758,15 @@ const ScanItems = () => {
           </Card>
         </div>
 
-        {/* Fixed Bottom Action Bar - Always visible */}
+        {/* Fixed Bottom Action Bar */}
         <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg z-40">
           <div className="flex gap-2">
-            {/* Clear Location Button */}
-            {selectedLocationId && !isLocationLocked && (
-              <Button
-                variant="outline"
-                onClick={clearLocation}
-                className="flex-1 h-12 text-slate-600 border-slate-300"
-              >
-                <X className="w-5 h-5 mr-2" />
-                Clear
-              </Button>
-            )}
-            
             {/* Submit Button - Main action */}
             <Button
               onClick={handleSubmitLocation}
-              disabled={!selectedLocationId || isLocationLocked || locationItems.length === 0}
+              disabled={isLocationLocked || locationItems.length === 0}
               className={`flex-1 h-12 text-base font-semibold ${
-                selectedLocationId && !isLocationLocked && locationItems.length > 0
+                !isLocationLocked && locationItems.length > 0
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   : 'bg-slate-200 text-slate-400'
               }`}
