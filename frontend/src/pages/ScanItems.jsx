@@ -297,13 +297,12 @@ const ScanItems = () => {
         setLocationSuccess(null);
       }
       
-      // Only auto-focus barcode input on desktop (not mobile/scanner)
-      // This prevents keyboard from opening automatically on scanner devices
-      if (!showScannerMode && barcodeInputRef.current) {
-        setTimeout(() => {
+      // Focus barcode input after location is selected
+      setTimeout(() => {
+        if (barcodeInputRef.current) {
           barcodeInputRef.current.focus();
-        }, 100);
-      }
+        }
+      }, 100);
     } else {
       // Check if it's a locked location error
       if (result.isLocked) {
@@ -324,8 +323,7 @@ const ScanItems = () => {
     setLocationInput('');
     setLocationError('');
     setLocationSuccess(null);
-    // Only auto-focus on desktop
-    if (!showScannerMode && locationInputRef.current) {
+    if (locationInputRef.current) {
       locationInputRef.current.focus();
     }
   };
