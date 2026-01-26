@@ -225,12 +225,10 @@ const ScanItems = () => {
     }
   }, []);
 
-  // Auto-focus barcode input when location is selected
-  useEffect(() => {
-    if (selectedLocationId && barcodeInputRef.current && !isLocationLocked) {
-      barcodeInputRef.current.focus();
-    }
-  }, [selectedLocationId, isLocationLocked]);
+  // NOTE: Removed auto-focus on barcode input when location is selected
+  // This prevents keyboard from opening automatically on mobile/scanner devices
+  // Hardware scanners work without keyboard - user can manually tap input if needed
+  // Desktop mode still works normally as users type with physical keyboard
 
   // Update location input display when location is selected
   useEffect(() => {
