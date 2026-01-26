@@ -731,14 +731,15 @@ const ScanItems = () => {
                     scrollBehavior: 'smooth'
                   }}
                 >
-                  {locationItems.map((item) => (
+                  {/* Reverse order - newest items at TOP */}
+                  {[...locationItems].reverse().map((item) => (
                     <div 
                       key={item.id} 
                       className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2"
                     >
-                      {/* Barcode & Description */}
+                      {/* Barcode & Description - LARGER FONT SIZE */}
                       <div className="flex-1 min-w-0 overflow-hidden">
-                        <p className="text-xs text-slate-600 font-mono font-semibold truncate">{item.barcode}</p>
+                        <p className="text-base text-slate-800 font-mono font-bold truncate">{item.barcode}</p>
                         <p className="text-xs text-slate-500 truncate">{item.productName}</p>
                       </div>
                       {/* Quantity & Delete */}
