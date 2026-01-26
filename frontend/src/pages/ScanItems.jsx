@@ -598,7 +598,6 @@ const ScanItems = () => {
                   disabled={isLocationLocked}
                   className="h-11 text-base font-mono flex-1"
                   autoComplete="off"
-                  autoFocus
                 />
                 {!isSingleSkuMode && (
                   <div className="flex items-center gap-1">
