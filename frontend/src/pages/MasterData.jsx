@@ -160,31 +160,31 @@ const MasterData = () => {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const headers = ['Barcode', 'Name', 'SKU', 'Category', 'Price'];
     const rows = masterProducts.map(p => 
       [p.barcode, `"${p.name}"`, p.sku, `"${p.category}"`, p.price].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
-    downloadCSV(csv, 'master_products.csv');
+    await downloadCSV(csv, 'master_products.csv');
   };
 
-  const downloadSampleProductCSV = () => {
+  const downloadSampleProductCSV = async () => {
     const sampleData = `Barcode,Name,SKU,Category,Price
 8901234567890,Organic Rice 5kg,ORG-RICE-5K,Food & Groceries,450
 8901234567891,Whole Wheat Flour 1kg,WH-FLOUR-1K,Food & Groceries,65
 8901234567892,Premium Olive Oil 500ml,OLV-OIL-500,Cooking Oil,850`;
     
-    downloadCSV(sampleData, 'sample_products.csv');
+    await downloadCSV(sampleData, 'sample_products.csv');
   };
 
-  const downloadSampleUserCSV = () => {
+  const downloadSampleUserCSV = async () => {
     const sampleData = `UserID,Password
 auth_user1,pass123
 auth_user2,pass456
 supervisor1,super789`;
     
-    downloadCSV(sampleData, 'sample_authorization_users.csv');
+    await downloadCSV(sampleData, 'sample_authorization_users.csv');
   };
 
   const categories = [...new Set(masterProducts.map(p => p.category))];
