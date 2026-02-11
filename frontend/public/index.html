@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
         <meta name="theme-color" content="#10b981" />
         <meta name="description" content="Audix Stock Management - Works Offline" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -11,6 +11,10 @@
         <meta name="apple-mobile-web-app-title" content="Audix" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="HandheldFriendly" content="true" />
+        <meta name="MobileOptimized" content="width" />
+        
+        <!-- X-UA-Compatible for older browsers -->
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         
         <!-- PWA Manifest -->
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
@@ -20,9 +24,180 @@
         <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
         
         <title>Audix</title>
+        
+        <!-- Critical CSS for initial loading - prevents blank screen -->
+        <style>
+            /* Loading screen styles - shows immediately */
+            #loading-screen {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                display: -webkit-box;
+                display: -webkit-flex;
+                display: flex;
+                -webkit-box-orient: vertical;
+                -webkit-flex-direction: column;
+                flex-direction: column;
+                -webkit-box-align: center;
+                -webkit-align-items: center;
+                align-items: center;
+                -webkit-box-pack: center;
+                -webkit-justify-content: center;
+                justify-content: center;
+                background: -webkit-linear-gradient(315deg, #10b981 0%, #059669 100%);
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                z-index: 9999;
+                -webkit-transition: opacity 0.3s ease;
+                transition: opacity 0.3s ease;
+            }
+            #loading-screen.hidden {
+                opacity: 0;
+                pointer-events: none;
+            }
+            #loading-logo {
+                font-size: 32px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                margin-bottom: 16px;
+            }
+            #loading-spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid rgba(255,255,255,0.3);
+                border-top-color: white;
+                border-radius: 50%;
+                -webkit-animation: spin 1s linear infinite;
+                animation: spin 1s linear infinite;
+            }
+            @-webkit-keyframes spin {
+                to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+            }
+            @keyframes spin {
+                to { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+            }
+            #loading-text {
+                margin-top: 16px;
+                font-size: 14px;
+                opacity: 0.9;
+            }
+            /* Hide loading screen when app is ready */
+            #root:not(:empty) ~ #loading-screen,
+            body.app-ready #loading-screen {
+                opacity: 0;
+                pointer-events: none;
+            }
+        </style>
+        
+        <!-- Polyfills for older Android WebView (CipherLab RK25, Newland, etc.) -->
+        <script>
+            // Promise polyfill check
+            if (typeof Promise === 'undefined') {
+                document.write('<script src="https://cdn.jsdelivr.net/npm/es6-promise@4/dist/es6-promise.auto.min.js"><\/script>');
+            }
+            // Array.from polyfill
+            if (!Array.from) {
+                Array.from = function(arrayLike) {
+                    return [].slice.call(arrayLike);
+                };
+            }
+            // Object.assign polyfill
+            if (typeof Object.assign !== 'function') {
+                Object.assign = function(target) {
+                    if (target == null) throw new TypeError('Cannot convert undefined or null to object');
+                    target = Object(target);
+                    for (var i = 1; i < arguments.length; i++) {
+                        var source = arguments[i];
+                        if (source != null) {
+                            for (var key in source) {
+                                if (Object.prototype.hasOwnProperty.call(source, key)) {
+                                    target[key] = source[key];
+                                }
+                            }
+                        }
+                    }
+                    return target;
+                };
+            }
+            // String.prototype.includes polyfill
+            if (!String.prototype.includes) {
+                String.prototype.includes = function(search, start) {
+                    if (typeof start !== 'number') start = 0;
+                    if (start + search.length > this.length) return false;
+                    return this.indexOf(search, start) !== -1;
+                };
+            }
+            // Array.prototype.includes polyfill
+            if (!Array.prototype.includes) {
+                Array.prototype.includes = function(search, start) {
+                    return this.indexOf(search, start) !== -1;
+                };
+            }
+            // Array.prototype.find polyfill
+            if (!Array.prototype.find) {
+                Array.prototype.find = function(predicate) {
+                    for (var i = 0; i < this.length; i++) {
+                        if (predicate(this[i], i, this)) return this[i];
+                    }
+                    return undefined;
+                };
+            }
+            // Array.prototype.findIndex polyfill
+            if (!Array.prototype.findIndex) {
+                Array.prototype.findIndex = function(predicate) {
+                    for (var i = 0; i < this.length; i++) {
+                        if (predicate(this[i], i, this)) return i;
+                    }
+                    return -1;
+                };
+            }
+        </script>
     </head>
     <body>
+        <!-- Loading screen - visible immediately while React loads -->
+        <div id="loading-screen">
+            <div id="loading-logo">AUDIX</div>
+            <div id="loading-spinner"></div>
+            <div id="loading-text">Loading...</div>
+        </div>
+        
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
+        
+        <!-- Hide loading screen when React mounts -->
+        <script>
+            // Hide loading screen after React app renders
+            var checkReady = setInterval(function() {
+                var root = document.getElementById('root');
+                if (root && root.children.length > 0) {
+                    document.body.classList.add('app-ready');
+                    clearInterval(checkReady);
+                }
+            }, 100);
+            
+            // Fallback: hide loading after 10 seconds max
+            setTimeout(function() {
+                document.body.classList.add('app-ready');
+                clearInterval(checkReady);
+            }, 10000);
+            
+            // Handle JS errors that might cause blank screen
+            window.onerror = function(msg, url, line, col, error) {
+                console.error('Global error:', msg, url, line);
+                var loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen && !document.body.classList.contains('app-ready')) {
+                    loadingScreen.innerHTML = 
+                        '<div style="text-align:center;padding:20px;">' +
+                        '<div style="font-size:24px;font-weight:700;margin-bottom:16px;">AUDIX</div>' +
+                        '<div style="margin-bottom:16px;">Error loading app</div>' +
+                        '<button onclick="location.reload()" style="padding:12px 24px;background:white;color:#10b981;border:none;border-radius:8px;font-weight:600;font-size:16px;">Reload</button>' +
+                        '</div>';
+                }
+                return false;
+            };
+        </script>
     </body>
 </html>
