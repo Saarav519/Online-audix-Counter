@@ -52,8 +52,6 @@ const MasterData = () => {
   const [newProduct, setNewProduct] = useState({
     barcode: '',
     name: '',
-    sku: '',
-    category: '',
     price: ''
   });
   
