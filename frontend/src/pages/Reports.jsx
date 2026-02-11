@@ -154,7 +154,7 @@ const Reports = () => {
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (reportItems.length === 0) return;
     
     const headers = ['Location', 'Barcode', 'Product Name', 'SKU', 'Category', 'Price', 'Quantity', 'Scanned At', 'Status'];
@@ -175,7 +175,7 @@ const Reports = () => {
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const selectionSuffix = isAllSelected ? 'all_locations' : `${selectedLocations.length}_locations`;
     const filename = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
-    downloadCSV(csv, filename);
+    await downloadCSV(csv, filename);
   };
 
   const handleEmailReport = () => {
