@@ -308,8 +308,6 @@ supervisor1,super789`;
     await downloadCSV(sampleData, 'sample_authorization_users.csv');
   };
 
-  const categories = [...new Set(masterProducts.map(p => p.category))];
-
   return (
     <div className="space-y-6">
       {/* Header */}
