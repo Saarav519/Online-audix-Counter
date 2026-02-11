@@ -354,7 +354,7 @@ supervisor1,super789`;
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -364,19 +364,6 @@ supervisor1,super789`;
               <div>
                 <p className="text-2xl font-bold text-slate-800">{masterProducts.length}</p>
                 <p className="text-sm text-slate-500">Total Products</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{categories.length}</p>
-                <p className="text-sm text-slate-500">Categories</p>
               </div>
             </div>
           </CardContent>
