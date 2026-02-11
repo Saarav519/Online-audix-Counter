@@ -355,6 +355,19 @@ const Settings = () => {
           <Separator />
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
+              <Label className="text-base">Allow Manual Barcode Entry</Label>
+              <p className="text-sm text-slate-500">
+                Allow typing barcodes manually (if off, only hardware scanner works)
+              </p>
+            </div>
+            <Switch
+              checked={pendingSettings.allowManualBarcodeEntry !== false}
+              onCheckedChange={(checked) => handlePendingSettingChange('allowManualBarcodeEntry', checked)}
+            />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
               <Label className="text-base">Allow Non-Master Products</Label>
               <p className="text-sm text-slate-500">
                 Accept barcodes not in the master product list
