@@ -110,71 +110,53 @@ export const downloadCSV = async (csvContent, filename) => {
         console.error('External storage failed:', err2);
       }
       
-      // Fallback to clipboard
-      try {
-        await navigator.clipboard.writeText(csvContent);
-        alert(
-          '📋 DATA COPIED TO CLIPBOARD\n\n' +
-          'File save failed. Data has been copied to clipboard.\n\n' +
-          'Open a text editor, paste the content, and save as .csv file.'
-        );
-        return { success: true, method: 'clipboard' };
-      } catch (e) {
-        alert('❌ Export Failed\n\nPlease try again or check app permissions.');
-        return { success: false };
-      }
+      // Fallback to blob download
+      return downloadViaBlob(content, filename, false);
     }
   }
   
-  // For Android browser (not Capacitor)
-  if (isAndroid() || isMobile()) {
-    try {
-      const blob = new Blob([content], { type: 'text/csv' });
-      const file = new File([blob], filename, { type: 'text/csv' });
+  // For all other environments (browser, mobile browser, desktop)
+  return downloadViaBlob(content, filename, true);
+};
+
+/**
+ * Download file using blob URL - reliable cross-browser method
+ */
+const downloadViaBlob = (content, filename, showAlert = true) => {
+  try {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    link.style.position = 'absolute';
+    link.style.left = '-9999px';
+    
+    document.body.appendChild(link);
+    
+    // Use setTimeout to ensure the link is in DOM before clicking
+    setTimeout(() => {
+      link.click();
       
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        alert('✅ File shared successfully!');
-        return { success: true };
-      }
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.log('Share failed:', err);
-      }
+      // Cleanup after a short delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }, 0);
+    
+    if (showAlert) {
+      // Show alert after a small delay to not block the download
+      setTimeout(() => {
+        alert('✅ File Downloaded!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
+      }, 200);
     }
     
-    // Fallback to blob download
-    try {
-      const blob = new Blob([content], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      alert('✅ File Downloaded!\n\nCheck your Downloads folder.');
-      return { success: true };
-    } catch (err) {
-      console.log('Blob download failed:', err);
-    }
-  }
-  
-  // Desktop - Standard blob download
-  try {
-    const blob = new Blob([content], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    alert('✅ File Downloaded!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
     return { success: true };
   } catch (err) {
+    console.error('Blob download failed:', err);
     alert('❌ Download Failed\n\nPlease try again.');
     return { success: false };
   }
