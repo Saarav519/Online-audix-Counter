@@ -469,24 +469,6 @@ supervisor1,super789`;
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input
-                id="sku"
-                placeholder="Enter SKU"
-                value={newProduct.sku}
-                onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                placeholder="Enter category"
-                value={newProduct.category}
-                onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
