@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, startTransition } from 'react';
 import { useApp } from '../context/AppContext';
 import { downloadCSV, getCSVAcceptTypes, isValidCSV } from '../utils/fileDownload';
 import { MasterProductsDB } from '../utils/indexedDB';
