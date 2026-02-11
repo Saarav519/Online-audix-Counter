@@ -122,8 +122,10 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Persist master products (supports 100MB+)
   // Only saves when master products change (not on every scan)
+  // OPTIMIZED: Uses debounced, non-blocking save
   // ============================================
   const masterProductsInitializedRef = useRef(false);
+  const saveTimeoutRef = useRef(null);
   
   useEffect(() => {
     // Skip first render (initial load from IndexedDB)
@@ -132,18 +134,32 @@ export const AppProvider = ({ children }) => {
       return;
     }
     
-    // Save to IndexedDB (async, non-blocking)
-    MasterProductsDB.importAll(masterProducts)
-      .then(() => console.log('✅ Master products saved to IndexedDB'))
-      .catch(err => {
-        console.warn('IndexedDB save failed, using localStorage fallback:', err);
-        // Fallback to localStorage (may fail for large data)
-        try {
-          localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
-        } catch (e) {
-          console.error('localStorage also failed:', e);
-        }
-      });
+    // Debounce the save to prevent multiple rapid saves
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Save after a short delay to batch multiple changes
+    saveTimeoutRef.current = setTimeout(() => {
+      // Save to IndexedDB (async, non-blocking)
+      MasterProductsDB.importAll(masterProducts)
+        .then(() => console.log('✅ Master products saved to IndexedDB'))
+        .catch(err => {
+          console.warn('IndexedDB save failed, using localStorage fallback:', err);
+          // Fallback to localStorage (may fail for large data)
+          try {
+            localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
+          } catch (e) {
+            console.error('localStorage also failed:', e);
+          }
+        });
+    }, 500); // 500ms debounce
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [masterProducts]);
 
   // Play sound for scan feedback - OPTIMIZED for fast scanning
