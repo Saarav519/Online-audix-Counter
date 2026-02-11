@@ -353,132 +353,155 @@ COLD-01,Cold Storage Unit 1`;
     </Card>
   );
 
-  // Render Card View for Dynamic Mode
-  const renderCardView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {filteredLocations.map((location) => {
-        const stats = getLocationStats(location.id);
-        
-        return (
-          <Card 
-            key={location.id} 
-            className={`border-0 shadow-sm hover:shadow-md transition-all duration-300 ${
-              location.isSubmitted ? 'bg-emerald-50/50' : location.isCompleted ? 'bg-teal-50/50' : 'bg-white'
-            }`}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div className={`p-3 rounded-xl ${
-                  location.isSubmitted 
-                    ? 'bg-emerald-100' 
-                    : location.isCompleted 
-                      ? 'bg-teal-100'
-                      : location.autoCreated
-                        ? 'bg-purple-100'
-                        : 'bg-slate-100'
-                }`}>
-                  <MapPin className={`w-6 h-6 ${
-                    location.isSubmitted 
-                      ? 'text-emerald-600' 
-                      : location.isCompleted 
-                        ? 'text-teal-600'
-                        : location.autoCreated
-                          ? 'text-purple-600'
-                          : 'text-slate-600'
-                  }`} />
-                </div>
+  // Render Compact List View for Dynamic Mode
+  const renderCompactListView = () => (
+    <Card className="border-0 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-purple-600" />
+            Dynamic Locations
+            <Badge variant="secondary" className="ml-2">
+              {filteredLocations.length} locations
+            </Badge>
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div 
+          className="overflow-y-auto" 
+          style={{ 
+            maxHeight: '500px', 
+            WebkitOverflowScrolling: 'touch' 
+          }}
+        >
+          {filteredLocations.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p>No locations yet</p>
+              <p className="text-xs text-slate-400 mt-1">Scan a location code to start</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {filteredLocations.map((location, index) => {
+                const stats = getLocationStats(location.id);
+                const isFirst = index === 0;
                 
-                <div className="flex items-center gap-2">
-                  {location.autoCreated && (
-                    <Badge className="bg-purple-100 text-purple-700 border-0 text-xs">
-                      Dynamic
-                    </Badge>
-                  )}
-                  {location.isSubmitted ? (
-                    <Lock className="w-4 h-4 text-emerald-600" />
-                  ) : location.isCompleted ? (
-                    <CheckCircle2 className="w-4 h-4 text-teal-600" />
-                  ) : (
-                    <Clock className="w-4 h-4 text-amber-500" />
-                  )}
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {!location.isSubmitted && (
-                        <DropdownMenuItem asChild>
-                          <Link to={`/scan?location=${location.id}`} className="flex items-center">
-                            <ScanBarcode className="w-4 h-4 mr-2" />
-                            Scan Items
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
-                      {location.isSubmitted && (
-                        <DropdownMenuItem onClick={() => handleReopenRequest(location)}>
-                          <Unlock className="w-4 h-4 mr-2" />
-                          Reopen Location
-                        </DropdownMenuItem>
-                      )}
-                      {!location.isSubmitted && location.isCompleted && (
-                        <DropdownMenuItem onClick={() => submitLocation(location.id)}>
-                          <Lock className="w-4 h-4 mr-2" />
-                          Submit & Lock
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => handleDeleteRequest(location)}
-                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                return (
+                  <div 
+                    key={location.id} 
+                    className={`flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors ${
+                      isFirst ? 'bg-purple-50/50' : ''
+                    } ${location.isSubmitted ? 'bg-emerald-50/30' : ''}`}
+                  >
+                    {/* Left: Location Info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Status Icon */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        location.isSubmitted 
+                          ? 'bg-emerald-100' 
+                          : stats.totalItems > 0 
+                            ? 'bg-amber-100'
+                            : 'bg-slate-100'
+                      }`}>
+                        {location.isSubmitted ? (
+                          <Lock className="w-4 h-4 text-emerald-600" />
+                        ) : stats.totalItems > 0 ? (
+                          <Clock className="w-4 h-4 text-amber-600" />
+                        ) : (
+                          <MapPin className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                      
+                      {/* Location Details */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-slate-800 truncate">
+                            {location.code}
+                          </span>
+                          {isFirst && (
+                            <Badge className="bg-purple-100 text-purple-700 border-0 text-xs">
+                              Latest
+                            </Badge>
+                          )}
+                          {location.autoCreated && !isFirst && (
+                            <Badge className="bg-slate-100 text-slate-500 border-0 text-xs">
+                              Dynamic
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500 truncate">{location.name}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Middle: Stats */}
+                    <div className="flex items-center gap-4 px-4">
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-slate-700">{stats.totalItems}</p>
+                        <p className="text-xs text-slate-400">Items</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-slate-700">{stats.totalQuantity}</p>
+                        <p className="text-xs text-slate-400">Qty</p>
+                      </div>
+                    </div>
+                    
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        onClick={() => handleOpenLocation(location)}
+                        className={`h-8 ${location.isSubmitted 
+                          ? "bg-amber-500 hover:bg-amber-600" 
+                          : "bg-emerald-600 hover:bg-emerald-700"
+                        }`}
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Location
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              <h3 className="font-semibold text-slate-800 mb-1">{location.name}</h3>
-              <p className="text-sm text-slate-500 mb-4">{location.code}</p>
-
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <span className="text-slate-500">Items: </span>
-                  <span className="font-medium text-slate-700">{stats.totalItems}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Qty: </span>
-                  <span className="font-medium text-slate-700">{stats.totalQuantity}</span>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                {location.isSubmitted ? (
-                  <Badge className="bg-emerald-100 text-emerald-700 border-0 w-full justify-center py-1">
-                    <Lock className="w-3 h-3 mr-1" /> Submitted & Locked
-                  </Badge>
-                ) : location.isCompleted ? (
-                  <Badge className="bg-teal-100 text-teal-700 border-0 w-full justify-center py-1">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> Completed
-                  </Badge>
-                ) : (
-                  <Link to={`/scan?location=${location.id}`}>
-                    <Button variant="outline" className="w-full border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200">
-                      <ScanBarcode className="w-4 h-4 mr-2" />
-                      Continue Scanning
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+                        {location.isSubmitted ? (
+                          <>
+                            <Unlock className="w-3 h-3 mr-1" />
+                            Reopen
+                          </>
+                        ) : (
+                          <>
+                            <ScanBarcode className="w-3 h-3 mr-1" />
+                            Scan
+                          </>
+                        )}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {!location.isSubmitted && stats.totalItems > 0 && (
+                            <DropdownMenuItem onClick={() => submitLocation(location.id)}>
+                              <Lock className="w-4 h-4 mr-2" />
+                              Submit & Lock
+                            </DropdownMenuItem>
+                          )}
+                          {!location.isSubmitted && stats.totalItems > 0 && (
+                            <DropdownMenuSeparator />
+                          )}
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteRequest(location)}
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 
   return (
