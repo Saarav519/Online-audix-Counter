@@ -125,7 +125,8 @@ const ScanItems = () => {
     scanLocation,
     playSound,
     getNextPendingLocation,
-    clearLocationItems
+    clearLocationItems,
+    getProductByBarcode
   } = useApp();
 
   // Initialize selectedLocationId from URL param or localStorage
