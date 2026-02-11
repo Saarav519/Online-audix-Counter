@@ -552,7 +552,8 @@ const ScanItems = () => {
     // In Non-Single SKU mode, use the quantity input value
     const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
     
-    const result = addScannedItem(selectedLocationId, barcodeInput.trim(), qty);
+    // Add to TEMP state (not saved until submit)
+    const result = addTempItem(barcodeInput.trim(), qty);
     
     setLastScanResult({
       barcode: barcodeInput,
@@ -567,6 +568,9 @@ const ScanItems = () => {
     if (!isSingleSkuMode) {
       setQuantityInput('1');
     }
+    
+    // Play success/error sound
+    playSound(result.success);
     
     // Clear result after 3 seconds
     setTimeout(() => setLastScanResult(null), 3000);
