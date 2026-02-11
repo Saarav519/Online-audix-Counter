@@ -178,15 +178,21 @@ export const AppProvider = ({ children }) => {
           // Short pleasant beep for valid scan
           oscillator.frequency.value = 1200;
           oscillator.type = 'sine';
-          gainNode.gain.value = 0.2;
+          gainNode.gain.value = 0.3;
         } else {
-          // Quick low tone for invalid
-          oscillator.frequency.value = 300;
+          // LOUD error tone for invalid - much more noticeable
+          oscillator.frequency.value = 400;
           oscillator.type = 'square';
-          gainNode.gain.value = 0.15;
+          gainNode.gain.value = 0.8; // Much louder (was 0.15)
+          
+          // Vibrate device for invalid scan (if supported)
+          if (navigator.vibrate) {
+            // Vibrate pattern: 200ms vibrate, 100ms pause, 200ms vibrate
+            navigator.vibrate([200, 100, 200]);
+          }
         }
         
-        const duration = isValid ? 0.08 : 0.15; // Shorter sounds for faster feedback
+        const duration = isValid ? 0.08 : 0.3; // Longer duration for invalid (was 0.15)
         const startTime = audioContext.currentTime;
         
         oscillator.start(startTime);
