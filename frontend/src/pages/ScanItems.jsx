@@ -548,8 +548,6 @@ const ScanItems = () => {
     }, 100);
   };
 
-  const totalQuantity = locationItems.reduce((sum, item) => sum + item.quantity, 0);
-
   // Scanner Mode UI - Optimized for handheld devices
   // TWO-STEP FLOW: Step 1 = Location Selection, Step 2 = Barcode Scanning
   if (showScannerMode) {
