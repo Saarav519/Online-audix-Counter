@@ -211,7 +211,7 @@ export const AppProvider = ({ children }) => {
             
             // LFO for warbling effect (20Hz modulation)
             lfo.frequency.value = 20;
-            lfoGain.gain.value = 0.3;
+            lfoGain.gain.value = 0.5;
             
             // Connect LFO to gain for tremolo
             lfo.connect(lfoGain);
@@ -222,8 +222,8 @@ export const AppProvider = ({ children }) => {
             osc2.connect(gainNode);
             gainNode.connect(audioContext.destination);
             
-            // Set volume
-            gainNode.gain.value = 0.5;
+            // Set volume - MAXIMUM LOUD
+            gainNode.gain.value = 1.0;
             
             const ringDuration = 0.25;
             
