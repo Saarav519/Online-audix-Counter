@@ -219,7 +219,12 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Sample CSV Download - Master Data Products"
+    - "Sample CSV Download - Authorization Users"
+    - "Sample CSV Download - Locations"
+    - "Master Data Export CSV"
+    - "Reports Export CSV"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -262,6 +267,28 @@ agent_communication:
       - Reports page shows 4 locations with 9 items totaling 162 quantity
       
       🎉 ALL TESTS PASSED - No critical issues found
+  - agent: "main"
+    message: |
+      Fixed CSV download functionality that was not working:
+      
+      1. Made all download functions async and properly await the downloadCSV function
+      2. Simplified downloadCSV to use a reliable blob download method
+      3. Fixed timing issues by using setTimeout for link click
+      4. Added proper cleanup of blob URLs
+      
+      Files modified:
+      - /app/frontend/src/utils/fileDownload.js - Simplified and fixed downloadViaBlob function
+      - /app/frontend/src/pages/MasterData.jsx - Made download functions async
+      - /app/frontend/src/pages/Reports.jsx - Made handleExportCSV async
+      - /app/frontend/src/pages/Locations.jsx - Made downloadSampleCSV async
+      
+      Testing agent should verify:
+      - Download Sample CSV in Master Data > Import Products modal
+      - Download Sample CSV in Master Data > Import Users modal
+      - Download Sample CSV in Locations (Pre-Assigned mode)
+      - Export Master Products CSV
+      - Export Reports CSV
+      
   - agent: "main"
     message: |
       Fixed three additional issues reported by user:
