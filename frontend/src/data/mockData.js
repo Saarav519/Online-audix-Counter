@@ -165,12 +165,56 @@ export const mockScannedItems = {
   ]
 };
 
+// Helper function to get current month session data dynamically
+const getCurrentSessionData = () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  
+  // Get first and last day of current month
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  
+  const formatDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  // Previous month data
+  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+  const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+  const prevFirstDay = new Date(prevYear, prevMonth, 1);
+  const prevLastDay = new Date(prevYear, prevMonth + 1, 0);
+  
+  return {
+    current: {
+      name: `${monthNames[currentMonth]} ${currentYear} Monthly Count`,
+      startDate: formatDate(firstDay),
+      endDate: formatDate(lastDay),
+    },
+    previous: {
+      name: `${monthNames[prevMonth]} ${prevYear} Quarterly Audit`,
+      startDate: formatDate(prevFirstDay),
+      endDate: formatDate(prevLastDay),
+    }
+  };
+};
+
+const sessionData = getCurrentSessionData();
+
 export const mockSessions = [
   {
     id: "session_1",
-    name: "July 2025 Monthly Count",
-    startDate: "2025-07-01",
-    endDate: "2025-07-31",
+    name: sessionData.current.name,
+    startDate: sessionData.current.startDate,
+    endDate: sessionData.current.endDate,
     status: "active",
     locations: ["loc_1", "loc_2", "loc_3", "loc_4"],
     completedLocations: 2,
@@ -178,9 +222,9 @@ export const mockSessions = [
   },
   {
     id: "session_2",
-    name: "June 2025 Quarterly Audit",
-    startDate: "2025-06-01",
-    endDate: "2025-06-30",
+    name: sessionData.previous.name,
+    startDate: sessionData.previous.startDate,
+    endDate: sessionData.previous.endDate,
     status: "completed",
     locations: ["loc_1", "loc_2"],
     completedLocations: 2,
