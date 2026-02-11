@@ -162,6 +162,9 @@ const ScanItems = () => {
   // ============================================
   const [tempScannedItems, setTempScannedItems] = useState([]);
   
+  // Temporary location for Dynamic mode - only saved when items are submitted
+  const [tempLocation, setTempLocation] = useState(null);
+  
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
   const quantityInputRef = useRef(null);
