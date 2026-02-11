@@ -581,9 +581,10 @@ const ScanItems = () => {
     }
   };
 
+  // Delete from TEMP state (not from context)
   const handleDelete = (itemId) => {
     if (isLocationLocked) return;
-    deleteScannedItem(selectedLocationId, itemId);
+    deleteTempItem(itemId);
     
     // Keep focus on barcode input after deletion (mobile)
     if (showScannerMode && barcodeInputRef.current) {
@@ -593,12 +594,13 @@ const ScanItems = () => {
     }
   };
 
+  // Update quantity in TEMP state
   const handleQuantityUpdate = (itemId) => {
     if (isSingleSkuMode) return; // No manual editing in single SKU mode
     
     const newQty = parseInt(editQuantity);
     if (newQty > 0) {
-      updateItemQuantity(selectedLocationId, itemId, newQty);
+      updateTempItemQuantity(itemId, newQty);
     }
     setEditingItemId(null);
     setEditQuantity('');
@@ -606,13 +608,13 @@ const ScanItems = () => {
 
   const handleQuantityIncrement = (itemId, currentQty) => {
     if (isSingleSkuMode) return; // No manual editing in single SKU mode
-    updateItemQuantity(selectedLocationId, itemId, currentQty + 1);
+    updateTempItemQuantity(itemId, currentQty + 1);
   };
 
   const handleQuantityDecrement = (itemId, currentQty) => {
     if (isSingleSkuMode) return; // No manual editing in single SKU mode
     if (currentQty > 1) {
-      updateItemQuantity(selectedLocationId, itemId, currentQty - 1);
+      updateTempItemQuantity(itemId, currentQty - 1);
     }
   };
 
@@ -620,9 +622,23 @@ const ScanItems = () => {
     setShowSubmitModal(true);
   };
 
+  // ============================================
+  // SUBMIT - This is when data gets SAVED to context
+  // ============================================
   const confirmSubmit = () => {
+    // Save all temp items to context (this persists to localStorage)
+    if (tempScannedItems.length > 0) {
+      tempScannedItems.forEach(item => {
+        addScannedItem(selectedLocationId, item.barcode, item.quantity);
+      });
+    }
+    
+    // Submit and lock the location
     submitLocation(selectedLocationId);
     setShowSubmitModal(false);
+    
+    // Clear temp items
+    clearTempItems();
     
     // Clear the current scan location from localStorage since it's submitted
     localStorage.removeItem('audix_current_scan_location');
