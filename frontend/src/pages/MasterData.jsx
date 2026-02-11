@@ -97,7 +97,8 @@ const MasterData = () => {
     setImportProgress(prev => prev ? { ...prev, status: 'Cancelling...' } : null);
   };
 
-  const handleFileUpload = (event) => {
+  // ULTRA-FAST Import: Direct to IndexedDB, then load to React once
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -107,142 +108,73 @@ const MasterData = () => {
     setImportProgress({ processed: 0, total: 0, status: 'Reading file...' });
     setImportResult(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target.result;
-      const lines = text.split('\n').filter(line => line.trim());
+    try {
+      // Read file
+      const text = await file.text();
       
-      // Skip header row
-      const dataLines = lines.slice(1);
-      const totalProducts = dataLines.length;
-      
-      if (totalProducts === 0) {
-        setImportResult({ success: false, error: 'No data found in CSV file' });
+      if (cancelImportRef.current) {
+        handleCancelComplete();
+        return;
+      }
+
+      // Import directly to IndexedDB with progress callback
+      const result = await MasterProductsDB.importFromCSV(text, (processed, total) => {
+        if (!cancelImportRef.current) {
+          setImportProgress({ 
+            processed, 
+            total, 
+            status: `Saving: ${processed.toLocaleString()} of ${total.toLocaleString()}` 
+          });
+        }
+      });
+
+      if (cancelImportRef.current) {
+        handleCancelComplete();
+        return;
+      }
+
+      if (!result.success) {
+        setImportResult({ success: false, error: result.error });
         setIsImporting(false);
         setImportProgress(null);
         return;
       }
 
-      setImportProgress({ processed: 0, total: totalProducts, status: 'Processing products...' });
+      // Update React state ONCE with all products
+      setImportProgress({ processed: result.count, total: result.count, status: 'Updating display...' });
       
-      // Store data lines for processing
-      importDataRef.current = dataLines;
+      // Small delay to show the status, then update React
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Process in chunks using requestIdleCallback or setTimeout for non-blocking
-      processInChunks(dataLines, totalProducts);
-    };
-    
-    reader.onerror = () => {
-      setImportResult({ success: false, error: 'Failed to read file' });
+      // Update React state (this triggers one re-render)
+      setMasterProductsDirect(result.products);
+      
+      setImportProgress({ processed: result.count, total: result.count, status: 'Complete!' });
+      setImportResult({ success: true, count: result.count, replaced: true });
+      
+      // Clear progress after a delay
+      setTimeout(() => {
+        setImportProgress(null);
+        setIsImporting(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportResult({ success: false, error: 'Failed to import file' });
       setIsImporting(false);
       setImportProgress(null);
-    };
-    
-    reader.readAsText(file);
+    }
     
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Non-blocking chunk processing
-  const processInChunks = async (dataLines, totalProducts) => {
-    const CHUNK_SIZE = 500; // Process 500 lines per chunk
-    const products = [];
-    let processedCount = 0;
-    
-    const processChunk = async (startIndex) => {
-      // Check for cancellation
-      if (cancelImportRef.current) {
-        setImportResult({ success: false, error: 'Import cancelled by user' });
-        setIsImporting(false);
-        setImportProgress(null);
-        cancelImportRef.current = false;
-        return;
-      }
-      
-      const endIndex = Math.min(startIndex + CHUNK_SIZE, dataLines.length);
-      
-      // Process this chunk
-      for (let i = startIndex; i < endIndex; i++) {
-        const line = dataLines[i];
-        const [barcode, name, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-        
-        if (barcode && name) {
-          products.push({
-            barcode,
-            name,
-            price: parseFloat(price) || 0
-          });
-        }
-      }
-      
-      processedCount = endIndex;
-      
-      // Update progress
-      setImportProgress({ 
-        processed: processedCount, 
-        total: totalProducts, 
-        status: `Processing: ${processedCount.toLocaleString()} of ${totalProducts.toLocaleString()}` 
-      });
-      
-      // Continue with next chunk or finish
-      if (endIndex < dataLines.length) {
-        // Use setTimeout to yield to main thread (prevents freezing)
-        setTimeout(() => processChunk(endIndex), 0);
-      } else {
-        // All chunks processed - now save
-        finishImport(products);
-      }
-    };
-    
-    // Start processing first chunk
-    setTimeout(() => processChunk(0), 0);
-  };
-
-  // Final save step
-  const finishImport = (products) => {
-    // Check for cancellation one more time
-    if (cancelImportRef.current) {
-      setImportResult({ success: false, error: 'Import cancelled by user' });
-      setIsImporting(false);
-      setImportProgress(null);
-      cancelImportRef.current = false;
-      return;
-    }
-    
-    if (products.length === 0) {
-      setImportResult({ success: false, error: 'No valid products found in CSV file' });
-      setIsImporting(false);
-      setImportProgress(null);
-      return;
-    }
-
-    setImportProgress({ 
-      processed: products.length, 
-      total: products.length, 
-      status: 'Saving to database...' 
-    });
-    
-    // Use setTimeout to let UI update before heavy save operation
-    setTimeout(() => {
-      try {
-        const count = importMasterProducts(products, true);
-        
-        setImportProgress({ processed: count, total: count, status: 'Complete!' });
-        setImportResult({ success: true, count, replaced: true });
-        
-        // Clear progress after a delay
-        setTimeout(() => {
-          setImportProgress(null);
-          setIsImporting(false);
-        }, 1500);
-      } catch (error) {
-        setImportResult({ success: false, error: 'Failed to save products' });
-        setIsImporting(false);
-        setImportProgress(null);
-      }
-    }, 50);
+  const handleCancelComplete = () => {
+    setImportResult({ success: false, error: 'Import cancelled by user' });
+    setIsImporting(false);
+    setImportProgress(null);
+    cancelImportRef.current = false;
   };
 
   const handleUserFileUpload = (event) => {
