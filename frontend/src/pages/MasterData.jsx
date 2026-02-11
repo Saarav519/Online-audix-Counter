@@ -162,14 +162,12 @@ const MasterData = () => {
       // Process this chunk
       for (let i = startIndex; i < endIndex; i++) {
         const line = dataLines[i];
-        const [barcode, name, sku, category, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
+        const [barcode, name, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
         
         if (barcode && name) {
           products.push({
             barcode,
             name,
-            sku: sku || '',
-            category: category || 'Uncategorized',
             price: parseFloat(price) || 0
           });
         }
