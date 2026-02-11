@@ -692,15 +692,46 @@ const ScanItems = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={clearLocation}
-                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                  onClick={handleBackClick}
+                  className="text-slate-700 border-slate-300 hover:bg-slate-100"
                 >
-                  <X className="w-4 h-4 mr-1" />
-                  Change
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
                 </Button>
               </div>
             </CardContent>
           </Card>
+
+          {/* Back Confirmation Dialog */}
+          <Dialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-amber-500" />
+                  Are you sure you want to go back?
+                </DialogTitle>
+                <DialogDescription>
+                  All scanned items for this location will be discarded and not saved.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex gap-2 sm:gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleBackCancel}
+                  className="flex-1"
+                >
+                  No, Stay
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleBackConfirm}
+                  className="flex-1"
+                >
+                  Yes, Go Back
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Mode Badges */}
           <div className="flex gap-2 px-1">
