@@ -87,35 +87,80 @@ const MasterData = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    setIsImporting(true);
+    setImportProgress({ processed: 0, total: 0, status: 'Reading file...' });
+    setImportResult(null);
+
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target.result;
         const lines = text.split('\n').filter(line => line.trim());
         
         // Skip header row
         const dataLines = lines.slice(1);
-        const products = dataLines.map(line => {
+        const totalProducts = dataLines.length;
+        
+        setImportProgress({ processed: 0, total: totalProducts, status: 'Processing products...' });
+
+        // Process in batches to prevent UI freeze
+        const BATCH_SIZE = 100;
+        const products = [];
+        
+        for (let i = 0; i < dataLines.length; i++) {
+          const line = dataLines[i];
           const [barcode, name, sku, category, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          return {
-            barcode,
-            name,
-            sku: sku || '',
-            category: category || 'Uncategorized',
-            price: parseFloat(price) || 0
-          };
-        }).filter(p => p.barcode && p.name);
+          
+          if (barcode && name) {
+            products.push({
+              barcode,
+              name,
+              sku: sku || '',
+              category: category || 'Uncategorized',
+              price: parseFloat(price) || 0
+            });
+          }
+
+          // Update progress every batch
+          if ((i + 1) % BATCH_SIZE === 0 || i === dataLines.length - 1) {
+            setImportProgress({ 
+              processed: i + 1, 
+              total: totalProducts, 
+              status: `Processing: ${i + 1} of ${totalProducts}` 
+            });
+            // Allow UI to update
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
 
         if (products.length === 0) {
           setImportResult({ success: false, error: 'No valid products found in CSV file' });
+          setIsImporting(false);
+          setImportProgress(null);
           return;
         }
 
+        setImportProgress({ processed: totalProducts, total: totalProducts, status: 'Saving to database...' });
+        
+        // Allow UI to update before heavy operation
+        await new Promise(resolve => setTimeout(resolve, 50));
+
         // Replace existing master data
         const count = importMasterProducts(products, true);
+        
+        setImportProgress({ processed: count, total: count, status: 'Complete!' });
         setImportResult({ success: true, count, replaced: true });
+        
+        // Clear progress after a delay
+        setTimeout(() => {
+          setImportProgress(null);
+          setIsImporting(false);
+        }, 1500);
+        
       } catch (error) {
         setImportResult({ success: false, error: 'Failed to parse CSV file' });
+        setIsImporting(false);
+        setImportProgress(null);
       }
     };
     reader.readAsText(file);
