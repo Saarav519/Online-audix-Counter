@@ -201,12 +201,17 @@ const ScanItems = () => {
   }, [quantityInput]);
 
   const selectedLocation = locations.find(l => l.id === selectedLocationId);
-  const locationItems = scannedItems[selectedLocationId] || [];
   const isLocationLocked = selectedLocation?.isSubmitted;
 
   // Single SKU mode: scanning only, no manual qty
   // Non-Single SKU mode: manual qty entry allowed
   const isSingleSkuMode = settings.singleSkuScanning;
+
+  // ============================================
+  // USE TEMPORARY ITEMS - Not saved until Submit
+  // locationItems now uses tempScannedItems (local state)
+  // ============================================
+  const locationItems = tempScannedItems;
 
   // Memoize reversed items to prevent unnecessary re-renders during fast scanning
   const reversedItems = useMemo(() => {
