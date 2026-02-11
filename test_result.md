@@ -232,6 +232,32 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
+      Implemented 3 layout changes as requested by user:
+      
+      1. ✅ Locations section - Only location name visible (removed zone below it)
+         - Modified renderCompactListView() in Locations.jsx
+         - Now shows single line with location name only, cleaner look
+      
+      2. ✅ Mobile view - Scan button moved inside three dots menu
+         - Removed separate Scan button from the row
+         - Added Scan/Open option as first item in DropdownMenu
+         - Location name and quantity now have more space
+         - Cleaner list view with only name, qty, and three dots
+      
+      3. ✅ Master file upload progress tracking
+         - Added progress bar during import in MasterData.jsx
+         - Shows "X processed out of Y total" with progress percentage
+         - Processes in batches of 100 to prevent UI freeze
+         - Screen stays responsive during large file imports
+         - Shows statuses: "Reading file...", "Processing: X of Y", "Saving to database...", "Complete!"
+      
+      Testing agent should verify:
+      - Locations page in mobile/dynamic mode shows only location name (no zone)
+      - Three dots menu contains Scan option
+      - Import Products modal shows progress bar during upload
+      
+  - agent: "main"
+    message: |
       Fixed the three reported issues:
       1. Pre-Assigned Mode Scrolling: Replaced ScrollArea with native div containers with overflow-y-auto and overflow-x-auto. Added minWidth: 800px for horizontal scroll support and sticky table headers.
       2. Sample Download: Fixed all download functions (Locations, MasterData products, MasterData users) by appending anchor element to document.body before clicking, then removing it after.
