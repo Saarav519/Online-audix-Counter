@@ -69,9 +69,7 @@ const MasterData = () => {
   const filteredProducts = masterProducts.filter(
     p =>
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.barcode.includes(searchTerm) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.category.toLowerCase().includes(searchTerm.toLowerCase())
+      p.barcode.includes(searchTerm)
   );
 
   const authorizationUsers = getAuthorizationUsers();
