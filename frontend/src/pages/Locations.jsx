@@ -360,7 +360,7 @@ COLD-01,Cold Storage Unit 1`;
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <MapPin className="w-4 h-4 text-purple-600" />
-            Dynamic Locations
+            Locations
             <Badge variant="secondary" className="ml-2">
               {filteredLocations.length} locations
             </Badge>
@@ -385,14 +385,13 @@ COLD-01,Cold Storage Unit 1`;
             <div className="divide-y divide-slate-100">
               {filteredLocations.map((location, index) => {
                 const stats = getLocationStats(location.id);
-                const isFirst = index === 0;
                 
                 return (
                   <div 
                     key={location.id} 
                     className={`flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors ${
-                      isFirst ? 'bg-purple-50/50' : ''
-                    } ${location.isSubmitted ? 'bg-emerald-50/30' : ''}`}
+                      location.isSubmitted ? 'bg-emerald-50/30' : ''
+                    }`}
                   >
                     {/* Left: Location Info */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -413,45 +412,31 @@ COLD-01,Cold Storage Unit 1`;
                         )}
                       </div>
                       
-                      {/* Location Details */}
+                      {/* Location Details - Full Name Visible */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-slate-800 truncate">
+                          <span className="font-mono font-semibold text-slate-800">
                             {location.code}
                           </span>
-                          {isFirst && (
-                            <Badge className="bg-purple-100 text-purple-700 border-0 text-xs">
-                              Latest
-                            </Badge>
-                          )}
-                          {location.autoCreated && !isFirst && (
-                            <Badge className="bg-slate-100 text-slate-500 border-0 text-xs">
-                              Dynamic
-                            </Badge>
-                          )}
                         </div>
-                        <p className="text-sm text-slate-500 truncate">{location.name}</p>
+                        <p className="text-sm text-slate-600">{location.name}</p>
                       </div>
                     </div>
                     
-                    {/* Middle: Stats */}
-                    <div className="flex items-center gap-4 px-4">
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-slate-700">{stats.totalItems}</p>
-                        <p className="text-xs text-slate-400">Items</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-sm font-semibold text-slate-700">{stats.totalQuantity}</p>
+                    {/* Middle: Quantity Only */}
+                    <div className="flex items-center gap-3 px-3">
+                      <div className="text-center min-w-[50px]">
+                        <p className="text-base font-bold text-slate-700">{stats.totalQuantity}</p>
                         <p className="text-xs text-slate-400">Qty</p>
                       </div>
                     </div>
                     
-                    {/* Right: Actions */}
+                    {/* Right: Actions - Smaller Scan Button */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Button
                         size="sm"
                         onClick={() => handleOpenLocation(location)}
-                        className={`h-8 ${location.isSubmitted 
+                        className={`h-7 px-2 text-xs ${location.isSubmitted 
                           ? "bg-amber-500 hover:bg-amber-600" 
                           : "bg-emerald-600 hover:bg-emerald-700"
                         }`}
@@ -470,7 +455,7 @@ COLD-01,Cold Storage Unit 1`;
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
