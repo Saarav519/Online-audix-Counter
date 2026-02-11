@@ -580,9 +580,21 @@ supervisor1,super789`;
             {/* Progress Display */}
             {importProgress && (
               <div className="p-4 bg-blue-50 rounded-lg space-y-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                  <span className="text-sm font-medium text-blue-700">{importProgress.status}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <span className="text-sm font-medium text-blue-700">{importProgress.status}</span>
+                  </div>
+                  {isImporting && importProgress.status !== 'Cancelling...' && importProgress.status !== 'Complete!' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelImport}
+                      className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
                 <Progress 
                   value={importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0} 
