@@ -576,8 +576,8 @@ COLD-01,Cold Storage Unit 1`;
         />
       </div>
 
-      {/* Locations Display - List View for Pre-Assigned, Card View for Dynamic */}
-      {isPreAssignedMode ? renderListView() : renderCardView()}
+      {/* Locations Display - List View for Both Modes */}
+      {isPreAssignedMode ? renderListView() : renderCompactListView()}
 
       {filteredLocations.length === 0 && (
         <div className="text-center py-12">
