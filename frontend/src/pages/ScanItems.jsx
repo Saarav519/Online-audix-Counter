@@ -970,15 +970,17 @@ const ScanItems = () => {
                 )}
               </div>
 
-              {/* Add Button */}
-              <Button
-                onClick={handleScan}
-                disabled={!barcodeInput.trim() || isLocationLocked}
-                className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Add {isSingleSkuMode ? '(Qty: 1)' : `(Qty: ${quantityInput})`}
-              </Button>
+              {/* Add Button - Only show if manual entry is allowed */}
+              {settings.allowManualBarcodeEntry !== false && (
+                <Button
+                  onClick={handleScan}
+                  disabled={!barcodeInput.trim() || isLocationLocked}
+                  className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Add {isSingleSkuMode ? '(Qty: 1)' : `(Qty: ${quantityInput})`}
+                </Button>
+              )}
 
               {/* Last Scan Result */}
               {lastScanResult && (
