@@ -89,69 +89,144 @@ const MasterData = () => {
     }
   };
 
+  // Cancel import function
+  const handleCancelImport = () => {
+    cancelImportRef.current = true;
+    setImportProgress(prev => prev ? { ...prev, status: 'Cancelling...' } : null);
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Reset cancel flag
+    cancelImportRef.current = false;
     setIsImporting(true);
     setImportProgress({ processed: 0, total: 0, status: 'Reading file...' });
     setImportResult(null);
 
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      // Skip header row
+      const dataLines = lines.slice(1);
+      const totalProducts = dataLines.length;
+      
+      if (totalProducts === 0) {
+        setImportResult({ success: false, error: 'No data found in CSV file' });
+        setIsImporting(false);
+        setImportProgress(null);
+        return;
+      }
+
+      setImportProgress({ processed: 0, total: totalProducts, status: 'Processing products...' });
+      
+      // Store data lines for processing
+      importDataRef.current = dataLines;
+      
+      // Process in chunks using requestIdleCallback or setTimeout for non-blocking
+      processInChunks(dataLines, totalProducts);
+    };
+    
+    reader.onerror = () => {
+      setImportResult({ success: false, error: 'Failed to read file' });
+      setIsImporting(false);
+      setImportProgress(null);
+    };
+    
+    reader.readAsText(file);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Non-blocking chunk processing
+  const processInChunks = async (dataLines, totalProducts) => {
+    const CHUNK_SIZE = 500; // Process 500 lines per chunk
+    const products = [];
+    let processedCount = 0;
+    
+    const processChunk = async (startIndex) => {
+      // Check for cancellation
+      if (cancelImportRef.current) {
+        setImportResult({ success: false, error: 'Import cancelled by user' });
+        setIsImporting(false);
+        setImportProgress(null);
+        cancelImportRef.current = false;
+        return;
+      }
+      
+      const endIndex = Math.min(startIndex + CHUNK_SIZE, dataLines.length);
+      
+      // Process this chunk
+      for (let i = startIndex; i < endIndex; i++) {
+        const line = dataLines[i];
+        const [barcode, name, sku, category, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
+        
+        if (barcode && name) {
+          products.push({
+            barcode,
+            name,
+            sku: sku || '',
+            category: category || 'Uncategorized',
+            price: parseFloat(price) || 0
+          });
+        }
+      }
+      
+      processedCount = endIndex;
+      
+      // Update progress
+      setImportProgress({ 
+        processed: processedCount, 
+        total: totalProducts, 
+        status: `Processing: ${processedCount.toLocaleString()} of ${totalProducts.toLocaleString()}` 
+      });
+      
+      // Continue with next chunk or finish
+      if (endIndex < dataLines.length) {
+        // Use setTimeout to yield to main thread (prevents freezing)
+        setTimeout(() => processChunk(endIndex), 0);
+      } else {
+        // All chunks processed - now save
+        finishImport(products);
+      }
+    };
+    
+    // Start processing first chunk
+    setTimeout(() => processChunk(0), 0);
+  };
+
+  // Final save step
+  const finishImport = (products) => {
+    // Check for cancellation one more time
+    if (cancelImportRef.current) {
+      setImportResult({ success: false, error: 'Import cancelled by user' });
+      setIsImporting(false);
+      setImportProgress(null);
+      cancelImportRef.current = false;
+      return;
+    }
+    
+    if (products.length === 0) {
+      setImportResult({ success: false, error: 'No valid products found in CSV file' });
+      setIsImporting(false);
+      setImportProgress(null);
+      return;
+    }
+
+    setImportProgress({ 
+      processed: products.length, 
+      total: products.length, 
+      status: 'Saving to database...' 
+    });
+    
+    // Use setTimeout to let UI update before heavy save operation
+    setTimeout(() => {
       try {
-        const text = e.target.result;
-        const lines = text.split('\n').filter(line => line.trim());
-        
-        // Skip header row
-        const dataLines = lines.slice(1);
-        const totalProducts = dataLines.length;
-        
-        setImportProgress({ processed: 0, total: totalProducts, status: 'Processing products...' });
-
-        // Process in batches to prevent UI freeze
-        const BATCH_SIZE = 100;
-        const products = [];
-        
-        for (let i = 0; i < dataLines.length; i++) {
-          const line = dataLines[i];
-          const [barcode, name, sku, category, price] = line.split(',').map(s => s.trim().replace(/"/g, ''));
-          
-          if (barcode && name) {
-            products.push({
-              barcode,
-              name,
-              sku: sku || '',
-              category: category || 'Uncategorized',
-              price: parseFloat(price) || 0
-            });
-          }
-
-          // Update progress every batch
-          if ((i + 1) % BATCH_SIZE === 0 || i === dataLines.length - 1) {
-            setImportProgress({ 
-              processed: i + 1, 
-              total: totalProducts, 
-              status: `Processing: ${i + 1} of ${totalProducts}` 
-            });
-            // Allow UI to update
-            await new Promise(resolve => setTimeout(resolve, 10));
-          }
-        }
-
-        if (products.length === 0) {
-          setImportResult({ success: false, error: 'No valid products found in CSV file' });
-          setIsImporting(false);
-          setImportProgress(null);
-          return;
-        }
-
-        setImportProgress({ processed: totalProducts, total: totalProducts, status: 'Saving to database...' });
-        
-        // Allow UI to update before heavy operation
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        // Replace existing master data
         const count = importMasterProducts(products, true);
         
         setImportProgress({ processed: count, total: count, status: 'Complete!' });
@@ -162,18 +237,12 @@ const MasterData = () => {
           setImportProgress(null);
           setIsImporting(false);
         }, 1500);
-        
       } catch (error) {
-        setImportResult({ success: false, error: 'Failed to parse CSV file' });
+        setImportResult({ success: false, error: 'Failed to save products' });
         setIsImporting(false);
         setImportProgress(null);
       }
-    };
-    reader.readAsText(file);
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    }, 50);
   };
 
   const handleUserFileUpload = (event) => {
