@@ -330,6 +330,12 @@ const ScanItems = () => {
       const result = scanLocation(scannedValue);
       if (result.success) {
         setSelectedLocationId(result.location.id);
+        // Store temp location if it's a new dynamic location
+        if (result.isTemp) {
+          setTempLocation(result.location);
+        } else {
+          setTempLocation(null);
+        }
         setLocationError('');
         setLocationSuccess(`Location: ${result.location.name}`);
         setWaitingForLocationScan(false);
