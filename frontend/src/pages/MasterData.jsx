@@ -56,6 +56,10 @@ const MasterData = () => {
     price: ''
   });
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+  
   // Progress tracking for large imports
   const [importProgress, setImportProgress] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -66,11 +70,28 @@ const MasterData = () => {
   const fileInputRef = useRef(null);
   const userFileInputRef = useRef(null);
 
-  const filteredProducts = masterProducts.filter(
-    p =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.barcode.includes(searchTerm)
-  );
+  // Filtered products with search
+  const filteredProducts = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+      return masterProducts;
+    }
+    const search = searchTerm.toLowerCase();
+    return masterProducts.filter(
+      p => p.name.toLowerCase().includes(search) || p.barcode.includes(searchTerm)
+    );
+  }, [masterProducts, searchTerm]);
+
+  // Paginated products - only slice what we need to display
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const paginatedProducts = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
+
+  // Reset to page 1 when search changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const authorizationUsers = getAuthorizationUsers();
 
