@@ -39,7 +39,9 @@ import {
   Trash2,
   AlertTriangle,
   RefreshCw,
-  Loader2
+  Loader2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const MasterData = () => {
