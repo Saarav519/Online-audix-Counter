@@ -674,22 +674,22 @@ const ScanItems = () => {
     setShowBackConfirmDialog(true);
   };
 
-  // Handle Back confirmation - discard data and go back
+  // Handle Back confirmation - discard temp data and go to location selection
   const handleBackConfirm = () => {
-    // Clear all scanned items for the current location (discard unsaved data)
-    if (selectedLocationId) {
-      clearLocationItems(selectedLocationId);
-    }
+    // Clear all temp scanned items (NOT saved to context)
+    clearTempItems();
     
-    // Clear the current location selection
+    // Clear the current location selection - go back to location selection screen
     setSelectedLocationId(null);
+    setSelectedLocationId('');
     localStorage.removeItem('audix_current_scan_location');
     setWaitingForLocationScan(true);
     setLastScanResult(null);
+    setLocationInput('');
     setShowBackConfirmDialog(false);
     
-    // Navigate to Locations page
-    navigate('/locations');
+    // Stay on Scan Items page but show location selection
+    // Do NOT navigate to Locations page
   };
 
   // Handle Back cancel - close dialog and stay
