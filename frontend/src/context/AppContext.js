@@ -168,41 +168,93 @@ export const AppProvider = ({ children }) => {
           audioContext.resume();
         }
         
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
         if (isValid) {
           // Short pleasant beep for valid scan
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
           oscillator.frequency.value = 1200;
           oscillator.type = 'sine';
           gainNode.gain.value = 0.3;
+          
+          const startTime = audioContext.currentTime;
+          oscillator.start(startTime);
+          oscillator.stop(startTime + 0.08);
+          
+          oscillator.onended = () => {
+            oscillator.disconnect();
+            gainNode.disconnect();
+          };
         } else {
-          // LOUD error tone for invalid - much more noticeable
-          oscillator.frequency.value = 400;
-          oscillator.type = 'square';
-          gainNode.gain.value = 0.8; // Much louder (was 0.15)
+          // Classic Rotary Telephone Ring for invalid scan
+          // Creates the distinctive dual-tone warbling ring sound
+          
+          const startTime = audioContext.currentTime;
+          
+          // First ring
+          const createRing = (ringStartTime) => {
+            // Two oscillators for the classic dual-tone ring (440Hz + 480Hz)
+            const osc1 = audioContext.createOscillator();
+            const osc2 = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            const lfo = audioContext.createOscillator(); // For warble effect
+            const lfoGain = audioContext.createGain();
+            
+            // Classic telephone frequencies
+            osc1.frequency.value = 440;
+            osc2.frequency.value = 480;
+            osc1.type = 'sine';
+            osc2.type = 'sine';
+            
+            // LFO for warbling effect (20Hz modulation)
+            lfo.frequency.value = 20;
+            lfoGain.gain.value = 0.3;
+            
+            // Connect LFO to gain for tremolo
+            lfo.connect(lfoGain);
+            lfoGain.connect(gainNode.gain);
+            
+            // Connect oscillators
+            osc1.connect(gainNode);
+            osc2.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Set volume
+            gainNode.gain.value = 0.5;
+            
+            const ringDuration = 0.25;
+            
+            osc1.start(ringStartTime);
+            osc2.start(ringStartTime);
+            lfo.start(ringStartTime);
+            
+            osc1.stop(ringStartTime + ringDuration);
+            osc2.stop(ringStartTime + ringDuration);
+            lfo.stop(ringStartTime + ringDuration);
+            
+            // Cleanup
+            osc1.onended = () => {
+              osc1.disconnect();
+              osc2.disconnect();
+              lfo.disconnect();
+              lfoGain.disconnect();
+              gainNode.disconnect();
+            };
+          };
+          
+          // Create two rings with a short gap (like real telephone)
+          createRing(startTime);
+          createRing(startTime + 0.35); // Second ring after 0.35s
           
           // Vibrate device for invalid scan (if supported)
           if (navigator.vibrate) {
-            // Vibrate pattern: 200ms vibrate, 100ms pause, 200ms vibrate
-            navigator.vibrate([200, 100, 200]);
+            // Vibrate pattern matching the ring: ring-pause-ring
+            navigator.vibrate([250, 100, 250]);
           }
         }
-        
-        const duration = isValid ? 0.08 : 0.3; // Longer duration for invalid (was 0.15)
-        const startTime = audioContext.currentTime;
-        
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-        
-        // Cleanup oscillator after it stops
-        oscillator.onended = () => {
-          oscillator.disconnect();
-          gainNode.disconnect();
-        };
       } catch (e) {
         // Silently fail if audio not supported
         console.warn('Audio playback failed:', e);
