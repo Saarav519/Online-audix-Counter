@@ -820,6 +820,7 @@ export const AppProvider = ({ children }) => {
     importAssignedLocations,
     clearAssignedLocations,
     addMasterProduct,
+    setMasterProductsDirect, // Direct set for imports (bypasses auto-save)
     importMasterProducts,
     importAuthorizationUsers,
     getLoginUsers,
