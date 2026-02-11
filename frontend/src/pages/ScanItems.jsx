@@ -123,6 +123,7 @@ const ScanItems = () => {
     updateItemQuantity,
     submitLocation,
     scanLocation,
+    saveTempLocation,
     playSound,
     getNextPendingLocation,
     clearLocationItems,
