@@ -325,6 +325,13 @@ export const AppProvider = ({ children }) => {
       }
     });
 
+    // Update location's lastUpdated timestamp
+    setLocations(prev => prev.map(loc => 
+      loc.id === locationId 
+        ? { ...loc, lastUpdated: new Date().toISOString() }
+        : loc
+    ));
+
     return { success: true, isValid: isValidBarcode, product, item: newItem };
   }, [masterProductMap, settings.allowNonMasterProducts, settings.singleSkuScanning]);
 
