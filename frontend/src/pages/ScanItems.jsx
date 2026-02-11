@@ -199,6 +199,16 @@ const ScanItems = () => {
   // Non-Single SKU mode: manual qty entry allowed
   const isSingleSkuMode = settings.singleSkuScanning;
 
+  // Memoize reversed items to prevent unnecessary re-renders during fast scanning
+  const reversedItems = useMemo(() => {
+    return [...locationItems].reverse();
+  }, [locationItems]);
+
+  // Memoize total quantity calculation
+  const totalQuantity = useMemo(() => {
+    return locationItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [locationItems]);
+
   // HIGH-PERFORMANCE Hardware scanner callback
   // Uses refs instead of state to avoid re-render delays during fast scanning
   const handleHardwareScan = useCallback((scannedValue) => {
