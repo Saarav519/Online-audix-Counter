@@ -37,7 +37,8 @@ import {
   X,
   Sparkles,
   Hash,
-  Send
+  Send,
+  ArrowLeft
 } from 'lucide-react';
 
 // Memoized ScannedItem component for better performance with large lists
