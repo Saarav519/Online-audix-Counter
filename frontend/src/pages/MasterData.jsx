@@ -49,11 +49,6 @@ const MasterData = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUserImportModal, setShowUserImportModal] = useState(false);
   const [importResult, setImportResult] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showUserImportModal, setShowUserImportModal] = useState(false);
-  const [importResult, setImportResult] = useState(null);
   const [userImportResult, setUserImportResult] = useState(null);
   const [newProduct, setNewProduct] = useState({
     barcode: '',
