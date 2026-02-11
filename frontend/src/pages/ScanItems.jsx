@@ -124,7 +124,8 @@ const ScanItems = () => {
     submitLocation,
     scanLocation,
     playSound,
-    getNextPendingLocation
+    getNextPendingLocation,
+    clearLocationItems
   } = useApp();
 
   // Initialize selectedLocationId from URL param or localStorage
