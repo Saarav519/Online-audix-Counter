@@ -61,6 +61,10 @@ const MasterData = () => {
   const [importProgress, setImportProgress] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
   
+  // Cancel flag ref - survives re-renders
+  const cancelImportRef = useRef(false);
+  const importDataRef = useRef(null);
+  
   const fileInputRef = useRef(null);
   const userFileInputRef = useRef(null);
 
