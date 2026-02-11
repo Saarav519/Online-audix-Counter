@@ -44,12 +44,23 @@ export const useDeviceDetection = () => {
     
     // Detect enterprise scanner devices
     // Common enterprise scanner user agents contain these identifiers
-    // Added RS31 and CipherLab specific identifiers for compatibility
+    // Added RS31, RK25 and CipherLab/Newland specific identifiers for compatibility
     const scannerKeywords = [
+      // CipherLab models
       'zebra', 'symbol', 'honeywell', 'datalogic', 'cipherlab',
       'bluebird', 'unitech', 'chainway', 'urovo', 'newland',
       'scanner', 'pda', 'handheld', 'mobile computer',
-      'rs31', 'rs30', 'rs50', 'rs51', 'cp', 'rk', '9700', '8000', '8200'
+      // CipherLab RS series
+      'rs31', 'rs30', 'rs50', 'rs51', 
+      // CipherLab RK series (including RK25)
+      'rk25', 'rk95', 'rk26', 'rk', 
+      // CipherLab CP series
+      'cp30', 'cp50', 'cp55', 'cp60', 'cp',
+      // CipherLab numeric models
+      '9700', '8000', '8200', '8600', '9200',
+      // Newland models
+      'nls-', 'mt90', 'mt65', 'n7', 'n5', 'n2', 'pt60', 'pt66',
+      'nquire', 'speedata'
     ];
     
     const isScanner = scannerKeywords.some(keyword => 
