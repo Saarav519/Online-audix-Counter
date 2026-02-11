@@ -705,6 +705,8 @@ export const AppProvider = ({ children }) => {
     getAllUsers,
     getNextPendingLocation,
     getProductByBarcode, // Fast O(1) product lookup
+    getStorageInfo, // Check available storage
+    isLoadingMasterData, // Loading state for master products
     playSound
   };
 
