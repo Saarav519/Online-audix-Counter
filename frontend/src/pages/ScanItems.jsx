@@ -151,6 +151,7 @@ const ScanItems = () => {
     return !savedLocation;
   });
   const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
+  const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false); // Back confirmation dialog
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
