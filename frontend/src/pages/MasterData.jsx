@@ -67,7 +67,6 @@ const MasterData = () => {
   
   // Cancel flag ref - survives re-renders
   const cancelImportRef = useRef(false);
-  const importDataRef = useRef(null);
   
   const fileInputRef = useRef(null);
   const userFileInputRef = useRef(null);
