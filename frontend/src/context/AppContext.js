@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { mockUsers, mockLocations, mockMasterProducts, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
+import { MasterProductsDB, ScannedItemsDB, getStorageInfo } from '../utils/indexedDB';
 
 const AppContext = createContext();
 
@@ -27,11 +28,9 @@ export const AppProvider = ({ children }) => {
     return savedLocations ? JSON.parse(savedLocations) : mockLocations;
   });
   
-  // Load master products from localStorage or use mock data
-  const [masterProducts, setMasterProducts] = useState(() => {
-    const savedProducts = localStorage.getItem('audix_master_products');
-    return savedProducts ? JSON.parse(savedProducts) : mockMasterProducts;
-  });
+  // Master products - loaded from IndexedDB (supports 100MB+)
+  const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
+  const [isLoadingMasterData, setIsLoadingMasterData] = useState(true);
   
   // Load scanned items from localStorage or use mock data
   const [scannedItems, setScannedItems] = useState(() => {
@@ -46,6 +45,36 @@ export const AppProvider = ({ children }) => {
     return savedSettings ? JSON.parse(savedSettings) : mockSettings;
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
+
+  // ============================================
+  // INDEXEDDB: Load Master Products on startup (supports 100MB+)
+  // ============================================
+  useEffect(() => {
+    const loadMasterProducts = async () => {
+      try {
+        const products = await MasterProductsDB.getAll();
+        if (products && products.length > 0) {
+          setMasterProducts(products);
+          console.log(`✅ Loaded ${products.length} master products from IndexedDB`);
+        } else {
+          // First time - save mock data to IndexedDB
+          await MasterProductsDB.importAll(mockMasterProducts);
+          console.log('✅ Initialized IndexedDB with mock master products');
+        }
+      } catch (err) {
+        console.warn('IndexedDB load failed, using localStorage fallback:', err);
+        // Fallback to localStorage
+        const saved = localStorage.getItem('audix_master_products');
+        if (saved) {
+          setMasterProducts(JSON.parse(saved));
+        }
+      } finally {
+        setIsLoadingMasterData(false);
+      }
+    };
+    
+    loadMasterProducts();
+  }, []);
 
   // ============================================
   // PERFORMANCE OPTIMIZATION: Master Product Lookup Map
