@@ -54,6 +54,11 @@ const MasterData = () => {
     category: '',
     price: ''
   });
+  
+  // Progress tracking for large imports
+  const [importProgress, setImportProgress] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  
   const fileInputRef = useRef(null);
   const userFileInputRef = useRef(null);
 
