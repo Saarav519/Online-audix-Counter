@@ -916,16 +916,25 @@ const ScanItems = () => {
               <Label className="text-xs text-slate-600 mb-1 block font-medium">
                 <ScanBarcode className="w-3 h-3 inline mr-1" />
                 Scan Barcode
+                {settings.allowManualBarcodeEntry === false && (
+                  <span className="text-amber-600 ml-1">(Scanner only)</span>
+                )}
               </Label>
               <div className="flex gap-2">
                 <Input
                   ref={barcodeInputRef}
-                  placeholder="Scan barcode..."
+                  placeholder={settings.allowManualBarcodeEntry === false ? "Use scanner..." : "Scan barcode..."}
                   value={barcodeInput}
-                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onChange={(e) => {
+                    // Only allow change if manual entry is enabled OR if it looks like scanner input (fast)
+                    if (settings.allowManualBarcodeEntry !== false) {
+                      setBarcodeInput(e.target.value);
+                    }
+                  }}
                   onKeyDown={handleBarcodeKeyDown}
                   disabled={isLocationLocked}
-                  className="h-11 text-base font-mono flex-1"
+                  readOnly={settings.allowManualBarcodeEntry === false}
+                  className={`h-11 text-base font-mono flex-1 ${settings.allowManualBarcodeEntry === false ? 'bg-slate-50' : ''}`}
                   autoComplete="off"
                   autoFocus
                 />
