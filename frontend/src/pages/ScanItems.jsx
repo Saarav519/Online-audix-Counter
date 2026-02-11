@@ -223,6 +223,96 @@ const ScanItems = () => {
     return locationItems.reduce((sum, item) => sum + item.quantity, 0);
   }, [locationItems]);
 
+  // ============================================
+  // LOCAL ITEM MANAGEMENT - Items stored in temp state
+  // Only saved to context when "Submit Location" is clicked
+  // ============================================
+  
+  // Get master product by barcode (from context)
+  const { getProductByBarcode } = useApp();
+  
+  // Add item to temporary state (not saved until submit)
+  const addTempItem = useCallback((barcode, quantity = 1) => {
+    const product = getProductByBarcode ? getProductByBarcode(barcode) : null;
+    const isValidBarcode = product !== undefined && product !== null;
+    
+    // Check if non-master products are allowed
+    if (!isValidBarcode && !settings.allowNonMasterProducts) {
+      return { success: false, error: 'Barcode not in master list', isValid: false };
+    }
+    
+    let newItem = null;
+    
+    setTempScannedItems(prev => {
+      const existingIndex = prev.findIndex(item => item.barcode === barcode);
+      
+      if (settings.singleSkuScanning) {
+        // Single SKU Mode: same barcode increments qty, moves to end
+        if (existingIndex !== -1) {
+          const existingItem = prev[existingIndex];
+          const filteredItems = prev.filter((_, idx) => idx !== existingIndex);
+          newItem = {
+            ...existingItem,
+            quantity: existingItem.quantity + 1,
+            scannedAt: new Date().toISOString()
+          };
+          return [...filteredItems, newItem];
+        } else {
+          newItem = {
+            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            barcode,
+            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
+            quantity: 1,
+            scannedAt: new Date().toISOString(),
+            isMaster: !!product
+          };
+          return [...prev, newItem];
+        }
+      } else {
+        // Non-Single SKU Mode
+        if (existingIndex !== -1) {
+          const existingItem = prev[existingIndex];
+          const filteredItems = prev.filter((_, idx) => idx !== existingIndex);
+          newItem = {
+            ...existingItem,
+            quantity: existingItem.quantity + quantity,
+            scannedAt: new Date().toISOString()
+          };
+          return [...filteredItems, newItem];
+        } else {
+          newItem = {
+            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            barcode,
+            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
+            quantity,
+            scannedAt: new Date().toISOString(),
+            isMaster: !!product
+          };
+          return [...prev, newItem];
+        }
+      }
+    });
+    
+    return { success: true, isValid: isValidBarcode, product, item: newItem };
+  }, [getProductByBarcode, settings.allowNonMasterProducts, settings.singleSkuScanning]);
+  
+  // Delete item from temp state
+  const deleteTempItem = useCallback((itemId) => {
+    setTempScannedItems(prev => prev.filter(item => item.id !== itemId));
+  }, []);
+  
+  // Update item quantity in temp state
+  const updateTempItemQuantity = useCallback((itemId, newQuantity) => {
+    setTempScannedItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, quantity: newQuantity } : item
+    ));
+  }, []);
+  
+  // Clear all temp items
+  const clearTempItems = useCallback(() => {
+    setTempScannedItems([]);
+  }, []);
+
   // HIGH-PERFORMANCE Hardware scanner callback
   // Uses refs instead of state to avoid re-render delays during fast scanning
   const handleHardwareScan = useCallback((scannedValue) => {
