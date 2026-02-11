@@ -127,7 +127,7 @@ const put = async (storeName, item) => {
  */
 const putMany = async (storeName, items, onProgress = null) => {
   const db = await initDB();
-  const BATCH_SIZE = 2000; // Larger batches = fewer transactions = faster
+  const BATCH_SIZE = 5000; // Large batches = fewer transactions = much faster
   let totalCompleted = 0;
   
   if (items.length === 0) {
@@ -157,11 +157,6 @@ const putMany = async (storeName, items, onProgress = null) => {
       
       transaction.onerror = () => reject(transaction.error);
     });
-    
-    // Minimal yield - just enough to prevent browser warning
-    if (i % 10000 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
   }
   
   return totalCompleted;
