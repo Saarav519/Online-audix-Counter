@@ -643,19 +643,30 @@ const ScanItems = () => {
   // SUBMIT - This is when data gets SAVED to context
   // ============================================
   const confirmSubmit = () => {
+    let finalLocationId = selectedLocationId;
+    
+    // If this is a temp location (Dynamic mode), save it permanently first
+    if (tempLocation && tempLocation.isTemp) {
+      const savedLocation = saveTempLocation(tempLocation);
+      if (savedLocation) {
+        finalLocationId = savedLocation.id;
+      }
+    }
+    
     // Save all temp items to context (this persists to localStorage)
     if (tempScannedItems.length > 0) {
       tempScannedItems.forEach(item => {
-        addScannedItem(selectedLocationId, item.barcode, item.quantity);
+        addScannedItem(finalLocationId, item.barcode, item.quantity);
       });
     }
     
     // Submit and lock the location
-    submitLocation(selectedLocationId);
+    submitLocation(finalLocationId);
     setShowSubmitModal(false);
     
-    // Clear temp items
+    // Clear temp items and temp location
     clearTempItems();
+    setTempLocation(null);
     
     // Clear the current scan location from localStorage since it's submitted
     localStorage.removeItem('audix_current_scan_location');
