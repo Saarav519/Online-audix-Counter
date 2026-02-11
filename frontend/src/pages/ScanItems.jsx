@@ -707,6 +707,9 @@ const ScanItems = () => {
     // Clear all temp scanned items (NOT saved to context)
     clearTempItems();
     
+    // Clear temp location (not saved since user pressed back)
+    setTempLocation(null);
+    
     // Clear the current location selection - go back to location selection screen
     setSelectedLocationId('');
     selectedLocationIdRef.current = ''; // Update ref as well
