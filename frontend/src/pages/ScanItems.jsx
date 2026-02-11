@@ -510,10 +510,17 @@ const ScanItems = () => {
       setLocationError('');
       playSound(true);
       
-      if (result.isNew) {
+      // Store temp location if it's a new dynamic location
+      if (result.isTemp) {
+        setTempLocation(result.location);
+        setLocationSuccess(`Location "${input}" ready for scanning`);
+        setTimeout(() => setLocationSuccess(null), 4000);
+      } else if (result.isNew) {
+        setTempLocation(null);
         setLocationSuccess(`New location "${input}" created automatically`);
         setTimeout(() => setLocationSuccess(null), 4000);
       } else {
+        setTempLocation(null);
         setLocationSuccess(null);
       }
       
