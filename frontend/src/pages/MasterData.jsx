@@ -659,13 +659,26 @@ supervisor1,super789`;
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            {isImporting && importProgress?.status !== 'Complete!' && importProgress?.status !== 'Cancelling...' && (
+              <Button 
+                variant="outline"
+                onClick={handleCancelImport}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                Cancel Import
+              </Button>
+            )}
             <Button 
               variant="outline" 
-              onClick={() => setShowImportModal(false)}
-              disabled={isImporting}
+              onClick={() => {
+                if (isImporting) {
+                  handleCancelImport();
+                }
+                setShowImportModal(false);
+              }}
             >
-              {isImporting ? 'Processing...' : 'Close'}
+              {isImporting ? 'Close & Cancel' : 'Close'}
             </Button>
           </DialogFooter>
         </DialogContent>
