@@ -82,7 +82,7 @@ const MasterData = () => {
         ...newProduct,
         price: parseFloat(newProduct.price) || 0
       });
-      setNewProduct({ barcode: '', name: '', sku: '', category: '', price: '' });
+      setNewProduct({ barcode: '', name: '', price: '' });
       setShowAddModal(false);
     }
   };
