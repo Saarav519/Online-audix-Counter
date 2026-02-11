@@ -663,6 +663,7 @@ export const AppProvider = ({ children }) => {
     getAuthorizationUsers,
     getAllUsers,
     getNextPendingLocation,
+    getProductByBarcode, // Fast O(1) product lookup
     playSound
   };
 
