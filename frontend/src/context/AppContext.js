@@ -210,9 +210,11 @@ export const AppProvider = ({ children }) => {
   };
 
   // Add scanned item to location - OPTIMIZED FOR FAST SCANNING
+  // Uses Map lookup O(1) instead of array.find O(n) for master product search
   // When duplicate barcode is scanned, it moves to the END of array (appears at TOP when reversed)
-  const addScannedItem = (locationId, barcode, quantity = 1) => {
-    const product = masterProducts.find(p => p.barcode === barcode);
+  const addScannedItem = useCallback((locationId, barcode, quantity = 1) => {
+    // O(1) lookup using Map instead of O(n) array.find
+    const product = masterProductMap.get(barcode);
     const isValidBarcode = product !== undefined;
     
     // Check if non-master products are allowed
@@ -243,7 +245,7 @@ export const AppProvider = ({ children }) => {
           };
           return { ...prev, [locationId]: [...filteredItems, newItem] };
         } else {
-          // Add new item with quantity 1
+          // Add new item - store minimal data, lookup details from master when needed
           newItem = {
             id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             barcode,
@@ -268,7 +270,7 @@ export const AppProvider = ({ children }) => {
           };
           return { ...prev, [locationId]: [...filteredItems, newItem] };
         } else {
-          // Add new item with specified quantity
+          // Add new item - store minimal data
           newItem = {
             id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             barcode,
@@ -283,7 +285,7 @@ export const AppProvider = ({ children }) => {
     });
 
     return { success: true, isValid: isValidBarcode, product, item: newItem };
-  };
+  }, [masterProductMap, settings.allowNonMasterProducts, settings.singleSkuScanning]);
 
   // Delete scanned item from specific location only
   const deleteScannedItem = (locationId, itemId) => {
