@@ -122,12 +122,12 @@ const put = async (storeName, item) => {
 };
 
 /**
- * Put multiple items efficiently (bulk insert) - OPTIMIZED for large datasets
- * Uses batched transactions to prevent freezing
+ * Put multiple items efficiently (bulk insert) - ULTRA OPTIMIZED for large datasets
+ * Uses single transaction per batch to minimize overhead
  */
 const putMany = async (storeName, items, onProgress = null) => {
   const db = await initDB();
-  const BATCH_SIZE = 1000; // Process 1000 items per batch
+  const BATCH_SIZE = 2000; // Larger batches = fewer transactions = faster
   let totalCompleted = 0;
   
   if (items.length === 0) {
@@ -142,9 +142,10 @@ const putMany = async (storeName, items, onProgress = null) => {
       const transaction = db.transaction(storeName, 'readwrite');
       const store = transaction.objectStore(storeName);
       
-      batch.forEach(item => {
+      // Use cursor-less batch put for speed
+      for (const item of batch) {
         store.put(item);
-      });
+      }
       
       transaction.oncomplete = () => {
         totalCompleted += batch.length;
@@ -157,8 +158,10 @@ const putMany = async (storeName, items, onProgress = null) => {
       transaction.onerror = () => reject(transaction.error);
     });
     
-    // Yield to main thread between batches
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // Minimal yield - just enough to prevent browser warning
+    if (i % 10000 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
   }
   
   return totalCompleted;
