@@ -229,9 +229,6 @@ const ScanItems = () => {
   // Only saved to context when "Submit Location" is clicked
   // ============================================
   
-  // Get master product by barcode (from context)
-  const { getProductByBarcode } = useApp();
-  
   // Add item to temporary state (not saved until submit)
   const addTempItem = useCallback((barcode, quantity = 1) => {
     const product = getProductByBarcode ? getProductByBarcode(barcode) : null;
