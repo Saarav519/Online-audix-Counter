@@ -639,9 +639,9 @@ export const AppProvider = ({ children }) => {
       return { success: false, error: `Location "${scannedCode}" not found. Only pre-assigned locations can be scanned.`, location: null };
     }
     
-    // Dynamic mode - create new location
-    const newLocation = createLocationFromScan(scannedCode);
-    return { success: true, location: newLocation, isNew: true };
+    // Dynamic mode - create TEMPORARY location (not saved until submit)
+    const tempLocation = createTempLocation(scannedCode);
+    return { success: true, location: tempLocation, isNew: true, isTemp: true };
   };
 
   // Add product to master list
