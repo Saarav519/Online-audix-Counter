@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { downloadCSV, getCSVAcceptTypes, isValidCSV } from '../utils/fileDownload';
+import { MasterProductsDB } from '../utils/indexedDB';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -42,7 +43,12 @@ import {
 } from 'lucide-react';
 
 const MasterData = () => {
-  const { masterProducts, addMasterProduct, importMasterProducts, importAuthorizationUsers, getAuthorizationUsers } = useApp();
+  const { masterProducts, addMasterProduct, setMasterProductsDirect, importAuthorizationUsers, getAuthorizationUsers } = useApp();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showUserImportModal, setShowUserImportModal] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
