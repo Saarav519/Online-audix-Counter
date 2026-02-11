@@ -788,6 +788,7 @@ export const AppProvider = ({ children }) => {
     findLocationByCode,
     scanLocation,
     createLocationFromScan,
+    saveTempLocation,
     importAssignedLocations,
     clearAssignedLocations,
     addMasterProduct,
