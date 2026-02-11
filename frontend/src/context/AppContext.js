@@ -56,22 +56,20 @@ export const AppProvider = ({ children }) => {
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
 
-  // Debounced localStorage writer for scanned items - prevents lag during fast scanning
-  const debouncedSaveScannedItems = useRef(
-    debounce((items) => {
-      localStorage.setItem('audix_scanned_items', JSON.stringify(items));
-    }, 500) // Wait 500ms after last change before writing
-  ).current;
-
   // Persist locations to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('audix_locations', JSON.stringify(locations));
   }, [locations]);
 
-  // Persist scanned items to localStorage with debouncing (prevents lag during fast scanning)
+  // Persist scanned items to localStorage immediately after every scan
+  // Data integrity is critical - save immediately to prevent data loss if device powers off
   useEffect(() => {
-    debouncedSaveScannedItems(scannedItems);
-  }, [scannedItems, debouncedSaveScannedItems]);
+    // Use requestAnimationFrame to avoid blocking the main thread during rapid scanning
+    // This saves immediately but doesn't block the UI
+    requestAnimationFrame(() => {
+      localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+    });
+  }, [scannedItems]);
 
   // Persist master products to localStorage whenever they change
   useEffect(() => {
