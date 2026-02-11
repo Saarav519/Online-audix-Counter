@@ -1319,23 +1319,27 @@ const ScanItems = () => {
                     >
                       <Plus className="w-4 h-4" />
                     </Button>
-                    <Button
-                      onClick={handleScan}
-                      disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
-                      className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white ml-2"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add
-                    </Button>
+                    {settings.allowManualBarcodeEntry !== false && (
+                      <Button
+                        onClick={handleScan}
+                        disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                        className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white ml-2"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add
+                      </Button>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-2">
-                    Scan barcode once, enter quantity, then click Add
+                    {settings.allowManualBarcodeEntry === false 
+                      ? 'Use hardware scanner to add items'
+                      : 'Scan barcode once, enter quantity, then click Add'}
                   </p>
                 </div>
               )}
 
               {/* Add button for Single SKU mode */}
-              {isSingleSkuMode && (
+              {isSingleSkuMode && settings.allowManualBarcodeEntry !== false && (
                 <div className="flex gap-2">
                   <Button
                     onClick={handleScan}
