@@ -336,10 +336,9 @@ const ScanItems = () => {
         playSound(false);
       }
     } else {
-      // FAST BARCODE PROCESSING
-      // Process immediately without waiting for state updates
+      // FAST BARCODE PROCESSING - Add to TEMP state (not saved until submit)
       const qty = isSingleSkuModeRef.current ? 1 : (parseInt(quantityInputRef2.current) || 1);
-      const result = addScannedItem(selectedLocationIdRef.current, scannedValue, qty);
+      const result = addTempItem(scannedValue, qty);
       
       if (result.success) {
         // Update scan count for feedback
@@ -353,7 +352,7 @@ const ScanItems = () => {
         
         setLastScanResult({ 
           success: true, 
-          message: `✓ ${result.item.productName}`, 
+          message: `✓ ${result.item?.productName || scannedValue}`, 
           item: result.item,
           isValid: result.isValid,
           barcode: scannedValue,
@@ -384,7 +383,7 @@ const ScanItems = () => {
         }, 3000);
       }
     }
-  }, [scanLocation, addScannedItem, playSound]);
+  }, [scanLocation, addTempItem, playSound]);
 
   // Enable hardware scanner hook
   useHardwareScanner(handleHardwareScan, !isLocationLocked);
