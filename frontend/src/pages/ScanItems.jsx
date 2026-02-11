@@ -550,6 +550,34 @@ const ScanItems = () => {
     }, 100);
   };
 
+  // Handle Back button click - shows confirmation dialog
+  const handleBackClick = () => {
+    setShowBackConfirmDialog(true);
+  };
+
+  // Handle Back confirmation - discard data and go back
+  const handleBackConfirm = () => {
+    // Clear all scanned items for the current location (discard unsaved data)
+    if (selectedLocationId) {
+      clearLocationItems(selectedLocationId);
+    }
+    
+    // Clear the current location selection
+    setSelectedLocationId(null);
+    localStorage.removeItem('audix_current_scan_location');
+    setWaitingForLocationScan(true);
+    setLastScanResult(null);
+    setShowBackConfirmDialog(false);
+    
+    // Navigate to Locations page
+    navigate('/locations');
+  };
+
+  // Handle Back cancel - close dialog and stay
+  const handleBackCancel = () => {
+    setShowBackConfirmDialog(false);
+  };
+
   // Scanner Mode UI - Optimized for handheld devices
   // TWO-STEP FLOW: Step 1 = Location Selection, Step 2 = Barcode Scanning
   if (showScannerMode) {
