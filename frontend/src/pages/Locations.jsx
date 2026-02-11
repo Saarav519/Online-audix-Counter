@@ -393,7 +393,7 @@ COLD-01,Cold Storage Unit 1`;
                       location.isSubmitted ? 'bg-emerald-50/30' : ''
                     }`}
                   >
-                    {/* Left: Location Info */}
+                    {/* Left: Location Info - Only Name, No Zone */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Status Icon */}
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -412,62 +412,60 @@ COLD-01,Cold Storage Unit 1`;
                         )}
                       </div>
                       
-                      {/* Location Details - Full Name Visible */}
+                      {/* Location Name Only - Clean View */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-slate-800">
-                            {location.code}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600">{location.name}</p>
+                        <span className="font-semibold text-slate-800 text-sm truncate block">
+                          {location.name || location.code}
+                        </span>
                       </div>
                     </div>
                     
-                    {/* Middle: Quantity Only */}
-                    <div className="flex items-center gap-3 px-3">
-                      <div className="text-center min-w-[50px]">
-                        <p className="text-base font-bold text-slate-700">{stats.totalQuantity}</p>
+                    {/* Middle: Quantity - More Space */}
+                    <div className="flex items-center gap-3 px-2">
+                      <div className="text-center min-w-[45px]">
+                        <p className="text-lg font-bold text-slate-700">{stats.totalQuantity}</p>
                         <p className="text-xs text-slate-400">Qty</p>
                       </div>
                     </div>
                     
-                    {/* Right: Actions - Smaller Scan Button */}
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        onClick={() => handleOpenLocation(location)}
-                        className={`h-7 px-2 text-xs ${location.isSubmitted 
-                          ? "bg-amber-500 hover:bg-amber-600" 
-                          : "bg-emerald-600 hover:bg-emerald-700"
-                        }`}
-                      >
-                        {location.isSubmitted ? (
-                          <>
-                            <Unlock className="w-3 h-3 mr-1" />
-                            Reopen
-                          </>
-                        ) : (
-                          <>
-                            <ScanBarcode className="w-3 h-3 mr-1" />
-                            Scan
-                          </>
-                        )}
-                      </Button>
+                    {/* Right: Three Dots Menu Only (Scan moved inside) */}
+                    <div className="flex items-center flex-shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <MoreVertical className="w-4 h-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-5 h-5" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-44">
+                          {/* Scan/Open option moved here */}
+                          <DropdownMenuItem 
+                            onClick={() => handleOpenLocation(location)}
+                            className={location.isSubmitted 
+                              ? "text-amber-600 focus:text-amber-600 focus:bg-amber-50" 
+                              : "text-emerald-600 focus:text-emerald-600 focus:bg-emerald-50"
+                            }
+                          >
+                            {location.isSubmitted ? (
+                              <>
+                                <Unlock className="w-4 h-4 mr-2" />
+                                Reopen
+                              </>
+                            ) : (
+                              <>
+                                <ScanBarcode className="w-4 h-4 mr-2" />
+                                Scan
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           {!location.isSubmitted && stats.totalItems > 0 && (
-                            <DropdownMenuItem onClick={() => submitLocation(location.id)}>
-                              <Lock className="w-4 h-4 mr-2" />
-                              Submit & Lock
-                            </DropdownMenuItem>
-                          )}
-                          {!location.isSubmitted && stats.totalItems > 0 && (
-                            <DropdownMenuSeparator />
+                            <>
+                              <DropdownMenuItem onClick={() => submitLocation(location.id)}>
+                                <Lock className="w-4 h-4 mr-2" />
+                                Submit & Lock
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
                           )}
                           <DropdownMenuItem 
                             onClick={() => handleDeleteRequest(location)}
