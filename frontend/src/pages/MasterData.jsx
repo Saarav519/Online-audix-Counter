@@ -476,13 +476,18 @@ supervisor1,super789`;
 
       {/* Import Products Modal */}
       <Dialog open={showImportModal} onOpenChange={(open) => {
-        setShowImportModal(open);
-        if (!open) setImportResult(null);
+        if (!isImporting) {
+          setShowImportModal(open);
+          if (!open) {
+            setImportResult(null);
+            setImportProgress(null);
+          }
+        }
       }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-emerald-600" />
+              <RefreshCw className={`w-5 h-5 text-emerald-600 ${isImporting ? 'animate-spin' : ''}`} />
               Import Master Products
             </DialogTitle>
             <DialogDescription>
@@ -499,38 +504,60 @@ supervisor1,super789`;
               </p>
             </div>
 
-            <div className="p-4 bg-slate-50 rounded-lg">
-              <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
-              <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
-                Barcode,Name,SKU,Category,Price
-              </code>
-              <Button
-                variant="link"
-                size="sm"
-                onClick={downloadSampleProductCSV}
-                className="text-emerald-600 p-0 h-auto mt-2"
-              >
-                <Download className="w-3 h-3 mr-1" />
-                Download Sample CSV
-              </Button>
-            </div>
-            
-            <div className="relative">
-              <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-400 transition-colors cursor-pointer">
-                <Upload className="w-10 h-10 text-slate-400 mb-3" />
-                <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
-                <p className="text-xs text-slate-400">CSV or TXT files</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={getCSVAcceptTypes()}
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            {/* Progress Display */}
+            {importProgress && (
+              <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                  <span className="text-sm font-medium text-blue-700">{importProgress.status}</span>
+                </div>
+                <Progress 
+                  value={importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0} 
+                  className="h-2"
                 />
+                <div className="flex justify-between text-xs text-blue-600">
+                  <span>{importProgress.processed.toLocaleString()} processed</span>
+                  <span>{importProgress.total.toLocaleString()} total</span>
+                </div>
               </div>
-            </div>
+            )}
 
-            {importResult && (
+            {!isImporting && (
+              <>
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
+                  <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
+                    Barcode,Name,SKU,Category,Price
+                  </code>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    onClick={downloadSampleProductCSV}
+                    className="text-emerald-600 p-0 h-auto mt-2"
+                  >
+                    <Download className="w-3 h-3 mr-1" />
+                    Download Sample CSV
+                  </Button>
+                </div>
+                
+                <div className="relative">
+                  <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-400 transition-colors cursor-pointer">
+                    <Upload className="w-10 h-10 text-slate-400 mb-3" />
+                    <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
+                    <p className="text-xs text-slate-400">CSV or TXT files</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={getCSVAcceptTypes()}
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {importResult && !importProgress && (
               <div className={`p-3 rounded-lg flex items-center gap-2 ${
                 importResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
               }`}>
@@ -541,15 +568,19 @@ supervisor1,super789`;
                 )}
                 <span className="text-sm">
                   {importResult.success 
-                    ? `Successfully imported ${importResult.count} products (old data replaced)`
+                    ? `Successfully imported ${importResult.count.toLocaleString()} products (old data replaced)`
                     : importResult.error}
                 </span>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowImportModal(false)}>
-              Close
+            <Button 
+              variant="outline" 
+              onClick={() => setShowImportModal(false)}
+              disabled={isImporting}
+            >
+              {isImporting ? 'Processing...' : 'Close'}
             </Button>
           </DialogFooter>
         </DialogContent>
