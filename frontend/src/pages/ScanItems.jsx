@@ -805,59 +805,23 @@ const ScanItems = () => {
                     scrollBehavior: 'smooth'
                   }}
                 >
-                  {/* Reverse order - newest items at TOP */}
-                  {[...locationItems].reverse().map((item) => (
-                    <div 
-                      key={item.id} 
-                      className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2"
-                    >
-                      {/* Barcode & Description - LARGER FONT SIZE */}
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <p className="text-base text-slate-800 font-mono font-bold truncate">{item.barcode}</p>
-                        <p className="text-xs text-slate-500 truncate">{item.productName}</p>
-                      </div>
-                      {/* Quantity & Delete */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {editingItemId === item.id ? (
-                          <Input
-                            type="number"
-                            min="1"
-                            value={editQuantity}
-                            onChange={(e) => setEditQuantity(e.target.value)}
-                            className="w-14 h-7 text-center text-sm font-bold p-1"
-                            autoFocus
-                            onKeyPress={(e) => e.key === 'Enter' && handleQuantityUpdate(item.id)}
-                            onBlur={() => handleQuantityUpdate(item.id)}
-                          />
-                        ) : (
-                          <span 
-                            className={`font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded ${
-                              !isSingleSkuMode && !isLocationLocked 
-                                ? 'bg-emerald-100 text-emerald-700 cursor-pointer active:bg-emerald-200' 
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                            onClick={() => {
-                              if (!isSingleSkuMode && !isLocationLocked) {
-                                setEditingItemId(item.id);
-                                setEditQuantity(String(item.quantity));
-                              }
-                            }}
-                          >
-                            {item.quantity}
-                          </span>
-                        )}
-                        {!isLocationLocked && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                  {/* Reverse order - newest items at TOP - Using memoized component for performance */}
+                  {reversedItems.map((item) => (
+                    <ScannedItemRow
+                      key={item.id}
+                      item={item}
+                      isEditing={editingItemId === item.id}
+                      editQuantity={editQuantity}
+                      setEditQuantity={setEditQuantity}
+                      onQuantityUpdate={handleQuantityUpdate}
+                      onDelete={handleDelete}
+                      isSingleSkuMode={isSingleSkuMode}
+                      isLocationLocked={isLocationLocked}
+                      onStartEdit={(id, qty) => {
+                        setEditingItemId(id);
+                        setEditQuantity(qty);
+                      }}
+                    />
                   ))}
                   <div style={{ height: '20px', minHeight: '20px' }}></div>
                 </div>
