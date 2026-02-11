@@ -137,20 +137,22 @@ const MasterData = () => {
       // Update React state ONCE with all products
       setImportProgress({ processed: result.count, total: result.count, status: 'Updating display...' });
       
-      // Small delay to show the status, then update React
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Use startTransition to make state update non-blocking (keeps UI responsive)
+      startTransition(() => {
+        setMasterProductsDirect(result.products);
+      });
       
-      // Update React state (this triggers one re-render)
-      setMasterProductsDirect(result.products);
-      
-      setImportProgress({ processed: result.count, total: result.count, status: 'Complete!' });
-      setImportResult({ success: true, count: result.count, replaced: true });
-      
-      // Clear progress after a delay
+      // Show completion after a brief moment
       setTimeout(() => {
-        setImportProgress(null);
-        setIsImporting(false);
-      }, 1000);
+        setImportProgress({ processed: result.count, total: result.count, status: 'Complete!' });
+        setImportResult({ success: true, count: result.count, replaced: true });
+        
+        // Clear progress after a delay
+        setTimeout(() => {
+          setImportProgress(null);
+          setIsImporting(false);
+        }, 800);
+      }, 200);
       
     } catch (error) {
       console.error('Import error:', error);
