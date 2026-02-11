@@ -212,7 +212,7 @@ const Locations = () => {
     setImportResult(null);
   };
 
-  const downloadSampleCSV = () => {
+  const downloadSampleCSV = async () => {
     const sampleData = `Location Code,Location Name
 WH-A1,Warehouse A - Section 1
 WH-A2,Warehouse A - Section 2
@@ -220,7 +220,7 @@ WH-B1,Warehouse B - Section 1
 STORE-01,Retail Store Front
 COLD-01,Cold Storage Unit 1`;
     
-    downloadCSV(sampleData, 'sample_locations.csv');
+    await downloadCSV(sampleData, 'sample_locations.csv');
   };
 
   const getLocationStats = (locationId) => {
