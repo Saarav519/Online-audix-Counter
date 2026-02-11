@@ -119,9 +119,31 @@ export const AppProvider = ({ children }) => {
     }
   }, [scannedItems]);
 
-  // Persist master products to localStorage whenever they change
+  // ============================================
+  // INDEXEDDB: Persist master products (supports 100MB+)
+  // Only saves when master products change (not on every scan)
+  // ============================================
+  const masterProductsInitializedRef = useRef(false);
+  
   useEffect(() => {
-    localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
+    // Skip first render (initial load from IndexedDB)
+    if (!masterProductsInitializedRef.current) {
+      masterProductsInitializedRef.current = true;
+      return;
+    }
+    
+    // Save to IndexedDB (async, non-blocking)
+    MasterProductsDB.importAll(masterProducts)
+      .then(() => console.log('✅ Master products saved to IndexedDB'))
+      .catch(err => {
+        console.warn('IndexedDB save failed, using localStorage fallback:', err);
+        // Fallback to localStorage (may fail for large data)
+        try {
+          localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
+        } catch (e) {
+          console.error('localStorage also failed:', e);
+        }
+      });
   }, [masterProducts]);
 
   // Play sound for scan feedback - OPTIMIZED for fast scanning
