@@ -549,12 +549,16 @@ supervisor1,super789`;
 
       {/* Import Products Modal */}
       <Dialog open={showImportModal} onOpenChange={(open) => {
-        if (!isImporting) {
-          setShowImportModal(open);
-          if (!open) {
-            setImportResult(null);
-            setImportProgress(null);
+        if (!open) {
+          // User is closing the dialog
+          if (isImporting) {
+            handleCancelImport();
           }
+          setShowImportModal(false);
+          setImportResult(null);
+          setImportProgress(null);
+        } else {
+          setShowImportModal(true);
         }
       }}>
         <DialogContent className="sm:max-w-lg">
