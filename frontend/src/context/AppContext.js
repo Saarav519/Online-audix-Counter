@@ -581,6 +581,42 @@ export const AppProvider = ({ children }) => {
     return newLocation;
   };
 
+  // Create a temporary location object WITHOUT saving to state
+  // Used in Dynamic mode - location is only saved when items are submitted
+  const createTempLocation = (scannedCode) => {
+    return {
+      id: `loc_temp_${Date.now()}`,
+      name: scannedCode,
+      code: scannedCode,
+      status: 'active',
+      itemCount: 0,
+      isCompleted: false,
+      isSubmitted: false,
+      isAssigned: false,
+      autoCreated: true,
+      isTemp: true, // Mark as temporary
+      lastUpdated: new Date().toISOString()
+    };
+  };
+
+  // Save a temporary location to permanent state (called during submit)
+  const saveTempLocation = (tempLocation) => {
+    if (!tempLocation || !tempLocation.isTemp) return tempLocation;
+    
+    // Check if location already exists (by code)
+    const existing = findLocationByCode(tempLocation.code);
+    if (existing) return existing;
+    
+    // Create permanent location from temp
+    const permanentLocation = {
+      ...tempLocation,
+      isTemp: false
+    };
+    setLocations(prev => [...prev, permanentLocation]);
+    setScannedItems(prev => ({ ...prev, [permanentLocation.id]: [] }));
+    return permanentLocation;
+  };
+
   // Scan location - handles both pre-assigned and dynamic modes
   const scanLocation = (scannedCode) => {
     const existingLocation = findLocationByCode(scannedCode);
