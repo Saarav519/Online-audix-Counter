@@ -189,19 +189,18 @@ export const AppProvider = ({ children }) => {
             gainNode.disconnect();
           };
         } else {
-          // Classic Rotary Telephone Ring for invalid scan
-          // Creates the distinctive dual-tone warbling ring sound
+          // Classic Telephone Ring for invalid scan (Android 7 compatible)
+          // Simplified dual-tone without LFO for older WebView compatibility
           
           const startTime = audioContext.currentTime;
           
-          // First ring
+          // Create a simple but loud telephone-like ring
           const createRing = (ringStartTime) => {
-            // Two oscillators for the classic dual-tone ring (440Hz + 480Hz)
+            // Two oscillators for dual-tone ring (440Hz + 480Hz)
             const osc1 = audioContext.createOscillator();
             const osc2 = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            const lfo = audioContext.createOscillator(); // For warble effect
-            const lfoGain = audioContext.createGain();
+            const gainNode1 = audioContext.createGain();
+            const gainNode2 = audioContext.createGain();
             
             // Classic telephone frequencies
             osc1.frequency.value = 440;
@@ -209,50 +208,43 @@ export const AppProvider = ({ children }) => {
             osc1.type = 'sine';
             osc2.type = 'sine';
             
-            // LFO for warbling effect (20Hz modulation)
-            lfo.frequency.value = 20;
-            lfoGain.gain.value = 0.5;
-            
-            // Connect LFO to gain for tremolo
-            lfo.connect(lfoGain);
-            lfoGain.connect(gainNode.gain);
-            
-            // Connect oscillators
-            osc1.connect(gainNode);
-            osc2.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            // Connect each oscillator to its own gain node
+            osc1.connect(gainNode1);
+            osc2.connect(gainNode2);
+            gainNode1.connect(audioContext.destination);
+            gainNode2.connect(audioContext.destination);
             
             // Set volume - MAXIMUM LOUD
-            gainNode.gain.value = 1.0;
+            gainNode1.gain.value = 1.0;
+            gainNode2.gain.value = 1.0;
             
-            const ringDuration = 0.25;
+            const ringDuration = 0.3;
             
             osc1.start(ringStartTime);
             osc2.start(ringStartTime);
-            lfo.start(ringStartTime);
             
             osc1.stop(ringStartTime + ringDuration);
             osc2.stop(ringStartTime + ringDuration);
-            lfo.stop(ringStartTime + ringDuration);
             
             // Cleanup
             osc1.onended = () => {
               osc1.disconnect();
+              gainNode1.disconnect();
+            };
+            osc2.onended = () => {
               osc2.disconnect();
-              lfo.disconnect();
-              lfoGain.disconnect();
-              gainNode.disconnect();
+              gainNode2.disconnect();
             };
           };
           
           // Create two rings with a short gap (like real telephone)
           createRing(startTime);
-          createRing(startTime + 0.35); // Second ring after 0.35s
+          createRing(startTime + 0.4); // Second ring after 0.4s
           
           // Vibrate device for invalid scan (if supported)
           if (navigator.vibrate) {
             // Vibrate pattern matching the ring: ring-pause-ring
-            navigator.vibrate([250, 100, 250]);
+            navigator.vibrate([300, 100, 300]);
           }
         }
       } catch (e) {
