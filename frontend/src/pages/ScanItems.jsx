@@ -680,16 +680,23 @@ const ScanItems = () => {
     clearTempItems();
     
     // Clear the current location selection - go back to location selection screen
-    setSelectedLocationId(null);
     setSelectedLocationId('');
+    selectedLocationIdRef.current = ''; // Update ref as well
     localStorage.removeItem('audix_current_scan_location');
     setWaitingForLocationScan(true);
+    waitingForLocationScanRef.current = true; // Update ref
     setLastScanResult(null);
     setLocationInput('');
+    setBarcodeInput('');
+    setQuantityInput('1');
     setShowBackConfirmDialog(false);
     
-    // Stay on Scan Items page but show location selection
-    // Do NOT navigate to Locations page
+    // Focus location input for next scan
+    setTimeout(() => {
+      if (locationInputRef.current) {
+        locationInputRef.current.focus();
+      }
+    }, 100);
   };
 
   // Handle Back cancel - close dialog and stay
