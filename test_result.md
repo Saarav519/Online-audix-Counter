@@ -262,3 +262,23 @@ agent_communication:
       - Reports page shows 4 locations with 9 items totaling 162 quantity
       
       🎉 ALL TESTS PASSED - No critical issues found
+  - agent: "main"
+    message: |
+      Fixed three additional issues reported by user:
+      
+      1. ✅ Date Display Fix: Session now shows dynamic date (February 2026) instead of hardcoded July 2025
+         - Made mockSessions dynamically calculate current month/year
+         - Session names and dates are now auto-generated based on system date
+      
+      2. ✅ Performance Optimization: Fixed app lag during fast scanning
+         - Added debounced localStorage writes (500ms) for scannedItems to prevent lag
+         - Added React.memo for ScannedItemRow component
+         - Added useMemo for reversedItems and totalQuantity calculations
+         - Optimized re-renders during rapid consecutive scans
+      
+      3. ✅ CipherLab RK25 & Newland Device Support:
+         - Added RK25, Newland-specific device identifiers to scanner detection
+         - Added ErrorBoundary component to catch JS errors
+         - Added loading screen in index.html (shows while React loads)
+         - Added ES6 polyfills for older Android WebView
+         - Added global error handler to prevent blank screens
