@@ -224,14 +224,16 @@ export const MasterProductsDB = {
   
   save: (product) => put(STORES.MASTER_PRODUCTS, product),
   
-  // Bulk import - replaces all existing data
-  importAll: async (products) => {
+  // Bulk import - replaces all existing data (OPTIMIZED for large datasets)
+  importAll: async (products, onProgress = null) => {
     await clearStore(STORES.MASTER_PRODUCTS);
-    return putMany(STORES.MASTER_PRODUCTS, products);
+    // Yield to UI after clearing
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return putMany(STORES.MASTER_PRODUCTS, products, onProgress);
   },
   
   // Bulk add without clearing
-  addMany: (products) => putMany(STORES.MASTER_PRODUCTS, products),
+  addMany: (products, onProgress = null) => putMany(STORES.MASTER_PRODUCTS, products, onProgress),
   
   delete: (barcode) => deleteByKey(STORES.MASTER_PRODUCTS, barcode),
   
