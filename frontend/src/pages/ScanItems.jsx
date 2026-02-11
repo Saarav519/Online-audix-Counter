@@ -154,6 +154,12 @@ const ScanItems = () => {
   const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false); // Back confirmation dialog
   
+  // ============================================
+  // TEMPORARY SCANNED ITEMS - Not saved until Submit
+  // This ensures data is only saved when user clicks "Submit Location"
+  // ============================================
+  const [tempScannedItems, setTempScannedItems] = useState([]);
+  
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
   const quantityInputRef = useRef(null);
