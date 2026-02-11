@@ -157,19 +157,16 @@ const Reports = () => {
   const handleExportCSV = async () => {
     if (reportItems.length === 0) return;
     
-    const headers = ['Location', 'Barcode', 'Product Name', 'SKU', 'Category', 'Price', 'Quantity', 'Scanned At', 'Status'];
+    const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
     const rows = reportItems.map(item => {
       const masterProduct = getMasterProductDetails(item.barcode);
       return [
         `"${item.locationName}"`,
         item.barcode,
         `"${item.productName}"`,
-        masterProduct?.sku || '',
-        `"${masterProduct?.category || 'Unknown'}"`,
         masterProduct?.price?.toFixed(2) || '0.00',
         item.quantity,
-        `"${new Date(item.scannedAt).toLocaleString()}"`,
-        item.isMaster !== false ? 'Master' : 'Non-Master'
+        `"${new Date(item.scannedAt).toLocaleString()}"`
       ];
     });
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
