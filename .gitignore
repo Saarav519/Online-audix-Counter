@@ -66,3 +66,7 @@ frontend/android/capacitor-cordova-android-plugins/build/
 # Memory/test files
 /app/memory/
 test_result.md
+-e 
+# Environment files
+*.env
+*.env.*
