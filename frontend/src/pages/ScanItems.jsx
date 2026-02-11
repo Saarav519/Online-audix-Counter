@@ -1241,6 +1241,11 @@ const ScanItems = () => {
                   Ready
                 </Badge>
               )}
+              {settings.allowManualBarcodeEntry === false && (
+                <Badge variant="outline" className="ml-2 text-amber-600 border-amber-300">
+                  Scanner Only
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1248,19 +1253,26 @@ const ScanItems = () => {
               {/* Barcode Input */}
               <div>
                 <Label className="text-sm text-slate-600 mb-1.5 block">
-                  {isSingleSkuMode 
-                    ? 'Scan barcode (each scan = 1 unit)'
-                    : 'Scan barcode, then enter quantity'}
+                  {settings.allowManualBarcodeEntry === false 
+                    ? 'Use hardware scanner to scan barcode'
+                    : isSingleSkuMode 
+                      ? 'Scan barcode (each scan = 1 unit)'
+                      : 'Scan barcode, then enter quantity'}
                 </Label>
                 <div className="flex gap-2">
                   <Input
                     ref={barcodeInputRef}
-                    placeholder={selectedLocationId ? "Scan barcode here..." : "Select location first"}
+                    placeholder={!selectedLocationId ? "Select location first" : settings.allowManualBarcodeEntry === false ? "Use scanner..." : "Scan barcode here..."}
                     value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
+                    onChange={(e) => {
+                      if (settings.allowManualBarcodeEntry !== false) {
+                        setBarcodeInput(e.target.value);
+                      }
+                    }}
                     onKeyDown={handleBarcodeKeyDown}
                     disabled={!selectedLocationId || isLocationLocked}
-                    className="h-12 text-lg font-mono flex-1"
+                    readOnly={settings.allowManualBarcodeEntry === false}
+                    className={`h-12 text-lg font-mono flex-1 ${settings.allowManualBarcodeEntry === false ? 'bg-slate-50' : ''}`}
                     autoComplete="off"
                   />
                 </div>
