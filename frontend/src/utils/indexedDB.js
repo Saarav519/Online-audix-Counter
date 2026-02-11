@@ -235,6 +235,47 @@ export const MasterProductsDB = {
     return putMany(STORES.MASTER_PRODUCTS, products, onProgress);
   },
   
+  // ULTRA-FAST: Direct CSV to IndexedDB import (bypasses React state)
+  // Returns the products array after saving to DB
+  importFromCSV: async (csvText, onProgress = null) => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    const dataLines = lines.slice(1); // Skip header
+    const totalLines = dataLines.length;
+    
+    if (totalLines === 0) {
+      return { success: false, error: 'No data found', products: [] };
+    }
+
+    // Parse all lines first (fast, in-memory)
+    const products = [];
+    for (let i = 0; i < dataLines.length; i++) {
+      const line = dataLines[i];
+      const parts = line.split(',').map(s => s.trim().replace(/"/g, ''));
+      const [barcode, name, price] = parts;
+      
+      if (barcode && name) {
+        products.push({
+          barcode,
+          name,
+          price: parseFloat(price) || 0,
+          isMaster: true
+        });
+      }
+    }
+
+    if (products.length === 0) {
+      return { success: false, error: 'No valid products found', products: [] };
+    }
+
+    // Clear and import to IndexedDB
+    await clearStore(STORES.MASTER_PRODUCTS);
+    
+    // Save to IndexedDB with progress
+    await putMany(STORES.MASTER_PRODUCTS, products, onProgress);
+    
+    return { success: true, count: products.length, products };
+  },
+  
   // Bulk add without clearing
   addMany: (products, onProgress = null) => putMany(STORES.MASTER_PRODUCTS, products, onProgress),
   
