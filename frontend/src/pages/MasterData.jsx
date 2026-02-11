@@ -398,7 +398,7 @@ supervisor1,super789`;
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <Input
-          placeholder="Search by name, barcode, SKU, or category..."
+          placeholder="Search by name or barcode..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10 h-11 border-slate-200"
@@ -412,12 +412,9 @@ supervisor1,super789`;
             <Table>
               <TableHeader>
                 <TableRow className="bg-slate-50">
-                  <TableHead className="w-[150px]">Barcode</TableHead>
+                  <TableHead className="w-[180px]">Barcode</TableHead>
                   <TableHead>Product Name</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="text-right w-[120px]">Price</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -425,19 +422,8 @@ supervisor1,super789`;
                   <TableRow key={product.id} className="hover:bg-slate-50">
                     <TableCell className="font-mono text-sm">{product.barcode}</TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell className="text-slate-500">{product.sku}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="border-slate-200">
-                        {product.category}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-right">
                       ₹{product.price?.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge className="bg-emerald-100 text-emerald-700 border-0">
-                        Master
-                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
