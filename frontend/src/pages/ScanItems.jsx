@@ -1216,8 +1216,8 @@ const ScanItems = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Reverse order - newest items at TOP */}
-                  {[...locationItems].reverse().map((item, index) => (
+                  {/* Reverse order - newest items at TOP - Using memoized reversedItems */}
+                  {reversedItems.map((item, index) => (
                     <TableRow key={item.id} className={index === 0 ? 'first-item bg-emerald-50/30' : ''}>
                       <TableCell className="font-mono text-base font-bold">{item.barcode}</TableCell>
                       <TableCell>
