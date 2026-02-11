@@ -282,19 +282,19 @@ const MasterData = () => {
   };
 
   const handleExport = async () => {
-    const headers = ['Barcode', 'Name', 'SKU', 'Category', 'Price'];
+    const headers = ['Barcode', 'Name', 'Price'];
     const rows = masterProducts.map(p => 
-      [p.barcode, `"${p.name}"`, p.sku, `"${p.category}"`, p.price].join(',')
+      [p.barcode, `"${p.name}"`, p.price].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
     await downloadCSV(csv, 'master_products.csv');
   };
 
   const downloadSampleProductCSV = async () => {
-    const sampleData = `Barcode,Name,SKU,Category,Price
-8901234567890,Organic Rice 5kg,ORG-RICE-5K,Food & Groceries,450
-8901234567891,Whole Wheat Flour 1kg,WH-FLOUR-1K,Food & Groceries,65
-8901234567892,Premium Olive Oil 500ml,OLV-OIL-500,Cooking Oil,850`;
+    const sampleData = `Barcode,Name,Price
+8901234567890,Organic Rice 5kg,450
+8901234567891,Whole Wheat Flour 1kg,65
+8901234567892,Premium Olive Oil 500ml,850`;
     
     await downloadCSV(sampleData, 'sample_products.csv');
   };
