@@ -149,13 +149,15 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AppProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <Toaster position="top-right" />
-        <PWAInstallPrompt />
-      </BrowserRouter>
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster position="top-right" />
+          <PWAInstallPrompt />
+        </BrowserRouter>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 
