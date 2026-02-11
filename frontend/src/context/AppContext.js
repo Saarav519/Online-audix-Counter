@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { mockUsers, mockLocations, mockMasterProducts, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
 
 const AppContext = createContext();
@@ -47,19 +47,57 @@ export const AppProvider = ({ children }) => {
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
 
+  // ============================================
+  // PERFORMANCE OPTIMIZATION: Master Product Lookup Map
+  // Convert array to Map for O(1) lookup instead of O(n) array.find()
+  // Critical for large master data (thousands of products)
+  // ============================================
+  const masterProductMap = useMemo(() => {
+    const map = new Map();
+    masterProducts.forEach(product => {
+      map.set(product.barcode, product);
+    });
+    return map;
+  }, [masterProducts]);
+
+  // Fast product lookup function - O(1) instead of O(n)
+  const getProductByBarcode = useCallback((barcode) => {
+    return masterProductMap.get(barcode);
+  }, [masterProductMap]);
+
   // Persist locations to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('audix_locations', JSON.stringify(locations));
   }, [locations]);
 
-  // Persist scanned items to localStorage immediately after every scan
-  // Data integrity is critical - save immediately to prevent data loss if device powers off
+  // ============================================
+  // PERFORMANCE OPTIMIZATION: Non-blocking localStorage save
+  // Uses setTimeout(0) to save in next event loop tick
+  // This prevents UI blocking during rapid scanning
+  // Data is still saved immediately, just non-blocking
+  // ============================================
+  const saveTimeoutRef = useRef(null);
+  
   useEffect(() => {
-    // Use requestAnimationFrame to avoid blocking the main thread during rapid scanning
-    // This saves immediately but doesn't block the UI
-    requestAnimationFrame(() => {
-      localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
-    });
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Save in next tick to not block current scan processing
+    saveTimeoutRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+      } catch (e) {
+        console.warn('localStorage save failed:', e);
+      }
+    }, 0);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [scannedItems]);
 
   // Persist master products to localStorage whenever they change
