@@ -71,33 +71,23 @@ export const AppProvider = ({ children }) => {
   }, [locations]);
 
   // ============================================
-  // PERFORMANCE OPTIMIZATION: Non-blocking localStorage save
-  // Uses setTimeout(0) to save in next event loop tick
-  // This prevents UI blocking during rapid scanning
-  // Data is still saved immediately, just non-blocking
+  // DATA SAFETY: Synchronous localStorage save
+  // Saves IMMEDIATELY after every scan - no delay
+  // Trade-off: Slightly slower scanning, but ZERO data loss risk
   // ============================================
-  const saveTimeoutRef = useRef(null);
+  const lastSavedRef = useRef(JSON.stringify(scannedItems));
   
   useEffect(() => {
-    // Clear any pending save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    // Save in next tick to not block current scan processing
-    saveTimeoutRef.current = setTimeout(() => {
+    const currentData = JSON.stringify(scannedItems);
+    // Only save if data actually changed (prevents unnecessary writes)
+    if (currentData !== lastSavedRef.current) {
       try {
-        localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+        localStorage.setItem('audix_scanned_items', currentData);
+        lastSavedRef.current = currentData;
       } catch (e) {
         console.warn('localStorage save failed:', e);
       }
-    }, 0);
-    
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
+    }
   }, [scannedItems]);
 
   // Persist master products to localStorage whenever they change
