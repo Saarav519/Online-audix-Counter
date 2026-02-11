@@ -563,7 +563,7 @@ supervisor1,super789`;
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
                   <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
-                    Barcode,Name,SKU,Category,Price
+                    Barcode,Name,Price
                   </code>
                   <Button
                     variant="link"
