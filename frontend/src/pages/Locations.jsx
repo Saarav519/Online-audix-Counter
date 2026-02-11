@@ -92,7 +92,15 @@ const Locations = () => {
     }
   });
 
-  const filteredLocations = modeFilteredLocations.filter(
+  // Sort locations - most recently updated/scanned at TOP
+  const sortedLocations = [...modeFilteredLocations].sort((a, b) => {
+    // Sort by lastUpdated descending (newest first)
+    const dateA = new Date(a.lastUpdated || 0);
+    const dateB = new Date(b.lastUpdated || 0);
+    return dateB - dateA;
+  });
+
+  const filteredLocations = sortedLocations.filter(
     loc =>
       loc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       loc.code.toLowerCase().includes(searchTerm.toLowerCase())
