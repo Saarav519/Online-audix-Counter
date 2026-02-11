@@ -6,7 +6,6 @@
 
 # Dependencies
 node_modules/
-/node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -20,7 +19,7 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 
-# Production builds (but not android)
+# Production builds
 /build
 dist/
 
@@ -52,75 +51,18 @@ chainlit.md
 # Build caches
 .cache/
 
-# Android build outputs (ignore these)
+# Android build outputs (these get regenerated)
 frontend/android/app/build/
 frontend/android/build/
 frontend/android/.gradle/
 frontend/android/local.properties
 frontend/android/capacitor-cordova-android-plugins/build/
 
-# Keep these android files (DO NOT ignore)
-# frontend/android/gradle/
-# frontend/android/gradlew
-# frontend/android/gradlew.bat
-# frontend/android/app/src/
--e 
-# Environment files
+# Environment files (keep out of git - contain secrets)
 *.env
 *.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
--e 
-# Environment files
-*.env
-*.env.*
+!*.env.example
+
+# Memory/test files
+/app/memory/
+test_result.md
