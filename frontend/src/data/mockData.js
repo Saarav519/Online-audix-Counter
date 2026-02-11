@@ -235,6 +235,7 @@ export const mockSessions = [
 export const mockSettings = {
   allowNonMasterProducts: false,
   singleSkuScanning: false,
+  allowManualBarcodeEntry: true, // If false, barcodes can only be entered via hardware scanner
   soundEnabled: true,
   autoSubmitOnComplete: false,
   requireAuthForEdit: true,
