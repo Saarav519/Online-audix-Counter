@@ -67,6 +67,42 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 
 ---
 
+## Bug Fixes (February 2026)
+
+### Fix #16: P0 - Submitted Data Not Appearing in Locations/Reports (CRITICAL)
+**Problem**: After scanning items and submitting a location, the data was not appearing in the Locations page or Reports page. This was a critical data loss issue making the app unusable.
+
+**Root Cause**: 
+1. `saveTempLocation` in AppContext.js was initializing `scannedItems[locationId] = []` AFTER items were being added, causing a race condition that wiped out the data.
+2. Multiple individual `addScannedItem` calls could be batched incorrectly by React's state updates.
+
+**Solution**:
+1. Removed the `setScannedItems` initialization from `saveTempLocation` - the location should not initialize empty scanned items since they will be populated by the submit flow
+2. Added new `batchSaveScannedItems` function for atomic batch saving of multiple items at once
+3. Updated `confirmSubmit` in ScanItems.jsx to use `batchSaveScannedItems` instead of individual item adds
+4. Added immediate localStorage sync in batch save for data safety
+
+**Files Changed**: 
+- `/app/frontend/src/context/AppContext.js` - saveTempLocation, batchSaveScannedItems (new)
+- `/app/frontend/src/pages/ScanItems.jsx` - confirmSubmit
+
+**Testing**: PASS - Verified with testing agent that scanned/submitted data now appears correctly in both Locations and Reports pages.
+
+### Fix #17: P1 - Orphaned Data on Location Delete
+**Problem**: When a location was deleted, the associated scanned items were not being removed from localStorage, causing "ghost" items to appear in Reports totals.
+
+**Solution**:
+1. Added immediate localStorage sync in `deleteLocation` function to ensure scanned items are removed atomically
+2. Added immediate localStorage sync in `deleteLocationFromReports` function
+3. Console logging added for debugging data cleanup
+
+**Files Changed**: 
+- `/app/frontend/src/context/AppContext.js` - deleteLocation, deleteLocationFromReports
+
+**Testing**: PASS - Verified with testing agent that deleting a location properly removes it from Reports page.
+
+---
+
 ## Bug Fixes (January 2026)
 
 ### Fix #9: Logo Position and Accidental Click Prevention
