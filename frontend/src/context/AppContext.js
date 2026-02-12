@@ -667,6 +667,13 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const newItems = { ...prev };
       delete newItems[locationId];
+      // Immediately persist to localStorage to prevent orphaned data
+      try {
+        localStorage.setItem('audix_scanned_items', JSON.stringify(newItems));
+        console.log(`🗑️ Deleted scanned items for location ${locationId}`);
+      } catch (e) {
+        console.warn('Failed to sync localStorage after delete:', e);
+      }
       return newItems;
     });
     // Also clear any temp items from localStorage
