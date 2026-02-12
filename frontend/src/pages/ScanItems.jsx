@@ -791,19 +791,10 @@ const ScanItems = () => {
         isMaster: item.isMaster
       }));
       
-      // Direct batch update to scannedItems state
-      // This is done in AppContext via a new batch function or direct manipulation
-      // Using the existing addScannedItem but with immediate localStorage sync
-      itemsToSave.forEach(item => {
-        addScannedItem(finalLocationId, item.barcode, item.quantity, true); // true = forceExactQuantity
-      });
+      // Use batch save for atomic update
+      batchSaveScannedItems(finalLocationId, itemsToSave);
       
-      // Force immediate localStorage sync after all items are added
-      // This ensures data persists even if the app crashes
-      setTimeout(() => {
-        const currentItems = JSON.parse(localStorage.getItem('audix_scanned_items') || '{}');
-        console.log(`✅ Verified ${(currentItems[finalLocationId] || []).length} items saved for location ${finalLocationId}`);
-      }, 100);
+      console.log(`📤 Submitted ${itemsToSave.length} items (${itemsToSave.reduce((s, i) => s + i.quantity, 0)} qty) to location ${finalLocationId}`);
     }
     
     // Submit and lock the location
