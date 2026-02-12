@@ -772,11 +772,28 @@ const ScanItems = () => {
   const confirmSubmit = () => {
     let finalLocationId = selectedLocationId;
     
+    // Check if location exists in the locations array
+    const existingLocationInList = locations.find(l => l.id === selectedLocationId);
+    
     // If this is a temp location (Dynamic mode), save it permanently first
+    // IMPORTANT: Use either tempLocation OR selectedLocation (for cases where tempLocation was lost)
     if (tempLocation && tempLocation.isTemp) {
       const savedLocation = saveTempLocation(tempLocation);
       if (savedLocation) {
         finalLocationId = savedLocation.id;
+        console.log(`✅ Saved temp location: ${savedLocation.name} (${savedLocation.id})`);
+      }
+    } else if (!existingLocationInList && selectedLocation) {
+      // Fallback: If location doesn't exist in list but we have selectedLocation
+      // This handles cases where tempLocation state was lost but selectedLocation is set
+      console.log(`⚠️ Location not in list, creating from selectedLocation: ${selectedLocation.name}`);
+      const savedLocation = saveTempLocation({
+        ...selectedLocation,
+        isTemp: true  // Force it to be treated as temp so it gets saved
+      });
+      if (savedLocation) {
+        finalLocationId = savedLocation.id;
+        console.log(`✅ Created location from selectedLocation: ${savedLocation.name} (${savedLocation.id})`);
       }
     }
     
