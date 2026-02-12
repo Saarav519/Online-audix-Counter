@@ -699,6 +699,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Save a temporary location to permanent state (called during submit)
+  // NOTE: Does NOT initialize scanned items - the caller is responsible for adding items
   const saveTempLocation = (tempLocation) => {
     if (!tempLocation || !tempLocation.isTemp) return tempLocation;
     
@@ -712,7 +713,8 @@ export const AppProvider = ({ children }) => {
       isTemp: false
     };
     setLocations(prev => [...prev, permanentLocation]);
-    setScannedItems(prev => ({ ...prev, [permanentLocation.id]: [] }));
+    // DO NOT initialize scannedItems here - it will be populated by addScannedItem
+    // Initializing to empty array here causes a race condition with addScannedItem
     return permanentLocation;
   };
 
