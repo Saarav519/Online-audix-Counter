@@ -563,8 +563,43 @@ const ScanItems = () => {
   // Handle barcode scan - auto-add when Enter is pressed
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
-      handleScan();
+      // Allow scan if manual entry is enabled OR if it came from hardware scanner
+      if (settings.allowManualBarcodeEntry !== false || inputBufferRef.current.length > 0) {
+        handleScan();
+      }
     }
+  };
+  
+  // Detect fast input (likely from hardware scanner) and process it
+  // This handles scanners that inject text directly into input fields
+  const handleBarcodeInputChange = (e) => {
+    const newValue = e.target.value;
+    const currentTime = Date.now();
+    const timeSinceLastInput = currentTime - lastInputTimeRef.current;
+    lastInputTimeRef.current = currentTime;
+    
+    // If manual entry is allowed, always accept input
+    if (settings.allowManualBarcodeEntry !== false) {
+      setBarcodeInput(newValue);
+      return;
+    }
+    
+    // Manual entry is DISABLED - only accept FAST input (from hardware scanner)
+    // Hardware scanners typically send characters < 50ms apart
+    if (timeSinceLastInput < 50 || inputBufferRef.current.length > 0) {
+      // This is likely scanner input - accept it
+      inputBufferRef.current = newValue;
+      setBarcodeInput(newValue);
+      
+      // Clear buffer after a brief delay (scanner input ends)
+      if (scannerInputTimeoutRef.current) {
+        clearTimeout(scannerInputTimeoutRef.current);
+      }
+      scannerInputTimeoutRef.current = setTimeout(() => {
+        inputBufferRef.current = '';
+      }, 200);
+    }
+    // Slow input (manual typing) - reject when manual entry is disabled
   };
 
   const handleScan = () => {
