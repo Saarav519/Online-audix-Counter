@@ -965,15 +965,9 @@ const ScanItems = () => {
                   ref={barcodeInputRef}
                   placeholder={settings.allowManualBarcodeEntry === false ? "Use scanner..." : "Scan barcode..."}
                   value={barcodeInput}
-                  onChange={(e) => {
-                    // Only allow change if manual entry is enabled OR if it looks like scanner input (fast)
-                    if (settings.allowManualBarcodeEntry !== false) {
-                      setBarcodeInput(e.target.value);
-                    }
-                  }}
+                  onChange={handleBarcodeInputChange}
                   onKeyDown={handleBarcodeKeyDown}
                   disabled={isLocationLocked}
-                  readOnly={settings.allowManualBarcodeEntry === false}
                   className={`h-11 text-base font-mono flex-1 ${settings.allowManualBarcodeEntry === false ? 'bg-slate-50' : ''}`}
                   autoComplete="off"
                   autoFocus
