@@ -131,15 +131,23 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Persist master products (supports 100MB+)
   // Only saves when master products change (not on every scan)
-  // OPTIMIZED: Uses debounced, non-blocking save
+  // CRITICAL: Only saves AFTER IndexedDB has finished loading to prevent data loss
   // ============================================
   const masterProductsInitializedRef = useRef(false);
   const saveTimeoutRef = useRef(null);
   
   useEffect(() => {
-    // Skip first render (initial load from IndexedDB)
+    // SAFETY CHECK 1: Don't save until IndexedDB has finished loading
+    // This prevents race conditions where mock data overwrites real data
+    if (!indexedDBLoadedRef.current) {
+      console.log('⏳ Skipping master products save - IndexedDB not loaded yet');
+      return;
+    }
+    
+    // SAFETY CHECK 2: Skip first render after IndexedDB load
     if (!masterProductsInitializedRef.current) {
       masterProductsInitializedRef.current = true;
+      console.log('⏳ Skipping first master products save after load');
       return;
     }
     
@@ -150,6 +158,7 @@ export const AppProvider = ({ children }) => {
     
     // Save after a short delay to batch multiple changes
     saveTimeoutRef.current = setTimeout(() => {
+      console.log(`💾 Saving ${masterProducts.length} master products to IndexedDB...`);
       // Save to IndexedDB (async, non-blocking)
       MasterProductsDB.importAll(masterProducts)
         .then(() => console.log('✅ Master products saved to IndexedDB'))
