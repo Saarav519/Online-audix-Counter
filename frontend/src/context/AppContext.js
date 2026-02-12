@@ -825,18 +825,44 @@ export const AppProvider = ({ children }) => {
   // Save a temporary location to permanent state (called during submit)
   // NOTE: Does NOT initialize scanned items - the caller is responsible for adding items
   const saveTempLocation = (tempLocation) => {
-    if (!tempLocation || !tempLocation.isTemp) return tempLocation;
+    if (!tempLocation) {
+      console.warn('⚠️ saveTempLocation called with null/undefined location');
+      return null;
+    }
     
-    // Check if location already exists (by code)
-    const existing = findLocationByCode(tempLocation.code);
-    if (existing) return existing;
+    // Check if location already exists (by code OR by ID)
+    const existingByCode = findLocationByCode(tempLocation.code);
+    const existingById = locations.find(l => l.id === tempLocation.id);
+    
+    if (existingByCode) {
+      console.log(`✅ Location already exists by code: ${existingByCode.name} (${existingByCode.id})`);
+      return existingByCode;
+    }
+    
+    if (existingById) {
+      console.log(`✅ Location already exists by ID: ${existingById.name} (${existingById.id})`);
+      return existingById;
+    }
     
     // Create permanent location from temp
     const permanentLocation = {
       ...tempLocation,
       isTemp: false
     };
+    
+    console.log(`📍 Creating permanent location: ${permanentLocation.name} (${permanentLocation.id})`);
     setLocations(prev => [...prev, permanentLocation]);
+    
+    // Also persist to localStorage immediately
+    try {
+      const currentLocations = JSON.parse(localStorage.getItem('audix_locations') || '[]');
+      currentLocations.push(permanentLocation);
+      localStorage.setItem('audix_locations', JSON.stringify(currentLocations));
+      console.log(`💾 Immediately persisted location to localStorage`);
+    } catch (e) {
+      console.warn('Failed to persist location to localStorage:', e);
+    }
+    
     // DO NOT initialize scannedItems here - it will be populated by addScannedItem
     // Initializing to empty array here causes a race condition with addScannedItem
     return permanentLocation;
