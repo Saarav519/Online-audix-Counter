@@ -118,7 +118,8 @@ const ScanItems = () => {
     locations, 
     scannedItems, 
     settings,
-    addScannedItem, 
+    addScannedItem,
+    batchSaveScannedItems, // For reliable batch submit
     deleteScannedItem,
     updateItemQuantity,
     submitLocation,
