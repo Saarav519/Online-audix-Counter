@@ -178,6 +178,11 @@ const ScanItems = () => {
   const quantityInputRef2 = useRef(quantityInput);
   const lastScanTimeRef = useRef(0);
   const scanResultTimeoutRef = useRef(null);
+  
+  // Ref to track if input is from hardware scanner (fast input)
+  const lastInputTimeRef = useRef(0);
+  const inputBufferRef = useRef('');
+  const scannerInputTimeoutRef = useRef(null);
 
   // Persist current location to localStorage whenever it changes
   useEffect(() => {
