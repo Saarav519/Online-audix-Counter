@@ -480,6 +480,14 @@ COLD-01,Cold Storage Unit 1`;
                               </>
                             )}
                           </DropdownMenuItem>
+                          {/* Rename option - always available */}
+                          <DropdownMenuItem 
+                            onClick={() => handleRenameRequest(location)}
+                            className="text-blue-600 focus:text-blue-600 focus:bg-blue-50"
+                          >
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Rename
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {!location.isSubmitted && stats.totalItems > 0 && (
                             <>
