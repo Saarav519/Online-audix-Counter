@@ -605,6 +605,8 @@ export const AppProvider = ({ children }) => {
       delete newItems[locationId];
       return newItems;
     });
+    // Also clear any temp items from localStorage
+    localStorage.removeItem(`audix_temp_items_${locationId}`);
   };
 
   // Delete location from reports - also removes from Locations if no scanned items
@@ -619,6 +621,9 @@ export const AppProvider = ({ children }) => {
     // Then, remove the location from the locations list
     // (since reports are tied to locations, deleting from reports means deleting the location)
     setLocations(prev => prev.filter(loc => loc.id !== locationId));
+    
+    // Also clear any temp items from localStorage
+    localStorage.removeItem(`audix_temp_items_${locationId}`);
   };
 
   // Clear scanned items for a location (keeps the location, removes items)
