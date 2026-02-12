@@ -770,46 +770,11 @@ export const AppProvider = ({ children }) => {
   // Create a temporary location object WITHOUT saving to state
   // Used in Dynamic mode - location is only saved when items are submitted
   const createTempLocation = (scannedCode) => {
-    // Generate a readable location name from the scanned code
-    // Format: "Location [CODE]" to distinguish from product barcodes
-    const generateLocationName = (code) => {
-      // If the code looks like a barcode (all digits, 8+ characters), format it nicely
-      if (/^\d{8,}$/.test(code)) {
-        return `Location ${code}`;
-      }
-      // If code has common prefixes like WH, LOC, ZONE, etc., capitalize properly
-      const upperCode = code.toUpperCase();
-      if (upperCode.startsWith('WH-') || upperCode.startsWith('WH_')) {
-        return `Warehouse ${code.substring(3)}`;
-      }
-      if (upperCode.startsWith('LOC-') || upperCode.startsWith('LOC_')) {
-        return `Location ${code.substring(4)}`;
-      }
-      if (upperCode.startsWith('ZONE-') || upperCode.startsWith('ZONE_')) {
-        return `Zone ${code.substring(5)}`;
-      }
-      if (upperCode.startsWith('AREA-') || upperCode.startsWith('AREA_')) {
-        return `Area ${code.substring(5)}`;
-      }
-      if (upperCode.startsWith('RACK-') || upperCode.startsWith('RACK_')) {
-        return `Rack ${code.substring(5)}`;
-      }
-      if (upperCode.startsWith('SHELF-') || upperCode.startsWith('SHELF_')) {
-        return `Shelf ${code.substring(6)}`;
-      }
-      if (upperCode.startsWith('BIN-') || upperCode.startsWith('BIN_')) {
-        return `Bin ${code.substring(4)}`;
-      }
-      if (upperCode.startsWith('STORE-') || upperCode.startsWith('STORE_')) {
-        return `Store ${code.substring(6)}`;
-      }
-      // For other codes, just prefix with "Location"
-      return `Location ${code}`;
-    };
-
+    // Use the scanned code directly as the location name
+    // No prefix added - the name will be exactly what the user scanned
     return {
       id: `loc_temp_${Date.now()}`,
-      name: generateLocationName(scannedCode),
+      name: scannedCode,  // Use scanned code as name directly
       code: scannedCode,
       status: 'active',
       itemCount: 0,
