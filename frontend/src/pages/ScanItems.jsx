@@ -778,9 +778,11 @@ const ScanItems = () => {
     }
     
     // Save all temp items to context (this persists to localStorage)
+    // IMPORTANT: Use forceExactQuantity=true to preserve the exact quantity from temp items
+    // Without this, Single SKU mode would reset quantities to 1
     if (tempScannedItems.length > 0) {
       tempScannedItems.forEach(item => {
-        addScannedItem(finalLocationId, item.barcode, item.quantity);
+        addScannedItem(finalLocationId, item.barcode, item.quantity, true); // true = forceExactQuantity
       });
     }
     
