@@ -37,8 +37,42 @@ export const AppProvider = ({ children }) => {
   const indexedDBLoadedRef = useRef(false);
   
   // Load scanned items from localStorage or use mock data
+  // Also cleanup orphaned items (items for locations that no longer exist)
   const [scannedItems, setScannedItems] = useState(() => {
     const savedItems = localStorage.getItem('audix_scanned_items');
+    const savedLocations = localStorage.getItem('audix_locations');
+    
+    if (savedItems && savedLocations) {
+      try {
+        const items = JSON.parse(savedItems);
+        const locs = JSON.parse(savedLocations);
+        const locationIds = new Set(locs.map(l => l.id));
+        
+        // Remove scanned items for locations that no longer exist
+        const cleanedItems = {};
+        let orphanedCount = 0;
+        
+        Object.entries(items).forEach(([locId, locItems]) => {
+          if (locationIds.has(locId)) {
+            cleanedItems[locId] = locItems;
+          } else {
+            orphanedCount += (locItems?.length || 0);
+          }
+        });
+        
+        if (orphanedCount > 0) {
+          console.log(`🧹 Cleaned up ${orphanedCount} orphaned scanned items`);
+          // Save cleaned data back to localStorage
+          localStorage.setItem('audix_scanned_items', JSON.stringify(cleanedItems));
+        }
+        
+        return cleanedItems;
+      } catch (e) {
+        console.warn('Failed to parse saved items:', e);
+        return mockScannedItems;
+      }
+    }
+    
     return savedItems ? JSON.parse(savedItems) : mockScannedItems;
   });
   
