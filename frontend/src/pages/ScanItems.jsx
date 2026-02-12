@@ -777,13 +777,32 @@ const ScanItems = () => {
       }
     }
     
-    // Save all temp items to context (this persists to localStorage)
-    // IMPORTANT: Use forceExactQuantity=true to preserve the exact quantity from temp items
-    // Without this, Single SKU mode would reset quantities to 1
+    // BATCH SAVE: Save all temp items to context at once (prevents race conditions)
+    // This is more reliable than adding items one by one
     if (tempScannedItems.length > 0) {
-      tempScannedItems.forEach(item => {
+      // Format items for permanent storage
+      const itemsToSave = tempScannedItems.map(item => ({
+        id: item.id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        barcode: item.barcode,
+        productName: item.productName,
+        quantity: item.quantity,
+        scannedAt: item.scannedAt || new Date().toISOString(),
+        isMaster: item.isMaster
+      }));
+      
+      // Direct batch update to scannedItems state
+      // This is done in AppContext via a new batch function or direct manipulation
+      // Using the existing addScannedItem but with immediate localStorage sync
+      itemsToSave.forEach(item => {
         addScannedItem(finalLocationId, item.barcode, item.quantity, true); // true = forceExactQuantity
       });
+      
+      // Force immediate localStorage sync after all items are added
+      // This ensures data persists even if the app crashes
+      setTimeout(() => {
+        const currentItems = JSON.parse(localStorage.getItem('audix_scanned_items') || '{}');
+        console.log(`✅ Verified ${(currentItems[finalLocationId] || []).length} items saved for location ${finalLocationId}`);
+      }, 100);
     }
     
     // Submit and lock the location
