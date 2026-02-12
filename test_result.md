@@ -125,7 +125,7 @@ backend:
         comment: "✅ Comprehensive backend verification completed. All API endpoints tested: GET /api/ (root), POST /api/status (create), GET /api/status (retrieve). MongoDB integration working. Data persistence verified. Backend ready to support frontend operations."
       - working: true
         agent: "testing"
-        comment: "✅ Re-verified all backend API endpoints as per user request. All endpoints working perfectly: GET /api/ returns 'Hello World', POST /api/status creates records with UUID and timestamp, GET /api/status retrieves all records. Data persistence confirmed through both Python requests and curl commands. Backend URL: https://audix-stock-fix.preview.emergentagent.com/api"
+        comment: "✅ Re-verified all backend API endpoints as per user request. All endpoints working perfectly: GET /api/ returns 'Hello World', POST /api/status creates records with UUID and timestamp, GET /api/status retrieves all records. Data persistence confirmed through both Python requests and curl commands. Backend URL: https://counter-sandbox.preview.emergentagent.com/api"
 
 frontend:
   - task: "Pre-Assigned Mode Location List Scrolling"
@@ -410,7 +410,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://audix-stock-fix.preview.emergentagent.com/api
+      - Backend URL: https://counter-sandbox.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
@@ -443,7 +443,7 @@ agent_communication:
       - ✅ MongoDB integration: Working correctly
       - ✅ CORS configuration: Properly configured
       
-      🌐 BACKEND URL VERIFIED: https://audix-stock-fix.preview.emergentagent.com/api
+      🌐 BACKEND URL VERIFIED: https://counter-sandbox.preview.emergentagent.com/api
       
       📝 TECHNICAL DETAILS:
       - FastAPI server running on proper port with supervisor
