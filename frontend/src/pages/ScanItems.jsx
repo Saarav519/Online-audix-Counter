@@ -157,13 +157,71 @@ const ScanItems = () => {
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false); // Back confirmation dialog
   
   // ============================================
-  // TEMPORARY SCANNED ITEMS - Not saved until Submit
-  // This ensures data is only saved when user clicks "Submit Location"
+  // TEMPORARY SCANNED ITEMS - Auto-saved to localStorage for persistence
+  // Final save to context happens when user clicks "Submit Location"
   // ============================================
   const [tempScannedItems, setTempScannedItems] = useState([]);
   
   // Temporary location for Dynamic mode - only saved when items are submitted
   const [tempLocation, setTempLocation] = useState(null);
+  
+  // ============================================
+  // AUTO-SAVE: Persist temp items to localStorage whenever they change
+  // This prevents data loss when navigating away
+  // ============================================
+  useEffect(() => {
+    if (selectedLocationId && tempScannedItems.length > 0) {
+      const key = `audix_temp_items_${selectedLocationId}`;
+      localStorage.setItem(key, JSON.stringify(tempScannedItems));
+      console.log(`💾 Auto-saved ${tempScannedItems.length} items for location ${selectedLocationId}`);
+    }
+  }, [tempScannedItems, selectedLocationId]);
+  
+  // ============================================
+  // LOAD: Load existing temp items when a location is selected
+  // ============================================
+  useEffect(() => {
+    if (selectedLocationId) {
+      // First, try to load temp items from localStorage (unsaved scanning session)
+      const key = `audix_temp_items_${selectedLocationId}`;
+      const savedTempItems = localStorage.getItem(key);
+      
+      if (savedTempItems) {
+        try {
+          const items = JSON.parse(savedTempItems);
+          if (Array.isArray(items) && items.length > 0) {
+            setTempScannedItems(items);
+            console.log(`📥 Loaded ${items.length} temp items for location ${selectedLocationId}`);
+            return; // Don't load from context if we have temp items
+          }
+        } catch (e) {
+          console.warn('Failed to parse saved temp items:', e);
+        }
+      }
+      
+      // If no temp items, check if this location has submitted items in context
+      // and load them for editing (if location is not locked)
+      const existingItems = scannedItems[selectedLocationId];
+      const location = locations.find(l => l.id === selectedLocationId);
+      
+      if (existingItems && existingItems.length > 0 && !location?.isSubmitted) {
+        // Convert context items to temp format for editing
+        const tempFormat = existingItems.map(item => ({
+          id: item.id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          barcode: item.barcode,
+          productName: item.productName || `Unknown (${item.barcode.slice(-6)})`,
+          quantity: item.quantity,
+          scannedAt: item.scannedAt || new Date().toISOString(),
+          isMaster: item.isMaster
+        }));
+        setTempScannedItems(tempFormat);
+        console.log(`📥 Loaded ${tempFormat.length} existing items for location ${selectedLocationId}`);
+      }
+    } else {
+      // Clear temp items when no location is selected
+      setTempScannedItems([]);
+    }
+  }, [selectedLocationId, scannedItems, locations]);
   
   const locationInputRef = useRef(null);
   const barcodeInputRef = useRef(null);
