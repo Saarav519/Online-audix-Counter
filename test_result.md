@@ -223,16 +223,38 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Sample CSV Download - Master Data Products"
-    - "Sample CSV Download - Authorization Users"
-    - "Sample CSV Download - Locations"
-    - "Master Data Export CSV"
-    - "Reports Export CSV"
+    - "Master Data Persistence Fix"
+    - "Allow Manual Barcode Entry Setting Fix"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      Fixed two issues reported by user:
+      
+      1. ✅ Master Data Reduces Automatically - FIXED
+         - Root cause: Race condition in auto-save could overwrite data before IndexedDB finished loading
+         - Added `indexedDBLoadedRef` flag to prevent auto-save until IndexedDB load completes
+         - Added safety checks in save effect to only save AFTER successful load
+         - Added console logs for debugging save operations
+         
+      2. ✅ Allow Manual Barcode Entry Setting - FIXED
+         - Root cause: When disabled, the input was set to readOnly which blocked some scanner types
+         - Now detects hardware scanner input by timing (fast input < 50ms = scanner)
+         - Hardware scanner input is ALWAYS accepted, even when manual entry is disabled
+         - Manual typing is rejected when setting is off
+         - Removed readOnly attribute that was blocking some scanner modes
+         
+      Files modified:
+      - /app/frontend/src/context/AppContext.js - Master data persistence fix
+      - /app/frontend/src/pages/ScanItems.jsx - Scanner input detection
+      
+      The "Allow Manual Barcode Entry" setting now works correctly:
+      - ON: Both manual typing AND hardware scanner work
+      - OFF: Only hardware scanner works, manual typing is blocked
+      
   - agent: "main"
     message: |
       Implemented 3 layout changes as requested by user:
