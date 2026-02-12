@@ -151,6 +151,22 @@ const Locations = () => {
     setSelectedLocation(null);
   };
 
+  // Handle rename location
+  const handleRenameRequest = (location) => {
+    setSelectedLocation(location);
+    setNewLocationName(location.name);
+    setShowRenameModal(true);
+  };
+
+  const handleRenameConfirm = () => {
+    if (newLocationName.trim()) {
+      renameLocation(selectedLocation.id, newLocationName.trim());
+      setShowRenameModal(false);
+      setSelectedLocation(null);
+      setNewLocationName('');
+    }
+  };
+
   const handleAuthSubmit = () => {
     // Use authorization credentials for reopen/delete actions
     const result = verifyAuthorizationCredentials(authCredentials.userId, authCredentials.password);
