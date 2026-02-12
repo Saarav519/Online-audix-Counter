@@ -373,10 +373,15 @@ const ScanItems = () => {
     ));
   }, []);
   
-  // Clear all temp items
+  // Clear all temp items (including from localStorage)
   const clearTempItems = useCallback(() => {
+    if (selectedLocationId) {
+      const key = `audix_temp_items_${selectedLocationId}`;
+      localStorage.removeItem(key);
+      console.log(`🗑️ Cleared temp items for location ${selectedLocationId}`);
+    }
     setTempScannedItems([]);
-  }, []);
+  }, [selectedLocationId]);
 
   // HIGH-PERFORMANCE Hardware scanner callback
   // Uses refs instead of state to avoid re-render delays during fast scanning
