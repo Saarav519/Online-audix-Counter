@@ -226,8 +226,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Master Data Persistence Fix"
-    - "Allow Manual Barcode Entry Setting Fix"
+    - "Dynamic Mode Location Submission Issue"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
