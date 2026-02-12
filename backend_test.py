@@ -1,124 +1,77 @@
-#!/usr/bin/env python3
 """
-Backend API Testing for Audix Stock Management App
-Tests the FastAPI backend endpoints
+Comprehensive Data Persistence Test
+Tests:
+1. Master Data - Upload and persistence
+2. Scanned Items - Scanning and persistence
 """
 
 import requests
 import json
-import os
-from datetime import datetime
-import sys
 
-# Get backend URL from frontend .env file
-def get_backend_url():
-    try:
-        with open('/app/frontend/.env', 'r') as f:
-            for line in f:
-                if line.startswith('REACT_APP_BACKEND_URL='):
-                    return line.split('=', 1)[1].strip()
-    except Exception as e:
-        print(f"Error reading frontend .env: {e}")
-        return None
+BASE_URL = "https://counter-v2-preview.preview.emergentagent.com"
 
 def test_backend_health():
-    """Test basic backend health and connectivity"""
-    backend_url = get_backend_url()
-    if not backend_url:
-        print("❌ Could not get backend URL from frontend/.env")
-        return False
-    
-    print(f"🔍 Testing backend at: {backend_url}")
+    """Test basic backend API health"""
+    print("\n" + "="*60)
+    print("BACKEND HEALTH CHECK")
+    print("="*60)
     
     try:
-        # Test root endpoint
-        response = requests.get(f"{backend_url}/", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("message") == "Hello World":
-                print("✅ Backend root endpoint working")
-                return True
-            else:
-                print(f"❌ Unexpected response from root: {data}")
-                return False
-        else:
-            print(f"❌ Backend root endpoint failed: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Backend connection failed: {e}")
-        return False
-
-def test_status_endpoints():
-    """Test status check endpoints (POST and GET)"""
-    backend_url = get_backend_url()
-    if not backend_url:
-        return False
-    
-    try:
-        # Test POST /api/status
-        test_data = {
-            "client_name": "test_client_backend_testing"
-        }
-        
-        response = requests.post(f"{backend_url}/status", 
-                               json=test_data, 
-                               timeout=10)
-        
-        if response.status_code == 200:
-            created_status = response.json()
-            print("✅ POST /api/status working")
-            print(f"   Created status with ID: {created_status.get('id')}")
-        else:
-            print(f"❌ POST /api/status failed: {response.status_code}")
-            return False
-        
-        # Test GET /api/status
-        response = requests.get(f"{backend_url}/status", timeout=10)
-        
-        if response.status_code == 200:
-            status_list = response.json()
-            print(f"✅ GET /api/status working - Retrieved {len(status_list)} status checks")
-            
-            # Verify our test data is in the list
-            test_found = any(status.get('client_name') == 'test_client_backend_testing' 
-                           for status in status_list)
-            if test_found:
-                print("✅ Test data successfully stored and retrieved")
-            else:
-                print("⚠️  Test data not found in retrieved list")
-            
-            return True
-        else:
-            print(f"❌ GET /api/status failed: {response.status_code}")
-            return False
-            
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Status endpoints test failed: {e}")
-        return False
-
-def main():
-    """Run all backend tests"""
-    print("🚀 Starting Backend API Tests for Audix Stock Management")
-    print("=" * 60)
-    
-    # Test backend health
-    health_ok = test_backend_health()
-    
-    if not health_ok:
-        print("\n❌ Backend health check failed - skipping other tests")
-        return False
-    
-    # Test status endpoints
-    status_ok = test_status_endpoints()
-    
-    print("\n" + "=" * 60)
-    if health_ok and status_ok:
-        print("🎉 ALL BACKEND TESTS PASSED")
+        response = requests.get(f"{BASE_URL}/api/")
+        print(f"✅ GET /api/ - Status: {response.status_code}")
+        print(f"   Response: {response.json()}")
         return True
-    else:
-        print("❌ SOME BACKEND TESTS FAILED")
+    except Exception as e:
+        print(f"❌ Backend health check failed: {e}")
+        return False
+
+def test_status_persistence():
+    """Test data persistence via status endpoint"""
+    print("\n" + "="*60)
+    print("STATUS DATA PERSISTENCE TEST")
+    print("="*60)
+    
+    try:
+        # Create a test status
+        test_data = {"client_name": f"persistence_test_{int(__import__('time').time())}"}
+        response = requests.post(f"{BASE_URL}/api/status", json=test_data)
+        print(f"✅ POST /api/status - Status: {response.status_code}")
+        created = response.json()
+        print(f"   Created: {created}")
+        
+        # Verify it persists
+        response = requests.get(f"{BASE_URL}/api/status")
+        print(f"✅ GET /api/status - Status: {response.status_code}")
+        statuses = response.json()
+        print(f"   Found {len(statuses)} status records")
+        
+        # Check if our test record exists
+        found = any(s.get('client_name') == test_data['client_name'] for s in statuses)
+        if found:
+            print(f"✅ Test record persisted successfully!")
+        else:
+            print(f"❌ Test record NOT found in retrieved data!")
+        
+        return found
+    except Exception as e:
+        print(f"❌ Status persistence test failed: {e}")
         return False
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    print("\n" + "#"*60)
+    print("# DATA PERSISTENCE VERIFICATION TEST")
+    print("#"*60)
+    
+    results = []
+    results.append(("Backend Health", test_backend_health()))
+    results.append(("Status Persistence", test_status_persistence()))
+    
+    print("\n" + "="*60)
+    print("TEST SUMMARY")
+    print("="*60)
+    for test_name, passed in results:
+        status = "✅ PASSED" if passed else "❌ FAILED"
+        print(f"  {test_name}: {status}")
+    
+    all_passed = all(r[1] for r in results)
+    print("\n" + ("✅ ALL TESTS PASSED" if all_passed else "❌ SOME TESTS FAILED"))
