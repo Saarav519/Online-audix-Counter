@@ -164,7 +164,33 @@ const ScanItems = () => {
   const [tempScannedItems, setTempScannedItems] = useState([]);
   
   // Temporary location for Dynamic mode - only saved when items are submitted
-  const [tempLocation, setTempLocation] = useState(null);
+  // Initialize from localStorage if available (to survive page refreshes/re-renders)
+  const [tempLocation, setTempLocation] = useState(() => {
+    const savedTempLocation = localStorage.getItem('audix_temp_location');
+    if (savedTempLocation) {
+      try {
+        const parsed = JSON.parse(savedTempLocation);
+        console.log(`📍 Restored temp location from localStorage: ${parsed.name}`);
+        return parsed;
+      } catch (e) {
+        console.warn('Failed to parse saved temp location:', e);
+      }
+    }
+    return null;
+  });
+  
+  // ============================================
+  // AUTO-SAVE: Persist temp location to localStorage whenever it changes
+  // This prevents data loss when component re-renders
+  // ============================================
+  useEffect(() => {
+    if (tempLocation) {
+      localStorage.setItem('audix_temp_location', JSON.stringify(tempLocation));
+      console.log(`📍 Saved temp location to localStorage: ${tempLocation.name}`);
+    } else {
+      localStorage.removeItem('audix_temp_location');
+    }
+  }, [tempLocation]);
   
   // ============================================
   // AUTO-SAVE: Persist temp items to localStorage whenever they change
