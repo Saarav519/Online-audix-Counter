@@ -352,9 +352,11 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 
 ## Prioritized Backlog
 
-### P0 - Critical (Current)
+### P0 - Critical (Completed Feb 2026)
 - [x] Pre-Assigned Mode Navigation Fix
 - [x] Scan Items Visibility Control
+- [x] Fix: Submitted data not appearing in Locations/Reports
+- [x] Fix: Orphaned data on location delete
 
 ### P1 - Backend Integration (Next)
 - [ ] Create API contracts document
@@ -377,5 +379,5 @@ Build a web clone of the "Stock Count: Stock Take Opname" mobile app named "Audi
 ---
 
 ## Known Limitations
-- **Data**: All data is currently mocked client-side (localStorage)
-- **Backend**: Not yet implemented - no persistent storage
+- **Data**: All data is currently mocked client-side (localStorage/IndexedDB)
+- **Backend**: Not yet implemented - no persistent server-side storage
