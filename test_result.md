@@ -103,10 +103,11 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Problems Faced in Pre-Assigned & Reports Modules:
-  1. Pre-Assigned Mode Location Scroll Issue - Horizontal and vertical scrolling not working
-  2. Sample Download & Data Export Not Working - Sample files not downloading, exports not working
-  3. Reports Location-Wise Export Not Working - Single and multiple location export not working
+  Dynamic Mode Location Submission Issue:
+  When users submit scanned items in Dynamic Mode, the location is not being saved to the locations list, even though the scanned items are saved. 
+  Test Steps: 1) Login with admin/admin123, 2) Navigate to Scan Items, 3) Enter NEW location code (e.g., "TEST-LOCATION-XYZ"), 4) Scan product barcodes, 5) Submit Location
+  Expected: Location should appear in both Locations and Reports pages with correct quantity
+  Actual: Location not visible after submission
 
 backend:
   - task: "Backend API health check"
