@@ -337,7 +337,7 @@ export const AppProvider = ({ children }) => {
   // Add scanned item to location - OPTIMIZED FOR FAST SCANNING
   // Uses Map lookup O(1) instead of array.find O(n) for master product search
   // When duplicate barcode is scanned, it moves to the END of array (appears at TOP when reversed)
-  const addScannedItem = useCallback((locationId, barcode, quantity = 1) => {
+  const addScannedItem = useCallback((locationId, barcode, quantity = 1, forceExactQuantity = false) => {
     // O(1) lookup using Map instead of O(n) array.find
     const product = masterProductMap.get(barcode);
     const isValidBarcode = product !== undefined;
@@ -353,6 +353,32 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const locationItems = prev[locationId] || [];
       const existingIndex = locationItems.findIndex(item => item.barcode === barcode);
+
+      // forceExactQuantity: Used when submitting/importing - sets exact quantity instead of incrementing
+      if (forceExactQuantity) {
+        if (existingIndex !== -1) {
+          // Update existing item with exact quantity
+          const existingItem = locationItems[existingIndex];
+          const filteredItems = locationItems.filter((_, idx) => idx !== existingIndex);
+          newItem = {
+            ...existingItem,
+            quantity: quantity, // SET exact quantity, don't add
+            scannedAt: new Date().toISOString()
+          };
+          return { ...prev, [locationId]: [...filteredItems, newItem] };
+        } else {
+          // Add new item with exact quantity
+          newItem = {
+            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            barcode,
+            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
+            quantity: quantity, // Use exact quantity
+            scannedAt: new Date().toISOString(),
+            isMaster: !!product
+          };
+          return { ...prev, [locationId]: [...locationItems, newItem] };
+        }
+      }
 
       if (settings.singleSkuScanning) {
         // Single SKU Mode: 
