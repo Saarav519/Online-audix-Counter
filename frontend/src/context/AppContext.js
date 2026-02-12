@@ -52,6 +52,7 @@ export const AppProvider = ({ children }) => {
 
   // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
+  // CRITICAL: This must complete BEFORE any auto-save can run
   // ============================================
   useEffect(() => {
     const loadMasterProducts = async () => {
@@ -63,6 +64,7 @@ export const AppProvider = ({ children }) => {
         } else {
           // First time - save mock data to IndexedDB
           await MasterProductsDB.importAll(mockMasterProducts);
+          setMasterProducts(mockMasterProducts);
           console.log('✅ Initialized IndexedDB with mock master products');
         }
       } catch (err) {
@@ -73,7 +75,10 @@ export const AppProvider = ({ children }) => {
           setMasterProducts(JSON.parse(saved));
         }
       } finally {
+        // Mark IndexedDB as loaded - NOW auto-save is allowed
+        indexedDBLoadedRef.current = true;
         setIsLoadingMasterData(false);
+        console.log('✅ IndexedDB load complete, auto-save enabled');
       }
     };
     
