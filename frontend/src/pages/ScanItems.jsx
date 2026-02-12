@@ -850,8 +850,11 @@ const ScanItems = () => {
     clearTempItems();
     setTempLocation(null);
     
-    // Clear the current scan location from localStorage since it's submitted
+    // Clear the current scan location and temp location from localStorage since it's submitted
     localStorage.removeItem('audix_current_scan_location');
+    localStorage.removeItem('audix_temp_location');
+    // Also clear temp items for this location
+    localStorage.removeItem(`audix_temp_items_${selectedLocationId}`);
     
     // Check if we're in Pre-Assigned mode
     if (settings.locationScanMode === 'preassigned') {
