@@ -72,8 +72,10 @@ const Locations = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showRenameModal, setShowRenameModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [newLocation, setNewLocation] = useState({ name: '', code: '' });
+  const [newLocationName, setNewLocationName] = useState('');
   const [authCredentials, setAuthCredentials] = useState({ userId: '', password: '' });
   const [authError, setAuthError] = useState('');
   const [pendingAction, setPendingAction] = useState(null);
