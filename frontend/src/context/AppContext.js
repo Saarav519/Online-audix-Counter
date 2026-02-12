@@ -987,6 +987,7 @@ export const AppProvider = ({ children }) => {
     scanLocation,
     createLocationFromScan,
     saveTempLocation,
+    renameLocation, // Rename a location
     importAssignedLocations,
     clearAssignedLocations,
     addMasterProduct,
