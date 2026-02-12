@@ -60,7 +60,8 @@ const Locations = () => {
     addLocation, 
     deleteLocation, 
     submitLocation, 
-    reopenLocation, 
+    reopenLocation,
+    renameLocation,
     importAssignedLocations,
     clearAssignedLocations,
     verifyAuthorizationCredentials 
