@@ -621,6 +621,15 @@ export const AppProvider = ({ children }) => {
     return newLocation;
   };
 
+  // Rename a location
+  const renameLocation = (locationId, newName) => {
+    setLocations(prev => prev.map(loc =>
+      loc.id === locationId
+        ? { ...loc, name: newName, lastUpdated: new Date().toISOString() }
+        : loc
+    ));
+  };
+
   // Import assigned locations (for Pre-Assigned mode)
   const importAssignedLocations = (locationsData) => {
     const newLocations = locationsData.map((loc, index) => ({
