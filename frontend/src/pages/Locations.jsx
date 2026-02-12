@@ -41,7 +41,8 @@ import {
   AlertCircle,
   Download,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Edit3
 } from 'lucide-react';
 import {
   DropdownMenu,
