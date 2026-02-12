@@ -1300,14 +1300,9 @@ const ScanItems = () => {
                     ref={barcodeInputRef}
                     placeholder={!selectedLocationId ? "Select location first" : settings.allowManualBarcodeEntry === false ? "Use scanner..." : "Scan barcode here..."}
                     value={barcodeInput}
-                    onChange={(e) => {
-                      if (settings.allowManualBarcodeEntry !== false) {
-                        setBarcodeInput(e.target.value);
-                      }
-                    }}
+                    onChange={handleBarcodeInputChange}
                     onKeyDown={handleBarcodeKeyDown}
                     disabled={!selectedLocationId || isLocationLocked}
-                    readOnly={settings.allowManualBarcodeEntry === false}
                     className={`h-12 text-lg font-mono flex-1 ${settings.allowManualBarcodeEntry === false ? 'bg-slate-50' : ''}`}
                     autoComplete="off"
                   />
