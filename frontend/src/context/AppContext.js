@@ -32,6 +32,10 @@ export const AppProvider = ({ children }) => {
   const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
   const [isLoadingMasterData, setIsLoadingMasterData] = useState(true);
   
+  // FLAG: Prevent auto-save until IndexedDB has finished loading
+  // This prevents race conditions where mock data could overwrite real data
+  const indexedDBLoadedRef = useRef(false);
+  
   // Load scanned items from localStorage or use mock data
   const [scannedItems, setScannedItems] = useState(() => {
     const savedItems = localStorage.getItem('audix_scanned_items');
