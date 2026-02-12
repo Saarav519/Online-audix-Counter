@@ -412,11 +412,15 @@ COLD-01,Cold Storage Unit 1`;
                         )}
                       </div>
                       
-                      {/* Location Name Only - Clean View */}
+                      {/* Location Name & Code - Show both for clarity */}
                       <div className="min-w-0 flex-1">
                         <span className="font-semibold text-slate-800 text-sm truncate block">
                           {location.name || location.code}
                         </span>
+                        {/* Show code below if different from name, or show "Dynamic" label */}
+                        {location.autoCreated && (
+                          <span className="text-xs text-purple-500 font-medium">Dynamic Location</span>
+                        )}
                       </div>
                     </div>
                     
