@@ -692,13 +692,10 @@ export const AppProvider = ({ children }) => {
   // DIRECT SET: Used by import to set all products at once (bypasses useEffect save)
   // Products are already saved to IndexedDB by the import function
   const setMasterProductsDirect = (products) => {
-    // Skip the IndexedDB save since products are already saved
-    masterProductsInitializedRef.current = false; // Prevent double-save
+    // Mark as already saved to prevent duplicate save
+    // The import function already saved to IndexedDB
+    console.log(`📥 Direct setting ${products.length} master products (already saved to IndexedDB)`);
     setMasterProducts(products);
-    // Re-enable auto-save after state update
-    setTimeout(() => {
-      masterProductsInitializedRef.current = true;
-    }, 100);
   };
 
   // Import master products from CSV data - replaces old data
