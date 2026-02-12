@@ -290,8 +290,10 @@ const ScanItems = () => {
     quantityInputRef2.current = quantityInput;
   }, [quantityInput]);
 
-  const selectedLocation = locations.find(l => l.id === selectedLocationId);
-  const isLocationLocked = selectedLocation?.isSubmitted;
+  const existingLocation = locations.find(l => l.id === selectedLocationId);
+  // Use existing location if found, otherwise use temp location (for new dynamic locations)
+  const selectedLocation = existingLocation || tempLocation;
+  const isLocationLocked = existingLocation?.isSubmitted;
 
   // Single SKU mode: scanning only, no manual qty
   // Non-Single SKU mode: manual qty entry allowed
