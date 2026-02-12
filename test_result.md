@@ -385,7 +385,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://counter-ui.preview.emergentagent.com/api
+      - Backend URL: https://counter-v2-preview.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
