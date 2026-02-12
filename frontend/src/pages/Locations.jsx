@@ -855,6 +855,55 @@ COLD-01,Cold Storage Unit 1`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename Location Modal */}
+      <Dialog open={showRenameModal} onOpenChange={setShowRenameModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="w-5 h-5 text-blue-600" />
+              Rename Location
+            </DialogTitle>
+            <DialogDescription>
+              Enter a new name for this location
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-500">Current Name</p>
+              <p className="font-medium text-slate-800">{selectedLocation?.name}</p>
+              <p className="text-xs text-slate-400 mt-1">Code: {selectedLocation?.code}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-name">New Location Name</Label>
+              <Input
+                id="new-name"
+                placeholder="Enter new location name"
+                value={newLocationName}
+                onChange={(e) => setNewLocationName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleRenameConfirm()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRenameModal(false);
+              setSelectedLocation(null);
+              setNewLocationName('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRenameConfirm} 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={!newLocationName.trim() || newLocationName.trim() === selectedLocation?.name}
+            >
+              <Edit3 className="w-4 h-4 mr-2" />
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
