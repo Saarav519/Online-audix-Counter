@@ -949,6 +949,7 @@ export const AppProvider = ({ children }) => {
     verifyAuthorizationCredentials,
     updateUserCredentials,
     addScannedItem,
+    batchSaveScannedItems, // Batch save for multiple items at once
     deleteScannedItem,
     deleteLocationData,
     updateItemQuantity,
