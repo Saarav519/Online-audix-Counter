@@ -692,15 +692,30 @@ const ScanItems = () => {
     const timeSinceLastInput = currentTime - lastInputTimeRef.current;
     lastInputTimeRef.current = currentTime;
     
+    // Calculate how many characters were added in this event
+    const previousLength = previousInputLengthRef.current;
+    const charsAdded = newValue.length - previousLength;
+    previousInputLengthRef.current = newValue.length;
+    
     // If manual entry is allowed, always accept input
     if (settings.allowManualBarcodeEntry !== false) {
       setBarcodeInput(newValue);
       return;
     }
     
-    // Manual entry is DISABLED - only accept FAST input (from hardware scanner)
-    // Hardware scanners typically send characters < 50ms apart
-    if (timeSinceLastInput < 50 || inputBufferRef.current.length > 0) {
+    // Manual entry is DISABLED - only accept input from hardware scanner
+    // Detection methods:
+    // 1. Fast timing (< 100ms between characters) - increased from 50ms for slower scanners
+    // 2. Bulk input (multiple characters at once) - scanners often inject entire barcode
+    // 3. Already in scanner buffer mode
+    
+    const isFastInput = timeSinceLastInput < 100;
+    const isBulkInput = charsAdded > 1; // More than 1 character added at once = scanner
+    const isInScannerMode = inputBufferRef.current.length > 0;
+    const isFirstCharAfterClear = previousLength === 0 && newValue.length > 0;
+    
+    // Accept if: fast input OR bulk input OR already scanning OR first char of bulk scan
+    if (isFastInput || isBulkInput || isInScannerMode || (isFirstCharAfterClear && charsAdded > 1)) {
       // This is likely scanner input - accept it
       inputBufferRef.current = newValue;
       setBarcodeInput(newValue);
@@ -711,10 +726,19 @@ const ScanItems = () => {
       }
       scannerInputTimeoutRef.current = setTimeout(() => {
         inputBufferRef.current = '';
-      }, 200);
+        previousInputLengthRef.current = 0; // Reset for next scan
+      }, 300); // Increased to 300ms to accommodate slower scanners
     }
-    // Slow input (manual typing) - reject when manual entry is disabled
+    // Slow single-character input (manual typing) - reject when manual entry is disabled
   };
+  
+  // Reset timing refs when barcode input is cleared (for proper scanner detection)
+  useEffect(() => {
+    if (barcodeInput === '') {
+      previousInputLengthRef.current = 0;
+      lastInputTimeRef.current = Date.now();
+    }
+  }, [barcodeInput]);
 
   const handleScan = () => {
     if (!barcodeInput.trim() || !selectedLocationId) return;
