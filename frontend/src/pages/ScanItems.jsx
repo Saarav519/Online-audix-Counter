@@ -677,8 +677,9 @@ const ScanItems = () => {
   // Handle barcode scan - auto-add when Enter is pressed
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
-      // Allow scan if manual entry is enabled OR if it came from hardware scanner
-      if (settings.allowManualBarcodeEntry !== false || inputBufferRef.current.length > 0) {
+      // Allow scan if manual entry is enabled OR if there's input in the field
+      // (if input got through, it passed scanner detection)
+      if (settings.allowManualBarcodeEntry !== false || barcodeInput.trim().length > 0) {
         handleScan();
       }
     }
