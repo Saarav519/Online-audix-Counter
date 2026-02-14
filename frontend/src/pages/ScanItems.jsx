@@ -303,6 +303,10 @@ const ScanItems = () => {
   // Keep refs in sync with state
   useEffect(() => {
     selectedLocationIdRef.current = selectedLocationId;
+    // If we have a selected location, we're not waiting for location scan
+    if (selectedLocationId) {
+      setWaitingForLocationScan(false);
+    }
   }, [selectedLocationId]);
   
   useEffect(() => {
