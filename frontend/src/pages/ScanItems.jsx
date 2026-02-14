@@ -150,6 +150,48 @@ const ScannedItemRow = memo(({
 
 ScannedItemRow.displayName = 'ScannedItemRow';
 
+// ============================================
+// PERFORMANCE: Virtualized row renderer for react-window
+// Only renders visible items in the list for massive performance boost
+// ============================================
+const VirtualizedItemRow = memo(({ index, style, data }) => {
+  const {
+    items,
+    editingItemId,
+    editQuantity,
+    setEditQuantity,
+    handleQuantityUpdate,
+    handleDelete,
+    isSingleSkuMode,
+    isLocationLocked,
+    setEditingItemId
+  } = data;
+  
+  const item = items[index];
+  if (!item) return null;
+  
+  return (
+    <div style={{ ...style, paddingRight: '8px', paddingBottom: '8px' }}>
+      <ScannedItemRow
+        item={item}
+        isEditing={editingItemId === item.id}
+        editQuantity={editQuantity}
+        setEditQuantity={setEditQuantity}
+        onQuantityUpdate={handleQuantityUpdate}
+        onDelete={handleDelete}
+        isSingleSkuMode={isSingleSkuMode}
+        isLocationLocked={isLocationLocked}
+        onStartEdit={(id, qty) => {
+          setEditingItemId(id);
+          setEditQuantity(String(qty));
+        }}
+      />
+    </div>
+  );
+});
+
+VirtualizedItemRow.displayName = 'VirtualizedItemRow';
+
 const ScanItems = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
