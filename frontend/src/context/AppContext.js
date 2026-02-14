@@ -1098,7 +1098,7 @@ export const AppProvider = ({ children }) => {
     getAllUsers,
     getNextPendingLocation,
     getProductByBarcode,
-    getStorageInfo,
+    // getStorageInfo is stable (imported function) - not included in deps
     isLoadingMasterData,
     playSound
   ]);
