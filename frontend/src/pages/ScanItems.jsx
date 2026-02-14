@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { FixedSizeList as List } from 'react-window';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection, useHardwareScanner } from '../hooks/useDeviceDetection';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -40,6 +41,47 @@ import {
   Send,
   ArrowLeft
 } from 'lucide-react';
+
+// ============================================
+// PERFORMANCE: Debounce utility for localStorage saves
+// ============================================
+const useDebouncedCallback = (callback, delay) => {
+  const timeoutRef = useRef(null);
+  const callbackRef = useRef(callback);
+  
+  // Keep callback ref updated
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+  
+  const debouncedFn = useCallback((...args) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+  }, [delay]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Force immediate execution (for before unmount/navigation)
+  const flush = useCallback((...args) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    callbackRef.current(...args);
+  }, []);
+  
+  return [debouncedFn, flush];
+};
 
 // Memoized ScannedItem component for better performance with large lists
 const ScannedItemRow = memo(({ 
