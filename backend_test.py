@@ -8,7 +8,7 @@ Tests:
 import requests
 import json
 
-BASE_URL = "https://counter-pro.preview.emergentagent.com"
+BASE_URL = "https://click-tracker-40.preview.emergentagent.com"
 
 def test_backend_health():
     """Test basic backend API health"""
