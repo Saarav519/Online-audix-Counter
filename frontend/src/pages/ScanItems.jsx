@@ -622,11 +622,11 @@ const ScanItems = () => {
     }
   }, [scanLocation, addTempItem, playSound]);
 
-  // Enable hardware scanner hook
-  // When manual entry is disabled, block scanner input from reaching input fields
-  // Scanner input will go through handleHardwareScan callback instead
-  const blockScannerFromInput = settings.allowManualBarcodeEntry === false;
-  useHardwareScanner(handleHardwareScan, !isLocationLocked, blockScannerFromInput);
+  // Enable hardware scanner hook - always enabled when location is not locked
+  // The hook captures ALL keyboard-based scanner input
+  // When manual entry is OFF, input field blocks direct typing
+  // When manual entry is ON, both hook and input field work
+  useHardwareScanner(handleHardwareScan, !isLocationLocked);
 
   // In Pre-Assigned mode, redirect to Locations page if no location is selected
   // Scan Items should only be accessed by opening a location from the Locations page
