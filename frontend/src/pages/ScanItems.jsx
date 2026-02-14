@@ -388,12 +388,6 @@ const ScanItems = () => {
   const quantityInputRef2 = useRef(quantityInput);
   const lastScanTimeRef = useRef(0);
   const scanResultTimeoutRef = useRef(null);
-  
-  // Ref to track if input is from hardware scanner (fast input)
-  const lastInputTimeRef = useRef(Date.now()); // Initialize to current time to avoid first-char rejection
-  const inputBufferRef = useRef('');
-  const scannerInputTimeoutRef = useRef(null);
-  const previousInputLengthRef = useRef(0); // Track previous input length to detect bulk input
 
   // Persist current location to localStorage whenever it changes
   useEffect(() => {
