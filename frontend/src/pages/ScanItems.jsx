@@ -1320,36 +1320,31 @@ const ScanItems = () => {
                   <p className="text-slate-400 text-xs mt-1">Start scanning barcodes</p>
                 </div>
               ) : (
-                <div 
+                /* PERFORMANCE: Virtualized list - only renders visible items */
+                <List
                   ref={itemsListRef}
-                  className="space-y-2 overflow-y-auto" 
+                  height={220}
+                  itemCount={reversedItems.length}
+                  itemSize={56}
+                  width="100%"
                   style={{ 
-                    maxHeight: '220px', 
                     paddingBottom: '60px',
-                    WebkitOverflowScrolling: 'touch',
-                    scrollBehavior: 'smooth'
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                  itemData={{
+                    items: reversedItems,
+                    editingItemId,
+                    editQuantity,
+                    setEditQuantity,
+                    handleQuantityUpdate,
+                    handleDelete,
+                    isSingleSkuMode,
+                    isLocationLocked,
+                    setEditingItemId
                   }}
                 >
-                  {/* Reverse order - newest items at TOP - Using memoized component for performance */}
-                  {reversedItems.map((item) => (
-                    <ScannedItemRow
-                      key={item.id}
-                      item={item}
-                      isEditing={editingItemId === item.id}
-                      editQuantity={editQuantity}
-                      setEditQuantity={setEditQuantity}
-                      onQuantityUpdate={handleQuantityUpdate}
-                      onDelete={handleDelete}
-                      isSingleSkuMode={isSingleSkuMode}
-                      isLocationLocked={isLocationLocked}
-                      onStartEdit={(id, qty) => {
-                        setEditingItemId(id);
-                        setEditQuantity(qty);
-                      }}
-                    />
-                  ))}
-                  <div style={{ height: '20px', minHeight: '20px' }}></div>
-                </div>
+                  {VirtualizedItemRow}
+                </List>
               )}
             </CardContent>
           </Card>
