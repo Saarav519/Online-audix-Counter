@@ -228,23 +228,43 @@ const ScanItems = () => {
   useEffect(() => {
     if (tempLocation) {
       localStorage.setItem('audix_temp_location', JSON.stringify(tempLocation));
-      console.log(`📍 Saved temp location to localStorage: ${tempLocation.name}`);
     } else {
       localStorage.removeItem('audix_temp_location');
     }
   }, [tempLocation]);
   
   // ============================================
-  // AUTO-SAVE: Persist temp items to localStorage whenever they change
-  // This prevents data loss when navigating away
+  // PERFORMANCE: Debounced localStorage save for temp items
+  // Saves every 500ms instead of on every scan - major performance boost
   // ============================================
+  const saveItemsToStorage = useCallback((items, locationId) => {
+    if (locationId && items.length > 0) {
+      const key = `audix_temp_items_${locationId}`;
+      try {
+        localStorage.setItem(key, JSON.stringify(items));
+      } catch (e) {
+        console.warn('localStorage save failed:', e);
+      }
+    }
+  }, []);
+  
+  const [debouncedSaveItems, flushSaveItems] = useDebouncedCallback(saveItemsToStorage, 500);
+  
+  // Auto-save temp items with debouncing (500ms delay for performance)
   useEffect(() => {
     if (selectedLocationId && tempScannedItems.length > 0) {
-      const key = `audix_temp_items_${selectedLocationId}`;
-      localStorage.setItem(key, JSON.stringify(tempScannedItems));
-      console.log(`💾 Auto-saved ${tempScannedItems.length} items (${tempScannedItems.reduce((s, i) => s + i.quantity, 0)} qty) for location ${selectedLocationId}`);
+      debouncedSaveItems(tempScannedItems, selectedLocationId);
     }
-  }, [tempScannedItems, selectedLocationId]);
+  }, [tempScannedItems, selectedLocationId, debouncedSaveItems]);
+  
+  // Flush save on unmount to prevent data loss
+  useEffect(() => {
+    return () => {
+      if (selectedLocationId && tempScannedItems.length > 0) {
+        flushSaveItems(tempScannedItems, selectedLocationId);
+      }
+    };
+  }, [selectedLocationId, tempScannedItems, flushSaveItems]);
   
   // Track if we've loaded items for current location to prevent re-loading
   const loadedLocationRef = useRef(null);
