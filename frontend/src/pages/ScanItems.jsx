@@ -797,64 +797,22 @@ const ScanItems = () => {
     }
   };
   
-  // Detect hardware scanner input vs manual typing
-  // When manual entry is DISABLED, we ONLY accept:
-  // 1. Bulk input (multiple characters at once) - this is how most scanners work
-  // 2. Very fast sequential input (< 30ms) while already in scanner mode
-  // Manual typing is ALWAYS single character, so we reject single char additions
+  // ============================================
+  // SIMPLIFIED INPUT HANDLING
+  // When manual entry is OFF: Input field is READ-ONLY
+  // All scanner input goes through useHardwareScanner hook
+  // This is more reliable on actual hardware scanners
+  // ============================================
   const handleBarcodeInputChange = (e) => {
-    const newValue = e.target.value;
-    const currentTime = Date.now();
-    const timeSinceLastInput = currentTime - lastInputTimeRef.current;
-    lastInputTimeRef.current = currentTime;
-    
-    // Calculate how many characters were added in this event
-    const previousLength = previousInputLengthRef.current;
-    const charsAdded = newValue.length - previousLength;
-    previousInputLengthRef.current = newValue.length;
-    
-    // If manual entry is allowed, always accept input
-    if (settings.allowManualBarcodeEntry !== false) {
-      setBarcodeInput(newValue);
+    // When manual entry is DISABLED, don't accept any direct input
+    // The useHardwareScanner hook will handle all scanner input
+    if (settings.allowManualBarcodeEntry === false) {
+      // Block all direct input - scanner goes through hook
       return;
     }
     
-    // ============================================
-    // MANUAL ENTRY IS DISABLED
-    // Only accept input that is clearly from a hardware scanner
-    // ============================================
-    
-    // Method 1: BULK INPUT - Scanner injected multiple characters at once
-    // This is the PRIMARY detection method - manual typing NEVER does this
-    const isBulkInput = charsAdded > 1;
-    
-    // Method 2: CONTINUATION - Very fast input while already receiving scanner data
-    // Once we detect a scanner started, accept fast follow-up chars (< 50ms)
-    const isInScannerMode = inputBufferRef.current.length > 0;
-    const isFastContinuation = isInScannerMode && timeSinceLastInput < 50;
-    
-    // ACCEPT: Bulk input OR fast continuation of existing scanner input
-    if (isBulkInput || isFastContinuation) {
-      // This is scanner input - accept it
-      inputBufferRef.current = newValue;
-      setBarcodeInput(newValue);
-      
-      // Clear scanner mode after input stops (scanner finished sending)
-      if (scannerInputTimeoutRef.current) {
-        clearTimeout(scannerInputTimeoutRef.current);
-      }
-      scannerInputTimeoutRef.current = setTimeout(() => {
-        inputBufferRef.current = '';
-        previousInputLengthRef.current = 0;
-      }, 150); // Short timeout - scanner sends data quickly
-      
-      return;
-    }
-    
-    // REJECT: Single character input when not in scanner mode
-    // This blocks manual typing completely
-    // The input field won't update, effectively blocking the keystroke
-    console.log(`🚫 Manual entry blocked: "${e.target.value.slice(-1)}" (charsAdded: ${charsAdded}, timeSince: ${timeSinceLastInput}ms)`);
+    // Manual entry is ENABLED - accept all input
+    setBarcodeInput(e.target.value);
   };
   
   // Reset scanner detection state when input is cleared
