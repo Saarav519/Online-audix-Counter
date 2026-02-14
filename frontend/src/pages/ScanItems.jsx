@@ -685,8 +685,11 @@ const ScanItems = () => {
     }
   };
   
-  // Detect fast input (likely from hardware scanner) and process it
-  // This handles scanners that inject text directly into input fields
+  // Detect hardware scanner input vs manual typing
+  // When manual entry is DISABLED, we ONLY accept:
+  // 1. Bulk input (multiple characters at once) - this is how most scanners work
+  // 2. Very fast sequential input (< 30ms) while already in scanner mode
+  // Manual typing is ALWAYS single character, so we reject single char additions
   const handleBarcodeInputChange = (e) => {
     const newValue = e.target.value;
     const currentTime = Date.now();
@@ -704,39 +707,49 @@ const ScanItems = () => {
       return;
     }
     
-    // Manual entry is DISABLED - only accept input from hardware scanner
-    // Detection methods:
-    // 1. Fast timing (< 100ms between characters) - increased from 50ms for slower scanners
-    // 2. Bulk input (multiple characters at once) - scanners often inject entire barcode
-    // 3. Already in scanner buffer mode
+    // ============================================
+    // MANUAL ENTRY IS DISABLED
+    // Only accept input that is clearly from a hardware scanner
+    // ============================================
     
-    const isFastInput = timeSinceLastInput < 100;
-    const isBulkInput = charsAdded > 1; // More than 1 character added at once = scanner
+    // Method 1: BULK INPUT - Scanner injected multiple characters at once
+    // This is the PRIMARY detection method - manual typing NEVER does this
+    const isBulkInput = charsAdded > 1;
+    
+    // Method 2: CONTINUATION - Very fast input while already receiving scanner data
+    // Once we detect a scanner started, accept fast follow-up chars (< 50ms)
     const isInScannerMode = inputBufferRef.current.length > 0;
-    const isFirstCharAfterClear = previousLength === 0 && newValue.length > 0;
+    const isFastContinuation = isInScannerMode && timeSinceLastInput < 50;
     
-    // Accept if: fast input OR bulk input OR already scanning OR first char of bulk scan
-    if (isFastInput || isBulkInput || isInScannerMode || (isFirstCharAfterClear && charsAdded > 1)) {
-      // This is likely scanner input - accept it
+    // ACCEPT: Bulk input OR fast continuation of existing scanner input
+    if (isBulkInput || isFastContinuation) {
+      // This is scanner input - accept it
       inputBufferRef.current = newValue;
       setBarcodeInput(newValue);
       
-      // Clear buffer after a brief delay (scanner input ends)
+      // Clear scanner mode after input stops (scanner finished sending)
       if (scannerInputTimeoutRef.current) {
         clearTimeout(scannerInputTimeoutRef.current);
       }
       scannerInputTimeoutRef.current = setTimeout(() => {
         inputBufferRef.current = '';
-        previousInputLengthRef.current = 0; // Reset for next scan
-      }, 300); // Increased to 300ms to accommodate slower scanners
+        previousInputLengthRef.current = 0;
+      }, 150); // Short timeout - scanner sends data quickly
+      
+      return;
     }
-    // Slow single-character input (manual typing) - reject when manual entry is disabled
+    
+    // REJECT: Single character input when not in scanner mode
+    // This blocks manual typing completely
+    // The input field won't update, effectively blocking the keystroke
+    console.log(`🚫 Manual entry blocked: "${e.target.value.slice(-1)}" (charsAdded: ${charsAdded}, timeSince: ${timeSinceLastInput}ms)`);
   };
   
-  // Reset timing refs when barcode input is cleared (for proper scanner detection)
+  // Reset scanner detection state when input is cleared
   useEffect(() => {
     if (barcodeInput === '') {
       previousInputLengthRef.current = 0;
+      inputBufferRef.current = '';
       lastInputTimeRef.current = Date.now();
     }
   }, [barcodeInput]);
