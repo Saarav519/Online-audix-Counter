@@ -973,7 +973,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Get next pending location (for auto-navigation after submit)
-  const getNextPendingLocation = () => {
+  const getNextPendingLocation = useCallback(() => {
     const pendingLocations = locations.filter(loc => {
       // Filter by mode
       if (settings.locationScanMode === 'preassigned') {
@@ -983,9 +983,13 @@ export const AppProvider = ({ children }) => {
       }
     });
     return pendingLocations.length > 0 ? pendingLocations[0] : null;
-  };
+  }, [locations, settings.locationScanMode]);
 
-  const value = {
+  // ============================================
+  // PERFORMANCE: Memoize context value to prevent unnecessary re-renders
+  // Only re-creates when dependencies actually change
+  // ============================================
+  const value = useMemo(() => ({
     user,
     isAuthenticated,
     locations,
@@ -1000,7 +1004,7 @@ export const AppProvider = ({ children }) => {
     verifyAuthorizationCredentials,
     updateUserCredentials,
     addScannedItem,
-    batchSaveScannedItems, // Batch save for multiple items at once
+    batchSaveScannedItems,
     deleteScannedItem,
     deleteLocationData,
     updateItemQuantity,
@@ -1015,22 +1019,67 @@ export const AppProvider = ({ children }) => {
     scanLocation,
     createLocationFromScan,
     saveTempLocation,
-    renameLocation, // Rename a location
+    renameLocation,
     importAssignedLocations,
     clearAssignedLocations,
     addMasterProduct,
-    setMasterProductsDirect, // Direct set for imports (bypasses auto-save)
+    setMasterProductsDirect,
     importMasterProducts,
     importAuthorizationUsers,
     getLoginUsers,
     getAuthorizationUsers,
     getAllUsers,
     getNextPendingLocation,
-    getProductByBarcode, // Fast O(1) product lookup
-    getStorageInfo, // Check available storage
-    isLoadingMasterData, // Loading state for master products
+    getProductByBarcode,
+    getStorageInfo,
+    isLoadingMasterData,
     playSound
-  };
+  }), [
+    user,
+    isAuthenticated,
+    locations,
+    masterProducts,
+    scannedItems,
+    sessions,
+    settings,
+    currentSession,
+    login,
+    logout,
+    verifyCredentials,
+    verifyAuthorizationCredentials,
+    updateUserCredentials,
+    addScannedItem,
+    batchSaveScannedItems,
+    deleteScannedItem,
+    deleteLocationData,
+    updateItemQuantity,
+    submitLocation,
+    reopenLocation,
+    updateSettings,
+    addLocation,
+    deleteLocation,
+    deleteLocationFromReports,
+    clearLocationItems,
+    findLocationByCode,
+    scanLocation,
+    createLocationFromScan,
+    saveTempLocation,
+    renameLocation,
+    importAssignedLocations,
+    clearAssignedLocations,
+    addMasterProduct,
+    setMasterProductsDirect,
+    importMasterProducts,
+    importAuthorizationUsers,
+    getLoginUsers,
+    getAuthorizationUsers,
+    getAllUsers,
+    getNextPendingLocation,
+    getProductByBarcode,
+    getStorageInfo,
+    isLoadingMasterData,
+    playSound
+  ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
