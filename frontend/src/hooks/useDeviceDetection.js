@@ -108,9 +108,8 @@ export const useDeviceDetection = () => {
  * - No React state updates during scanning (uses refs)
  * - Debounced processing to prevent overwrites
  * - Compatible with most enterprise Android scanners
- * - Option to block scanner input from reaching input fields
  */
-export const useHardwareScanner = (onScan, isEnabled = true, blockInputField = false) => {
+export const useHardwareScanner = (onScan, isEnabled = true) => {
   const [scanBuffer, setScanBuffer] = useState('');
   
   // Use refs to avoid re-renders during fast scanning
@@ -120,16 +119,11 @@ export const useHardwareScanner = (onScan, isEnabled = true, blockInputField = f
   const scanQueueRef = useRef([]);
   const processingRef = useRef(false);
   const onScanRef = useRef(onScan);
-  const blockInputFieldRef = useRef(blockInputField);
   
-  // Keep refs updated
+  // Keep onScan ref updated
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
-  
-  useEffect(() => {
-    blockInputFieldRef.current = blockInputField;
-  }, [blockInputField]);
 
   // Process scan queue - handles rapid consecutive scans
   const processQueue = useCallback(() => {
