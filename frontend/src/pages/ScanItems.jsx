@@ -808,15 +808,6 @@ const ScanItems = () => {
     // Manual entry is ENABLED - accept all input
     setBarcodeInput(e.target.value);
   };
-  
-  // Reset scanner detection state when input is cleared
-  useEffect(() => {
-    if (barcodeInput === '') {
-      previousInputLengthRef.current = 0;
-      inputBufferRef.current = '';
-      lastInputTimeRef.current = Date.now();
-    }
-  }, [barcodeInput]);
 
   const handleScan = () => {
     if (!barcodeInput.trim() || !selectedLocationId) return;
