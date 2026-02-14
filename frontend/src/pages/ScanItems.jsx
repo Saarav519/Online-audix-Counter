@@ -630,6 +630,7 @@ const ScanItems = () => {
       setSelectedLocationId(result.location.id);
       setLocationInput(result.location.code);
       setLocationError('');
+      setWaitingForLocationScan(false); // Important: Mark location as selected
       playSound(true);
       
       // Store temp location if it's a new dynamic location
