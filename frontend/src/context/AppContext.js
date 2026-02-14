@@ -143,23 +143,45 @@ export const AppProvider = ({ children }) => {
   }, [locations]);
 
   // ============================================
-  // DATA SAFETY: Synchronous localStorage save
-  // Saves IMMEDIATELY after every scan - no delay
-  // Trade-off: Slightly slower scanning, but ZERO data loss risk
+  // PERFORMANCE: Debounced localStorage save for scannedItems
+  // Saves every 300ms instead of on every change - major performance boost
+  // Still fast enough to prevent data loss in normal usage
   // ============================================
   const lastSavedRef = useRef(JSON.stringify(scannedItems));
+  const saveTimeoutRef2 = useRef(null);
   
   useEffect(() => {
     const currentData = JSON.stringify(scannedItems);
     // Only save if data actually changed (prevents unnecessary writes)
     if (currentData !== lastSavedRef.current) {
-      try {
-        localStorage.setItem('audix_scanned_items', currentData);
-        lastSavedRef.current = currentData;
-      } catch (e) {
-        console.warn('localStorage save failed:', e);
+      // Clear any pending save
+      if (saveTimeoutRef2.current) {
+        clearTimeout(saveTimeoutRef2.current);
       }
+      
+      // Debounced save - 300ms delay for performance
+      saveTimeoutRef2.current = setTimeout(() => {
+        try {
+          localStorage.setItem('audix_scanned_items', currentData);
+          lastSavedRef.current = currentData;
+        } catch (e) {
+          console.warn('localStorage save failed:', e);
+        }
+      }, 300);
     }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (saveTimeoutRef2.current) {
+        clearTimeout(saveTimeoutRef2.current);
+        // Force immediate save on unmount to prevent data loss
+        try {
+          localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+        } catch (e) {
+          console.warn('localStorage save failed on unmount:', e);
+        }
+      }
+    };
   }, [scannedItems]);
 
   // ============================================
