@@ -167,10 +167,6 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
       
       lastKeyTimeRef.current = currentTime;
       
-      // Detect if this is fast scanner input (< 50ms between keys)
-      const isFastInput = timeDiff < 50;
-      const isInScannerMode = bufferRef.current.length > 0;
-      
       // Handle Enter key (most scanners send Enter after barcode)
       if (e.key === 'Enter') {
         // IMPORTANT: Only intercept if we have buffered scanner input
@@ -199,15 +195,8 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
         return;
       }
       
-      // Only capture printable characters
+      // Only capture printable characters for scanner buffer
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // If this is fast input (scanner) OR we're already in scanner mode
-        // AND blockInputField is enabled, prevent the key from reaching input fields
-        if ((isFastInput || isInScannerMode) && blockInputFieldRef.current) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        
         bufferRef.current += e.key;
         
         // Update display buffer (debounced to avoid excessive re-renders)
