@@ -109,7 +109,7 @@ export const useDeviceDetection = () => {
  * - Debounced processing to prevent overwrites
  * - Compatible with most enterprise Android scanners
  */
-export const useHardwareScanner = (onScan, isEnabled = true) => {
+export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = true) => {
   const [scanBuffer, setScanBuffer] = useState('');
   
   // Use refs to avoid re-renders during fast scanning
@@ -166,14 +166,34 @@ export const useHardwareScanner = (onScan, isEnabled = true) => {
       }
       
       lastKeyTimeRef.current = currentTime;
+
+      // BLOCKING MODE: If manual input is disabled, prevent default for ALL printable keys
+      // This ensures they don't appear in the input field, but we still capture them in buffer
+      if (!allowKeyInput) {
+        // Allow navigation/special keys but block printable chars
+        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        // Also block Enter if it's part of the scan sequence or just a manual press
+        if (e.key === 'Enter') {
+             e.preventDefault();
+             e.stopPropagation();
+        }
+      }
       
       // Handle Enter key (most scanners send Enter after barcode)
       if (e.key === 'Enter') {
         // IMPORTANT: Only intercept if we have buffered scanner input
         // This allows normal form submissions to work
         if (bufferRef.current.length > 0) {
-          e.preventDefault();
-          e.stopPropagation();
+          // If blocking mode is ON, we already prevented default above.
+          // If OFF, we need to prevent it here to capture the scan.
+          if (allowKeyInput) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          
           queueScan(bufferRef.current);
           bufferRef.current = '';
           setScanBuffer('');
