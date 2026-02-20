@@ -72,6 +72,21 @@ const MasterData = () => {
   
   const fileInputRef = useRef(null);
   const userFileInputRef = useRef(null);
+  const locationFileInputRef = useRef(null);
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('products');
+
+  // Location Master state
+  const [locSearchTerm, setLocSearchTerm] = useState('');
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false);
+  const [showLocImportModal, setShowLocImportModal] = useState(false);
+  const [locImportResult, setLocImportResult] = useState(null);
+  const [newLocation, setNewLocation] = useState({ code: '', name: '', description: '' });
+  const [locCurrentPage, setLocCurrentPage] = useState(1);
+  const [locImportProgress, setLocImportProgress] = useState(null);
+  const [isLocImporting, setIsLocImporting] = useState(false);
+  const cancelLocImportRef = useRef(false);
 
   // Filtered products with search
   const filteredProducts = React.useMemo(() => {
