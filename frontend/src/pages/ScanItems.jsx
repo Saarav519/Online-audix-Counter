@@ -721,7 +721,8 @@ const ScanItems = () => {
     }
   }, [locationItems.length]);
 
-  // Keep focus on barcode input - prevent focus loss on touch (Mobile only)
+  // Keep focus on barcode input - ALWAYS refocus after ANY interaction (Mobile only)
+  // The ONLY exception is when user is actively editing a quantity input field
   useEffect(() => {
     if (!showScannerMode || !selectedLocationId || isLocationLocked) return;
     
@@ -729,39 +730,42 @@ const ScanItems = () => {
       // Don't interfere if quantity popup is open
       if (showQuantityPopup) return;
       
-      // Don't interfere if user is editing quantity or clicking buttons
       const target = e.target;
-      const isButton = target.closest('button');
-      const isInput = target.tagName === 'INPUT';
-      const isQuantityEdit = editingItemId !== null;
-      const isQtyArea = target.closest('[data-qty-edit]') || target.hasAttribute('data-qty-input');
       
-      // If user clicked on a button, qty edit area, or is editing quantity, allow it
-      if (isButton || isQuantityEdit || isQtyArea) return;
+      // ONLY skip refocusing for quantity input interactions
+      const isQtyInput = target && (
+        target.hasAttribute('data-qty-input') || 
+        (target.tagName === 'INPUT' && target.closest('[data-qty-edit]'))
+      );
+      if (isQtyInput) return;
       
-      // If user clicked on another input (like quantity), allow it
-      if (isInput && target !== barcodeInputRef.current) return;
-      
-      // Otherwise, refocus barcode input after a short delay
+      // For EVERYTHING else (buttons, toggles, switches, empty space, etc.)
+      // refocus the barcode input after a short delay to let the action complete
       setTimeout(() => {
-        // Don't steal focus from quantity inputs that may have just been focused
+        // Final safety check: don't steal focus from qty inputs that may have just been focused
         const activeEl = document.activeElement;
-        const isActiveQtyInput = activeEl && (activeEl.hasAttribute('data-qty-input') || activeEl.closest('[data-qty-edit]'));
+        const isActiveQtyInput = activeEl && (
+          activeEl.hasAttribute('data-qty-input') || 
+          activeEl.closest('[data-qty-edit]') ||
+          activeEl.closest('[role="dialog"]')
+        );
         if (isActiveQtyInput) return;
         
-        if (barcodeInputRef.current && !isLocationLocked && selectedLocationId && !showQuantityPopup && editingItemId === null) {
+        if (barcodeInputRef.current && !isLocationLocked && selectedLocationId && !showQuantityPopup) {
           barcodeInputRef.current.focus();
         }
       }, 150);
     };
 
-    // Add touchend listener to refocus after touch
+    // Listen on both touch and click to cover all interaction types
     document.addEventListener('touchend', keepFocusOnBarcode);
+    document.addEventListener('mouseup', keepFocusOnBarcode);
     
     return () => {
       document.removeEventListener('touchend', keepFocusOnBarcode);
+      document.removeEventListener('mouseup', keepFocusOnBarcode);
     };
-  }, [showScannerMode, selectedLocationId, isLocationLocked, editingItemId, showQuantityPopup]);
+  }, [showScannerMode, selectedLocationId, isLocationLocked, showQuantityPopup]);
 
   // Handle location scan/input
   const handleLocationKeyDown = (e) => {
