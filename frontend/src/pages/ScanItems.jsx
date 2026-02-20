@@ -496,55 +496,32 @@ const ScanItems = () => {
     setTempScannedItems(prev => {
       const existingIndex = prev.findIndex(item => item.barcode === barcode);
       
-      if (settings.singleSkuScanning) {
-        // Single SKU Mode: same barcode increments qty, moves to end
-        if (existingIndex !== -1) {
-          const existingItem = prev[existingIndex];
-          const filteredItems = prev.filter((_, idx) => idx !== existingIndex);
-          newItem = {
-            ...existingItem,
-            quantity: existingItem.quantity + 1,
-            scannedAt: new Date().toISOString()
-          };
-          return [...filteredItems, newItem];
-        } else {
-          newItem = {
-            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            barcode,
-            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
-            quantity: 1,
-            scannedAt: new Date().toISOString(),
-            isMaster: !!product
-          };
-          return [...prev, newItem];
-        }
+      if (existingIndex !== -1) {
+        // Existing barcode: increment quantity, move to end
+        const existingItem = prev[existingIndex];
+        const filteredItems = prev.filter((_, idx) => idx !== existingIndex);
+        newItem = {
+          ...existingItem,
+          quantity: existingItem.quantity + quantity,
+          scannedAt: new Date().toISOString()
+        };
+        return [...filteredItems, newItem];
       } else {
-        // Non-Single SKU Mode
-        if (existingIndex !== -1) {
-          const existingItem = prev[existingIndex];
-          const filteredItems = prev.filter((_, idx) => idx !== existingIndex);
-          newItem = {
-            ...existingItem,
-            quantity: existingItem.quantity + quantity,
-            scannedAt: new Date().toISOString()
-          };
-          return [...filteredItems, newItem];
-        } else {
-          newItem = {
-            id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            barcode,
-            productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
-            quantity,
-            scannedAt: new Date().toISOString(),
-            isMaster: !!product
-          };
-          return [...prev, newItem];
-        }
+        // New barcode: create new item
+        newItem = {
+          id: `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          barcode,
+          productName: product ? product.name : `Unknown (${barcode.slice(-6)})`,
+          quantity,
+          scannedAt: new Date().toISOString(),
+          isMaster: !!product
+        };
+        return [...prev, newItem];
       }
     });
     
     return { success: true, isValid: isValidBarcode, product, item: newItem };
-  }, [getProductByBarcode, settings.allowNonMasterProducts, settings.singleSkuScanning]);
+  }, [getProductByBarcode, settings.allowNonMasterProducts]);
   
   // Delete item from temp state
   const deleteTempItem = useCallback((itemId) => {
