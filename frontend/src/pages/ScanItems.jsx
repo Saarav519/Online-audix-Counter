@@ -904,29 +904,113 @@ const ScanItems = () => {
     setBarcodeInput(newValue);
   };
 
+  // Toggle handler for "Ask Quantity Before Adding"
+  const handleToggleAskQuantity = (checked) => {
+    setAskQuantityBeforeAdding(checked);
+    localStorage.setItem('audix_ask_qty_before_adding', String(checked));
+  };
+
+  // Show quantity popup for a barcode
+  const showQtyPopup = useCallback((barcode) => {
+    const product = getProductByBarcode ? getProductByBarcode(barcode) : null;
+    const isValid = product !== undefined && product !== null;
+    
+    // Check if non-master products are allowed
+    if (!isValid && !settings.allowNonMasterProducts) {
+      return { success: false, error: 'Barcode not in master list' };
+    }
+    
+    setPendingBarcode(barcode);
+    setPendingProductName(product ? product.name : `Unknown (${barcode.slice(-6)})`);
+    setPendingIsValid(isValid);
+    setPopupQuantity('1');
+    setShowQuantityPopup(true);
+    
+    // Focus qty input after popup opens
+    setTimeout(() => {
+      if (popupQuantityRef.current) {
+        popupQuantityRef.current.focus();
+        popupQuantityRef.current.select();
+      }
+    }, 100);
+    
+    return { success: true };
+  }, [getProductByBarcode, settings.allowNonMasterProducts]);
+
+  // Confirm quantity from popup and add item
+  const confirmQuantityPopup = () => {
+    const qty = parseInt(popupQuantity) || 1;
+    if (qty < 1) return;
+    
+    const result = addTempItem(pendingBarcode, qty);
+    
+    setLastScanResult({
+      barcode: pendingBarcode,
+      quantity: qty,
+      ...result
+    });
+    
+    playSound(result.success);
+    setTimeout(() => setLastScanResult(null), 3000);
+    
+    // Close popup and reset
+    setShowQuantityPopup(false);
+    setPendingBarcode('');
+    setBarcodeInput('');
+    
+    // Refocus barcode input
+    setTimeout(() => {
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  // Cancel quantity popup
+  const cancelQuantityPopup = () => {
+    setShowQuantityPopup(false);
+    setPendingBarcode('');
+    setBarcodeInput('');
+    
+    // Refocus barcode input
+    setTimeout(() => {
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    }, 100);
+  };
+
   const handleScan = () => {
     if (!barcodeInput.trim() || !selectedLocationId) return;
     
-    // In Single SKU mode, always add quantity of 1
-    // In Non-Single SKU mode, use the quantity input value
-    const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
+    if (askQuantityBeforeAdding) {
+      // Punching Mode: show quantity popup
+      const checkResult = showQtyPopup(barcodeInput.trim());
+      if (!checkResult.success) {
+        setLastScanResult({
+          barcode: barcodeInput,
+          quantity: 0,
+          success: false,
+          error: checkResult.error
+        });
+        setBarcodeInput('');
+        playSound(false);
+        setTimeout(() => setLastScanResult(null), 3000);
+      }
+      return;
+    }
     
-    // Add to TEMP state (not saved until submit)
-    const result = addTempItem(barcodeInput.trim(), qty);
+    // Default Mode: auto-add with qty=1
+    const result = addTempItem(barcodeInput.trim(), 1);
     
     setLastScanResult({
       barcode: barcodeInput,
-      quantity: qty,
+      quantity: 1,
       ...result
     });
     
     // Clear barcode input immediately after scan
     setBarcodeInput('');
-    
-    // Reset quantity to 1 after adding (for non-single SKU mode)
-    if (!isSingleSkuMode) {
-      setQuantityInput('1');
-    }
     
     // Play success/error sound
     playSound(result.success);
