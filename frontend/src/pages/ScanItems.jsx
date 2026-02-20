@@ -1328,7 +1328,7 @@ const ScanItems = () => {
                 
                 {/* Confirm Button */}
                 <Button
-                  onClick={handleLocationScan}
+                  onClick={() => handleLocationScan()}
                   disabled={!locationInput.trim()}
                   className="w-full h-14 mt-4 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-semibold"
                 >
