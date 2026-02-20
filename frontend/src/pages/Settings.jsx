@@ -322,6 +322,42 @@ const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Location Validation */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-emerald-600" />
+            Location Validation
+          </CardTitle>
+          <CardDescription>Control which locations can be scanned</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Allow Non-Master Locations</Label>
+              <p className="text-sm text-slate-500">
+                {pendingSettings.allowNonMasterLocations 
+                  ? 'Any scanned location is accepted'
+                  : 'Only locations in Location Master are accepted'}
+              </p>
+            </div>
+            <Switch
+              checked={pendingSettings.allowNonMasterLocations || false}
+              onCheckedChange={(checked) => handlePendingSettingChange('allowNonMasterLocations', checked)}
+            />
+          </div>
+          <div className={`p-3 rounded-lg text-sm ${
+            pendingSettings.allowNonMasterLocations 
+              ? 'bg-amber-50 text-amber-700' 
+              : 'bg-blue-50 text-blue-700'
+          }`}>
+            {pendingSettings.allowNonMasterLocations 
+              ? '⚠️ All scanned locations will be accepted regardless of master data.'
+              : '🔒 Only locations defined in Location Master (Master Data) will be accepted. Unknown locations will be rejected.'}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Scanning Settings */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
