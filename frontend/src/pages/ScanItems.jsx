@@ -822,11 +822,12 @@ const ScanItems = () => {
   // Handle barcode scan - auto-add when Enter is pressed
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
-      // Allow scan if manual entry is enabled OR if there's input in the field
-      // (if input got through, it passed scanner detection)
-      if (settings.allowManualBarcodeEntry !== false || barcodeInput.trim().length > 0) {
-        handleScan();
+      // Cancel any pending auto-process since Enter was pressed explicitly
+      if (barcodeAutoProcessTimerRef.current) {
+        clearTimeout(barcodeAutoProcessTimerRef.current);
+        barcodeAutoProcessTimerRef.current = null;
       }
+      handleScan();
     }
   };
   
