@@ -46,10 +46,7 @@ const Settings = () => {
   const [pendingSettings, setPendingSettings] = useState({ ...settings });
   const [hasChanges, setHasChanges] = useState(false);
   
-  // Save confirmation
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveCredentials, setSaveCredentials] = useState({ userId: '', password: '' });
-  const [saveError, setSaveError] = useState('');
+  // Save success feedback
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   // Password change modal
