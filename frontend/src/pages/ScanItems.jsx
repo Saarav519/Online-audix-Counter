@@ -764,8 +764,8 @@ const ScanItems = () => {
     }
   };
 
-  const handleLocationScan = () => {
-    const input = locationInput.trim();
+  const handleLocationScan = (inputOverride) => {
+    const input = (inputOverride || locationInput).trim();
     if (!input) return;
 
     const result = scanLocation(input);
