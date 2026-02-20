@@ -949,6 +949,12 @@ const ScanItems = () => {
   const handleToggleAskQuantity = (checked) => {
     setAskQuantityBeforeAdding(checked);
     localStorage.setItem('audix_ask_qty_before_adding', String(checked));
+    // Immediately refocus barcode input after toggle
+    setTimeout(() => {
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.focus();
+      }
+    }, 50);
   };
 
   // Show quantity popup for a barcode
