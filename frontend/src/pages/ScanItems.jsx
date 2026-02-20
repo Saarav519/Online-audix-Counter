@@ -92,7 +92,6 @@ const ScannedItemRow = memo(({
   setEditQuantity, 
   onQuantityUpdate, 
   onDelete,
-  isSingleSkuMode,
   isLocationLocked,
   onStartEdit
 }) => {
@@ -106,27 +105,32 @@ const ScannedItemRow = memo(({
         <p className="text-xs text-slate-500 truncate">{item.productName}</p>
       </div>
       {/* Quantity & Delete */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0" data-qty-edit="true">
         {isEditing ? (
           <Input
             type="number"
             min="1"
             value={editQuantity}
             onChange={(e) => setEditQuantity(e.target.value)}
-            className="w-14 h-7 text-center text-sm font-bold p-1"
+            className="w-16 h-8 text-center text-sm font-bold p-1"
             autoFocus
-            onKeyPress={(e) => e.key === 'Enter' && onQuantityUpdate(item.id)}
+            data-qty-input="true"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                onQuantityUpdate(item.id);
+              }
+            }}
             onBlur={() => onQuantityUpdate(item.id)}
           />
         ) : (
           <span 
-            className={`font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded ${
-              !isSingleSkuMode && !isLocationLocked 
-                ? 'bg-emerald-100 text-emerald-700 cursor-pointer active:bg-emerald-200' 
-                : 'bg-slate-100 text-slate-700'
-            }`}
-            onClick={() => {
-              if (!isSingleSkuMode && !isLocationLocked) {
+            className="font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded bg-emerald-100 text-emerald-700 cursor-pointer active:bg-emerald-200"
+            data-qty-edit="true"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isLocationLocked) {
                 onStartEdit(item.id, String(item.quantity));
               }
             }}
