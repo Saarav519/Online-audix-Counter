@@ -58,7 +58,7 @@ const Layout = ({ children }) => {
   // Bottom nav items for scanner mode (limited to 5 for better UX)
   const bottomNavItems = useMemo(() => {
     const items = [
-      { path: '/', icon: LayoutDashboard, label: 'Home' },
+      { path: '/master-data', icon: Database, label: 'Master' },
       { path: '/locations', icon: MapPin, label: 'Locations' },
       { path: '/scan', icon: ScanBarcode, label: 'Scan', hideInPreAssigned: true },
       { path: '/reports', icon: FileSpreadsheet, label: 'Reports' },
