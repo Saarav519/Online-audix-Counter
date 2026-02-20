@@ -452,6 +452,29 @@ agent_communication:
       🎉 CONCLUSION: All backend API endpoints are functioning perfectly and ready for production use.
   - agent: "main"
     message: |
+      Implemented 2 UI changes in mobile/scanner view as requested by user:
+      
+      1. ✅ Quantity Popup (Ask Qty toggle ON): Removed +/- increment/decrement buttons
+         - Replaced with a clean full-width numeric input field (type="number", inputMode="numeric")
+         - Default value is 1, auto-focused and auto-selected on popup open
+         - Enter key confirms and adds item
+         - Validation: minimum 1
+         - Helper text: "Type quantity and press Enter to add"
+         - Both mobile and desktop popups updated
+      
+      2. ✅ Scanned Items List: Quantity is now always editable
+         - Replaced tap-to-edit badge with always-visible inline numeric input field
+         - Users can directly tap the quantity field and type a new value
+         - Green border/bg styling to indicate editability
+         - Enter key or blur confirms the change
+         - Fixed potential focus-stealing by keepFocusOnBarcode handler
+         - When location is locked/submitted, shows read-only quantity badge
+      
+      Files modified:
+      - /app/frontend/src/pages/ScanItems.jsx
+      
+  - agent: "main"
+    message: |
       Fixed Manual Entry mode behavior for hardware scanners:
       
       1. ✅ Manual Entry OFF now STRICTLY blocks manual typing
