@@ -1907,14 +1907,7 @@ const ScanItems = () => {
                         <p className="font-medium">{item.productName}</p>
                       </TableCell>
                       <TableCell className="text-center">
-                        {/* In Single SKU mode, show quantity as read-only */}
-                        {isSingleSkuMode ? (
-                          <span className="font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded">
-                            {item.quantity}
-                          </span>
-                        ) : (
-                          // In Non-Single SKU mode, allow editing
-                          editingItemId === item.id ? (
+                        {editingItemId === item.id ? (
                             <div className="flex items-center justify-center gap-1">
                               <Input
                                 type="number"
