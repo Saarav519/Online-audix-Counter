@@ -246,6 +246,18 @@ const ScanItems = () => {
   const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false); // Back confirmation dialog
   
+  // "Ask Quantity Before Adding" toggle (Punching Mode)
+  const [askQuantityBeforeAdding, setAskQuantityBeforeAdding] = useState(() => {
+    const saved = localStorage.getItem('audix_ask_qty_before_adding');
+    return saved === 'true';
+  });
+  const [showQuantityPopup, setShowQuantityPopup] = useState(false);
+  const [pendingBarcode, setPendingBarcode] = useState('');
+  const [pendingProductName, setPendingProductName] = useState('');
+  const [pendingIsValid, setPendingIsValid] = useState(false);
+  const [popupQuantity, setPopupQuantity] = useState('1');
+  const popupQuantityRef = useRef(null);
+  
   // ============================================
   // TEMPORARY SCANNED ITEMS - Auto-saved to localStorage for persistence
   // Final save to context happens when user clicks "Submit Location"
