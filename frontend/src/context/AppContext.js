@@ -1028,6 +1028,55 @@ export const AppProvider = ({ children }) => {
     return newProducts.length;
   };
 
+  // ============================================
+  // MASTER LOCATIONS CRUD FUNCTIONS
+  // ============================================
+  
+  // Add single master location
+  const addMasterLocation = (locationData) => {
+    const newLocation = {
+      code: locationData.code,
+      name: locationData.name || locationData.code,
+      description: locationData.description || '',
+      isMaster: true
+    };
+    setMasterLocations(prev => {
+      // Prevent duplicates by code
+      const existing = prev.find(l => l.code === newLocation.code);
+      if (existing) return prev;
+      return [...prev, newLocation];
+    });
+    return newLocation;
+  };
+
+  // DIRECT SET: Used by import to set all locations at once
+  const setMasterLocationsDirect = (locations) => {
+    console.log(`📥 Direct setting ${locations.length} master locations (already saved to IndexedDB)`);
+    setMasterLocations(locations);
+  };
+
+  // Import master locations from CSV data
+  const importMasterLocations = (locations, replaceExisting = true) => {
+    const newLocations = locations.map(l => ({
+      code: l.code,
+      name: l.name || l.code,
+      description: l.description || '',
+      isMaster: true
+    }));
+    
+    if (replaceExisting) {
+      setMasterLocations(newLocations);
+    } else {
+      setMasterLocations(prev => [...prev, ...newLocations]);
+    }
+    return newLocations.length;
+  };
+
+  // Delete single master location by code
+  const deleteMasterLocation = (code) => {
+    setMasterLocations(prev => prev.filter(l => l.code !== code));
+  };
+
   // Import users from CSV data - FOR AUTHORIZATION ONLY
   // These users can only authorize actions like delete/reopen, NOT login
   const importAuthorizationUsers = (usersData) => {
