@@ -1961,8 +1961,7 @@ const ScanItems = () => {
                                 </Button>
                               )}
                             </div>
-                          )
-                        )}
+                          )}
                       </TableCell>
                       <TableCell className="text-center">
                         {item.isMaster !== false ? (
