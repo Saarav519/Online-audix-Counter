@@ -124,6 +124,61 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   // ============================================
+  // INDEXEDDB: Load Master Locations on startup
+  // ============================================
+  useEffect(() => {
+    const loadMasterLocations = async () => {
+      try {
+        const locations = await MasterLocationsDB.getAll();
+        if (locations && locations.length > 0) {
+          setMasterLocations(locations);
+          console.log(`✅ Loaded ${locations.length} master locations from IndexedDB`);
+        } else {
+          // First time - save mock data to IndexedDB
+          await MasterLocationsDB.importAll(mockMasterLocations);
+          setMasterLocations(mockMasterLocations);
+          console.log('✅ Initialized IndexedDB with mock master locations');
+        }
+      } catch (err) {
+        console.warn('IndexedDB master locations load failed, using localStorage fallback:', err);
+        const saved = localStorage.getItem('audix_master_locations');
+        if (saved) {
+          setMasterLocations(JSON.parse(saved));
+        }
+      }
+    };
+    
+    loadMasterLocations();
+  }, []);
+
+  // ============================================
+  // AUTO-SAVE: Persist master locations to IndexedDB when changed
+  // ============================================
+  useEffect(() => {
+    if (!indexedDBLoadedRef.current) return;
+    if (!masterLocationsInitializedRef.current) {
+      masterLocationsInitializedRef.current = true;
+      return;
+    }
+    
+    const saveTimeout = setTimeout(() => {
+      console.log(`💾 Saving ${masterLocations.length} master locations to IndexedDB...`);
+      MasterLocationsDB.importAll(masterLocations)
+        .then(() => console.log('✅ Master locations saved to IndexedDB'))
+        .catch(err => {
+          console.warn('IndexedDB master locations save failed, using localStorage fallback:', err);
+          try {
+            localStorage.setItem('audix_master_locations', JSON.stringify(masterLocations));
+          } catch (e) {
+            console.warn('localStorage fallback also failed:', e);
+          }
+        });
+    }, 300);
+
+    return () => clearTimeout(saveTimeout);
+  }, [masterLocations]);
+
+  // ============================================
   // PERFORMANCE OPTIMIZATION: Master Product Lookup Map
   // Convert array to Map for O(1) lookup instead of O(n) array.find()
   // Critical for large master data (thousands of products)
