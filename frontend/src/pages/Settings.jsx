@@ -234,6 +234,14 @@ const Settings = () => {
         </div>
       )}
 
+      {/* Save Success Message */}
+      {saveSuccess && (
+        <div className="p-3 bg-emerald-50 rounded-lg flex items-center gap-2 text-emerald-700">
+          <CheckCircle2 className="w-4 h-4" />
+          <span className="text-sm">Settings saved successfully!</span>
+        </div>
+      )}
+
       {/* User Info */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
