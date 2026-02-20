@@ -32,6 +32,10 @@ export const AppProvider = ({ children }) => {
   const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
   const [isLoadingMasterData, setIsLoadingMasterData] = useState(true);
   
+  // Master locations - loaded from IndexedDB (similar pattern to masterProducts)
+  const [masterLocations, setMasterLocations] = useState(mockMasterLocations);
+  const masterLocationsInitializedRef = useRef(false);
+  
   // FLAG: Prevent auto-save until IndexedDB has finished loading
   // This prevents race conditions where mock data could overwrite real data
   const indexedDBLoadedRef = useRef(false);
