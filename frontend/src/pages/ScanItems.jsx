@@ -38,8 +38,10 @@ import {
   Sparkles,
   Hash,
   Send,
-  ArrowLeft
+  ArrowLeft,
+  ToggleRight
 } from 'lucide-react';
+import { Switch } from '../components/ui/switch';
 
 // ============================================
 // PERFORMANCE: Debounce utility for localStorage saves
