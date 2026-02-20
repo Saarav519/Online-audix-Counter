@@ -45,7 +45,7 @@ import {
 } from 'lucide-react';
 
 const MasterData = () => {
-  const { masterProducts, addMasterProduct, setMasterProductsDirect, importAuthorizationUsers, getAuthorizationUsers } = useApp();
+  const { masterProducts, addMasterProduct, setMasterProductsDirect, masterLocations, addMasterLocation, setMasterLocationsDirect, deleteMasterLocation, importAuthorizationUsers, getAuthorizationUsers } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
