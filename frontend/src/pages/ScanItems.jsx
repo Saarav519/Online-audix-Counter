@@ -307,10 +307,15 @@ const ScanItems = () => {
   // Saves every 500ms instead of on every scan - major performance boost
   // ============================================
   const saveItemsToStorage = useCallback((items, locationId) => {
-    if (locationId && items.length > 0) {
+    if (locationId) {
       const key = `audix_temp_items_${locationId}`;
       try {
-        localStorage.setItem(key, JSON.stringify(items));
+        if (items.length > 0) {
+          localStorage.setItem(key, JSON.stringify(items));
+        } else {
+          // Empty array - remove the key so stale data doesn't persist
+          localStorage.removeItem(key);
+        }
       } catch (e) {
         console.warn('localStorage save failed:', e);
       }
