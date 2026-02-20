@@ -41,7 +41,8 @@ import {
   RefreshCw,
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MapPin
 } from 'lucide-react';
 
 const MasterData = () => {
