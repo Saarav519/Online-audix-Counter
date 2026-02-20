@@ -1996,7 +1996,7 @@ const ScanItems = () => {
         </CardContent>
       </Card>
 
-      {/* Quantity Popup (Punching Mode) - Desktop */}
+      {/* Quantity Popup (Punching Mode) - Desktop - Clean numeric input only */}
       <Dialog open={showQuantityPopup} onOpenChange={(open) => { if (!open) cancelQuantityPopup(); }}>
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
@@ -2011,39 +2011,32 @@ const ScanItems = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12"
-                onClick={() => setPopupQuantity(String(Math.max(1, parseInt(popupQuantity) - 1)))}
-              >
-                <Minus className="w-5 h-5" />
-              </Button>
+            <div className="flex items-center justify-center">
               <Input
                 ref={popupQuantityRef}
                 type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min="1"
                 value={popupQuantity}
-                onChange={(e) => setPopupQuantity(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setPopupQuantity(val);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
+                    e.stopPropagation();
                     confirmQuantityPopup();
                   }
                 }}
-                className="h-14 w-28 text-center text-2xl font-bold"
+                onFocus={(e) => e.target.select()}
+                className="h-16 w-full text-center text-3xl font-bold border-2 border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500"
                 data-qty-input="true"
+                autoFocus
               />
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12"
-                onClick={() => setPopupQuantity(String(parseInt(popupQuantity || '0') + 1))}
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
             </div>
+            <p className="text-xs text-slate-400 text-center mt-2">Type quantity and press Enter to add</p>
           </div>
           <DialogFooter className="flex gap-2 sm:gap-2">
             <Button
