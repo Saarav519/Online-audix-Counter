@@ -950,6 +950,21 @@ export const AppProvider = ({ children }) => {
 
   // Scan location - handles both pre-assigned and dynamic modes
   const scanLocation = (scannedCode) => {
+    // ============================================
+    // MASTER LOCATION VALIDATION
+    // If allowNonMasterLocations is false (default), only accept master locations
+    // ============================================
+    if (!settings.allowNonMasterLocations && masterLocations.length > 0) {
+      if (!isLocationInMaster(scannedCode)) {
+        return { 
+          success: false, 
+          error: `Location "${scannedCode}" not in Master. Only master locations are allowed.`, 
+          location: null,
+          notInMaster: true
+        };
+      }
+    }
+
     const existingLocation = findLocationByCode(scannedCode);
     
     if (existingLocation) {
@@ -965,7 +980,7 @@ export const AppProvider = ({ children }) => {
       return { success: true, location: existingLocation, isNew: false };
     }
     
-    // Location not found
+    // Location not found in active locations
     if (settings.locationScanMode === 'preassigned') {
       return { success: false, error: `Location "${scannedCode}" not found. Only pre-assigned locations can be scanned.`, location: null };
     }
