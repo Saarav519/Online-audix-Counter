@@ -292,6 +292,71 @@ export const MasterProductsDB = {
 };
 
 /**
+ * Master Locations API
+ */
+export const MasterLocationsDB = {
+  getAll: () => getAll(STORES.MASTER_LOCATIONS),
+  
+  getByCode: (code) => getByKey(STORES.MASTER_LOCATIONS, code),
+  
+  save: (location) => put(STORES.MASTER_LOCATIONS, location),
+  
+  // Bulk import - replaces all existing data
+  importAll: async (locations, onProgress = null) => {
+    await clearStore(STORES.MASTER_LOCATIONS);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+  },
+  
+  // Direct CSV to IndexedDB import
+  importFromCSV: async (csvText, onProgress = null) => {
+    const lines = csvText.split('\n').filter(line => line.trim());
+    const dataLines = lines.slice(1); // Skip header
+    const totalLines = dataLines.length;
+    
+    if (totalLines === 0) {
+      return { success: false, error: 'No data found', locations: [] };
+    }
+
+    const locations = [];
+    for (let i = 0; i < dataLines.length; i++) {
+      const line = dataLines[i];
+      const parts = line.split(',').map(s => s.trim().replace(/"/g, ''));
+      const [code, name, description] = parts;
+      
+      if (code) {
+        locations.push({
+          code,
+          name: name || code,
+          description: description || '',
+          isMaster: true
+        });
+      }
+    }
+
+    if (locations.length === 0) {
+      return { success: false, error: 'No valid locations found', locations: [] };
+    }
+
+    await clearStore(STORES.MASTER_LOCATIONS);
+    await putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+    
+    return { success: true, count: locations.length, locations };
+  },
+  
+  addMany: (locations, onProgress = null) => putMany(STORES.MASTER_LOCATIONS, locations, onProgress),
+  
+  delete: (code) => deleteByKey(STORES.MASTER_LOCATIONS, code),
+  
+  clear: () => clearStore(STORES.MASTER_LOCATIONS),
+  
+  count: async () => {
+    const all = await getAll(STORES.MASTER_LOCATIONS);
+    return all.length;
+  }
+};
+
+/**
  * Scanned Items API
  */
 export const ScannedItemsDB = {
