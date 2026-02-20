@@ -1993,7 +1993,76 @@ const ScanItems = () => {
         </CardContent>
       </Card>
 
-      {/* Submit Confirmation Modal */}
+      {/* Quantity Popup (Punching Mode) - Desktop */}
+      <Dialog open={showQuantityPopup} onOpenChange={(open) => { if (!open) cancelQuantityPopup(); }}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Hash className="w-5 h-5 text-emerald-600" />
+              Enter Quantity
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              <span className="font-mono text-sm font-bold text-slate-800">{pendingBarcode}</span>
+              <br />
+              <span className="text-slate-500">{pendingProductName}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12"
+                onClick={() => setPopupQuantity(String(Math.max(1, parseInt(popupQuantity) - 1)))}
+              >
+                <Minus className="w-5 h-5" />
+              </Button>
+              <Input
+                ref={popupQuantityRef}
+                type="number"
+                min="1"
+                value={popupQuantity}
+                onChange={(e) => setPopupQuantity(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    confirmQuantityPopup();
+                  }
+                }}
+                className="h-14 w-28 text-center text-2xl font-bold"
+                data-qty-input="true"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12"
+                onClick={() => setPopupQuantity(String(parseInt(popupQuantity || '0') + 1))}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={cancelQuantityPopup}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmQuantityPopup}
+              disabled={!popupQuantity || parseInt(popupQuantity) < 1}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Add (Qty: {popupQuantity || 0})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submit Confirmation Modal - Desktop */}
       <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
