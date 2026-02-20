@@ -304,6 +304,9 @@ const ScanItems = () => {
       if (selectedLocationId && tempScannedItems.length > 0) {
         flushSaveItems(tempScannedItems, selectedLocationId);
       }
+      // Cleanup auto-confirm/auto-process timers
+      if (locationAutoConfirmTimerRef.current) clearTimeout(locationAutoConfirmTimerRef.current);
+      if (barcodeAutoProcessTimerRef.current) clearTimeout(barcodeAutoProcessTimerRef.current);
     };
   }, [selectedLocationId, tempScannedItems, flushSaveItems]);
   
