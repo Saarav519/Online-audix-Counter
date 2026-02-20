@@ -156,6 +156,22 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
     if (!isEnabled) return;
 
     const handleKeyDown = (e) => {
+      // CRITICAL: Do NOT intercept keyboard events for quantity input fields
+      // Check if the focused/target element is a quantity input (popup or inline)
+      const target = e.target;
+      const isQtyInput = target && (
+        target.hasAttribute('data-qty-input') ||
+        target.closest('[data-qty-edit]') ||
+        target.closest('[role="dialog"]')
+      );
+      
+      if (isQtyInput) {
+        // Let the event pass through naturally to quantity inputs
+        // Clear any scanner buffer to prevent stale data
+        bufferRef.current = '';
+        return;
+      }
+      
       const currentTime = Date.now();
       const timeDiff = currentTime - lastKeyTimeRef.current;
       
