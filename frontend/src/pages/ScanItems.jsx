@@ -1305,31 +1305,33 @@ const ScanItems = () => {
                   <p className="text-slate-400 text-xs mt-1">Start scanning barcodes</p>
                 </div>
               ) : (
-                /* PERFORMANCE: Virtualized list - only renders visible items */
-                <List
+                <div 
                   ref={itemsListRef}
-                  height={220}
-                  itemCount={reversedItems.length}
-                  itemSize={56}
-                  width="100%"
+                  className="space-y-2 overflow-y-auto"
                   style={{ 
-                    paddingBottom: '60px',
+                    maxHeight: '220px',
+                    paddingBottom: '8px',
                     WebkitOverflowScrolling: 'touch'
                   }}
-                  itemData={{
-                    items: reversedItems,
-                    editingItemId,
-                    editQuantity,
-                    setEditQuantity,
-                    handleQuantityUpdate,
-                    handleDelete,
-                    isSingleSkuMode,
-                    isLocationLocked,
-                    setEditingItemId
-                  }}
                 >
-                  {VirtualizedItemRow}
-                </List>
+                  {reversedItems.map((item) => (
+                    <ScannedItemRow
+                      key={item.id}
+                      item={item}
+                      isEditing={editingItemId === item.id}
+                      editQuantity={editQuantity}
+                      setEditQuantity={setEditQuantity}
+                      onQuantityUpdate={handleQuantityUpdate}
+                      onDelete={handleDelete}
+                      isSingleSkuMode={isSingleSkuMode}
+                      isLocationLocked={isLocationLocked}
+                      onStartEdit={(id, qty) => {
+                        setEditingItemId(id);
+                        setEditQuantity(String(qty));
+                      }}
+                    />
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
