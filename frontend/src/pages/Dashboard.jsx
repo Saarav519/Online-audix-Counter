@@ -31,8 +31,8 @@ const Dashboard = () => {
   const submittedLocations = locations.filter(l => l.isSubmitted).length;
   const pendingLocations = totalLocations - completedLocations;
 
-  const totalScannedItems = Object.values(scannedItems).reduce(
-    (sum, items) => sum + items.reduce((s, i) => s + i.quantity, 0),
+  const totalScannedItems = Object.values(scannedItems || {}).reduce(
+    (sum, items) => sum + (items || []).reduce((s, i) => s + i.quantity, 0),
     0
   );
 
