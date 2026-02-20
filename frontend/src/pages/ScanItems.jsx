@@ -533,10 +533,31 @@ const ScanItems = () => {
     return { success: true, isValid: isValidBarcode, product, item: newItem };
   }, [getProductByBarcode, settings.allowNonMasterProducts]);
   
-  // Delete item from temp state
+  // Delete item from temp state - IMMEDIATELY persists to localStorage
   const deleteTempItem = useCallback((itemId) => {
-    setTempScannedItems(prev => prev.filter(item => item.id !== itemId));
-  }, []);
+    setTempScannedItems(prev => {
+      const updated = prev.filter(item => item.id !== itemId);
+      
+      // Immediately persist deletion to localStorage (not debounced)
+      // This prevents deleted items from reappearing when navigating away and back
+      if (selectedLocationId) {
+        const key = `audix_temp_items_${selectedLocationId}`;
+        try {
+          if (updated.length > 0) {
+            localStorage.setItem(key, JSON.stringify(updated));
+          } else {
+            // All items deleted - remove the key entirely
+            localStorage.removeItem(key);
+          }
+          console.log(`🗑️ Deleted item ${itemId}, ${updated.length} items remaining, saved to localStorage`);
+        } catch (e) {
+          console.warn('localStorage save after delete failed:', e);
+        }
+      }
+      
+      return updated;
+    });
+  }, [selectedLocationId]);
   
   // Update item quantity in temp state
   const updateTempItemQuantity = useCallback((itemId, newQuantity) => {
