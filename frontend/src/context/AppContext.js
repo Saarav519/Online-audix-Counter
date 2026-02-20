@@ -196,6 +196,40 @@ export const AppProvider = ({ children }) => {
     return masterProductMap.get(barcode);
   }, [masterProductMap]);
 
+  // ============================================
+  // PERFORMANCE OPTIMIZATION: Master Location Lookup Set
+  // Uses Set for O(1) lookup by location code
+  // ============================================
+  const masterLocationSet = useMemo(() => {
+    const set = new Set();
+    masterLocations.forEach(loc => {
+      set.add(loc.code);
+      // Also add lowercase for case-insensitive matching
+      set.add(loc.code.toLowerCase());
+    });
+    return set;
+  }, [masterLocations]);
+
+  // Master location lookup map - O(1) by code
+  const masterLocationMap = useMemo(() => {
+    const map = new Map();
+    masterLocations.forEach(loc => {
+      map.set(loc.code, loc);
+      map.set(loc.code.toLowerCase(), loc);
+    });
+    return map;
+  }, [masterLocations]);
+
+  // Fast location master lookup
+  const getMasterLocationByCode = useCallback((code) => {
+    return masterLocationMap.get(code) || masterLocationMap.get(code.toLowerCase());
+  }, [masterLocationMap]);
+
+  // Check if a location code is in master
+  const isLocationInMaster = useCallback((code) => {
+    return masterLocationSet.has(code) || masterLocationSet.has(code.toLowerCase());
+  }, [masterLocationSet]);
+
   // Persist locations to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('audix_locations', JSON.stringify(locations));
