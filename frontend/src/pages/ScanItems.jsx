@@ -755,12 +755,14 @@ const ScanItems = () => {
 
     // Scanner detection: multiple chars at once OR rapid input (< 80ms between changes)
     if (newValue.trim() && (charsAdded > 2 || (timeDiff < 80 && charsAdded > 0))) {
-      // Wait a brief moment for scanner to finish sending all characters, then auto-confirm
+      // Wait for scanner to finish sending all characters, then auto-confirm
+      // Use the DOM input ref value to get the final scanner output
       locationAutoConfirmTimerRef.current = setTimeout(() => {
-        if (newValue.trim()) {
-          handleLocationScan();
+        const finalValue = locationInputRef.current?.value?.trim();
+        if (finalValue) {
+          handleLocationScan(finalValue);
         }
-      }, 150);
+      }, 300);
     }
   };
 
