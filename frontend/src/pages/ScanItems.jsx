@@ -559,12 +559,26 @@ const ScanItems = () => {
     });
   }, [selectedLocationId]);
   
-  // Update item quantity in temp state
+  // Update item quantity in temp state - IMMEDIATELY persists to localStorage
   const updateTempItemQuantity = useCallback((itemId, newQuantity) => {
-    setTempScannedItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, quantity: newQuantity } : item
-    ));
-  }, []);
+    setTempScannedItems(prev => {
+      const updated = prev.map(item => 
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      );
+      
+      // Immediately persist to localStorage
+      if (selectedLocationId) {
+        const key = `audix_temp_items_${selectedLocationId}`;
+        try {
+          localStorage.setItem(key, JSON.stringify(updated));
+        } catch (e) {
+          console.warn('localStorage save after qty update failed:', e);
+        }
+      }
+      
+      return updated;
+    });
+  }, [selectedLocationId]);
   
   // Clear all temp items (including from localStorage)
   const clearTempItems = useCallback(() => {
