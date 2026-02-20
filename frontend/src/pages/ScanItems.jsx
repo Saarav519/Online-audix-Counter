@@ -576,9 +576,29 @@ const ScanItems = () => {
         playSound(false);
       }
     } else {
-      // FAST BARCODE PROCESSING - Add to TEMP state (not saved until submit)
-      const qty = isSingleSkuModeRef.current ? 1 : (parseInt(quantityInputRef2.current) || 1);
-      const result = addTempItem(scannedValue, qty);
+      // FAST BARCODE PROCESSING
+      
+      // Check if "Ask Quantity Before Adding" is ON
+      if (askQuantityRef.current) {
+        // Punching Mode: show quantity popup
+        const checkResult = showQtyPopup(scannedValue);
+        if (!checkResult.success) {
+          setLastScanResult({ 
+            success: false, 
+            message: checkResult.error,
+            barcode: scannedValue
+          });
+          playSound(false);
+          scanResultTimeoutRef.current = setTimeout(() => {
+            setLastScanResult(null);
+          }, 3000);
+        }
+        setBarcodeInput('');
+        return;
+      }
+      
+      // Default Mode: auto-add with qty=1
+      const result = addTempItem(scannedValue, 1);
       
       if (result.success) {
         // Update scan count for feedback
@@ -596,7 +616,7 @@ const ScanItems = () => {
           item: result.item,
           isValid: result.isValid,
           barcode: scannedValue,
-          quantity: qty,
+          quantity: 1,
           scanTime: timeSinceLastScan
         });
         
@@ -623,7 +643,7 @@ const ScanItems = () => {
         }, 3000);
       }
     }
-  }, [scanLocation, addTempItem, playSound]);
+  }, [scanLocation, addTempItem, playSound, showQtyPopup]);
 
   // Enable hardware scanner hook - always enabled when location is not locked
   // The hook captures ALL keyboard-based scanner input
