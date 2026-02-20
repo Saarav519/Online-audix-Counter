@@ -300,6 +300,117 @@ supervisor1,super789`;
     await downloadCSV(sampleData, 'sample_authorization_users.csv');
   };
 
+  // ============================================
+  // LOCATION MASTER HANDLERS
+  // ============================================
+  const handleAddLocation = () => {
+    if (newLocation.code) {
+      addMasterLocation({
+        code: newLocation.code.trim(),
+        name: newLocation.name.trim() || newLocation.code.trim(),
+        description: newLocation.description.trim()
+      });
+      setNewLocation({ code: '', name: '', description: '' });
+      setShowAddLocationModal(false);
+    }
+  };
+
+  const handleCancelLocImport = () => {
+    cancelLocImportRef.current = true;
+    setLocImportProgress(prev => prev ? { ...prev, status: 'Cancelling...' } : null);
+  };
+
+  const handleLocFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    cancelLocImportRef.current = false;
+    setIsLocImporting(true);
+    setLocImportProgress({ processed: 0, total: 0, status: 'Reading file...' });
+    setLocImportResult(null);
+
+    try {
+      const text = await file.text();
+      
+      if (cancelLocImportRef.current) {
+        handleLocCancelComplete();
+        return;
+      }
+
+      const result = await MasterLocationsDB.importFromCSV(text, (processed, total) => {
+        if (!cancelLocImportRef.current) {
+          setLocImportProgress({ 
+            processed, total, 
+            status: `Saving: ${processed.toLocaleString()} of ${total.toLocaleString()}` 
+          });
+        }
+      });
+
+      if (cancelLocImportRef.current) {
+        handleLocCancelComplete();
+        return;
+      }
+
+      if (!result.success) {
+        setLocImportResult({ success: false, error: result.error });
+        setIsLocImporting(false);
+        setLocImportProgress(null);
+        return;
+      }
+
+      setLocImportProgress({ processed: result.count, total: result.count, status: 'Updating display...' });
+      
+      startTransition(() => {
+        setMasterLocationsDirect(result.locations);
+      });
+      
+      setTimeout(() => {
+        setLocImportProgress({ processed: result.count, total: result.count, status: 'Complete!' });
+        setLocImportResult({ success: true, count: result.count, replaced: true });
+        setTimeout(() => {
+          setLocImportProgress(null);
+          setIsLocImporting(false);
+        }, 800);
+      }, 200);
+      
+    } catch (error) {
+      console.error('Location import error:', error);
+      setLocImportResult({ success: false, error: 'Failed to import file' });
+      setIsLocImporting(false);
+      setLocImportProgress(null);
+    }
+    
+    if (locationFileInputRef.current) {
+      locationFileInputRef.current.value = '';
+    }
+  };
+
+  const handleLocCancelComplete = () => {
+    setLocImportResult({ success: false, error: 'Import cancelled by user' });
+    setIsLocImporting(false);
+    setLocImportProgress(null);
+    cancelLocImportRef.current = false;
+  };
+
+  const handleLocExport = async () => {
+    const headers = ['Code', 'Name', 'Description'];
+    const rows = masterLocations.map(l => 
+      [l.code, `"${l.name}"`, `"${l.description || ''}"`].join(',')
+    );
+    const csv = [headers.join(','), ...rows].join('\n');
+    await downloadCSV(csv, 'master_locations.csv');
+  };
+
+  const downloadSampleLocationCSV = async () => {
+    const sampleData = `Code,Name,Description
+WH-A1,Warehouse A Section 1,Main warehouse section 1
+WH-A2,Warehouse A Section 2,Main warehouse section 2
+WH-B-CS,Warehouse B Cold Storage,Cold storage facility
+RT-SF,Retail Store Front,Front retail area`;
+    
+    await downloadCSV(sampleData, 'sample_locations.csv');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
