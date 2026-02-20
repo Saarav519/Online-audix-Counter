@@ -417,45 +417,49 @@ RT-SF,Retail Store Front,Front retail area`;
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Master Data</h1>
-          <p className="text-slate-500 mt-1">Manage products and user credentials</p>
+          <p className="text-slate-500 mt-1">Manage products, locations and user credentials</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowImportModal(true)}
-            className="border-slate-200"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            Import Products
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowUserImportModal(true)}
-            className="border-blue-200 text-blue-700 hover:bg-blue-50"
-          >
-            <Users className="w-4 h-4 mr-2" />
-            Import Users
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            className="border-slate-200"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button
-            onClick={() => setShowAddModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Product
-          </Button>
+          {activeTab === 'products' ? (
+            <>
+              <Button variant="outline" onClick={() => setShowImportModal(true)} className="border-slate-200">
+                <Upload className="w-4 h-4 mr-2" />
+                Import Products
+              </Button>
+              <Button variant="outline" onClick={() => setShowUserImportModal(true)} className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                <Users className="w-4 h-4 mr-2" />
+                Import Users
+              </Button>
+              <Button variant="outline" onClick={handleExport} className="border-slate-200">
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button onClick={() => setShowAddModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setShowLocImportModal(true)} className="border-slate-200">
+                <Upload className="w-4 h-4 mr-2" />
+                Import Locations
+              </Button>
+              <Button variant="outline" onClick={handleLocExport} className="border-slate-200">
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button onClick={() => setShowAddLocationModal(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Location
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -464,7 +468,20 @@ RT-SF,Retail Store Front,Front retail area`;
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-800">{masterProducts.length}</p>
-                <p className="text-sm text-slate-500">Total Products</p>
+                <p className="text-sm text-slate-500">Products</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-100 rounded-lg">
+                <MapPin className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-800">{masterLocations.length}</p>
+                <p className="text-sm text-slate-500">Locations</p>
               </div>
             </div>
           </CardContent>
@@ -477,7 +494,7 @@ RT-SF,Retail Store Front,Front retail area`;
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-800">{authorizationUsers.length}</p>
-                <p className="text-sm text-slate-500">Authorization Users</p>
+                <p className="text-sm text-slate-500">Auth Users</p>
               </div>
             </div>
           </CardContent>
@@ -492,138 +509,227 @@ RT-SF,Retail Store Front,Front retail area`;
                 <p className="text-2xl font-bold text-slate-800">
                   {masterProducts.filter(p => p.isMaster).length}
                 </p>
-                <p className="text-sm text-slate-500">Master Products</p>
+                <p className="text-sm text-slate-500">Master Items</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-        <Input
-          placeholder="Search by name or barcode..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-11 border-slate-200"
-        />
-      </div>
+      {/* Tabs: Products | Locations */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full grid grid-cols-2 mb-4">
+          <TabsTrigger value="products" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Products
+          </TabsTrigger>
+          <TabsTrigger value="locations" className="flex items-center gap-2">
+            <MapPin className="w-4 h-4" />
+            Locations
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Products Table */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50">
-                <TableHead className="w-[180px]">Barcode</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead className="text-right w-[120px]">Price</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedProducts.map((product) => (
-                <TableRow key={product.barcode} className="hover:bg-slate-50">
-                  <TableCell className="font-mono text-sm">{product.barcode}</TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-right">
-                    ₹{product.price?.toFixed(2)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {/* Pagination Controls */}
-          {filteredProducts.length > ITEMS_PER_PAGE && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-              <p className="text-sm text-slate-500">
-                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length.toLocaleString()}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="h-8 px-2"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-sm text-slate-600 min-w-[80px] text-center">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="h-8 px-2"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+        {/* ========== PRODUCTS TAB ========== */}
+        <TabsContent value="products" className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              placeholder="Search by name or barcode..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-11 border-slate-200"
+            />
+          </div>
+
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="w-[180px]">Barcode</TableHead>
+                    <TableHead>Product Name</TableHead>
+                    <TableHead className="text-right w-[120px]">Price</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedProducts.map((product) => (
+                    <TableRow key={product.barcode} className="hover:bg-slate-50">
+                      <TableCell className="font-mono text-sm">{product.barcode}</TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell className="text-right">
+                        ₹{product.price?.toFixed(2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {filteredProducts.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-sm text-slate-500">
+                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length.toLocaleString()}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="h-8 px-2">
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm text-slate-600 min-w-[80px] text-center">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="h-8 px-2">
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {filteredProducts.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No products found</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">No products found</p>
-        </div>
-      )}
+        {/* ========== LOCATIONS TAB ========== */}
+        <TabsContent value="locations" className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <Input
+              placeholder="Search by code or name..."
+              value={locSearchTerm}
+              onChange={(e) => setLocSearchTerm(e.target.value)}
+              className="pl-10 h-11 border-slate-200"
+            />
+          </div>
+
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="w-[140px]">Code</TableHead>
+                    <TableHead>Location Name</TableHead>
+                    <TableHead className="text-right w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedLocations.map((loc) => (
+                    <TableRow key={loc.code} className="hover:bg-slate-50">
+                      <TableCell className="font-mono text-sm font-bold">{loc.code}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{loc.name}</p>
+                          {loc.description && <p className="text-xs text-slate-400">{loc.description}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-400 hover:text-red-600"
+                          onClick={() => deleteMasterLocation(loc.code)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {filteredLocations.length > ITEMS_PER_PAGE && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-sm text-slate-500">
+                    Showing {((locCurrentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(locCurrentPage * ITEMS_PER_PAGE, filteredLocations.length)} of {filteredLocations.length.toLocaleString()}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setLocCurrentPage(p => Math.max(1, p - 1))} disabled={locCurrentPage === 1} className="h-8 px-2">
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm text-slate-600 min-w-[80px] text-center">
+                      Page {locCurrentPage} of {locTotalPages}
+                    </span>
+                    <Button variant="outline" size="sm" onClick={() => setLocCurrentPage(p => Math.min(locTotalPages, p + 1))} disabled={locCurrentPage === locTotalPages} className="h-8 px-2">
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {filteredLocations.length === 0 && (
+            <div className="text-center py-12">
+              <MapPin className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-500">No master locations found</p>
+              <p className="text-xs text-slate-400 mt-1">Import or add locations to get started</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* ========== MODALS ========== */}
 
       {/* Add Product Modal */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add New Product</DialogTitle>
-            <DialogDescription>
-              Add a new product to your master database
-            </DialogDescription>
+            <DialogDescription>Add a new product to your master database</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="barcode">Barcode *</Label>
-              <Input
-                id="barcode"
-                placeholder="Enter barcode"
-                value={newProduct.barcode}
-                onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
-              />
+              <Input id="barcode" placeholder="Enter barcode" value={newProduct.barcode} onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Product Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter product name"
-                value={newProduct.name}
-                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              />
+              <Input id="name" placeholder="Enter product name" value={newProduct.name} onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                type="number"
-                placeholder="Enter price"
-                value={newProduct.price}
-                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-              />
+              <Input id="price" type="number" placeholder="Enter price" value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddProduct} 
-              className="bg-emerald-600 hover:bg-emerald-700"
-              disabled={!newProduct.barcode || !newProduct.name}
-            >
-              Add Product
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
+            <Button onClick={handleAddProduct} className="bg-emerald-600 hover:bg-emerald-700" disabled={!newProduct.barcode || !newProduct.name}>Add Product</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Location Modal */}
+      <Dialog open={showAddLocationModal} onOpenChange={setShowAddLocationModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-emerald-600" />
+              Add Master Location
+            </DialogTitle>
+            <DialogDescription>Add a predefined location to master data</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="loc-code">Location Code *</Label>
+              <Input id="loc-code" placeholder="e.g., WH-A1" value={newLocation.code} onChange={(e) => setNewLocation({ ...newLocation, code: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loc-name">Location Name</Label>
+              <Input id="loc-name" placeholder="e.g., Warehouse A Section 1" value={newLocation.name} onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="loc-desc">Description</Label>
+              <Input id="loc-desc" placeholder="Optional description" value={newLocation.description} onChange={(e) => setNewLocation({ ...newLocation, description: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddLocationModal(false)}>Cancel</Button>
+            <Button onClick={handleAddLocation} className="bg-emerald-600 hover:bg-emerald-700" disabled={!newLocation.code}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Location
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -632,10 +738,7 @@ RT-SF,Retail Store Front,Front retail area`;
       {/* Import Products Modal */}
       <Dialog open={showImportModal} onOpenChange={(open) => {
         if (!open) {
-          // User is closing the dialog
-          if (isImporting) {
-            handleCancelImport();
-          }
+          if (isImporting) handleCancelImport();
           setShowImportModal(false);
           setImportResult(null);
           setImportProgress(null);
@@ -649,21 +752,15 @@ RT-SF,Retail Store Front,Front retail area`;
               <RefreshCw className={`w-5 h-5 text-emerald-600 ${isImporting ? 'animate-spin' : ''}`} />
               Import Master Products
             </DialogTitle>
-            <DialogDescription>
-              Upload a CSV file to replace existing master data
-            </DialogDescription>
+            <DialogDescription>Upload a CSV file to replace existing master data</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            {/* Warning about replacement */}
             <div className="p-3 bg-amber-50 rounded-lg flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-amber-700">
-                <strong>Warning:</strong> Importing a new file will replace ALL existing master products. 
-                The old data will be permanently deleted.
+                <strong>Warning:</strong> Importing will replace ALL existing master products.
               </p>
             </div>
-
-            {/* Progress Display */}
             {importProgress && (
               <div className="p-4 bg-blue-50 rounded-lg space-y-3">
                 <div className="flex items-center justify-between">
@@ -672,99 +769,125 @@ RT-SF,Retail Store Front,Front retail area`;
                     <span className="text-sm font-medium text-blue-700">{importProgress.status}</span>
                   </div>
                   {isImporting && importProgress.status !== 'Cancelling...' && importProgress.status !== 'Complete!' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelImport}
-                      className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      Cancel
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCancelImport} className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50">Cancel</Button>
                   )}
                 </div>
-                <Progress 
-                  value={importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0} 
-                  className="h-2"
-                />
+                <Progress value={importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0} className="h-2" />
                 <div className="flex justify-between text-xs text-blue-600">
                   <span>{importProgress.processed.toLocaleString()} processed</span>
                   <span>{importProgress.total.toLocaleString()} total</span>
                 </div>
               </div>
             )}
-
             {!isImporting && (
               <>
                 <div className="p-4 bg-slate-50 rounded-lg">
                   <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
-                  <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
-                    Barcode,Name,Price
-                  </code>
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onClick={downloadSampleProductCSV}
-                    className="text-emerald-600 p-0 h-auto mt-2"
-                  >
+                  <code className="text-xs text-slate-500 block bg-white p-2 rounded border">Barcode,Name,Price</code>
+                  <Button variant="link" size="sm" onClick={downloadSampleProductCSV} className="text-emerald-600 p-0 h-auto mt-2">
                     <Download className="w-3 h-3 mr-1" />
                     Download Sample CSV
                   </Button>
                 </div>
-                
                 <div className="relative">
                   <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-emerald-400 transition-colors cursor-pointer">
                     <Upload className="w-10 h-10 text-slate-400 mb-3" />
                     <p className="text-sm text-slate-500 mb-2">Click to upload or drag and drop</p>
                     <p className="text-xs text-slate-400">CSV or TXT files</p>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={getCSVAcceptTypes()}
-                      onChange={handleFileUpload}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
+                    <input ref={fileInputRef} type="file" accept={getCSVAcceptTypes()} onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </div>
                 </div>
               </>
             )}
-
             {importResult && !importProgress && (
-              <div className={`p-3 rounded-lg flex items-center gap-2 ${
-                importResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-              }`}>
-                {importResult.success ? (
-                  <CheckCircle2 className="w-5 h-5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5" />
-                )}
+              <div className={`p-3 rounded-lg flex items-center gap-2 ${importResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                {importResult.success ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                 <span className="text-sm">
-                  {importResult.success 
-                    ? `Successfully imported ${importResult.count.toLocaleString()} products (old data replaced)`
-                    : importResult.error}
+                  {importResult.success ? `Successfully imported ${importResult.count.toLocaleString()} products (old data replaced)` : importResult.error}
                 </span>
               </div>
             )}
           </div>
-          <DialogFooter className="gap-2">
-            {isImporting && importProgress?.status !== 'Complete!' && importProgress?.status !== 'Cancelling...' && (
-              <Button 
-                variant="outline"
-                onClick={handleCancelImport}
-                className="text-red-600 border-red-200 hover:bg-red-50"
-              >
-                Cancel Import
-              </Button>
-            )}
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                if (isImporting) {
-                  handleCancelImport();
-                }
-                setShowImportModal(false);
-              }}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { if (isImporting) handleCancelImport(); setShowImportModal(false); }}>
               {isImporting ? 'Close & Cancel' : 'Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Locations Modal */}
+      <Dialog open={showLocImportModal} onOpenChange={(open) => {
+        if (!open) {
+          if (isLocImporting) handleCancelLocImport();
+          setShowLocImportModal(false);
+          setLocImportResult(null);
+          setLocImportProgress(null);
+        } else {
+          setShowLocImportModal(true);
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className={`w-5 h-5 text-blue-600 ${isLocImporting ? 'animate-spin' : ''}`} />
+              Import Master Locations
+            </DialogTitle>
+            <DialogDescription>Upload a CSV file to replace existing master locations</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="p-3 bg-amber-50 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-700">
+                <strong>Warning:</strong> Importing will replace ALL existing master locations.
+              </p>
+            </div>
+            {locImportProgress && (
+              <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                    <span className="text-sm font-medium text-blue-700">{locImportProgress.status}</span>
+                  </div>
+                  {isLocImporting && locImportProgress.status !== 'Cancelling...' && locImportProgress.status !== 'Complete!' && (
+                    <Button variant="outline" size="sm" onClick={handleCancelLocImport} className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50">Cancel</Button>
+                  )}
+                </div>
+                <Progress value={locImportProgress.total > 0 ? (locImportProgress.processed / locImportProgress.total) * 100 : 0} className="h-2" />
+              </div>
+            )}
+            {!isLocImporting && (
+              <>
+                <div className="p-4 bg-slate-50 rounded-lg">
+                  <p className="text-sm font-medium text-slate-700 mb-2">CSV Format:</p>
+                  <code className="text-xs text-slate-500 block bg-white p-2 rounded border">Code,Name,Description</code>
+                  <Button variant="link" size="sm" onClick={downloadSampleLocationCSV} className="text-blue-600 p-0 h-auto mt-2">
+                    <Download className="w-3 h-3 mr-1" />
+                    Download Sample CSV
+                  </Button>
+                </div>
+                <div className="relative">
+                  <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 transition-colors cursor-pointer">
+                    <MapPin className="w-10 h-10 text-slate-400 mb-3" />
+                    <p className="text-sm text-slate-500 mb-2">Click to upload location master CSV</p>
+                    <p className="text-xs text-slate-400">CSV or TXT files</p>
+                    <input ref={locationFileInputRef} type="file" accept={getCSVAcceptTypes()} onChange={handleLocFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </div>
+                </div>
+              </>
+            )}
+            {locImportResult && !locImportProgress && (
+              <div className={`p-3 rounded-lg flex items-center gap-2 ${locImportResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                {locImportResult.success ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                <span className="text-sm">
+                  {locImportResult.success ? `Successfully imported ${locImportResult.count.toLocaleString()} locations (old data replaced)` : locImportResult.error}
+                </span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { if (isLocImporting) handleCancelLocImport(); setShowLocImportModal(false); }}>
+              {isLocImporting ? 'Close & Cancel' : 'Close'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -781,12 +904,9 @@ RT-SF,Retail Store Front,Front retail area`;
               <Users className="w-5 h-5 text-blue-600" />
               Import Authorization Users
             </DialogTitle>
-            <DialogDescription>
-              Upload User IDs and Passwords for authorization actions only
-            </DialogDescription>
+            <DialogDescription>Upload User IDs and Passwords for authorization actions only</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            {/* Important Notice */}
             <div className="p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-700">
                 <strong>Important:</strong> These credentials are used ONLY for authorization actions:
@@ -796,11 +916,8 @@ RT-SF,Retail Store Front,Front retail area`;
                 <li>Reopening scanned/locked locations</li>
                 <li>Other protected actions</li>
               </ul>
-              <p className="text-xs text-blue-500 mt-2">
-                These credentials will NOT work for main login or settings access.
-              </p>
+              <p className="text-xs text-blue-500 mt-2">These credentials will NOT work for main login or settings access.</p>
             </div>
-
             <div className="p-4 bg-slate-50 rounded-lg">
               <p className="text-sm font-medium text-slate-700 mb-2">CSV Format (only UserID & Password required):</p>
               <code className="text-xs text-slate-500 block bg-white p-2 rounded border">
@@ -808,18 +925,11 @@ RT-SF,Retail Store Front,Front retail area`;
                 auth_user1,pass123<br />
                 auth_user2,pass456
               </code>
-              <Button
-                variant="link"
-                size="sm"
-                onClick={downloadSampleUserCSV}
-                className="text-blue-600 p-0 h-auto mt-2"
-              >
+              <Button variant="link" size="sm" onClick={downloadSampleUserCSV} className="text-blue-600 p-0 h-auto mt-2">
                 <Download className="w-3 h-3 mr-1" />
                 Download Sample CSV
               </Button>
             </div>
-
-            {/* Current authorization users */}
             {authorizationUsers.length > 0 && (
               <div className="p-3 bg-purple-50 rounded-lg">
                 <p className="text-sm font-medium text-purple-700 mb-2">
@@ -827,50 +937,30 @@ RT-SF,Retail Store Front,Front retail area`;
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {authorizationUsers.map(u => (
-                    <Badge key={u.id} variant="outline" className="border-purple-200 text-purple-700">
-                      {u.userId}
-                    </Badge>
+                    <Badge key={u.id} variant="outline" className="border-purple-200 text-purple-700">{u.userId}</Badge>
                   ))}
                 </div>
               </div>
             )}
-            
             <div className="relative">
               <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 rounded-lg hover:border-blue-400 transition-colors cursor-pointer">
                 <Users className="w-10 h-10 text-slate-400 mb-3" />
                 <p className="text-sm text-slate-500 mb-2">Click to upload authorization credentials</p>
                 <p className="text-xs text-slate-400">CSV or TXT files</p>
-                <input
-                  ref={userFileInputRef}
-                  type="file"
-                  accept={getCSVAcceptTypes()}
-                  onChange={handleUserFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
+                <input ref={userFileInputRef} type="file" accept={getCSVAcceptTypes()} onChange={handleUserFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               </div>
             </div>
-
             {userImportResult && (
-              <div className={`p-3 rounded-lg flex items-center gap-2 ${
-                userImportResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-              }`}>
-                {userImportResult.success ? (
-                  <CheckCircle2 className="w-5 h-5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5" />
-                )}
+              <div className={`p-3 rounded-lg flex items-center gap-2 ${userImportResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                {userImportResult.success ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                 <span className="text-sm">
-                  {userImportResult.success 
-                    ? `Successfully imported ${userImportResult.count} authorization user(s)`
-                    : userImportResult.error}
+                  {userImportResult.success ? `Successfully imported ${userImportResult.count} authorization user(s)` : userImportResult.error}
                 </span>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUserImportModal(false)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => setShowUserImportModal(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
