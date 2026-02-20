@@ -77,7 +77,7 @@ const Reports = () => {
   // Get items for selected locations
   const getLocationItems = useMemo(() => {
     if (isAllSelected) {
-      return Object.entries(scannedItems).flatMap(([locId, items]) => {
+      return Object.entries(scannedItems || {}).flatMap(([locId, items]) => {
         const loc = locations.find(l => l.id === locId);
         return items.map(item => ({ ...item, locationName: loc?.name || 'Unknown', locationId: locId }));
       });
