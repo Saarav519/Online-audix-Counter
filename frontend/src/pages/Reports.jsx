@@ -327,7 +327,7 @@ const Reports = () => {
               <p className="text-xs text-slate-500">Select all {locations.length} locations</p>
             </div>
             <Badge className="bg-emerald-100 text-emerald-700 border-0">
-              {Object.values(scannedItems).flat().length} items
+              {Object.values(scannedItems || {}).flat().length} items
             </Badge>
           </div>
 
