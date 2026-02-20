@@ -326,7 +326,7 @@ const ScanItems = () => {
   
   // Auto-save temp items with debouncing (500ms delay for performance)
   useEffect(() => {
-    if (selectedLocationId && tempScannedItems.length > 0) {
+    if (selectedLocationId) {
       debouncedSaveItems(tempScannedItems, selectedLocationId);
     }
   }, [tempScannedItems, selectedLocationId, debouncedSaveItems]);
@@ -334,7 +334,7 @@ const ScanItems = () => {
   // Flush save on unmount to prevent data loss
   useEffect(() => {
     return () => {
-      if (selectedLocationId && tempScannedItems.length > 0) {
+      if (selectedLocationId) {
         flushSaveItems(tempScannedItems, selectedLocationId);
       }
       // Cleanup auto-confirm/auto-process timers
