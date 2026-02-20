@@ -70,6 +70,33 @@ export const mockLocations = [
   }
 ];
 
+export const mockMasterLocations = [
+  {
+    code: "WH-A1",
+    name: "Warehouse A - Section 1",
+    description: "Main warehouse, section 1",
+    isMaster: true
+  },
+  {
+    code: "WH-A2",
+    name: "Warehouse A - Section 2",
+    description: "Main warehouse, section 2",
+    isMaster: true
+  },
+  {
+    code: "WH-B-CS",
+    name: "Warehouse B - Cold Storage",
+    description: "Cold storage facility",
+    isMaster: true
+  },
+  {
+    code: "RT-SF",
+    name: "Retail Store Front",
+    description: "Front retail area",
+    isMaster: true
+  }
+];
+
 export const mockMasterProducts = [
   {
     id: "prod_1",
