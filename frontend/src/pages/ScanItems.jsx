@@ -1363,8 +1363,8 @@ const ScanItems = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Mode Badges */}
-          <div className="flex gap-2 px-1">
+          {/* Mode Badges + Ask Quantity Toggle */}
+          <div className="flex items-center justify-between px-1">
             <Badge 
               variant="outline" 
               className={`text-xs ${settings.locationScanMode === 'dynamic' 
@@ -1373,14 +1373,17 @@ const ScanItems = () => {
             >
               {settings.locationScanMode === 'dynamic' ? 'Dynamic' : 'Pre-Assigned'}
             </Badge>
-            <Badge 
-              variant="outline" 
-              className={`text-xs ${isSingleSkuMode 
-                ? 'bg-orange-50 text-orange-700 border-orange-200' 
-                : 'bg-teal-50 text-teal-700 border-teal-200'}`}
-            >
-              {isSingleSkuMode ? 'Single SKU' : 'Manual Qty'}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="ask-qty-toggle-mobile" className="text-xs text-slate-600 cursor-pointer">
+                Ask Qty
+              </Label>
+              <Switch
+                id="ask-qty-toggle-mobile"
+                checked={askQuantityBeforeAdding}
+                onCheckedChange={handleToggleAskQuantity}
+                className="data-[state=checked]:bg-emerald-600"
+              />
+            </div>
           </div>
 
           {/* Barcode Scanner */}
@@ -1405,36 +1408,6 @@ const ScanItems = () => {
                   autoComplete="off"
                   autoFocus
                 />
-                {!isSingleSkuMode && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantityInput(String(Math.max(1, parseInt(quantityInput) - 1)))}
-                      disabled={isLocationLocked}
-                      className="h-11 w-10"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={quantityInput}
-                      onChange={(e) => setQuantityInput(e.target.value)}
-                      disabled={isLocationLocked}
-                      className="h-11 text-center text-base font-bold w-14"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantityInput(String(parseInt(quantityInput) + 1))}
-                      disabled={isLocationLocked}
-                      className="h-11 w-10"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
               </div>
 
               {/* Add Button - Only show if manual entry is allowed */}
@@ -1445,7 +1418,7 @@ const ScanItems = () => {
                   className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
                 >
                   <Plus className="w-5 h-5 mr-2" />
-                  Add {isSingleSkuMode ? '(Qty: 1)' : `(Qty: ${quantityInput})`}
+                  {askQuantityBeforeAdding ? 'Scan & Enter Qty' : 'Add (Qty: 1)'}
                 </Button>
               )}
 
@@ -1466,7 +1439,7 @@ const ScanItems = () => {
                   <span className="flex-1 text-xs">
                     {lastScanResult.success 
                       ? `Added ${lastScanResult.quantity} unit(s)` 
-                      : lastScanResult.error}
+                      : (lastScanResult.error || lastScanResult.message)}
                   </span>
                 </div>
               )}
