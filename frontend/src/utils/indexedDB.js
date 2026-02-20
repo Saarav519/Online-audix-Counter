@@ -461,6 +461,7 @@ initDB().catch(err => console.warn('IndexedDB init failed:', err));
 
 export default {
   MasterProductsDB,
+  MasterLocationsDB,
   ScannedItemsDB,
   LocationsDB,
   SettingsDB,
