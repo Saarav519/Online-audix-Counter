@@ -113,6 +113,27 @@ const MasterData = () => {
 
   const authorizationUsers = getAuthorizationUsers();
 
+  // ============================================
+  // LOCATION MASTER: Filtered & paginated
+  // ============================================
+  const filteredLocations = React.useMemo(() => {
+    if (!locSearchTerm.trim()) return masterLocations;
+    const search = locSearchTerm.toLowerCase();
+    return masterLocations.filter(
+      l => l.name.toLowerCase().includes(search) || l.code.toLowerCase().includes(search)
+    );
+  }, [masterLocations, locSearchTerm]);
+
+  const locTotalPages = Math.ceil(filteredLocations.length / ITEMS_PER_PAGE);
+  const paginatedLocations = React.useMemo(() => {
+    const startIndex = (locCurrentPage - 1) * ITEMS_PER_PAGE;
+    return filteredLocations.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredLocations, locCurrentPage]);
+
+  React.useEffect(() => {
+    setLocCurrentPage(1);
+  }, [locSearchTerm]);
+
   const handleAddProduct = () => {
     if (newProduct.barcode && newProduct.name) {
       addMasterProduct({
