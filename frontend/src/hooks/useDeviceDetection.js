@@ -257,7 +257,7 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       window.removeEventListener('message', handleMessage);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [isEnabled, queueScan]);
+  }, [isEnabled, queueScan, allowKeyInput]);
 
   return { scanBuffer };
 };
