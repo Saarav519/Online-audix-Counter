@@ -832,20 +832,64 @@ const ScanItems = () => {
   
   // ============================================
   // SIMPLIFIED INPUT HANDLING
-  // When manual entry is OFF: Input field is READ-ONLY
-  // All scanner input goes through useHardwareScanner hook
-  // This is more reliable on actual hardware scanners
+  // When manual entry is OFF: Accept scanner input (rapid), block manual typing (slow)
+  // When manual entry is ON: Accept all input
   // ============================================
   const handleBarcodeInputChange = (e) => {
-    // When manual entry is DISABLED, don't accept any direct input
-    // The useHardwareScanner hook will handle all scanner input
+    const newValue = e.target.value;
+    
     if (settings.allowManualBarcodeEntry === false) {
-      // Block all direct input - scanner goes through hook
+      // When manual entry is DISABLED, detect scanner vs manual input
+      const currentTime = Date.now();
+      const timeDiff = currentTime - barcodeInputTimeRef.current;
+      const charsAdded = newValue.length - barcodeInput.length;
+      barcodeInputTimeRef.current = currentTime;
+      
+      // Scanner detection: multiple chars at once OR rapid input (< 80ms between changes)
+      if (charsAdded > 2 || (timeDiff < 80 && charsAdded > 0)) {
+        // Scanner input detected - accept it
+        setBarcodeInput(newValue);
+        
+        // Clear pending auto-process timer
+        if (barcodeAutoProcessTimerRef.current) {
+          clearTimeout(barcodeAutoProcessTimerRef.current);
+        }
+        
+        // Auto-process after scanner finishes (some scanners don't send Enter)
+        barcodeAutoProcessTimerRef.current = setTimeout(() => {
+          if (newValue.trim() && selectedLocationId) {
+            const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
+            const result = addTempItem(newValue.trim(), qty);
+            
+            setLastScanResult({
+              barcode: newValue,
+              quantity: qty,
+              ...result
+            });
+            
+            setBarcodeInput('');
+            
+            if (!isSingleSkuMode) {
+              setQuantityInput('1');
+            }
+            
+            playSound(result.success);
+            setTimeout(() => setLastScanResult(null), 3000);
+            
+            if (barcodeInputRef.current) {
+              barcodeInputRef.current.focus();
+            }
+          }
+        }, 300);
+        return;
+      }
+      
+      // Slow input = manual typing - block it when manual entry is OFF
       return;
     }
     
     // Manual entry is ENABLED - accept all input
-    setBarcodeInput(e.target.value);
+    setBarcodeInput(newValue);
   };
 
   const handleScan = () => {
