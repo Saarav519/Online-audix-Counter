@@ -87,28 +87,15 @@ const Settings = () => {
     setPendingSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  // Handle save with confirmation
+  // Handle save - directly save since user is already authenticated
   const handleSaveClick = () => {
-    setShowSaveModal(true);
-    setSaveCredentials({ userId: '', password: '' });
-    setSaveError('');
-    setSaveSuccess(false);
-  };
-
-  const handleConfirmSave = () => {
-    const result = verifyCredentials(saveCredentials.userId, saveCredentials.password);
-    if (result.success) {
-      updateSettings(pendingSettings);
-      setSaveSuccess(true);
-      setSaveError('');
-      setHasChanges(false);
-      setTimeout(() => {
-        setShowSaveModal(false);
-        setSaveSuccess(false);
-      }, 1500);
-    } else {
-      setSaveError('Invalid credentials. Changes not saved.');
-    }
+    updateSettings(pendingSettings);
+    setSaveSuccess(true);
+    setHasChanges(false);
+    // Clear success message after a brief display
+    setTimeout(() => {
+      setSaveSuccess(false);
+    }, 2000);
   };
 
   const handleCancelChanges = () => {
