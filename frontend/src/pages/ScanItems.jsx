@@ -387,6 +387,12 @@ const ScanItems = () => {
   const quantityInputRef2 = useRef(quantityInput);
   const lastScanTimeRef = useRef(0);
   const scanResultTimeoutRef = useRef(null);
+  
+  // Refs for auto-detecting scanner input (rapid onChange events)
+  const locationInputTimeRef = useRef(0);
+  const locationAutoConfirmTimerRef = useRef(null);
+  const barcodeInputTimeRef = useRef(0);
+  const barcodeAutoProcessTimerRef = useRef(null);
 
   // Persist current location to localStorage whenever it changes
   useEffect(() => {
