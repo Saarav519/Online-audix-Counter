@@ -1923,7 +1923,13 @@ const ScanItems = () => {
                                 onChange={(e) => setEditQuantity(e.target.value)}
                                 className="w-20 h-8 text-center"
                                 autoFocus
-                                onKeyPress={(e) => e.key === 'Enter' && handleQuantityUpdate(item.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleQuantityUpdate(item.id);
+                                  }
+                                }}
                                 onBlur={() => handleQuantityUpdate(item.id)}
                               />
                             </div>
