@@ -12,7 +12,8 @@ import {
   X,
   LogOut,
   User,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Database
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
