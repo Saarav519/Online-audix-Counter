@@ -1762,9 +1762,9 @@ const ScanItems = () => {
                 <Label className="text-sm text-slate-600 mb-1.5 block">
                   {settings.allowManualBarcodeEntry === false 
                     ? 'Use hardware scanner to scan barcode'
-                    : isSingleSkuMode 
-                      ? 'Scan barcode (each scan = 1 unit)'
-                      : 'Scan barcode, then enter quantity'}
+                    : askQuantityBeforeAdding 
+                      ? 'Scan barcode → enter quantity in popup'
+                      : 'Scan barcode (each scan adds 1 unit, re-scan increments)'}
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -1777,90 +1777,28 @@ const ScanItems = () => {
                     className={`h-12 text-lg font-mono flex-1 ${settings.allowManualBarcodeEntry === false ? 'bg-slate-50' : ''}`}
                     autoComplete="off"
                   />
+                  {settings.allowManualBarcodeEntry !== false && (
+                    <Button
+                      onClick={handleScan}
+                      disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
+                      className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {askQuantityBeforeAdding ? 'Enter Qty' : 'Add'}
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Quantity Input - Only shown when Single SKU mode is OFF */}
-              {!isSingleSkuMode && (
-                <div className={`p-4 rounded-xl border-2 border-dashed ${
-                  selectedLocationId && barcodeInput 
-                    ? 'border-teal-300 bg-teal-50' 
-                    : 'border-slate-200 bg-slate-50'
-                }`}>
-                  <Label className="text-sm font-medium text-slate-700 mb-2 block flex items-center gap-2">
-                    <Hash className="w-4 h-4" />
-                    Enter Quantity (Manual Entry)
-                  </Label>
-                  <div className="flex gap-2 items-center">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantityInput(String(Math.max(1, parseInt(quantityInput) - 1)))}
-                      disabled={!selectedLocationId || isLocationLocked}
-                      className="h-10 w-10"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    <Input
-                      ref={quantityInputRef}
-                      type="number"
-                      min="1"
-                      value={quantityInput}
-                      onChange={(e) => setQuantityInput(e.target.value)}
-                      disabled={!selectedLocationId || isLocationLocked}
-                      className="h-10 text-center text-lg font-bold w-24"
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantityInput(String(parseInt(quantityInput) + 1))}
-                      disabled={!selectedLocationId || isLocationLocked}
-                      className="h-10 w-10"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                    {settings.allowManualBarcodeEntry !== false && (
-                      <Button
-                        onClick={handleScan}
-                        disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
-                        className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 text-white ml-2"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    {settings.allowManualBarcodeEntry === false 
-                      ? 'Use hardware scanner to add items'
-                      : 'Scan barcode once, enter quantity, then click Add'}
-                  </p>
-                </div>
-              )}
-
-              {/* Add button for Single SKU mode */}
-              {isSingleSkuMode && settings.allowManualBarcodeEntry !== false && (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleScan}
-                    disabled={!selectedLocationId || !barcodeInput.trim() || isLocationLocked}
-                    className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <ScanBarcode className="w-5 h-5 mr-2" />
-                    Add (Qty: 1)
-                  </Button>
-                </div>
-              )}
-
               {/* Mode Info */}
-              {isSingleSkuMode && (
-                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <p className="text-sm text-orange-700 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <strong>Single SKU Mode:</strong> Each scan adds exactly 1 unit. Manual quantity entry is disabled.
-                  </p>
-                </div>
-              )}
+              <div className={`p-3 rounded-lg border ${askQuantityBeforeAdding ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-200'}`}>
+                <p className="text-sm flex items-center gap-2 ${askQuantityBeforeAdding ? 'text-teal-700' : 'text-slate-600'}">
+                  <Hash className="w-4 h-4" />
+                  {askQuantityBeforeAdding 
+                    ? <span className="text-teal-700"><strong>Punching Mode:</strong> After scanning, a popup will ask for the quantity before adding.</span>
+                    : <span className="text-slate-600"><strong>Auto Mode:</strong> Each scan adds 1 unit. Same barcode increments qty. Edit qty by clicking the number.</span>}
+                </p>
+              </div>
 
               {/* Last Scan Result */}
               {lastScanResult && (
@@ -1886,7 +1824,7 @@ const ScanItems = () => {
                         ? lastScanResult.isValid 
                           ? `Added ${lastScanResult.quantity} unit(s) successfully` 
                           : `Non-master item added (${lastScanResult.quantity} unit(s))`
-                        : lastScanResult.error}
+                        : (lastScanResult.error || lastScanResult.message)}
                     </p>
                     <p className="text-xs opacity-75 font-mono">{lastScanResult.barcode}</p>
                   </div>
