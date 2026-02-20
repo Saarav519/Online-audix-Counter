@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { mockUsers, mockLocations, mockMasterProducts, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
-import { MasterProductsDB, ScannedItemsDB, getStorageInfo } from '../utils/indexedDB';
+import { mockUsers, mockLocations, mockMasterProducts, mockMasterLocations, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
+import { MasterProductsDB, MasterLocationsDB, ScannedItemsDB, getStorageInfo } from '../utils/indexedDB';
 
 const AppContext = createContext();
 
