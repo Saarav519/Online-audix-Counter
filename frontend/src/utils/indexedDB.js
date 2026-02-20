@@ -51,6 +51,12 @@ const initDB = () => {
         productStore.createIndex('category', 'category', { unique: false });
       }
 
+      // Master Locations store - indexed by code for fast lookup
+      if (!db.objectStoreNames.contains(STORES.MASTER_LOCATIONS)) {
+        const masterLocStore = db.createObjectStore(STORES.MASTER_LOCATIONS, { keyPath: 'code' });
+        masterLocStore.createIndex('name', 'name', { unique: false });
+      }
+
       // Scanned Items store - indexed by locationId
       if (!db.objectStoreNames.contains(STORES.SCANNED_ITEMS)) {
         const scannedStore = db.createObjectStore(STORES.SCANNED_ITEMS, { keyPath: 'id', autoIncrement: true });
