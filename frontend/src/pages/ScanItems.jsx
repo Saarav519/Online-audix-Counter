@@ -1542,10 +1542,7 @@ const ScanItems = () => {
                 ref={locationInputRef}
                 placeholder="Scan location code here..."
                 value={locationInput}
-                onChange={(e) => {
-                  setLocationInput(e.target.value);
-                  setLocationError('');
-                }}
+                onChange={handleLocationInputChange}
                 onKeyDown={handleLocationKeyDown}
                 className={`h-12 text-lg font-mono pr-10 ${selectedLocationId ? 'bg-emerald-50 border-emerald-300' : ''}`}
                 autoComplete="off"
