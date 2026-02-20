@@ -723,7 +723,41 @@ const ScanItems = () => {
   // Handle location scan/input
   const handleLocationKeyDown = (e) => {
     if (e.key === 'Enter' && locationInput.trim()) {
+      // Cancel any pending auto-confirm since Enter was pressed explicitly
+      if (locationAutoConfirmTimerRef.current) {
+        clearTimeout(locationAutoConfirmTimerRef.current);
+        locationAutoConfirmTimerRef.current = null;
+      }
       handleLocationScan();
+    }
+  };
+
+  // Auto-detect scanner input in location field and auto-confirm
+  const handleLocationInputChange = (e) => {
+    const newValue = e.target.value;
+    setLocationInput(newValue);
+    setLocationError('');
+
+    // Auto-confirm logic: detect scanner-like rapid input
+    const currentTime = Date.now();
+    const timeDiff = currentTime - locationInputTimeRef.current;
+    const charsAdded = newValue.length - locationInput.length;
+    locationInputTimeRef.current = currentTime;
+
+    // Clear any pending auto-confirm timer
+    if (locationAutoConfirmTimerRef.current) {
+      clearTimeout(locationAutoConfirmTimerRef.current);
+      locationAutoConfirmTimerRef.current = null;
+    }
+
+    // Scanner detection: multiple chars at once OR rapid input (< 80ms between changes)
+    if (newValue.trim() && (charsAdded > 2 || (timeDiff < 80 && charsAdded > 0))) {
+      // Wait a brief moment for scanner to finish sending all characters, then auto-confirm
+      locationAutoConfirmTimerRef.current = setTimeout(() => {
+        if (newValue.trim()) {
+          handleLocationScan();
+        }
+      }, 150);
     }
   };
 
