@@ -1039,8 +1039,6 @@ const ScanItems = () => {
 
   // Update quantity in TEMP state
   const handleQuantityUpdate = (itemId) => {
-    if (isSingleSkuMode) return; // No manual editing in single SKU mode
-    
     const newQty = parseInt(editQuantity);
     if (newQty > 0) {
       updateTempItemQuantity(itemId, newQty);
@@ -1050,12 +1048,10 @@ const ScanItems = () => {
   };
 
   const handleQuantityIncrement = (itemId, currentQty) => {
-    if (isSingleSkuMode) return; // No manual editing in single SKU mode
     updateTempItemQuantity(itemId, currentQty + 1);
   };
 
   const handleQuantityDecrement = (itemId, currentQty) => {
-    if (isSingleSkuMode) return; // No manual editing in single SKU mode
     if (currentQty > 1) {
       updateTempItemQuantity(itemId, currentQty - 1);
     }
