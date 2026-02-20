@@ -93,8 +93,11 @@ const ScannedItemRow = memo(({
   onQuantityUpdate, 
   onDelete,
   isLocationLocked,
-  onStartEdit
+  onStartEdit,
+  onDirectQuantityChange
 }) => {
+  const inlineInputRef = useRef(null);
+
   return (
     <div 
       className="flex items-center justify-between p-2 bg-slate-50 rounded-lg gap-2"
@@ -106,37 +109,44 @@ const ScannedItemRow = memo(({
       </div>
       {/* Quantity & Delete */}
       <div className="flex items-center gap-2 flex-shrink-0" data-qty-edit="true">
-        {isEditing ? (
-          <Input
+        {isLocationLocked ? (
+          <span 
+            className="font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded bg-slate-100 text-slate-600"
+          >
+            {item.quantity}
+          </span>
+        ) : (
+          <input
+            ref={inlineInputRef}
             type="number"
             min="1"
-            value={editQuantity}
-            onChange={(e) => setEditQuantity(e.target.value)}
-            className="w-16 h-8 text-center text-sm font-bold p-1"
-            autoFocus
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={isEditing ? editQuantity : item.quantity}
             data-qty-input="true"
+            className="w-16 h-8 text-center text-sm font-bold p-1 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            onFocus={(e) => {
+              e.stopPropagation();
+              onStartEdit(item.id, String(item.quantity));
+              e.target.select();
+            }}
+            onChange={(e) => {
+              e.stopPropagation();
+              setEditQuantity(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
                 e.stopPropagation();
                 onQuantityUpdate(item.id);
+                e.target.blur();
               }
             }}
-            onBlur={() => onQuantityUpdate(item.id)}
-          />
-        ) : (
-          <span 
-            className="font-bold text-sm min-w-[32px] text-center px-2 py-1 rounded bg-emerald-100 text-emerald-700 cursor-pointer active:bg-emerald-200"
-            data-qty-edit="true"
-            onClick={(e) => {
+            onBlur={(e) => {
               e.stopPropagation();
-              if (!isLocationLocked) {
-                onStartEdit(item.id, String(item.quantity));
-              }
+              onQuantityUpdate(item.id);
             }}
-          >
-            {item.quantity}
-          </span>
+          />
         )}
         {!isLocationLocked && (
           <Button
