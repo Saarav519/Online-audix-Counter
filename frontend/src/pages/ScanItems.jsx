@@ -863,12 +863,13 @@ const ScanItems = () => {
         
         // Auto-process after scanner finishes (some scanners don't send Enter)
         barcodeAutoProcessTimerRef.current = setTimeout(() => {
-          if (newValue.trim() && selectedLocationId) {
+          const finalValue = barcodeInputRef.current?.value?.trim();
+          if (finalValue && selectedLocationId) {
             const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
-            const result = addTempItem(newValue.trim(), qty);
+            const result = addTempItem(finalValue, qty);
             
             setLastScanResult({
-              barcode: newValue,
+              barcode: finalValue,
               quantity: qty,
               ...result
             });
