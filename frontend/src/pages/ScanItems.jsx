@@ -890,26 +890,28 @@ const ScanItems = () => {
         barcodeAutoProcessTimerRef.current = setTimeout(() => {
           const finalValue = barcodeInputRef.current?.value?.trim();
           if (finalValue && selectedLocationId) {
-            const qty = isSingleSkuMode ? 1 : (parseInt(quantityInput) || 1);
-            const result = addTempItem(finalValue, qty);
-            
-            setLastScanResult({
-              barcode: finalValue,
-              quantity: qty,
-              ...result
-            });
-            
-            setBarcodeInput('');
-            
-            if (!isSingleSkuMode) {
-              setQuantityInput('1');
-            }
-            
-            playSound(result.success);
-            setTimeout(() => setLastScanResult(null), 3000);
-            
-            if (barcodeInputRef.current) {
-              barcodeInputRef.current.focus();
+            if (askQuantityBeforeAdding) {
+              // Punching Mode: show popup
+              showQtyPopup(finalValue);
+              setBarcodeInput('');
+            } else {
+              // Default Mode: auto-add qty=1
+              const result = addTempItem(finalValue, 1);
+              
+              setLastScanResult({
+                barcode: finalValue,
+                quantity: 1,
+                ...result
+              });
+              
+              setBarcodeInput('');
+              
+              playSound(result.success);
+              setTimeout(() => setLastScanResult(null), 3000);
+              
+              if (barcodeInputRef.current) {
+                barcodeInputRef.current.focus();
+              }
             }
           }
         }, 300);
