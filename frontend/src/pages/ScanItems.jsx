@@ -744,10 +744,15 @@ const ScanItems = () => {
       
       // Otherwise, refocus barcode input after a short delay
       setTimeout(() => {
+        // Don't steal focus from quantity inputs that may have just been focused
+        const activeEl = document.activeElement;
+        const isActiveQtyInput = activeEl && (activeEl.hasAttribute('data-qty-input') || activeEl.closest('[data-qty-edit]'));
+        if (isActiveQtyInput) return;
+        
         if (barcodeInputRef.current && !isLocationLocked && selectedLocationId && !showQuantityPopup && editingItemId === null) {
           barcodeInputRef.current.focus();
         }
-      }, 100);
+      }, 150);
     };
 
     // Add touchend listener to refocus after touch
