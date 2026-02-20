@@ -5,11 +5,12 @@
  */
 
 const DB_NAME = 'AudixStockDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Store names
 const STORES = {
   MASTER_PRODUCTS: 'masterProducts',
+  MASTER_LOCATIONS: 'masterLocations',
   SCANNED_ITEMS: 'scannedItems',
   LOCATIONS: 'locations',
   SETTINGS: 'settings',
