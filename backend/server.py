@@ -1914,10 +1914,19 @@ async def seed_test_data():
             "username": "admin",
             "password_hash": hash_password("admin123"),
             "role": "admin",
+            "is_active": True,
+            "is_approved": True,
+            "last_login": None,
             "created_at": now.isoformat()
         }
         await db.portal_users.insert_one(admin_user)
         logger.info("Created admin user (admin/admin123)")
+    else:
+        # Ensure existing admin has the new fields
+        await db.portal_users.update_one(
+            {"username": "admin"},
+            {"$set": {"is_active": True, "is_approved": True}},
+        )
     
     # 2. Create Clients
     client_a_id = str(uuid.uuid4())
