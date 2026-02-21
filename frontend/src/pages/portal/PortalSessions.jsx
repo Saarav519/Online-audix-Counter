@@ -107,6 +107,25 @@ export default function PortalSessions() {
     }
   };
 
+  const handleDeleteSession = async (sessionId, sessionName) => {
+    if (!window.confirm(`Are you sure you want to delete "${sessionName}"?\n\nThis will also delete all synced data, expected stock, and alerts for this session.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) throw new Error('Failed to delete session');
+
+      toast.success('Session deleted!');
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   const handleImportExpected = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
