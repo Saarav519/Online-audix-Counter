@@ -200,7 +200,8 @@ export const isValidCSV = (file) => {
 };
 
 export default { 
-  downloadCSV, 
+  downloadCSV,
+  buildCSV,
   listExportedFiles,
   isAndroid, 
   isMobile, 
