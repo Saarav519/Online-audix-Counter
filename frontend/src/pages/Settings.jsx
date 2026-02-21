@@ -847,11 +847,13 @@ const Settings = () => {
 
           {/* Pending Sync Count */}
           {(() => {
+            // scannedItems is an object keyed by locationId
+            const allItems = Object.values(scannedItems || {}).flat();
             const pendingLocations = locations.filter(loc => 
-              scannedItems.some(item => item.locationId === loc.id)
+              scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0
             );
-            const pendingItems = scannedItems.length;
-            const pendingQty = scannedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            const pendingItems = allItems.length;
+            const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
             
             if (pendingLocations.length > 0) {
               return (
