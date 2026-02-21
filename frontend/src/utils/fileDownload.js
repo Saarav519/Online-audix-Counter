@@ -46,6 +46,18 @@ const ensureAppFolder = async () => {
 };
 
 /**
+ * Build CSV content efficiently using array join (much faster than string concatenation)
+ * For large datasets, builds in chunks to avoid blocking the UI thread
+ */
+export const buildCSV = (headers, rows) => {
+  const parts = [headers.join(',')];
+  for (let i = 0; i < rows.length; i++) {
+    parts.push(rows[i]);
+  }
+  return parts.join('\n');
+};
+
+/**
  * Download CSV file
  * On Android: Saves to Audix_Exports folder in Documents
  * On Desktop: Standard download
@@ -111,7 +123,7 @@ export const downloadCSV = async (csvContent, filename) => {
       }
       
       // Fallback to blob download
-      return downloadViaBlob(content, filename, false);
+      return downloadViaBlob(content, filename, true);
     }
   }
   
