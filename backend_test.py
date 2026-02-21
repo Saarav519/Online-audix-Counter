@@ -68,13 +68,15 @@ class AudixBackendTester:
             response = self.session.post(f"{API_BASE}/portal/clients", json=client_data)
             
             if response.status_code == 200:
-                client = response.json()
+                client_response = response.json()
+                # Handle nested client object
+                client = client_response.get("client", client_response)
                 if "id" in client and client["name"] == "CascadeTest Client":
                     self.client_id = client["id"]
                     return self.log_test("Create Client", True, 
                         f"Client created - ID: {client['id']}, Name: {client['name']}, Code: {client['code']}")
                 else:
-                    return self.log_test("Create Client", False, f"Invalid client response: {client}")
+                    return self.log_test("Create Client", False, f"Invalid client response: {client_response}")
             else:
                 return self.log_test("Create Client", False, 
                     f"Client creation failed - Status: {response.status_code}, Response: {response.text}")
