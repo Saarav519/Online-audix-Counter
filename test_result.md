@@ -749,11 +749,23 @@ agent_communication:
       
       🎉 CONCLUSION: Frontend scanner hook barcode overlap fixes had NO impact on backend functionality. All API endpoints remain fully operational and healthy.
 
-  - agent: "testing"
+  - agent: "main"
     message: |
-      ✅ BACKEND HEALTH CHECK RE-VERIFICATION COMPLETED - ALL ENDPOINTS HEALTHY
+      Added "Clear Master Data" option inside Master Data page:
       
-      User requested specific backend health check after frontend-only changes to ScanItems.jsx:
+      1. ✅ Added "Clear Data" button (red outline) in Master Data page header
+      2. ✅ Confirmation dialog with checkboxes to selectively clear:
+         - Products (shows count)
+         - Locations (shows count)
+         - Authorization Users (shows count)
+      3. ✅ Warning message about permanent deletion
+      4. ✅ "Clear Selected" red button only enabled when at least one option is checked
+      5. ✅ Cancel button to dismiss
+      6. ✅ Exported clearMasterProducts, clearMasterLocations, clearAuthUsers from AppContext
+      
+      Files modified:
+      - /app/frontend/src/context/AppContext.js - Exported clear functions in context value
+      - /app/frontend/src/pages/MasterData.jsx - Added Clear Data button and confirmation dialog
       
       🔍 ENDPOINTS RE-TESTED (2026-02-21 14:21):
       1. GET /api/ → ✅ Returns {"message": "Hello World"} (Status: 200)
