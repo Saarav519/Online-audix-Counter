@@ -8,7 +8,8 @@ import {
   FileBarChart, 
   Bell, 
   Settings, 
-  LogOut 
+  LogOut,
+  Database
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/portal/sessions', icon: FolderOpen, label: 'Audit Sessions' },
   { to: '/portal/devices', icon: Smartphone, label: 'Devices' },
   { to: '/portal/reports', icon: FileBarChart, label: 'Reports' },
+  { to: '/portal/sync-logs', icon: Database, label: 'Sync Logs' },
   { to: '/portal/alerts', icon: Bell, label: 'Alerts' },
   { to: '/portal/settings', icon: Settings, label: 'Settings' },
 ];
