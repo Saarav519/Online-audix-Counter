@@ -119,81 +119,52 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
   const scanQueueRef = useRef([]);
   const processingRef = useRef(false);
   const onScanRef = useRef(onScan);
-  const cooldownRef = useRef(false); // Cooldown after processing a scan
+  const cooldownRef = useRef(false);
   const cooldownTimerRef = useRef(null);
-  const autoSubmitTimerRef = useRef(null); // Auto-submit buffer after idle period
-  const lastSubmitTimeRef = useRef(0); // Track when last scan was submitted
+  const lastSubmitTimeRef = useRef(0);
   
-  // Max barcode length - anything longer is likely overlapping scans
+  // SCANNER MODE: When true, ALL printable chars are intercepted (not sent to input field)
+  // This is the KEY fix for barcode overlap - scanner chars never reach the input field
+  const scannerModeRef = useRef(false);
+  const scannerModeTimerRef = useRef(null);
+  
   const MAX_BARCODE_LENGTH = 25;
   
-  // Keep onScan ref updated
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
 
-  // Process scan queue - handles rapid consecutive scans ONE AT A TIME
   const processQueue = useCallback(() => {
     if (processingRef.current || scanQueueRef.current.length === 0) return;
-    
     processingRef.current = true;
-    
-    // Process all queued scans
     while (scanQueueRef.current.length > 0) {
       const barcode = scanQueueRef.current.shift();
       if (barcode && onScanRef.current) {
         onScanRef.current(barcode);
       }
     }
-    
     processingRef.current = false;
   }, []);
 
-  // Flush and submit the current buffer content
-  const flushBuffer = useCallback(() => {
-    if (bufferRef.current.length > 0) {
-      const buffered = bufferRef.current;
-      bufferRef.current = '';
-      setScanBuffer('');
-      // Activate cooldown so next key resets fresh
-      cooldownRef.current = true;
-      lastSubmitTimeRef.current = Date.now();
-      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-      cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 100);
-      return buffered;
-    }
-    return null;
-  }, []);
-
-  // Add scan to queue and process
   const queueScan = useCallback((barcode) => {
     if (!barcode || barcode.trim().length === 0) return;
-    
     const cleaned = barcode.trim();
     
-    // ANTI-OVERLAP: If barcode is suspiciously long, it may be
-    // two barcodes concatenated. Try to split intelligently.
-    // Standard barcodes: EAN-13 (13), UPC-A (12), EAN-8 (8), Code128 (variable up to ~20)
+    // ANTI-OVERLAP: Split suspiciously long barcodes
     if (cleaned.length > MAX_BARCODE_LENGTH) {
-      // Strategy 1: All-numeric - try splitting at common barcode lengths
       if (/^\d+$/.test(cleaned)) {
         for (const splitLen of [13, 12, 8]) {
           if (cleaned.length >= splitLen + 8) {
-            // Try to split: first barcode at splitLen, rest is second
             const first = cleaned.substring(0, splitLen);
             const second = cleaned.substring(splitLen);
             if (second.length >= 8 && second.length <= 20) {
-              console.log(`[Scanner] Anti-overlap split: "${first}" + "${second}"`);
               scanQueueRef.current.push(first);
               scanQueueRef.current.push(second);
               queueMicrotask(processQueue);
               return;
             }
-            // Second part is also too long? Try splitting it recursively
             if (second.length > 20) {
-              console.log(`[Scanner] Anti-overlap split first: "${first}", recursing rest`);
               scanQueueRef.current.push(first);
-              // Re-queue the remainder for another split attempt
               queueMicrotask(() => queueScan(second));
               queueMicrotask(processQueue);
               return;
@@ -201,33 +172,13 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
           }
         }
       }
-      
-      // Strategy 2: Check if it's the same barcode repeated (duplicate scan)
+      // Check for duplicate barcode
       const halfLen = Math.floor(cleaned.length / 2);
-      if (cleaned.length % 2 === 0 || cleaned.length % 2 === 1) {
-        for (const tryLen of [halfLen, halfLen + 1, halfLen - 1]) {
-          if (tryLen >= 8 && tryLen <= 20) {
-            const first = cleaned.substring(0, tryLen);
-            const second = cleaned.substring(tryLen);
-            if (first === second) {
-              // Exact duplicate - just queue once (or twice, scanner user expects both)
-              console.log(`[Scanner] Duplicate barcode detected: "${first}"`);
-              scanQueueRef.current.push(first);
-              scanQueueRef.current.push(second);
-              queueMicrotask(processQueue);
-              return;
-            }
-          }
-        }
-      }
-      
-      // Strategy 3: Alphanumeric - try splitting at half or common lengths
-      for (const splitLen of [13, 12, 10, 8]) {
-        if (cleaned.length >= splitLen + 8) {
-          const first = cleaned.substring(0, splitLen);
-          const second = cleaned.substring(splitLen);
-          if (second.length >= 8 && second.length <= 20) {
-            console.log(`[Scanner] Anti-overlap alpha split: "${first}" + "${second}"`);
+      for (const tryLen of [halfLen, halfLen + 1, halfLen - 1]) {
+        if (tryLen >= 8 && tryLen <= 20) {
+          const first = cleaned.substring(0, tryLen);
+          const second = cleaned.substring(tryLen);
+          if (first === second) {
             scanQueueRef.current.push(first);
             scanQueueRef.current.push(second);
             queueMicrotask(processQueue);
@@ -235,29 +186,74 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
           }
         }
       }
-      
-      // Fallback: just submit as-is (might be a long Code128 barcode)
-      console.warn(`[Scanner] Long barcode (${cleaned.length} chars), submitting as-is: "${cleaned}"`);
+      // Alphanumeric split
+      for (const splitLen of [13, 12, 10, 8]) {
+        if (cleaned.length >= splitLen + 8) {
+          const first = cleaned.substring(0, splitLen);
+          const second = cleaned.substring(splitLen);
+          if (second.length >= 8 && second.length <= 20) {
+            scanQueueRef.current.push(first);
+            scanQueueRef.current.push(second);
+            queueMicrotask(processQueue);
+            return;
+          }
+        }
+      }
     }
     
     scanQueueRef.current.push(cleaned);
     queueMicrotask(processQueue);
   }, [processQueue]);
 
+  // Submit the buffer contents as a scan result
+  const submitBuffer = useCallback((currentTime) => {
+    if (bufferRef.current.length === 0) return;
+    
+    const scanned = bufferRef.current;
+    bufferRef.current = '';
+    setScanBuffer('');
+    
+    // Activate cooldown + keep scanner mode active
+    cooldownRef.current = true;
+    scannerModeRef.current = true;
+    lastSubmitTimeRef.current = currentTime || Date.now();
+    
+    if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 120);
+    
+    // Keep scanner mode active a bit longer than cooldown to catch next barcode's first chars
+    if (scannerModeTimerRef.current) clearTimeout(scannerModeTimerRef.current);
+    scannerModeTimerRef.current = setTimeout(() => { scannerModeRef.current = false; }, 300);
+    
+    // Also clear any focused input field's value to prevent stale chars
+    try {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        if (!activeEl.hasAttribute('data-qty-input') && !activeEl.closest('[role="dialog"]')) {
+          activeEl.value = '';
+          // Dispatch input event to sync React state
+          activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    } catch (e) { /* ignore */ }
+    
+    queueScan(scanned);
+  }, [queueScan]);
+
   useEffect(() => {
     if (!isEnabled) return;
 
     const handleKeyDown = (e) => {
-      // CRITICAL: Do NOT intercept keyboard events for quantity input fields
+      // Skip qty inputs and dialogs
       const target = e.target;
       const isQtyInput = target && (
         target.hasAttribute('data-qty-input') ||
         target.closest('[data-qty-edit]') ||
         target.closest('[role="dialog"]')
       );
-      
       if (isQtyInput) {
         bufferRef.current = '';
+        scannerModeRef.current = false;
         return;
       }
       
@@ -265,116 +261,81 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       const timeDiff = currentTime - lastKeyTimeRef.current;
       const timeSinceLastSubmit = currentTime - lastSubmitTimeRef.current;
       
-      // Reset buffer if:
-      // 1. Too much time has passed between keys (> 80ms) - new scan starting
-      // 2. In cooldown (just processed a scan) - force fresh start
-      // 3. Very short time since last submit (< 100ms) - scanner firing next barcode
-      if (timeDiff > 80 || cooldownRef.current || (timeSinceLastSubmit < 100 && timeDiff > 30)) {
+      // =============================================
+      // BUFFER RESET LOGIC
+      // =============================================
+      if (timeDiff > 80 || cooldownRef.current) {
         bufferRef.current = '';
         cooldownRef.current = false;
+        // If long gap AND not in post-submit window, exit scanner mode
+        if (timeDiff > 300 && timeSinceLastSubmit > 300) {
+          scannerModeRef.current = false;
+        }
       }
       
       lastKeyTimeRef.current = currentTime;
-
-      // Cancel any pending auto-submit since we're still receiving keys
-      if (autoSubmitTimerRef.current) {
-        clearTimeout(autoSubmitTimerRef.current);
-        autoSubmitTimerRef.current = null;
-      }
-
-      // BLOCKING MODE: If manual input is disabled, prevent default for ALL printable keys
-      if (!allowKeyInput) {
-        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          e.stopPropagation();
-        }
+      
+      // =============================================
+      // SCANNER MODE DETECTION
+      // After 2+ rapid chars (< 50ms apart), activate scanner mode
+      // Scanner mode: block ALL chars from reaching input field
+      // =============================================
+      const isRapidInput = timeDiff < 50;
+      
+      if (isRapidInput && bufferRef.current.length >= 1) {
+        // We have rapid consecutive input = scanner mode
+        scannerModeRef.current = true;
+        // Keep extending scanner mode timeout while chars keep coming
+        if (scannerModeTimerRef.current) clearTimeout(scannerModeTimerRef.current);
+        scannerModeTimerRef.current = setTimeout(() => { scannerModeRef.current = false; }, 300);
       }
       
-      // Handle Enter key (most scanners send Enter after barcode)
+      // Determine if we should block this key from reaching the input field
+      const shouldBlock = !allowKeyInput || scannerModeRef.current;
+      
+      // =============================================
+      // HANDLE ENTER KEY
+      // =============================================
       if (e.key === 'Enter') {
         if (bufferRef.current.length > 0) {
-          if (allowKeyInput) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
-          
-          const scanned = bufferRef.current;
-          bufferRef.current = '';
-          setScanBuffer('');
-          
-          // ACTIVATE COOLDOWN - critical for preventing overlap
-          cooldownRef.current = true;
-          lastSubmitTimeRef.current = currentTime;
-          if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-          cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 100);
-          
-          queueScan(scanned);
+          // Always block Enter when we have buffer content (prevent form submission / input handler)
+          e.preventDefault();
+          e.stopPropagation();
+          submitBuffer(currentTime);
         }
         return;
       }
       
-      // Handle Tab key (some scanners use Tab as suffix)
+      // =============================================
+      // HANDLE TAB KEY
+      // =============================================
       if (e.key === 'Tab') {
         if (bufferRef.current.length > 0) {
           e.preventDefault();
           e.stopPropagation();
-          
-          const scanned = bufferRef.current;
-          bufferRef.current = '';
-          setScanBuffer('');
-          
-          // ACTIVATE COOLDOWN
-          cooldownRef.current = true;
-          lastSubmitTimeRef.current = currentTime;
-          if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-          cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 100);
-          
-          queueScan(scanned);
+          submitBuffer(currentTime);
         }
         return;
       }
       
-      // Only capture printable characters for scanner buffer
+      // =============================================
+      // HANDLE PRINTABLE CHARS
+      // =============================================
       if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        bufferRef.current += e.key;
         
-        // SAFETY: If buffer exceeds max barcode length, force-submit immediately
-        // This prevents infinite accumulation from overlapping scans
-        if (bufferRef.current.length >= MAX_BARCODE_LENGTH) {
-          const scanned = bufferRef.current;
-          bufferRef.current = '';
-          setScanBuffer('');
-          
-          // ACTIVATE COOLDOWN
-          cooldownRef.current = true;
-          lastSubmitTimeRef.current = currentTime;
-          if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-          cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 100);
-          
-          queueScan(scanned);
-          return;
+        // BLOCK from input field when in scanner mode or manual input disabled
+        if (shouldBlock) {
+          e.preventDefault();
+          e.stopPropagation();
         }
         
-        // AUTO-SUBMIT TIMER: If no more chars arrive within 200ms, submit buffer
-        // This handles scanners that don't send Enter/Tab suffix
-        autoSubmitTimerRef.current = setTimeout(() => {
-          if (bufferRef.current.length > 0) {
-            const scanned = bufferRef.current;
-            bufferRef.current = '';
-            setScanBuffer('');
-            
-            cooldownRef.current = true;
-            lastSubmitTimeRef.current = Date.now();
-            if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
-            cooldownTimerRef.current = setTimeout(() => { cooldownRef.current = false; }, 100);
-            
-            queueScan(scanned);
-          }
-        }, 200);
+        bufferRef.current += e.key;
+        
+        // SAFETY: Force-submit if buffer exceeds max length
+        if (bufferRef.current.length >= MAX_BARCODE_LENGTH) {
+          submitBuffer(currentTime);
+          return;
+        }
         
         // Update display buffer (debounced)
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -384,13 +345,11 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       }
     };
 
-    // Handle hardware scan button events (for Zebra, Honeywell, etc.)
+    // Handle hardware scan button events (Zebra, Honeywell, etc.)
     const handleScanButton = (e) => {
       if (e.type === 'scanbutton' || e.type === 'hardwarescan') {
         const barcode = e.detail?.barcode || e.data;
-        if (barcode) {
-          queueScan(barcode);
-        }
+        if (barcode) queueScan(barcode);
       }
     };
 
@@ -401,7 +360,7 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       }
     };
 
-    // Use capture phase for faster response
+    // Use capture phase for fastest interception
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     document.addEventListener('scanbutton', handleScanButton);
     document.addEventListener('hardwarescan', handleScanButton);
@@ -413,10 +372,10 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       document.removeEventListener('hardwarescan', handleScanButton);
       window.removeEventListener('message', handleMessage);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (autoSubmitTimerRef.current) clearTimeout(autoSubmitTimerRef.current);
       if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+      if (scannerModeTimerRef.current) clearTimeout(scannerModeTimerRef.current);
     };
-  }, [isEnabled, queueScan, allowKeyInput, flushBuffer]);
+  }, [isEnabled, queueScan, allowKeyInput, submitBuffer]);
 
   return { scanBuffer };
 };
