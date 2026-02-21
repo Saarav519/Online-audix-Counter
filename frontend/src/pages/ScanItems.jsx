@@ -916,6 +916,8 @@ const ScanItems = () => {
       // Wait for scanner to finish sending all characters, then auto-confirm
       // Use the DOM input ref value to get the final scanner output
       locationAutoConfirmTimerRef.current = setTimeout(() => {
+        // Guard: Don't auto-confirm if location was already selected by hardware scanner hook
+        if (selectedLocationIdRef.current) return;
         const finalValue = locationInputRef.current?.value?.trim();
         if (finalValue) {
           handleLocationScan(finalValue);
