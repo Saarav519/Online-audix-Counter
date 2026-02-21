@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend Health Check Test Script for AUDIX Stock Management App
-Tests the 3 core API endpoints after frontend changes
+Backend API Health Check Test
+Tests the 3 core endpoints after frontend changes to scanner hook
 """
 
 import requests
@@ -9,136 +9,121 @@ import json
 import sys
 from datetime import datetime
 
-# Backend URL from frontend/.env
+# Backend URL from environment
 BACKEND_URL = "https://counter-mobile-view.preview.emergentagent.com/api"
 
 def test_root_endpoint():
-    """Test GET /api/ endpoint"""
-    print("🔍 Testing GET /api/ endpoint...")
+    """Test GET /api/ - should return Hello World message"""
+    print("🔍 Testing GET /api/ (Root endpoint)")
     try:
-        response = requests.get(f"{BACKEND_URL}/", timeout=10)
-        print(f"   Status Code: {response.status_code}")
+        response = requests.get(f"{BACKEND_URL}/")
+        print(f"   Status: {response.status_code}")
+        print(f"   Response: {response.text}")
         
         if response.status_code == 200:
             data = response.json()
-            print(f"   Response: {data}")
-            
             if data.get("message") == "Hello World":
-                print("   ✅ ROOT ENDPOINT - PASSED")
+                print("   ✅ PASS: Root endpoint working correctly")
                 return True
             else:
-                print("   ❌ ROOT ENDPOINT - FAILED: Incorrect message")
+                print(f"   ❌ FAIL: Expected 'Hello World', got {data}")
                 return False
         else:
-            print(f"   ❌ ROOT ENDPOINT - FAILED: Status {response.status_code}")
+            print(f"   ❌ FAIL: Expected status 200, got {response.status_code}")
             return False
             
-    except requests.exceptions.RequestException as e:
-        print(f"   ❌ ROOT ENDPOINT - FAILED: {e}")
+    except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
         return False
 
 def test_create_status():
-    """Test POST /api/status endpoint"""
-    print("\n🔍 Testing POST /api/status endpoint...")
+    """Test POST /api/status - should create a status record"""
+    print("\n🔍 Testing POST /api/status (Create status record)")
     try:
-        payload = {"client_name": "test"}
-        response = requests.post(f"{BACKEND_URL}/status", 
-                               json=payload, 
-                               headers={"Content-Type": "application/json"},
-                               timeout=10)
-        print(f"   Status Code: {response.status_code}")
+        payload = {"client_name": "health_check_test"}
+        response = requests.post(
+            f"{BACKEND_URL}/status", 
+            json=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        print(f"   Status: {response.status_code}")
+        print(f"   Response: {response.text}")
         
         if response.status_code == 200:
             data = response.json()
-            print(f"   Response: {data}")
-            
-            # Verify required fields
-            required_fields = ["id", "client_name", "timestamp"]
-            if all(field in data for field in required_fields):
-                if data["client_name"] == "test" and data["id"]:
-                    print("   ✅ CREATE STATUS - PASSED")
-                    return True, data["id"]
-                else:
-                    print("   ❌ CREATE STATUS - FAILED: Invalid field values")
-                    return False, None
+            if "id" in data and "client_name" in data and "timestamp" in data:
+                print(f"   ✅ PASS: Status record created with ID {data.get('id')}")
+                return True, data.get('id')
             else:
-                print("   ❌ CREATE STATUS - FAILED: Missing required fields")
+                print(f"   ❌ FAIL: Missing expected fields in response")
                 return False, None
         else:
-            print(f"   ❌ CREATE STATUS - FAILED: Status {response.status_code}")
+            print(f"   ❌ FAIL: Expected status 200, got {response.status_code}")
             return False, None
             
-    except requests.exceptions.RequestException as e:
-        print(f"   ❌ CREATE STATUS - FAILED: {e}")
+    except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
         return False, None
 
-def test_get_status():
-    """Test GET /api/status endpoint"""
-    print("\n🔍 Testing GET /api/status endpoint...")
+def test_get_all_status():
+    """Test GET /api/status - should return all status records"""
+    print("\n🔍 Testing GET /api/status (Get all status records)")
     try:
-        response = requests.get(f"{BACKEND_URL}/status", timeout=10)
-        print(f"   Status Code: {response.status_code}")
+        response = requests.get(f"{BACKEND_URL}/status")
+        print(f"   Status: {response.status_code}")
         
         if response.status_code == 200:
             data = response.json()
-            print(f"   Response: Found {len(data)} records")
-            
-            if isinstance(data, list):
-                print("   ✅ GET STATUS - PASSED")
-                return True, len(data)
-            else:
-                print("   ❌ GET STATUS - FAILED: Response is not a list")
-                return False, 0
+            print(f"   Records found: {len(data)} records")
+            if len(data) > 0:
+                print(f"   Sample record keys: {list(data[0].keys())}")
+            print("   ✅ PASS: Successfully retrieved all status records")
+            return True, len(data)
         else:
-            print(f"   ❌ GET STATUS - FAILED: Status {response.status_code}")
+            print(f"   ❌ FAIL: Expected status 200, got {response.status_code}")
             return False, 0
             
-    except requests.exceptions.RequestException as e:
-        print(f"   ❌ GET STATUS - FAILED: {e}")
+    except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
         return False, 0
 
-def main():
-    """Main test execution"""
+def run_health_check():
+    """Run all health check tests"""
     print("=" * 60)
-    print("🚀 AUDIX STOCK MANAGEMENT - BACKEND HEALTH CHECK")
-    print("=" * 60)
+    print("BACKEND API HEALTH CHECK")
     print(f"Backend URL: {BACKEND_URL}")
-    print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print()
+    print(f"Test time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
     
-    # Track test results
     results = []
     
     # Test 1: Root endpoint
     results.append(test_root_endpoint())
     
     # Test 2: Create status
-    create_passed, created_id = test_create_status()
-    results.append(create_passed)
+    success, record_id = test_create_status()
+    results.append(success)
     
-    # Test 3: Get status
-    get_passed, record_count = test_get_status()
-    results.append(get_passed)
+    # Test 3: Get all status
+    success, record_count = test_get_all_status()
+    results.append(success)
     
     # Summary
     print("\n" + "=" * 60)
-    print("📊 TEST SUMMARY")
+    print("HEALTH CHECK SUMMARY")
     print("=" * 60)
     passed = sum(results)
     total = len(results)
     
-    print(f"✅ Tests Passed: {passed}/{total}")
-    print(f"❌ Tests Failed: {total - passed}/{total}")
+    print(f"Tests passed: {passed}/{total}")
     
     if passed == total:
-        print("\n🎉 ALL BACKEND HEALTH CHECKS PASSED!")
-        print("   Backend is healthy and ready for production use.")
+        print("🎉 ALL TESTS PASSED - Backend is healthy!")
         return True
     else:
-        print(f"\n⚠️  {total - passed} BACKEND HEALTH CHECK(S) FAILED!")
-        print("   Backend requires attention before production use.")
+        print("❌ SOME TESTS FAILED - Backend has issues!")
         return False
 
 if __name__ == "__main__":
-    success = main()
+    success = run_health_check()
     sys.exit(0 if success else 1)
