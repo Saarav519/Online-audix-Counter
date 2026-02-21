@@ -931,10 +931,8 @@ const ScanItems = () => {
       setWaitingForLocationScan(false); // Important: Mark location as selected
       playSound(true);
       
-      // Update URL to reflect selected location (triggers Layout bottom nav hide)
-      navigate(`/scan?location=${result.location.id}`, { replace: true });
-      
       // Store temp location if it's a new dynamic location
+      // IMPORTANT: Set tempLocation BEFORE navigate to avoid URL sync clearing it
       if (result.isTemp) {
         setTempLocation(result.location);
         setLocationSuccess(`Location "${input}" ready for scanning`);
@@ -947,6 +945,11 @@ const ScanItems = () => {
         setTempLocation(null);
         setLocationSuccess(null);
       }
+      
+      // Update prevUrlLocationRef BEFORE navigating to prevent URL sync effect from clearing state
+      prevUrlLocationRef.current = result.location.id;
+      // Update URL to reflect selected location (triggers Layout bottom nav hide)
+      navigate(`/scan?location=${result.location.id}`, { replace: true });
       
       // Focus barcode input after location is selected
       setTimeout(() => {
