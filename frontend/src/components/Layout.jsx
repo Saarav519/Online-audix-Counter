@@ -125,7 +125,7 @@ const Layout = ({ children }) => {
 
         {/* Large Bottom Navigation for Scanner Devices */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
-          <div className="grid grid-cols-5 h-18">
+          <div className={`grid h-18 ${bottomNavItems.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
