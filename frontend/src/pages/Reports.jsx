@@ -320,13 +320,25 @@ const Reports = () => {
 
   // ============ PREASSIGNED: Export CSV ============
   const handlePreassignedExportCSV = async () => {
-    if (preassignedReportItems.length === 0) return;
+    // Use ALL preassigned locations (not search-filtered)
+    const allItems = preassignedLocationData.flatMap(d => {
+      if (!d.assignedLocation) return [];
+      const items = scannedItems[d.assignedLocation.id] || [];
+      return items.map(item => ({
+        ...item,
+        locationName: d.masterLocation.name || d.masterLocation.code,
+        locationId: d.assignedLocation.id
+      }));
+    });
+
+    if (allItems.length === 0) return;
+
     const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
-    const rows = preassignedReportItems.map(item => {
+    const rows = allItems.map(item => {
       const masterProduct = masterProducts.find(p => p.barcode === item.barcode);
       return [
         `"${item.locationName}"`,
-        item.barcode,
+        `="${item.barcode}"`,
         `"${item.productName}"`,
         masterProduct?.price?.toFixed(2) || '0.00',
         item.quantity,
@@ -335,6 +347,22 @@ const Reports = () => {
     });
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const filename = `stock_report_preassigned_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Show export summary with location count
+    const exportedLocationNames = [...new Set(allItems.map(i => i.locationName))];
+    const locationsWithData = preassignedLocationData.filter(d => 
+      d.assignedLocation && (scannedItems[d.assignedLocation.id] || []).length > 0
+    ).length;
+
+    alert(
+      `✅ EXPORT SUMMARY\n\n` +
+      `📊 Locations with data: ${locationsWithData} of ${masterLocations.length}\n` +
+      `📍 Locations exported: ${exportedLocationNames.length}\n` +
+      `📦 Total items: ${allItems.length}\n` +
+      `🔢 Total quantity: ${allItems.reduce((sum, i) => sum + i.quantity, 0)}\n\n` +
+      `📁 File: ${filename}`
+    );
+
     await downloadCSV(csv, filename);
   };
 
