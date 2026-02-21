@@ -1005,15 +1005,18 @@ agent_communication:
 
   - task: "Accuracy % and Remarks in Existing Reports"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Updated bin-wise and detailed reports with accuracy_pct and remark fields. Helper functions calc_accuracy() and generate_remark() provide professional contextual remarks."
+      - working: true
+        agent: "testing"
+        comment: "✅ ACCURACY % AND REMARKS IN EXISTING REPORTS WORKING - Bin-wise report: Found 4 locations with accuracy_pct and remark fields present, Total accuracy: 49.2%. Sample remark: 'Not Scanned — Item exists in master but was not counted'. Detailed report: Found 7 items with category, accuracy_pct and remark fields present. Professional contextual remarks working correctly."
 
 test_plan:
   current_focus:
