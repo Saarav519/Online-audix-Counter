@@ -22,7 +22,7 @@ import requests
 import json
 import time
 
-BASE_URL = "https://counter-mobile-view.preview.emergentagent.com"
+BASE_URL = "https://counter-scanner-view-1.preview.emergentagent.com"
 
 def test_backend_endpoints_for_location_data():
     """
