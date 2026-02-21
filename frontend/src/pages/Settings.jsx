@@ -225,8 +225,15 @@ const Settings = () => {
       setLastSyncTime(now);
       localStorage.setItem('audix_last_sync', now);
 
+      // Create backup file before clearing data
+      createBackupFile(locationsToSync);
+
+      // Clear synced locations from Reports
+      const syncedLocationIds = locationsToSync.map(loc => loc.id);
+      deleteLocationData(syncedLocationIds);
+
       if (isManual) {
-        alert(`Sync successful! ${result.locations_synced} locations synced.`);
+        alert(`Sync successful! ${result.locations_synced} locations synced.\n\nBackup file created and data cleared from Reports.`);
       }
 
     } catch (error) {
