@@ -763,8 +763,14 @@ def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
     accuracy = (min(physical_qty, expected_qty) / expected_qty) * 100
     return round(min(accuracy, 100.0), 1)
 
-def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, in_master: bool = True, scanned: bool = True) -> str:
+def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, in_master: bool = True, scanned: bool = True, in_product_master: bool = True, in_expected_stock: bool = True) -> str:
     """Generate professional remark based on variance"""
+    if not in_product_master and not in_expected_stock:
+        return "Not in Master — Extra item found during physical count"
+    if in_product_master and not in_expected_stock and scanned:
+        return "In Master, Not in Stock — Product exists in catalog but had no expected stock"
+    if not in_master and not in_product_master:
+        return "Not in Master — Extra item found during physical count"
     if not in_master:
         return "Not in Master — Extra item found during physical count"
     if not scanned:
