@@ -945,15 +945,18 @@ agent_communication:
 
   - task: "CSV Import with Category and Article fields"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Updated import-expected endpoint to handle all 3 CSV formats based on variance_mode. Added category, article_code, article_name fields. Case-insensitive column mapping."
+      - working: true
+        agent: "testing"
+        comment: "✅ CSV IMPORT WITH VARIANCE MODES WORKING - Successfully imported expected stock CSV for all 3 variance modes: bin-wise (4 records with Location, Category), barcode-wise (4 records with Category), article-wise (4 records with Article_Code, Article_Name, Category). Case-insensitive column mapping working correctly."
 
   - task: "Barcode-wise Variance Report"
     implemented: true
