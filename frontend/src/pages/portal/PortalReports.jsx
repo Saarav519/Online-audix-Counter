@@ -310,23 +310,23 @@ export default function PortalReports() {
               <tbody>
                 {reportData.report.map((row, index) => (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2 px-3">{row.location}</td>
-                    <td className="py-2 px-3 font-mono text-xs">{row.barcode}</td>
-                    <td className="py-2 px-3">{row.description}</td>
-                    <td className="py-2 px-3 text-right">{row.mrp.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right">{row.cost.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right">{row.stock_qty}</td>
-                    <td className="py-2 px-3 text-right">{row.stock_value.toFixed(2)}</td>
-                    <td className="py-2 px-3 text-right">{row.physical_qty}</td>
-                    <td className="py-2 px-3 text-right">{row.physical_value.toFixed(2)}</td>
+                    <td className="py-2 px-3">{row.location || '-'}</td>
+                    <td className="py-2 px-3 font-mono text-xs">{row.barcode || '-'}</td>
+                    <td className="py-2 px-3">{row.description || '-'}</td>
+                    <td className="py-2 px-3 text-right">{(row.mrp || 0).toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right">{(row.cost || 0).toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right">{row.stock_qty || 0}</td>
+                    <td className="py-2 px-3 text-right">{(row.stock_value || 0).toFixed(2)}</td>
+                    <td className="py-2 px-3 text-right">{row.physical_qty || 0}</td>
+                    <td className="py-2 px-3 text-right">{(row.physical_value || 0).toFixed(2)}</td>
                     <td className="py-2 px-3 text-right">
-                      <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_qty)}`}>
-                        {row.diff_qty > 0 ? '+' : ''}{row.diff_qty}
+                      <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_qty || 0)}`}>
+                        {(row.diff_qty || 0) > 0 ? '+' : ''}{row.diff_qty || 0}
                       </span>
                     </td>
                     <td className="py-2 px-3 text-right">
-                      <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
-                        {row.diff_value > 0 ? '+' : ''}{row.diff_value.toFixed(2)}
+                      <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value || 0)}`}>
+                        {(row.diff_value || 0) > 0 ? '+' : ''}{(row.diff_value || 0).toFixed(2)}
                       </span>
                     </td>
                   </tr>
@@ -335,18 +335,18 @@ export default function PortalReports() {
               <tfoot className="bg-gray-50 font-semibold text-sm">
                 <tr>
                   <td colSpan="5" className="py-3 px-3">TOTALS</td>
-                  <td className="py-3 px-3 text-right">{reportData.totals.stock_qty}</td>
-                  <td className="py-3 px-3 text-right">{reportData.totals.stock_value.toFixed(2)}</td>
-                  <td className="py-3 px-3 text-right">{reportData.totals.physical_qty}</td>
-                  <td className="py-3 px-3 text-right">{reportData.totals.physical_value.toFixed(2)}</td>
+                  <td className="py-3 px-3 text-right">{reportData.totals?.stock_qty || 0}</td>
+                  <td className="py-3 px-3 text-right">{(reportData.totals?.stock_value || 0).toFixed(2)}</td>
+                  <td className="py-3 px-3 text-right">{reportData.totals?.physical_qty || 0}</td>
+                  <td className="py-3 px-3 text-right">{(reportData.totals?.physical_value || 0).toFixed(2)}</td>
                   <td className="py-3 px-3 text-right">
-                    <span className={`px-2 py-0.5 rounded ${getVarianceClass(reportData.totals.diff_qty)}`}>
-                      {reportData.totals.diff_qty > 0 ? '+' : ''}{reportData.totals.diff_qty}
+                    <span className={`px-2 py-0.5 rounded ${getVarianceClass(reportData.totals?.diff_qty || 0)}`}>
+                      {(reportData.totals?.diff_qty || 0) > 0 ? '+' : ''}{reportData.totals?.diff_qty || 0}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-right">
-                    <span className={`px-2 py-0.5 rounded ${getVarianceClass(reportData.totals.diff_value)}`}>
-                      {reportData.totals.diff_value > 0 ? '+' : ''}{reportData.totals.diff_value.toFixed(2)}
+                    <span className={`px-2 py-0.5 rounded ${getVarianceClass(reportData.totals?.diff_value || 0)}`}>
+                      {(reportData.totals?.diff_value || 0) > 0 ? '+' : ''}{(reportData.totals?.diff_value || 0).toFixed(2)}
                     </span>
                   </td>
                 </tr>
