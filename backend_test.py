@@ -94,9 +94,11 @@ class AudixBackendTester:
         
         # Test Create Client - POST /api/portal/clients
         try:
+            # Use unique code to avoid conflicts
+            unique_code = f"TC{int(time.time())}"
             client_data = {
                 "name": "Test Client",
-                "code": "TC01",
+                "code": unique_code,
                 "address": "Test Address"
             }
             
