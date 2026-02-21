@@ -103,11 +103,12 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Dynamic Mode Location Submission Issue:
-  When users submit scanned items in Dynamic Mode, the location is not being saved to the locations list, even though the scanned items are saved. 
-  Test Steps: 1) Login with admin/admin123, 2) Navigate to Scan Items, 3) Enter NEW location code (e.g., "TEST-LOCATION-XYZ"), 4) Scan product barcodes, 5) Submit Location
-  Expected: Location should appear in both Locations and Reports pages with correct quantity
-  Actual: Location not visible after submission
+  Merge Locations into Reports & Remove Dashboard:
+  1. Remove Dashboard page completely - after login, go directly to Reports
+  2. Remove Locations page - merge all location features into Reports page
+  3. Reports page now serves as unified hub: location management + export/reporting
+  4. Bottom nav: Master, Scan, Reports, Settings (4 items, no Dashboard/Locations)
+  5. All changes in mobile/scanner view only
 
 backend:
   - task: "Dynamic Mode Location Submission Backend Analysis"
