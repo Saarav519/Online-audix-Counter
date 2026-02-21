@@ -1352,6 +1352,12 @@ const ScanItems = () => {
     setQuantityInput('1');
     setShowBackConfirmDialog(false);
     
+    // In preassigned mode, go back to Reports (location list)
+    if (settings.locationScanMode === 'preassigned') {
+      navigate('/reports');
+      return;
+    }
+    
     // Update URL to remove location param (shows bottom nav again)
     navigate('/scan', { replace: true });
     
