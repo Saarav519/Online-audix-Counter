@@ -256,13 +256,15 @@ async def register_portal_user(user: PortalUserCreate):
     portal_user = PortalUser(
         username=user.username,
         password_hash=hash_password(user.password),
-        role=user.role
+        role="viewer",  # All new registrations are viewers by default
+        is_active=True,
+        is_approved=False  # Needs admin approval
     )
     doc = portal_user.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.portal_users.insert_one(doc)
     
-    return {"message": "User registered successfully", "user_id": portal_user.id}
+    return {"message": "Registration successful! Your account is pending admin approval.", "user_id": portal_user.id}
 
 @portal_router.post("/login")
 async def login_portal_user(credentials: PortalUserLogin):
