@@ -1502,6 +1502,47 @@ COLD-01,Cold Storage Unit 1`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export Auth Modal (password only) */}
+      <Dialog open={showExportAuthModal} onOpenChange={(open) => {
+        setShowExportAuthModal(open);
+        if (!open) { setExportAuthPassword(''); setExportAuthError(''); }
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-emerald-600" />Admin Password Required
+            </DialogTitle>
+            <DialogDescription>Enter admin password to export data.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {exportAuthError && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4" />{exportAuthError}
+              </p>
+            )}
+            <div>
+              <Label htmlFor="export-password-dyn">Password</Label>
+              <Input
+                id="export-password-dyn"
+                type="password"
+                value={exportAuthPassword}
+                onChange={(e) => { setExportAuthPassword(e.target.value); setExportAuthError(''); }}
+                placeholder="Enter admin password"
+                className="mt-1"
+                onKeyPress={(e) => e.key === 'Enter' && handleExportAuthSubmit()}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowExportAuthModal(false)}>Cancel</Button>
+            <Button onClick={handleExportAuthSubmit} disabled={!exportAuthPassword} className="bg-emerald-600 hover:bg-emerald-700">
+              <Download className="w-4 h-4 mr-2" />Export
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
