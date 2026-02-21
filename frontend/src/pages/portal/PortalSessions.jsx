@@ -36,6 +36,7 @@ export default function PortalSessions() {
   const [formData, setFormData] = useState({
     client_id: '',
     name: '',
+    variance_mode: 'bin-wise',
     start_date: new Date().toISOString().split('T')[0]
   });
   const fileInputRef = useRef(null);
