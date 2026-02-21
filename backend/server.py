@@ -1252,22 +1252,17 @@ async def get_category_summary(session_id: str):
     
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     
-    # Build barcode -> category mapping (master priority, then expected stock)
+    # Build barcode -> category mapping (stock priority, then master fallback)
     barcode_info = {}
-    # First from master
-    for bc, m in master_by_barcode.items():
-        barcode_info[bc] = {"category": m.get("category", "") or "Uncategorized", "cost": m.get("cost", 0)}
     
     expected_by_category = {}
     for e in expected:
         bc = e["barcode"]
-        # Use master category if available, else expected stock's category
-        if bc not in barcode_info:
-            cat = e.get("category", "") or "Uncategorized"
-            cost = e.get("cost", 0)
-            barcode_info[bc] = {"category": cat, "cost": cost}
-        cat = barcode_info[bc]["category"]
-        cost = barcode_info[bc]["cost"]
+        # Stock first, master fallback
+        master_info = master_by_barcode.get(bc, {})
+        cat = e.get("category", "") or master_info.get("category", "") or "Uncategorized"
+        cost = e.get("cost", 0) or master_info.get("cost", 0)
+        barcode_info[bc] = {"category": cat, "cost": cost}
         
         if cat not in expected_by_category:
             expected_by_category[cat] = {"qty": 0, "value": 0, "item_count": 0}
