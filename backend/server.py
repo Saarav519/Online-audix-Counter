@@ -299,6 +299,100 @@ async def login_portal_user(credentials: PortalUserLogin):
         }
     }
 
+# ==================== PASSWORD RESET ====================
+
+class PasswordResetRequest(BaseModel):
+    username: str
+    new_password: str
+
+@portal_router.post("/reset-password")
+async def reset_password(request: PasswordResetRequest):
+    """Public endpoint - reset password by username"""
+    user = await db.portal_users.find_one({"username": request.username}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Username not found")
+    
+    if len(request.new_password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    
+    await db.portal_users.update_one(
+        {"username": request.username},
+        {"$set": {"password_hash": hash_password(request.new_password)}}
+    )
+    
+    return {"message": "Password reset successful. You can now login with your new password."}
+
+# ==================== USER MANAGEMENT ROUTES ====================
+
+@portal_router.get("/users")
+async def get_portal_users():
+    """List all registered portal users (admin only)"""
+    users = await db.portal_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    return users
+
+@portal_router.put("/users/{user_id}/approve")
+async def approve_user(user_id: str):
+    """Approve a pending user"""
+    result = await db.portal_users.update_one(
+        {"id": user_id},
+        {"$set": {"is_approved": True}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User approved successfully"}
+
+@portal_router.put("/users/{user_id}/reject")
+async def reject_user(user_id: str):
+    """Reject/unapprove a user"""
+    result = await db.portal_users.update_one(
+        {"id": user_id},
+        {"$set": {"is_approved": False}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": "User rejected"}
+
+@portal_router.put("/users/{user_id}/toggle-active")
+async def toggle_user_active(user_id: str):
+    """Enable/disable a user"""
+    user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_status = not user.get("is_active", True)
+    await db.portal_users.update_one(
+        {"id": user_id},
+        {"$set": {"is_active": new_status}}
+    )
+    return {"message": f"User {'enabled' if new_status else 'disabled'}", "is_active": new_status}
+
+@portal_router.put("/users/{user_id}/role")
+async def change_user_role(user_id: str, role_data: dict):
+    """Change user role (admin/viewer)"""
+    role = role_data.get("role", "viewer")
+    if role not in ["admin", "viewer"]:
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'viewer'")
+    
+    result = await db.portal_users.update_one(
+        {"id": user_id},
+        {"$set": {"role": role}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"message": f"User role changed to {role}"}
+
+@portal_router.delete("/users/{user_id}")
+async def delete_portal_user(user_id: str):
+    """Delete a portal user"""
+    user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("username") == "admin":
+        raise HTTPException(status_code=400, detail="Cannot delete the default admin user")
+    
+    await db.portal_users.delete_one({"id": user_id})
+    return {"message": "User deleted successfully"}
+
 # ==================== CLIENT ROUTES ====================
 
 @portal_router.get("/clients")
