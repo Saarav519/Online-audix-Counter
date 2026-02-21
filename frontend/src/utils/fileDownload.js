@@ -140,30 +140,20 @@ const downloadViaBlob = (content, filename, showAlert = true) => {
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    link.style.position = 'absolute';
-    link.style.left = '-9999px';
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
     
     document.body.appendChild(link);
+    link.click();
     
-    // Use setTimeout to ensure the link is in DOM before clicking
-    setTimeout(() => {
-      link.click();
-      
-      // Cleanup after a short delay
-      setTimeout(() => {
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      }, 100);
-    }, 0);
+    // Cleanup immediately after click
+    document.body.removeChild(link);
+    // Revoke after a short delay to ensure download starts
+    setTimeout(() => URL.revokeObjectURL(url), 500);
     
     if (showAlert) {
-      // Show alert after a small delay to not block the download
-      setTimeout(() => {
-        alert('✅ File Downloaded!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
-      }, 200);
+      alert('✅ File Downloaded!\n\nFile: ' + filename + '\n\nCheck your Downloads folder.');
     }
     
     return { success: true };
