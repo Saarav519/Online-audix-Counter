@@ -668,3 +668,25 @@ agent_communication:
       - No errors or warnings detected
       
       🎉 CONCLUSION: Frontend layout/UX changes had NO impact on backend functionality. All API endpoints remain fully operational and healthy.
+
+  - agent: "main"
+    message: |
+      Fixed barcode overlap during fast scanning in useHardwareScanner hook:
+      
+      Root causes identified and fixed:
+      1. ✅ Cooldown mechanism was NEVER activated - after processing a scan on Enter/Tab, 
+         cooldownRef.current was never set to true, so rapid next-scan chars weren't separated
+      2. ✅ No auto-submit timer - if scanner doesn't send Enter between rapid scans,
+         chars kept buffering indefinitely  
+      3. ✅ No max buffer length guard - buffer could grow beyond any reasonable barcode length
+      4. ✅ Anti-overlap split logic was too narrow - only handled specific numeric length combinations
+      
+      Changes made to /app/frontend/src/hooks/useDeviceDetection.js:
+      - COOLDOWN ACTIVATION: After every scan submission (Enter/Tab/overflow), set cooldownRef=true
+        with 100ms timer, and track lastSubmitTimeRef for additional gap detection
+      - AUTO-SUBMIT TIMER: 200ms idle timeout auto-submits buffer (catches scanners without Enter suffix)
+      - MAX BUFFER GUARD: If buffer exceeds 25 chars, force-submit immediately (prevents infinite accumulation)
+      - IMPROVED SPLIT LOGIC: Handles numeric splits recursively, detects duplicate barcodes,
+        handles alphanumeric splits at common barcode lengths (13, 12, 10, 8)
+      - ADDITIONAL GAP DETECTION: If timeSinceLastSubmit < 100ms AND timeDiff > 30ms, reset buffer
+        (catches the narrow window between Enter of scan 1 and first char of scan 2)
