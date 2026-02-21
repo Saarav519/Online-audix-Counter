@@ -873,7 +873,10 @@ async def get_bin_wise_report(session_id: str):
 
 @portal_router.get("/reports/{session_id}/detailed")
 async def get_detailed_report(session_id: str):
-    """Detailed item-wise report with values, accuracy%, remarks"""
+    """Detailed item-wise report with values, accuracy%, remarks. Uses master products for product info."""
+    # Load master products for product info enrichment
+    master_by_barcode = await get_master_for_session(session_id)
+    
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_map = {}
     for e in expected:
@@ -895,6 +898,8 @@ async def get_detailed_report(session_id: str):
                 }
             physical_map[key]["quantity"] += item["quantity"]
     
+    # Also include barcodes that are in master but not in expected stock or physical
+    # For items in master with no expected stock: show them if they were scanned
     all_keys = set(expected_map.keys()) | set(physical_map.keys())
     
     report = []
@@ -910,10 +915,13 @@ async def get_detailed_report(session_id: str):
         
         location = exp.get("location") or phy.get("location", "")
         barcode = exp.get("barcode") or phy.get("barcode", "")
-        description = exp.get("description") or phy.get("product_name", "")
-        category = exp.get("category", "")
-        mrp = exp.get("mrp", 0)
-        cost = exp.get("cost", 0)
+        
+        # Enrich product info from master products (priority: master > expected > physical)
+        master_info = master_by_barcode.get(barcode, {})
+        description = master_info.get("description") or exp.get("description") or phy.get("product_name", "")
+        category = master_info.get("category") or exp.get("category", "")
+        mrp = master_info.get("mrp") or exp.get("mrp", 0)
+        cost = master_info.get("cost") or exp.get("cost", 0)
         
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
@@ -924,9 +932,10 @@ async def get_detailed_report(session_id: str):
         diff_value = diff_qty * cost
         
         accuracy = calc_accuracy(stock_qty, physical_qty)
-        in_master = key in expected_map
+        in_expected = key in expected_map
+        in_prod_master = barcode in master_by_barcode
         scanned = key in physical_map
-        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master=in_expected, scanned=scanned, in_product_master=in_prod_master, in_expected_stock=in_expected)
         
         totals["stock_qty"] += stock_qty
         totals["stock_value"] += stock_value
@@ -949,7 +958,9 @@ async def get_detailed_report(session_id: str):
             "diff_qty": diff_qty,
             "diff_value": diff_value,
             "accuracy_pct": accuracy,
-            "remark": remark
+            "remark": remark,
+            "in_master": barcode in master_by_barcode,
+            "in_expected_stock": key in expected_map
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
