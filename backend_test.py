@@ -7,7 +7,7 @@ This script tests the complete AUDIX Admin Portal backend API functionality
 including portal authentication, client management, audit sessions, sync API, 
 dashboard, and reports as requested in the review.
 
-Backend URL: https://mobile-counter-scan.preview.emergentagent.com
+Backend URL: https://offline-sync-portal.preview.emergentagent.com
 """
 
 import requests
@@ -19,7 +19,7 @@ import time
 
 class AudixBackendTester:
     def __init__(self):
-        self.base_url = "https://mobile-counter-scan.preview.emergentagent.com"
+        self.base_url = "https://offline-sync-portal.preview.emergentagent.com"
         self.api_url = f"{self.base_url}/api"
         self.portal_url = f"{self.base_url}/api/portal"
         self.sync_url = f"{self.base_url}/api/sync"
