@@ -999,7 +999,7 @@ COLD-01,Cold Storage Unit 1`;
 
         {/* Action Buttons Row 1: Add/Import */}
         <div className="flex gap-2 flex-wrap">
-          {isPreAssignedMode ? (
+          {isPreAssignedMode && (
             <Button
               variant="outline"
               size="sm"
@@ -1009,20 +1009,11 @@ COLD-01,Cold Storage Unit 1`;
               <Upload className="w-4 h-4 mr-1" />
               Import
             </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={() => setShowAddModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add Location
-            </Button>
           )}
           <Button
             variant="outline"
             size="sm"
-            onClick={handleExportCSV}
+            onClick={() => handleExportAuthRequest('csv')}
             disabled={reportItems.length === 0}
           >
             <Download className="w-4 h-4 mr-1" />
@@ -1031,7 +1022,7 @@ COLD-01,Cold Storage Unit 1`;
           <Button
             variant="outline"
             size="sm"
-            onClick={handleEmailReport}
+            onClick={() => handleExportAuthRequest('email')}
             disabled={reportItems.length === 0}
           >
             <Mail className="w-4 h-4 mr-1" />
