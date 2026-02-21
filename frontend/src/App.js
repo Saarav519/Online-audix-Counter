@@ -201,6 +201,18 @@ function AppRoutes() {
         >
           <Route index element={<Suspense fallback={<PageLoader />}><PortalSyncLogs /></Suspense>} />
         </Route>
+        <Route
+          path="/portal/users"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalUsers /></Suspense>} />
+        </Route>
 
         {/* Scanner App Routes - Mobile Only */}
         <Route
