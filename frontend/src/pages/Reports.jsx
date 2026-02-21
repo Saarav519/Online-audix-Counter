@@ -730,7 +730,7 @@ COLD-01,Cold Storage Unit 1`;
           <Button
             variant="outline"
             size="sm"
-            onClick={handlePreassignedExportCSV}
+            onClick={() => handleExportAuthRequest('csv-preassigned')}
             disabled={preassignedReportItems.length === 0}
           >
             <Download className="w-4 h-4 mr-1" />
@@ -739,7 +739,7 @@ COLD-01,Cold Storage Unit 1`;
           <Button
             variant="outline"
             size="sm"
-            onClick={handlePreassignedEmailReport}
+            onClick={() => handleExportAuthRequest('email-preassigned')}
             disabled={preassignedReportItems.length === 0}
           >
             <Mail className="w-4 h-4 mr-1" />
