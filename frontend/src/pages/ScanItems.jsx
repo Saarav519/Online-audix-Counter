@@ -2004,8 +2004,18 @@ const ScanItems = () => {
                               <Input
                                 type="number"
                                 min="1"
+                                max={isSingleSkuMode ? item.quantity : undefined}
                                 value={editQuantity}
-                                onChange={(e) => setEditQuantity(e.target.value)}
+                                onChange={(e) => {
+                                  let val = e.target.value;
+                                  if (isSingleSkuMode && val !== '') {
+                                    const numVal = parseInt(val);
+                                    if (!isNaN(numVal) && numVal > item.quantity) {
+                                      val = String(item.quantity);
+                                    }
+                                  }
+                                  setEditQuantity(val);
+                                }}
                                 className="w-20 h-8 text-center"
                                 autoFocus
                                 onKeyDown={(e) => {
@@ -2042,7 +2052,7 @@ const ScanItems = () => {
                               >
                                 {item.quantity}
                               </span>
-                              {!isLocationLocked && (
+                              {!isLocationLocked && !isSingleSkuMode && (
                                 <Button
                                   variant="outline"
                                   size="icon"
