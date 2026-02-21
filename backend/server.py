@@ -1276,7 +1276,15 @@ async def get_category_summary(session_id: str):
     for s in synced:
         for item in s["items"]:
             bc = item["barcode"]
-            info = barcode_info.get(bc, {"category": "Unmapped", "cost": 0})
+            # Use barcode_info (which already prioritizes master)
+            if bc not in barcode_info:
+                # Check master for this barcode
+                master_info = master_by_barcode.get(bc, {})
+                if master_info:
+                    barcode_info[bc] = {"category": master_info.get("category", "") or "Unmapped", "cost": master_info.get("cost", 0)}
+                else:
+                    barcode_info[bc] = {"category": "Unmapped", "cost": 0}
+            info = barcode_info[bc]
             cat = info["category"]
             cost = info["cost"]
             
