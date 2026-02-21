@@ -993,6 +993,80 @@ RT-SF,Retail Store Front,Front retail area`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Clear Master Data Confirmation Modal */}
+      <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Clear Master Data
+            </DialogTitle>
+            <DialogDescription>Select which master data you want to clear. This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="p-3 bg-red-50 rounded-lg">
+              <p className="text-sm text-red-700 font-medium">Warning: This will permanently delete the selected data.</p>
+            </div>
+
+            {/* Products checkbox */}
+            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+              <input 
+                type="checkbox" 
+                checked={clearOptions.products} 
+                onChange={(e) => setClearOptions(prev => ({ ...prev, products: e.target.checked }))}
+                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800">Products</p>
+                <p className="text-xs text-slate-500">{masterProducts.length} product(s)</p>
+              </div>
+              <Package className="w-5 h-5 text-slate-400" />
+            </label>
+
+            {/* Locations checkbox */}
+            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+              <input 
+                type="checkbox" 
+                checked={clearOptions.locations} 
+                onChange={(e) => setClearOptions(prev => ({ ...prev, locations: e.target.checked }))}
+                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800">Locations</p>
+                <p className="text-xs text-slate-500">{masterLocations.length} location(s)</p>
+              </div>
+              <MapPin className="w-5 h-5 text-slate-400" />
+            </label>
+
+            {/* Auth Users checkbox */}
+            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+              <input 
+                type="checkbox" 
+                checked={clearOptions.authUsers} 
+                onChange={(e) => setClearOptions(prev => ({ ...prev, authUsers: e.target.checked }))}
+                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800">Authorization Users</p>
+                <p className="text-xs text-slate-500">{authorizationUsers.length} user(s)</p>
+              </div>
+              <Users className="w-5 h-5 text-slate-400" />
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowClearModal(false)}>Cancel</Button>
+            <Button 
+              onClick={handleClearMasterData} 
+              disabled={!anyClearSelected}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear Selected
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
