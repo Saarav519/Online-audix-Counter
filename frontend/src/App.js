@@ -189,30 +189,6 @@ function AppRoutes() {
           <Route index element={<Suspense fallback={<PageLoader />}><PortalReports /></Suspense>} />
         </Route>
         <Route
-          path="/portal/alerts"
-          element={
-            <PortalProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <PortalLayout />
-              </Suspense>
-            </PortalProtectedRoute>
-          }
-        >
-          <Route index element={<Suspense fallback={<PageLoader />}><PortalAlerts /></Suspense>} />
-        </Route>
-        <Route
-          path="/portal/settings"
-          element={
-            <PortalProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <PortalLayout />
-              </Suspense>
-            </PortalProtectedRoute>
-          }
-        >
-          <Route index element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
-        </Route>
-        <Route
           path="/portal/sync-logs"
           element={
             <PortalProtectedRoute>
