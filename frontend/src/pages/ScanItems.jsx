@@ -474,6 +474,11 @@ const ScanItems = () => {
   
   useEffect(() => {
     isSingleSkuModeRef.current = settings.singleSkuScanning;
+    // When Single SKU mode is ON, auto-disable Ask Qty
+    if (settings.singleSkuScanning && askQuantityBeforeAdding) {
+      setAskQuantityBeforeAdding(false);
+      localStorage.setItem('audix_ask_qty_before_adding', 'false');
+    }
   }, [settings.singleSkuScanning]);
   
   useEffect(() => {
