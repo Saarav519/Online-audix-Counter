@@ -915,6 +915,9 @@ const ScanItems = () => {
       setWaitingForLocationScan(false); // Important: Mark location as selected
       playSound(true);
       
+      // Update URL to reflect selected location (triggers Layout bottom nav hide)
+      navigate(`/scan?location=${result.location.id}`, { replace: true });
+      
       // Store temp location if it's a new dynamic location
       if (result.isTemp) {
         setTempLocation(result.location);
