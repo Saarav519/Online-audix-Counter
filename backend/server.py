@@ -503,7 +503,32 @@ async def sync_data(sync_request: SyncRequest):
         raise HTTPException(status_code=404, detail="Session not found")
     
     sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sync_timestamp = datetime.now(timezone.utc).isoformat()
     synced_count = 0
+    
+    # Store raw sync log (append-only audit trail)
+    raw_log = {
+        "id": str(uuid.uuid4()),
+        "device_name": sync_request.device_name,
+        "client_id": sync_request.client_id or session.get("client_id", ""),
+        "session_id": sync_request.session_id,
+        "sync_date": sync_date,
+        "synced_at": sync_timestamp,
+        "raw_payload": {
+            "locations": sync_request.locations,
+            "device_name": sync_request.device_name,
+            "session_id": sync_request.session_id,
+            "client_id": sync_request.client_id
+        },
+        "location_count": len(sync_request.locations),
+        "total_items": sum(len(loc.get("items", [])) for loc in sync_request.locations),
+        "total_quantity": sum(
+            sum(item.get("quantity", 0) for item in loc.get("items", []))
+            for loc in sync_request.locations
+        ),
+        "action": "sync"
+    }
+    await db.sync_raw_logs.insert_one(raw_log)
     
     for loc_data in sync_request.locations:
         location_id = loc_data.get("id", str(uuid.uuid4()))
