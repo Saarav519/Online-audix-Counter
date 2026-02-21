@@ -121,13 +121,14 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Main Content - Adjusted for smaller header and bottom nav */}
-        <main className="flex-1 pt-12 pb-20 overflow-y-auto overflow-x-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <main className={`flex-1 pt-12 ${isActiveScanMode ? 'pb-4' : 'pb-20'} overflow-y-auto overflow-x-hidden`} style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="p-3 min-h-full">
             {children}
           </div>
         </main>
 
-        {/* Large Bottom Navigation for Scanner Devices */}
+        {/* Large Bottom Navigation for Scanner Devices - Hidden during active scanning */}
+        {!isActiveScanMode && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg z-50">
           <div className={`grid h-18 ${bottomNavItems.length === 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {bottomNavItems.map((item) => {
@@ -153,6 +154,7 @@ const Layout = ({ children }) => {
             })}
           </div>
         </nav>
+        )}
       </div>
     );
   }
