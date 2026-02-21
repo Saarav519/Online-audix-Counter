@@ -2115,9 +2115,9 @@ const ScanItems = () => {
               <Input
                 ref={popupQuantityRef}
                 type="number"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                min="1"
+                inputMode="decimal"
+                step="any"
+                min="0.01"
                 value={popupQuantity}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -2148,7 +2148,7 @@ const ScanItems = () => {
             </Button>
             <Button
               onClick={confirmQuantityPopup}
-              disabled={!popupQuantity || parseInt(popupQuantity) < 1}
+              disabled={!popupQuantity || parseFloat(popupQuantity) <= 0}
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               <CheckCircle2 className="w-4 h-4 mr-2" />
