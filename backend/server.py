@@ -322,7 +322,117 @@ async def delete_client(client_id: str):
     result = await db.clients.delete_one({"id": client_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
+    # Also delete master products for this client
+    await db.master_products.delete_many({"client_id": client_id})
     return {"message": "Client deleted"}
+
+# ==================== MASTER PRODUCT ROUTES (Client-Level) ====================
+
+@portal_router.post("/clients/{client_id}/import-master")
+async def import_master_products(client_id: str, file: UploadFile = File(...)):
+    """Import product master catalog CSV at client level. Replaces existing master on re-upload."""
+    # Verify client exists
+    client = await db.clients.find_one({"id": client_id})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Read CSV file
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    reader = csv.DictReader(io.StringIO(decoded))
+    
+    # Clear existing master products for this client
+    await db.master_products.delete_many({"client_id": client_id})
+    
+    # Import new master products
+    records = []
+    for row in reader:
+        # Normalize column names (case-insensitive, strip whitespace)
+        norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
+        
+        barcode = norm_row.get('barcode', '')
+        if not barcode:
+            continue  # Skip rows without barcode
+        
+        master = MasterProduct(
+            client_id=client_id,
+            barcode=barcode,
+            description=norm_row.get('description', norm_row.get('product_name', '')),
+            category=norm_row.get('category', ''),
+            article_code=norm_row.get('article_code', ''),
+            article_name=norm_row.get('article_name', ''),
+            mrp=float(norm_row.get('mrp', 0) or 0),
+            cost=float(norm_row.get('cost', 0) or 0),
+        )
+        doc = master.model_dump()
+        doc['imported_at'] = doc['imported_at'].isoformat()
+        records.append(doc)
+    
+    if records:
+        await db.master_products.insert_many(records)
+    
+    # Update client flag
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"master_imported": True, "master_product_count": len(records)}}
+    )
+    
+    return {
+        "message": f"Imported {len(records)} master products",
+        "product_count": len(records)
+    }
+
+@portal_router.get("/clients/{client_id}/master-products")
+async def get_master_products(client_id: str, limit: int = 1000, skip: int = 0):
+    """Get master products for a client with pagination"""
+    total = await db.master_products.count_documents({"client_id": client_id})
+    records = await db.master_products.find(
+        {"client_id": client_id}, {"_id": 0}
+    ).skip(skip).limit(limit).to_list(limit)
+    
+    return {
+        "products": records,
+        "total": total,
+        "limit": limit,
+        "skip": skip
+    }
+
+@portal_router.get("/clients/{client_id}/master-products/stats")
+async def get_master_product_stats(client_id: str):
+    """Get master product statistics for a client"""
+    total = await db.master_products.count_documents({"client_id": client_id})
+    
+    # Get unique categories
+    categories = await db.master_products.distinct("category", {"client_id": client_id})
+    categories = [c for c in categories if c]  # Remove empty
+    
+    # Get unique article codes
+    article_codes = await db.master_products.distinct("article_code", {"client_id": client_id})
+    article_codes = [a for a in article_codes if a]  # Remove empty
+    
+    return {
+        "total_products": total,
+        "unique_categories": len(categories),
+        "categories": categories,
+        "unique_articles": len(article_codes),
+        "article_codes_count": len(article_codes)
+    }
+
+@portal_router.delete("/clients/{client_id}/master-products")
+async def clear_master_products(client_id: str):
+    """Clear all master products for a client"""
+    result = await db.master_products.delete_many({"client_id": client_id})
+    
+    # Update client flag
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"master_imported": False, "master_product_count": 0}}
+    )
+    
+    return {
+        "message": f"Cleared {result.deleted_count} master products",
+        "deleted_count": result.deleted_count
+    }
 
 # ==================== AUDIT SESSION ROUTES ====================
 
