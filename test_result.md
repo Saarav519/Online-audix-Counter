@@ -960,15 +960,18 @@ agent_communication:
 
   - task: "Barcode-wise Variance Report"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "New endpoint GET /api/portal/reports/{session_id}/barcode-wise. Pivots expected and physical data by barcode (summing across all locations). Returns accuracy%, professional remarks."
+      - working: true
+        agent: "testing"
+        comment: "✅ BARCODE-WISE VARIANCE REPORT WORKING - GET /api/portal/reports/{session_id}/barcode-wise endpoint successfully pivots data by barcode across locations. Found 5 unique barcodes with proper aggregation. Sample: Barcode 8901234567890, Stock: 100.0, Physical: 95.0, accuracy_pct and remark fields present in all records."
 
   - task: "Article-wise Variance Report"
     implemented: true
