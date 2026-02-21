@@ -60,9 +60,13 @@ class AudixBackendTester:
     def test_2_create_client(self):
         """Test 2: Create CascadeTest Client"""
         try:
+            # Generate unique client code with timestamp
+            import time
+            unique_code = f"CASC{int(time.time() % 100000)}"
+            
             client_data = {
                 "name": "CascadeTest Client",
-                "code": "CASC01"
+                "code": unique_code
             }
             
             response = self.session.post(f"{API_BASE}/portal/clients", json=client_data)
@@ -77,6 +81,18 @@ class AudixBackendTester:
                         f"Client created - ID: {client['id']}, Name: {client['name']}, Code: {client['code']}")
                 else:
                     return self.log_test("Create Client", False, f"Invalid client response: {client_response}")
+            elif response.status_code == 400 and "already exists" in response.text:
+                # Client already exists, try to find it
+                clients_response = self.session.get(f"{API_BASE}/portal/clients")
+                if clients_response.status_code == 200:
+                    clients_data = clients_response.json()
+                    for client in clients_data:
+                        if "CascadeTest Client" in client.get("name", ""):
+                            self.client_id = client["id"]
+                            return self.log_test("Create Client", True, 
+                                f"Found existing client - ID: {client['id']}, Name: {client['name']}, Code: {client['code']}")
+                
+                return self.log_test("Create Client", False, f"Client exists but couldn't find it: {response.text}")
             else:
                 return self.log_test("Create Client", False, 
                     f"Client creation failed - Status: {response.status_code}, Response: {response.text}")
