@@ -782,6 +782,33 @@ agent_communication:
       - /app/frontend/src/App.js - Added React.lazy() + Suspense for route code splitting
       - /app/frontend/src/utils/fileDownload.js - Optimized export, added buildCSV helper
       - /app/frontend/src/context/AppContext.js - Removed redundant localStorage writes
+
+  - agent: "main"
+    message: |
+      Fixed two export issues reported by user:
+      
+      1. ✅ Locations missed during export - FIXED
+         Root cause: Export used search-filtered locations (filteredLocations). If user had active search,
+         some locations were excluded from export.
+         Fix: Export now uses ALL mode-filtered locations (modeFilteredLocations), bypassing search filter.
+         Added export summary alert showing: locations exported count, total items, total quantity, filename.
+      
+      2. ✅ Barcodes losing last digits in Excel - FIXED
+         Root cause: CSV exported raw numeric barcodes. Excel interprets long numbers and truncates
+         precision beyond 15 digits (IEEE 754 limit).
+         Fix: Barcodes now exported as ="8901234567890" format in CSV, which forces Excel to treat
+         them as text literals, preserving all digits.
+      
+      3. ✅ Export alert shows ONE combined notification with both summary AND file info
+         No more duplicate alerts. Shows: locations exported, items, quantity, filename, folder.
+      
+      4. ✅ downloadCSV now accepts showAlert parameter (default true) so callers can suppress
+         the default alert and show their own custom summary.
+      
+      Files modified:
+      - /app/frontend/src/pages/Reports.jsx - Fixed both Dynamic & Pre-Assigned exports
+      - /app/frontend/src/pages/MasterData.jsx - Fixed barcode format in master export
+      - /app/frontend/src/utils/fileDownload.js - Added showAlert parameter to downloadCSV
       
       🔍 ENDPOINTS RE-TESTED (2026-02-21 14:21):
       1. GET /api/ → ✅ Returns {"message": "Hello World"} (Status: 200)
