@@ -70,6 +70,10 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
+  // Detect if currently in active scanning mode (on /scan with location param)
+  // In this case, hide bottom nav to give more space for scanning
+  const isActiveScanMode = location.pathname === '/scan' && location.search.includes('location=');
+
   if (!isAuthenticated) {
     return <>{children}</>;
   }
