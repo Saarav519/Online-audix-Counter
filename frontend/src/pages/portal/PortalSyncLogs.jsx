@@ -296,90 +296,36 @@ export default function PortalSyncLogs() {
                           </div>
                         </div>
 
-                        {/* Individual Logs (inside date) */}
+                        {/* Individual Logs (inside date) — summary only, no inline data */}
                         {expandedDate === dateKey && (
                           <div className="pl-16 pr-5 py-2 space-y-2 bg-white">
                             {dateGroup.logs.map((log) => (
                               <div key={log.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                                {/* Log Header */}
-                                <div 
-                                  className="px-4 py-2.5 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
-                                  onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
-                                >
+                                <div className="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50">
                                   <div className="flex items-center gap-3">
-                                    {expandedLog === log.id ? (
-                                      <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                                    ) : (
-                                      <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                                    )}
                                     <Smartphone className="w-4 h-4 text-blue-500" />
                                     <div>
                                       <p className="font-medium text-gray-800 text-sm">{log.device_name}</p>
-                                      <p className="text-xs text-gray-400">Session: {log.session_id?.substring(0, 8)}...</p>
+                                      <p className="text-xs text-gray-400">
+                                        Session: {log.session_id?.substring(0, 8)}... &nbsp;·&nbsp; ID: {log.id?.substring(0, 8)}...
+                                      </p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-4 text-xs text-gray-500">
                                     <span><MapPin className="w-3 h-3 inline mr-0.5" />{log.location_count} loc</span>
                                     <span><Package className="w-3 h-3 inline mr-0.5" />{log.total_items} items / {log.total_quantity} qty</span>
                                     <span className="text-gray-400"><Clock className="w-3 h-3 inline mr-0.5" />{formatDate(log.synced_at)}</span>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 h-7 text-xs"
+                                      onClick={() => handleExportSingleLog(log, clientGroup.client_name)}
+                                    >
+                                      <Download className="w-3 h-3 mr-1" />
+                                      Export
+                                    </Button>
                                   </div>
                                 </div>
-
-                                {/* Expanded Raw Data */}
-                                {expandedLog === log.id && (
-                                  <div className="border-t border-gray-200 p-4 bg-gray-50">
-                                    <div className="grid grid-cols-3 gap-4 mb-3 text-xs">
-                                      <div>
-                                        <span className="text-gray-500">Log ID:</span>
-                                        <p className="font-mono text-gray-700">{log.id}</p>
-                                      </div>
-                                      <div>
-                                        <span className="text-gray-500">Session ID:</span>
-                                        <p className="font-mono text-gray-700">{log.session_id}</p>
-                                      </div>
-                                      <div>
-                                        <span className="text-gray-500">Action:</span>
-                                        <p className="text-gray-700">{log.action || 'sync'}</p>
-                                      </div>
-                                    </div>
-
-                                    <h4 className="text-xs font-medium text-gray-700 mb-2">Locations & Items:</h4>
-                                    {(log.raw_payload?.locations || []).map((loc, locIdx) => (
-                                      <div key={locIdx} className="mb-2 bg-white rounded-lg border border-gray-200 p-2.5">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                          <span className="font-medium text-xs text-gray-800">
-                                            {loc.name || loc.location_name || `Location ${locIdx + 1}`}
-                                          </span>
-                                          <span className="text-xs text-gray-400">
-                                            {(loc.items || []).length} items
-                                          </span>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                          <table className="w-full text-xs">
-                                            <thead>
-                                              <tr className="border-b border-gray-100">
-                                                <th className="text-left py-1 px-2 font-medium text-gray-500">Barcode</th>
-                                                <th className="text-left py-1 px-2 font-medium text-gray-500">Product Name</th>
-                                                <th className="text-right py-1 px-2 font-medium text-gray-500">Qty</th>
-                                                <th className="text-left py-1 px-2 font-medium text-gray-500">Scanned At</th>
-                                              </tr>
-                                            </thead>
-                                            <tbody>
-                                              {(loc.items || []).map((item, itemIdx) => (
-                                                <tr key={itemIdx} className="border-b border-gray-50">
-                                                  <td className="py-1 px-2 font-mono">{item.barcode}</td>
-                                                  <td className="py-1 px-2">{item.product_name || item.productName || '-'}</td>
-                                                  <td className="py-1 px-2 text-right font-medium">{item.quantity}</td>
-                                                  <td className="py-1 px-2 text-gray-400">{item.scanned_at || item.scannedAt || '-'}</td>
-                                                </tr>
-                                              ))}
-                                            </tbody>
-                                          </table>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             ))}
                           </div>
