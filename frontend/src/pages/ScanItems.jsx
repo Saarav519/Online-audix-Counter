@@ -1142,6 +1142,16 @@ const ScanItems = () => {
   const handleQuantityUpdate = (itemId) => {
     const newQty = parseInt(editQuantity);
     if (newQty > 0) {
+      // In Single SKU mode, only allow DECREASE (not increase)
+      if (isSingleSkuMode) {
+        const currentItem = locationItems.find(i => i.id === itemId);
+        if (currentItem && newQty > currentItem.quantity) {
+          // Don't allow increase - revert to current quantity
+          setEditingItemId(null);
+          setEditQuantity('');
+          return;
+        }
+      }
       updateTempItemQuantity(itemId, newQty);
     }
     setEditingItemId(null);
