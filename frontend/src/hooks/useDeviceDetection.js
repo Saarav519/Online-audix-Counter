@@ -119,13 +119,15 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
   const scanQueueRef = useRef([]);
   const processingRef = useRef(false);
   const onScanRef = useRef(onScan);
+  const cooldownRef = useRef(false); // Cooldown after processing a scan
+  const cooldownTimerRef = useRef(null);
   
   // Keep onScan ref updated
   useEffect(() => {
     onScanRef.current = onScan;
   }, [onScan]);
 
-  // Process scan queue - handles rapid consecutive scans
+  // Process scan queue - handles rapid consecutive scans ONE AT A TIME
   const processQueue = useCallback(() => {
     if (processingRef.current || scanQueueRef.current.length === 0) return;
     
@@ -146,9 +148,29 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
   const queueScan = useCallback((barcode) => {
     if (!barcode || barcode.trim().length === 0) return;
     
-    scanQueueRef.current.push(barcode.trim());
+    const cleaned = barcode.trim();
     
-    // Process immediately using microtask to avoid blocking
+    // ANTI-OVERLAP: If barcode is suspiciously long (> 20 chars), it may be
+    // two barcodes concatenated. Try to split by detecting repeated patterns.
+    // Standard barcodes: EAN-13 (13), UPC-A (12), EAN-8 (8), Code128 (variable up to ~20)
+    if (cleaned.length > 20 && /^\d+$/.test(cleaned)) {
+      // All numeric - likely two EAN/UPC barcodes merged
+      // Try splitting at common lengths: 13, 12, 8
+      for (const splitLen of [13, 12, 8]) {
+        if (cleaned.length >= splitLen * 2 && cleaned.length <= splitLen * 2 + 2) {
+          const first = cleaned.substring(0, splitLen);
+          const second = cleaned.substring(splitLen);
+          if (second.length >= 8) {
+            scanQueueRef.current.push(first);
+            scanQueueRef.current.push(second);
+            queueMicrotask(processQueue);
+            return;
+          }
+        }
+      }
+    }
+    
+    scanQueueRef.current.push(cleaned);
     queueMicrotask(processQueue);
   }, [processQueue]);
 
@@ -157,7 +179,6 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
 
     const handleKeyDown = (e) => {
       // CRITICAL: Do NOT intercept keyboard events for quantity input fields
-      // Check if the focused/target element is a quantity input (popup or inline)
       const target = e.target;
       const isQtyInput = target && (
         target.hasAttribute('data-qty-input') ||
@@ -166,8 +187,6 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       );
       
       if (isQtyInput) {
-        // Let the event pass through naturally to quantity inputs
-        // Clear any scanner buffer to prevent stale data
         bufferRef.current = '';
         return;
       }
@@ -175,9 +194,14 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       const currentTime = Date.now();
       const timeDiff = currentTime - lastKeyTimeRef.current;
       
-      // Reset buffer if too much time has passed (> 100ms between keys)
-      // Hardware scanners typically send input < 50ms between keys
-      if (timeDiff > 100) {
+      // Reset buffer if too much time has passed (> 80ms between keys)
+      // OR if we're in cooldown (just processed a scan)
+      if (timeDiff > 80 || cooldownRef.current) {
+        bufferRef.current = '';
+        cooldownRef.current = false;
+      }
+      
+      lastKeyTimeRef.current = currentTime;
         bufferRef.current = '';
       }
       
