@@ -24,6 +24,7 @@ const PortalSessions = React.lazy(() => import("./pages/portal/PortalSessions"))
 const PortalDevices = React.lazy(() => import("./pages/portal/PortalDevices"));
 const PortalReports = React.lazy(() => import("./pages/portal/PortalReports"));
 const PortalSyncLogs = React.lazy(() => import("./pages/portal/PortalSyncLogs"));
+const PortalUsers = React.lazy(() => import("./pages/portal/PortalUsers"));
 
 // Minimal loading fallback for lazy routes
 const PageLoader = () => (
