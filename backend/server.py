@@ -969,7 +969,10 @@ async def get_detailed_report(session_id: str):
 
 @portal_router.get("/reports/{session_id}/barcode-wise")
 async def get_barcode_wise_report(session_id: str):
-    """Barcode-wise variance: Pivots by barcode across all locations, ignores location dimension"""
+    """Barcode-wise variance: Pivots by barcode across all locations, uses master for product info"""
+    # Load master products for product info enrichment
+    master_by_barcode = await get_master_for_session(session_id)
+    
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     
     # Pivot expected by barcode (sum across locations)
@@ -977,14 +980,7 @@ async def get_barcode_wise_report(session_id: str):
     for e in expected:
         bc = e["barcode"]
         if bc not in expected_by_barcode:
-            expected_by_barcode[bc] = {
-                "barcode": bc,
-                "description": e.get("description", ""),
-                "category": e.get("category", ""),
-                "mrp": e.get("mrp", 0),
-                "cost": e.get("cost", 0),
-                "qty": 0
-            }
+            expected_by_barcode[bc] = {"qty": 0}
         expected_by_barcode[bc]["qty"] += e.get("qty", 0)
     
     # Pivot physical by barcode (sum across all synced locations)
@@ -1014,10 +1010,12 @@ async def get_barcode_wise_report(session_id: str):
         exp = expected_by_barcode.get(bc, {})
         phy = physical_by_barcode.get(bc, {})
         
-        description = exp.get("description") or phy.get("product_name", "")
-        category = exp.get("category", "")
-        mrp = exp.get("mrp", 0)
-        cost = exp.get("cost", 0)
+        # Enrich from master products (priority: master > expected stock > physical)
+        master_info = master_by_barcode.get(bc, {})
+        description = master_info.get("description") or phy.get("product_name", "")
+        category = master_info.get("category", "")
+        mrp = master_info.get("mrp", 0)
+        cost = master_info.get("cost", 0)
         
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
@@ -1028,9 +1026,10 @@ async def get_barcode_wise_report(session_id: str):
         diff_value = diff_qty * cost
         
         accuracy = calc_accuracy(stock_qty, physical_qty)
-        in_master = bc in expected_by_barcode
+        in_expected = bc in expected_by_barcode
+        in_prod_master = bc in master_by_barcode
         scanned = bc in physical_by_barcode
-        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master=in_expected, scanned=scanned, in_product_master=in_prod_master, in_expected_stock=in_expected)
         
         totals["stock_qty"] += stock_qty
         totals["stock_value"] += stock_value
@@ -1052,7 +1051,9 @@ async def get_barcode_wise_report(session_id: str):
             "diff_qty": diff_qty,
             "diff_value": diff_value,
             "accuracy_pct": accuracy,
-            "remark": remark
+            "remark": remark,
+            "in_master": bc in master_by_barcode,
+            "in_expected_stock": bc in expected_by_barcode
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
