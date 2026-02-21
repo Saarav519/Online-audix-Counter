@@ -301,7 +301,7 @@ const MasterData = () => {
   const handleExport = async () => {
     const headers = ['Barcode', 'Name', 'Price'];
     const rows = masterProducts.map(p => 
-      [p.barcode, `"${p.name}"`, p.price].join(',')
+      [`="${p.barcode}"`, `"${p.name}"`, p.price].join(',')
     );
     const csv = [headers.join(','), ...rows].join('\n');
     await downloadCSV(csv, 'master_products.csv');
