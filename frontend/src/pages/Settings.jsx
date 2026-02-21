@@ -41,7 +41,7 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
-  const { settings, updateSettings, user, playSound, verifyCredentials, updateUserCredentials } = useApp();
+  const { settings, updateSettings, user, playSound, verifyCredentials, updateUserCredentials, locations, scannedItems } = useApp();
   
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,6 +66,176 @@ const Settings = () => {
   });
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Sync configuration state
+  const [syncConfig, setSyncConfig] = useState({
+    deviceName: localStorage.getItem('audix_device_name') || '',
+    clientId: localStorage.getItem('audix_client_id') || '',
+    sessionId: localStorage.getItem('audix_session_id') || '',
+    syncPassword: localStorage.getItem('audix_sync_password') || '',
+    autoSync: localStorage.getItem('audix_auto_sync') === 'true',
+    clearAfterSync: localStorage.getItem('audix_clear_after_sync') === 'true'
+  });
+  const [clients, setClients] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [syncing, setSyncing] = useState(false);
+  const [showSyncPasswordModal, setShowSyncPasswordModal] = useState(false);
+  const [manualSyncPassword, setManualSyncPassword] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState(localStorage.getItem('audix_last_sync') || null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+  // Fetch sync config on mount
+  useEffect(() => {
+    fetchSyncConfig();
+    
+    // Online/offline listeners
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Auto-sync when online
+  useEffect(() => {
+    if (isOnline && syncConfig.autoSync && syncConfig.deviceName && syncConfig.sessionId && syncConfig.syncPassword) {
+      // Auto sync in background (no password prompt)
+      performSync(false);
+    }
+  }, [isOnline]);
+
+  // Fetch sessions when client changes
+  useEffect(() => {
+    if (syncConfig.clientId) {
+      fetchSessions(syncConfig.clientId);
+    }
+  }, [syncConfig.clientId]);
+
+  const fetchSyncConfig = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/sync/config`);
+      if (response.ok) {
+        const data = await response.json();
+        setClients(data.clients || []);
+        if (syncConfig.clientId) {
+          const clientSessions = (data.sessions || []).filter(s => s.client_id === syncConfig.clientId);
+          setSessions(clientSessions);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch sync config:', error);
+    }
+  };
+
+  const fetchSessions = async (clientId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${clientId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data.filter(s => s.status === 'active'));
+      }
+    } catch (error) {
+      console.error('Failed to fetch sessions:', error);
+    }
+  };
+
+  const handleSyncConfigChange = (key, value) => {
+    setSyncConfig(prev => {
+      const newConfig = { ...prev, [key]: value };
+      localStorage.setItem(`audix_${key.replace(/([A-Z])/g, '_$1').toLowerCase()}`, value.toString());
+      return newConfig;
+    });
+  };
+
+  const handleManualSync = () => {
+    setManualSyncPassword('');
+    setShowSyncPasswordModal(true);
+  };
+
+  const confirmManualSync = () => {
+    if (manualSyncPassword !== syncConfig.syncPassword) {
+      alert('Invalid sync password');
+      return;
+    }
+    setShowSyncPasswordModal(false);
+    performSync(true);
+  };
+
+  const performSync = async (isManual = false) => {
+    if (!syncConfig.deviceName || !syncConfig.sessionId || !syncConfig.syncPassword) {
+      if (isManual) alert('Please configure device name, client, session, and sync password first');
+      return;
+    }
+
+    if (!isOnline) {
+      if (isManual) alert('No internet connection');
+      return;
+    }
+
+    setSyncing(true);
+
+    try {
+      // Prepare locations data for sync
+      const locationsToSync = locations.map(loc => ({
+        id: loc.id,
+        name: loc.name,
+        items: scannedItems
+          .filter(item => item.locationId === loc.id)
+          .map(item => ({
+            barcode: item.barcode,
+            productName: item.productName,
+            price: item.price,
+            quantity: item.quantity,
+            scannedAt: item.scannedAt
+          }))
+      })).filter(loc => loc.items.length > 0);
+
+      if (locationsToSync.length === 0) {
+        if (isManual) alert('No data to sync');
+        setSyncing(false);
+        return;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/api/sync/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_name: syncConfig.deviceName,
+          sync_password: syncConfig.syncPassword,
+          client_id: syncConfig.clientId,
+          session_id: syncConfig.sessionId,
+          locations: locationsToSync,
+          clear_after_sync: syncConfig.clearAfterSync
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Sync failed');
+      }
+
+      const result = await response.json();
+      const now = new Date().toISOString();
+      setLastSyncTime(now);
+      localStorage.setItem('audix_last_sync', now);
+
+      if (isManual) {
+        alert(`Sync successful! ${result.locations_synced} locations synced.`);
+      }
+
+    } catch (error) {
+      console.error('Sync failed:', error);
+      if (isManual) alert(`Sync failed: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Check for changes
   useEffect(() => {
