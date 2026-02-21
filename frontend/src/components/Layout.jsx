@@ -24,7 +24,7 @@ import {
 } from './ui/dropdown-menu';
 
 const Layout = ({ children }) => {
-  const { user, logout, isAuthenticated, settings } = useApp();
+  const { user, logout, isAuthenticated, settings, hideBottomNav } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
