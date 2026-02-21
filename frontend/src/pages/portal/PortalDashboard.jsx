@@ -3,7 +3,7 @@ import {
   Building2, 
   FolderOpen, 
   Smartphone, 
-  Bell,
+  Users,
   RefreshCw,
   Activity
 } from 'lucide-react';
