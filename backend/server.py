@@ -109,6 +109,20 @@ class ExpectedStock(BaseModel):
     qty: float = 0
     imported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# Master Product Model (imported at client level - product catalog)
+class MasterProduct(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    barcode: str
+    description: str = ""
+    category: str = ""
+    article_code: str = ""
+    article_name: str = ""
+    mrp: float = 0
+    cost: float = 0
+    imported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Device Model
 class Device(BaseModel):
     model_config = ConfigDict(extra="ignore")
