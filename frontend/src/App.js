@@ -88,6 +88,17 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Portal Auth Guard
+const PortalProtectedRoute = ({ children }) => {
+  const portalUser = localStorage.getItem('portalUser');
+  
+  if (!portalUser) {
+    return <Navigate to="/portal" replace />;
+  }
+  
+  return children;
+};
+
 function AppRoutes() {
   useRoutePersistence();
   
@@ -96,6 +107,35 @@ function AppRoutes() {
       <RouteRestorer />
       
       <Routes>
+        {/* Portal Routes */}
+        <Route
+          path="/portal"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <PortalLogin />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/portal/*"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><PortalDashboard /></Suspense>} />
+          <Route path="clients" element={<Suspense fallback={<PageLoader />}><PortalClients /></Suspense>} />
+          <Route path="sessions" element={<Suspense fallback={<PageLoader />}><PortalSessions /></Suspense>} />
+          <Route path="devices" element={<Suspense fallback={<PageLoader />}><PortalDevices /></Suspense>} />
+          <Route path="reports" element={<Suspense fallback={<PageLoader />}><PortalReports /></Suspense>} />
+          <Route path="alerts" element={<Suspense fallback={<PageLoader />}><PortalAlerts /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
+        </Route>
+
+        {/* Scanner App Routes */}
         <Route
           path="/login"
           element={
