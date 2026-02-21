@@ -183,14 +183,20 @@ const Reports = () => {
     };
   }, [isPreAssignedMode, preassignedLocationData, scannedItems, masterLocations.length]);
 
-  // Filtered preassigned locations (search)
+  // Filtered & sorted preassigned locations: pending first, completed at bottom
   const filteredPreassignedData = useMemo(() => {
-    if (!searchTerm.trim()) return preassignedLocationData;
-    const term = searchTerm.toLowerCase();
-    return preassignedLocationData.filter(d =>
-      d.masterLocation.name.toLowerCase().includes(term) ||
-      d.masterLocation.code.toLowerCase().includes(term)
-    );
+    let data = preassignedLocationData;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      data = data.filter(d =>
+        d.masterLocation.name.toLowerCase().includes(term) ||
+        d.masterLocation.code.toLowerCase().includes(term)
+      );
+    }
+    // Sort: pending/active first, completed at bottom (preserve serial order within each group)
+    const pending = data.filter(d => !d.isSubmitted);
+    const completed = data.filter(d => d.isSubmitted);
+    return [...pending, ...completed];
   }, [preassignedLocationData, searchTerm]);
 
   // Report items for preassigned export
