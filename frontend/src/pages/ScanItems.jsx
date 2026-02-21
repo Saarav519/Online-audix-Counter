@@ -1451,32 +1451,25 @@ const ScanItems = () => {
       <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
-          {/* Location Info Header - Shows selected location with change option */}
-          <Card className="border-0 shadow-sm bg-emerald-50">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-emerald-600 font-medium">Current Location</p>
-                    <p className="text-base font-bold text-emerald-800">{selectedLocation?.name}</p>
-                    <p className="text-xs text-emerald-600 font-mono">{selectedLocation?.code}</p>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBackClick}
-                  className="text-slate-700 border-slate-300 hover:bg-slate-100"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Location Info Header - Compact bar */}
+          <div className="flex items-center gap-2 px-2 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
+            <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-emerald-800 truncate">{selectedLocation?.name}</p>
+              <p className="text-[10px] text-emerald-600 font-mono">{selectedLocation?.code}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackClick}
+              className="h-7 px-2 text-xs text-slate-600 hover:bg-slate-100"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-0.5" />
+              Back
+            </Button>
+          </div>
 
           {/* Back Confirmation Dialog */}
           <Dialog open={showBackConfirmDialog} onOpenChange={setShowBackConfirmDialog}>
