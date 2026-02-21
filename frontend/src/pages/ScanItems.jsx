@@ -120,10 +120,10 @@ const ScannedItemRow = memo(({
           <input
             ref={inlineInputRef}
             type="number"
-            min="1"
+            min="0.01"
+            step="any"
             max={singleSkuMode ? item.quantity : undefined}
-            inputMode="numeric"
-            pattern="[0-9]*"
+            inputMode="decimal"
             value={isEditing ? editQuantity : item.quantity}
             data-qty-input="true"
             className={`w-16 h-8 text-center text-sm font-bold p-1 rounded border focus:outline-none focus:ring-2 ${
