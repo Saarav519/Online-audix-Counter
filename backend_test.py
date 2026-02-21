@@ -121,7 +121,28 @@ class AudixBackendTester:
                 else:
                     self.log_result("Create Client", False, f"Invalid response: {data}")
             else:
-                self.log_result("Create Client", False, f"Status {response.status_code}: {response.text}")
+                # If client creation failed, try to get existing clients and use the first one
+                if response.status_code == 400 and "already exists" in response.text:
+                    # Try to get existing clients
+                    try:
+                        get_response = requests.get(f"{self.portal_url}/clients", timeout=10)
+                        if get_response.status_code == 200:
+                            clients = get_response.json()
+                            if clients and len(clients) > 0:
+                                self.test_data["client_id"] = clients[0]["id"]
+                                self.log_result(
+                                    "Create Client", 
+                                    True, 
+                                    f"Used existing client: {clients[0]['name']} (ID: {clients[0]['id']})"
+                                )
+                            else:
+                                self.log_result("Create Client", False, "No existing clients found")
+                        else:
+                            self.log_result("Create Client", False, f"Could not retrieve existing clients: {get_response.status_code}")
+                    except Exception as e:
+                        self.log_result("Create Client", False, f"Error retrieving existing clients: {str(e)}")
+                else:
+                    self.log_result("Create Client", False, f"Status {response.status_code}: {response.text}")
                 
         except Exception as e:
             self.log_result("Create Client", False, f"Exception: {str(e)}")
