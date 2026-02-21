@@ -240,6 +240,8 @@ const ScanItems = () => {
     saveTempLocation,
     playSound,
     getNextPendingLocation,
+    getOrCreateAssignedLocation,
+    getNextSequentialLocation,
     clearLocationItems,
     getProductByBarcode
   } = useApp();
