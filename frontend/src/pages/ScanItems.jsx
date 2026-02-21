@@ -665,6 +665,18 @@ const ScanItems = () => {
     } else {
       // FAST BARCODE PROCESSING
       
+      // CRITICAL: Clear input field IMMEDIATELY (both DOM and React state)
+      // to prevent next scan's chars from appending to old barcode value
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.value = '';
+      }
+      setBarcodeInput('');
+      // Cancel any pending auto-process timer from input field handler
+      if (barcodeAutoProcessTimerRef.current) {
+        clearTimeout(barcodeAutoProcessTimerRef.current);
+        barcodeAutoProcessTimerRef.current = null;
+      }
+      
       // Check if "Ask Quantity Before Adding" is ON
       if (askQuantityRef.current) {
         // Punching Mode: show quantity popup
