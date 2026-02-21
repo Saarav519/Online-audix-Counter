@@ -1537,7 +1537,7 @@ const ScanItems = () => {
                   <span className="text-amber-600 ml-1">(Scanner only)</span>
                 )}
               </Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <Input
                   ref={barcodeInputRef}
                   placeholder={settings.allowManualBarcodeEntry === false ? "Use scanner..." : "Scan barcode..."}
@@ -1549,19 +1549,18 @@ const ScanItems = () => {
                   autoComplete="off"
                   autoFocus
                 />
+                {/* Inline Add Button */}
+                {settings.allowManualBarcodeEntry !== false && (
+                  <Button
+                    onClick={handleScan}
+                    disabled={!barcodeInput.trim() || isLocationLocked}
+                    className="h-11 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex-shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    {askQuantityBeforeAdding ? 'Qty' : isSingleSkuMode ? '+1' : 'Add'}
+                  </Button>
+                )}
               </div>
-
-              {/* Add Button - Only show if manual entry is allowed */}
-              {settings.allowManualBarcodeEntry !== false && (
-                <Button
-                  onClick={handleScan}
-                  disabled={!barcodeInput.trim() || isLocationLocked}
-                  className="w-full h-12 mt-2 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-semibold"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  {askQuantityBeforeAdding ? 'Scan & Enter Qty' : 'Add (Qty: 1)'}
-                </Button>
-              )}
 
               {/* Last Scan Result */}
               {lastScanResult && (
