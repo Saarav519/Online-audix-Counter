@@ -756,6 +756,16 @@ const ScanItems = () => {
     }
   }, [searchParams]);
 
+  // Hide bottom nav when a location is selected (active scanning)
+  useEffect(() => {
+    if (selectedLocationId && showScannerMode) {
+      setHideBottomNav(true);
+    } else {
+      setHideBottomNav(false);
+    }
+    return () => setHideBottomNav(false); // Cleanup on unmount
+  }, [selectedLocationId, showScannerMode, setHideBottomNav]);
+
   // In Pre-Assigned mode, redirect to Locations page if no location is selected
   // Scan Items should only be accessed by opening a location from the Locations page
   useEffect(() => {
