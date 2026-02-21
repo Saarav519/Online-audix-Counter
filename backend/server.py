@@ -328,7 +328,7 @@ async def create_session(session: AuditSessionCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.audit_sessions.insert_one(doc)
     
-    return {"message": "Session created", "session": doc}
+    return {"message": "Session created", "session": new_session.model_dump()}
 
 @portal_router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
