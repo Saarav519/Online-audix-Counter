@@ -471,7 +471,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://mobile-counter-view.preview.emergentagent.com/api
+      - Backend URL: https://counter-mobile-view.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
@@ -504,7 +504,7 @@ agent_communication:
       - ✅ MongoDB integration: Working correctly
       - ✅ CORS configuration: Properly configured
       
-      🌐 BACKEND URL VERIFIED: https://mobile-counter-view.preview.emergentagent.com/api
+      🌐 BACKEND URL VERIFIED: https://counter-mobile-view.preview.emergentagent.com/api
       
       📝 TECHNICAL DETAILS:
       - FastAPI server running on proper port with supervisor
@@ -601,7 +601,7 @@ agent_communication:
       - ✅ UUID generation: Working correctly for record IDs
       - ✅ Timestamp generation: UTC timezone format working
       
-      🌐 BACKEND URL CONFIRMED: https://mobile-counter-view.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://counter-mobile-view.preview.emergentagent.com/api
       
       📋 TECHNICAL STATUS:
       - FastAPI server: Running correctly
@@ -630,7 +630,7 @@ agent_communication:
       - ✅ MongoDB persistence: Records stored and retrieved successfully
       - ✅ Response format: Valid JSON with proper schema validation
       
-      🌐 BACKEND URL STABLE: https://mobile-counter-view.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://counter-mobile-view.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -660,7 +660,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:33:30.957335Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://mobile-counter-view.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://counter-mobile-view.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
