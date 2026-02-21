@@ -7,6 +7,7 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import { Toaster } from "./components/ui/sonner";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import MobileOnlyGuard from "./components/MobileOnlyGuard";
 
 // Lazy-load heavy pages - only loaded when navigated to
 const ScanItems = React.lazy(() => import("./pages/ScanItems"));
