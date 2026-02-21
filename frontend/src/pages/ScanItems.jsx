@@ -1045,8 +1045,8 @@ const ScanItems = () => {
 
   // Confirm quantity from popup and add item
   const confirmQuantityPopup = () => {
-    const qty = parseInt(popupQuantity) || 1;
-    if (qty < 1) return;
+    const qty = parseFloat(popupQuantity) || 1;
+    if (qty <= 0) return;
     
     const result = addTempItem(pendingBarcode, qty);
     
