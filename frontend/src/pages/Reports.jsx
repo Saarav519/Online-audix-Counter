@@ -598,13 +598,30 @@ COLD-01,Cold Storage Unit 1`;
   const getMasterProductDetails = (barcode) => masterProducts.find(p => p.barcode === barcode) || null;
 
   const handleExportCSV = async () => {
-    if (reportItems.length === 0) return;
+    // IMPORTANT: Export ALL mode-filtered locations, NOT search-filtered
+    // This ensures no locations are missed due to active search term
+    const locsToExport = isAllSelected 
+      ? modeFilteredLocations 
+      : modeFilteredLocations.filter(l => selectedLocations.includes(l.id));
+    
+    if (locsToExport.length === 0) return;
+
+    const allExportItems = locsToExport.flatMap(loc => {
+      return (scannedItems[loc.id] || []).map(item => ({
+        ...item,
+        locationName: loc.name || 'Unknown',
+        locationId: loc.id
+      }));
+    });
+
+    if (allExportItems.length === 0) return;
+
     const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
-    const rows = reportItems.map(item => {
+    const rows = allExportItems.map(item => {
       const masterProduct = getMasterProductDetails(item.barcode);
       return [
         `"${item.locationName}"`,
-        item.barcode,
+        `="${item.barcode}"`,
         `"${item.productName}"`,
         masterProduct?.price?.toFixed(2) || '0.00',
         item.quantity,
@@ -614,6 +631,17 @@ COLD-01,Cold Storage Unit 1`;
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const selectionSuffix = isAllSelected ? 'all_locations' : `${selectedLocations.length}_locations`;
     const filename = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    // Show export summary with location count
+    const exportedLocationNames = [...new Set(allExportItems.map(i => i.locationName))];
+    alert(
+      `✅ EXPORT SUMMARY\n\n` +
+      `📊 Locations exported: ${exportedLocationNames.length}\n` +
+      `📦 Total items: ${allExportItems.length}\n` +
+      `🔢 Total quantity: ${allExportItems.reduce((sum, i) => sum + i.quantity, 0)}\n\n` +
+      `📁 File: ${filename}`
+    );
+
     await downloadCSV(csv, filename);
   };
 
