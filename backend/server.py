@@ -1086,16 +1086,16 @@ async def get_article_wise_report(session_id: str):
     # Then process expected stock for quantities
     for e in expected:
         bc = e["barcode"]
-        # Use master article mapping if available, else fallback to expected stock's article_code
-        article_code = barcode_to_article.get(bc) or e.get("article_code", "") or bc
+        # Use expected stock's article_code first, fallback to master article mapping
+        article_code = e.get("article_code", "") or barcode_to_article.get(bc, "") or bc
         barcode_to_article[bc] = article_code
         
-        # Get product info from master (priority) then expected
+        # Product info priority: Stock (expected) > Master (fallback)
         master_info = master_by_barcode.get(bc, {})
-        article_name = master_info.get("article_name") or master_info.get("description") or e.get("article_name", "") or e.get("description", "")
-        category = master_info.get("category") or e.get("category", "")
-        cost = master_info.get("cost") or e.get("cost", 0)
-        mrp = master_info.get("mrp") or e.get("mrp", 0)
+        article_name = e.get("article_name", "") or e.get("description", "") or master_info.get("article_name") or master_info.get("description", "")
+        category = e.get("category", "") or master_info.get("category", "")
+        cost = e.get("cost", 0) or master_info.get("cost", 0)
+        mrp = e.get("mrp", 0) or master_info.get("mrp", 0)
         
         if article_code not in expected_by_article:
             expected_by_article[article_code] = {
