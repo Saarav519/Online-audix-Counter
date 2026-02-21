@@ -133,13 +133,15 @@ class AudixBackendTester:
             response = self.session.post(f"{API_BASE}/portal/sessions", json=session_data)
             
             if response.status_code == 200:
-                session = response.json()
+                session_response = response.json()
+                # Handle nested session object
+                session = session_response.get("session", session_response)
                 if "id" in session and session["name"] == "CascadeTest Session":
                     self.session_id = session["id"]
                     return self.log_test("Create Session", True, 
                         f"Session created - ID: {session['id']}, Name: {session['name']}, Mode: {session.get('variance_mode')}")
                 else:
-                    return self.log_test("Create Session", False, f"Invalid session response: {session}")
+                    return self.log_test("Create Session", False, f"Invalid session response: {session_response}")
             else:
                 return self.log_test("Create Session", False, 
                     f"Session creation failed - Status: {response.status_code}, Response: {response.text}")
