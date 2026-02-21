@@ -1315,6 +1315,9 @@ const ScanItems = () => {
     setLocationSuccess('Location submitted successfully! Scan a new location to continue.');
     playSound(true);
     
+    // Update URL to remove location param (shows bottom nav again)
+    navigate('/scan', { replace: true });
+    
     // Focus location input for next scan
     setTimeout(() => {
       if (locationInputRef.current) {
