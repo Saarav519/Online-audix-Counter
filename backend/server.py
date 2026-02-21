@@ -975,12 +975,18 @@ async def get_barcode_wise_report(session_id: str):
     
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     
-    # Pivot expected by barcode (sum across locations)
+    # Pivot expected by barcode (sum across locations, keep product details)
     expected_by_barcode = {}
     for e in expected:
         bc = e["barcode"]
         if bc not in expected_by_barcode:
-            expected_by_barcode[bc] = {"qty": 0}
+            expected_by_barcode[bc] = {
+                "qty": 0,
+                "description": e.get("description", ""),
+                "category": e.get("category", ""),
+                "mrp": e.get("mrp", 0),
+                "cost": e.get("cost", 0),
+            }
         expected_by_barcode[bc]["qty"] += e.get("qty", 0)
     
     # Pivot physical by barcode (sum across all synced locations)
