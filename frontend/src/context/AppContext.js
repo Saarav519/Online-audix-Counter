@@ -1165,6 +1165,60 @@ export const AppProvider = ({ children }) => {
   }, [locations, settings.locationScanMode]);
 
   // ============================================
+  // PREASSIGNED MODE: Get or create assigned location for a master location code
+  // Returns existing assigned location or creates a new one
+  // ============================================
+  const getOrCreateAssignedLocation = useCallback((masterCode, masterName) => {
+    const existing = locations.find(l =>
+      l.isAssigned && l.code.toLowerCase() === masterCode.toLowerCase()
+    );
+    if (existing) return existing;
+
+    const newLoc = {
+      id: `loc_assigned_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: masterName || masterCode,
+      code: masterCode,
+      status: 'active',
+      itemCount: 0,
+      isCompleted: false,
+      isSubmitted: false,
+      isAssigned: true,
+      lastUpdated: new Date().toISOString()
+    };
+
+    setLocations(prev => [...prev, newLoc]);
+    setScannedItems(prev => ({ ...prev, [newLoc.id]: [] }));
+
+    return newLoc;
+  }, [locations]);
+
+  // ============================================
+  // PREASSIGNED MODE: Get next sequential master location after current
+  // Follows masterLocations array order (import order)
+  // Skips already-submitted locations
+  // ============================================
+  const getNextSequentialLocation = useCallback((currentCode) => {
+    if (!masterLocations || masterLocations.length === 0) return null;
+
+    const currentIndex = masterLocations.findIndex(
+      ml => ml.code.toLowerCase() === currentCode.toLowerCase()
+    );
+
+    if (currentIndex === -1) return null;
+
+    for (let i = currentIndex + 1; i < masterLocations.length; i++) {
+      const ml = masterLocations[i];
+      const assignedLoc = locations.find(
+        l => l.isAssigned && l.code.toLowerCase() === ml.code.toLowerCase()
+      );
+      if (!assignedLoc || !assignedLoc.isSubmitted) {
+        return ml;
+      }
+    }
+    return null; // All remaining locations are submitted
+  }, [masterLocations, locations]);
+
+  // ============================================
   // PERFORMANCE: Memoize context value to prevent unnecessary re-renders
   // Only re-creates when dependencies actually change
   // ============================================
