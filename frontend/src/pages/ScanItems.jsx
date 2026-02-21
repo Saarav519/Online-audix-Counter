@@ -1644,8 +1644,8 @@ const ScanItems = () => {
           </Card>
         </div>
 
-        {/* Fixed Bottom Action Bar */}
-        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg z-40">
+        {/* Fixed Bottom Action Bar - Submit only (no bottom nav in scan mode) */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-3 shadow-lg z-40">
 
         {/* Quantity Popup (Punching Mode) - Clean numeric input only */}
         <Dialog open={showQuantityPopup} onOpenChange={(open) => { if (!open) cancelQuantityPopup(); }}>
