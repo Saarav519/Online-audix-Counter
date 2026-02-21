@@ -1139,13 +1139,16 @@ test_plan:
 
   - task: "Sync Logs Portal Endpoint"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET /api/portal/sync-logs with client_id, session_id, limit filters. GET /api/portal/sync-logs/{log_id} for detail."
+      - working: true
+        agent: "testing"
+        comment: "✅ SYNC LOGS PORTAL ENDPOINTS WORKING - All endpoints tested and working correctly. GET /api/portal/sync-logs returns all logs with required fields. Filtering by session_id parameter working (retrieved logs only for specified session). GET /api/portal/sync-logs/{log_id} returns detailed log with complete raw_payload including locations and items data. Client_id filtering also confirmed working."
 
