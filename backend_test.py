@@ -1,452 +1,351 @@
 #!/usr/bin/env python3
 """
-AUDIX Admin Portal Backend API Testing
-=====================================
-
-This script tests the complete AUDIX Admin Portal backend API functionality
-including portal authentication, client management, audit sessions, sync API, 
-dashboard, and reports as requested in the review.
-
-Backend URL: https://offline-sync-portal.preview.emergentagent.com
+Comprehensive Backend Test Suite for AUDIX Admin Portal Sync Raw Logs Feature
+Tests the new sync raw logs functionality following the exact review request flow.
 """
 
 import requests
 import json
-from datetime import datetime, timezone
 import sys
+from datetime import datetime
 import time
 
+# Backend URL from frontend .env
+BASE_URL = "https://offline-sync-portal.preview.emergentagent.com"
+API_URL = f"{BASE_URL}/api"
 
-class AudixBackendTester:
+class SyncRawLogsTestSuite:
     def __init__(self):
-        self.base_url = "https://offline-sync-portal.preview.emergentagent.com"
-        self.api_url = f"{self.base_url}/api"
-        self.portal_url = f"{self.base_url}/api/portal"
-        self.sync_url = f"{self.base_url}/api/sync"
-        
-        # Store test data for cross-endpoint testing
-        self.test_data = {
-            "user_info": None,
-            "client_id": None,
-            "session_id": None
-        }
-        
-        self.passed_tests = 0
-        self.failed_tests = 0
+        self.session = requests.Session()
         self.test_results = []
-
-    def log_result(self, test_name, success, details=""):
-        """Log test result and print status"""
-        status = "✅ PASSED" if success else "❌ FAILED"
-        print(f"{status}: {test_name}")
-        if details:
-            print(f"   {details}")
+        self.test_data = {}
         
-        self.test_results.append({
+    def log_test(self, test_name, status, details=""):
+        """Log test results"""
+        result = {
             "test": test_name,
-            "success": success,
+            "status": "✅" if status else "❌",
             "details": details
-        })
-        
-        if success:
-            self.passed_tests += 1
-        else:
-            self.failed_tests += 1
-
-    def test_portal_authentication(self):
-        """Test 1: Portal Authentication - POST /api/portal/login"""
-        print("\n=== TESTING PORTAL AUTHENTICATION ===")
-        
+        }
+        self.test_results.append(result)
+        print(f"{result['status']} {test_name}: {details}")
+        return status
+    
+    def test_portal_login(self):
+        """Test portal authentication as prerequisite"""
         try:
-            # Test with correct credentials
-            login_data = {
-                "username": "admin",
-                "password": "admin123"
-            }
-            
-            response = requests.post(
-                f"{self.portal_url}/login",
-                json=login_data,
-                headers={"Content-Type": "application/json"},
-                timeout=10
-            )
+            # Test portal login with admin credentials
+            response = self.session.post(f"{API_URL}/portal/login", 
+                json={"username": "admin", "password": "admin123"})
             
             if response.status_code == 200:
                 data = response.json()
-                if "user" in data and "id" in data["user"] and "username" in data["user"] and "role" in data["user"]:
-                    self.test_data["user_info"] = data["user"]
-                    self.log_result(
-                        "Portal Login", 
-                        True, 
-                        f"User ID: {data['user']['id']}, Username: {data['user']['username']}, Role: {data['user']['role']}"
-                    )
-                else:
-                    self.log_result("Portal Login", False, f"Invalid response structure: {data}")
+                self.test_data["admin_user"] = data
+                return self.log_test("Portal Login", True, 
+                    f"Admin login successful, User ID: {data.get('id', 'N/A')}")
             else:
-                self.log_result("Portal Login", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Portal Login", False, 
+                    f"Login failed: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            self.log_result("Portal Login", False, f"Exception: {str(e)}")
-
-    def test_client_management(self):
-        """Test 2: Client Management - Create and Get clients"""
-        print("\n=== TESTING CLIENT MANAGEMENT ===")
-        
-        # Test Create Client - POST /api/portal/clients
+            return self.log_test("Portal Login", False, f"Exception: {str(e)}")
+    
+    def test_get_existing_session(self):
+        """Get an existing session for testing sync"""
         try:
-            # Use unique code to avoid conflicts
-            unique_code = f"TC{int(time.time())}"
-            client_data = {
-                "name": "Test Client",
-                "code": unique_code,
-                "address": "Test Address"
-            }
-            
-            response = requests.post(
-                f"{self.portal_url}/clients",
-                json=client_data,
-                headers={"Content-Type": "application/json"},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "client" in data and "id" in data["client"]:
-                    self.test_data["client_id"] = data["client"]["id"]
-                    self.log_result(
-                        "Create Client", 
-                        True, 
-                        f"Client ID: {data['client']['id']}, Name: {data['client']['name']}"
-                    )
-                else:
-                    self.log_result("Create Client", False, f"Invalid response: {data}")
-            else:
-                # If client creation failed, try to get existing clients and use the first one
-                if response.status_code == 400 and "already exists" in response.text:
-                    # Try to get existing clients
-                    try:
-                        get_response = requests.get(f"{self.portal_url}/clients", timeout=10)
-                        if get_response.status_code == 200:
-                            clients = get_response.json()
-                            if clients and len(clients) > 0:
-                                self.test_data["client_id"] = clients[0]["id"]
-                                self.log_result(
-                                    "Create Client", 
-                                    True, 
-                                    f"Used existing client: {clients[0]['name']} (ID: {clients[0]['id']})"
-                                )
-                            else:
-                                self.log_result("Create Client", False, "No existing clients found")
-                        else:
-                            self.log_result("Create Client", False, f"Could not retrieve existing clients: {get_response.status_code}")
-                    except Exception as e:
-                        self.log_result("Create Client", False, f"Error retrieving existing clients: {str(e)}")
-                else:
-                    self.log_result("Create Client", False, f"Status {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_result("Create Client", False, f"Exception: {str(e)}")
-
-        # Test Get Clients - GET /api/portal/clients
-        try:
-            response = requests.get(
-                f"{self.portal_url}/clients",
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                clients = response.json()
-                if isinstance(clients, list):
-                    # Check if our created client is in the list
-                    created_client = None
-                    if self.test_data["client_id"]:
-                        created_client = next(
-                            (c for c in clients if c.get("id") == self.test_data["client_id"]), 
-                            None
-                        )
-                    
-                    if created_client:
-                        self.log_result(
-                            "Get Clients", 
-                            True, 
-                            f"Found {len(clients)} clients, including created client '{created_client['name']}'"
-                        )
-                    else:
-                        self.log_result(
-                            "Get Clients", 
-                            True, 
-                            f"Retrieved {len(clients)} clients (created client not yet visible)"
-                        )
-                else:
-                    self.log_result("Get Clients", False, f"Expected list, got: {type(clients)}")
-            else:
-                self.log_result("Get Clients", False, f"Status {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_result("Get Clients", False, f"Exception: {str(e)}")
-
-    def test_audit_session_management(self):
-        """Test 3: Audit Session Management - Create and Get sessions"""
-        print("\n=== TESTING AUDIT SESSION MANAGEMENT ===")
-        
-        if not self.test_data["client_id"]:
-            self.log_result("Create Session", False, "No client_id available from previous test")
-            return
-
-        # Test Create Session - POST /api/portal/sessions
-        try:
-            session_data = {
-                "client_id": self.test_data["client_id"],
-                "name": f"Test Audit Session {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                "start_date": datetime.now(timezone.utc).isoformat()
-            }
-            
-            response = requests.post(
-                f"{self.portal_url}/sessions",
-                json=session_data,
-                headers={"Content-Type": "application/json"},
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if "session" in data and "id" in data["session"]:
-                    self.test_data["session_id"] = data["session"]["id"]
-                    self.log_result(
-                        "Create Session", 
-                        True, 
-                        f"Session ID: {data['session']['id']}, Name: {data['session']['name']}"
-                    )
-                else:
-                    self.log_result("Create Session", False, f"Invalid response: {data}")
-            else:
-                self.log_result("Create Session", False, f"Status {response.status_code}: {response.text}")
-                
-        except Exception as e:
-            self.log_result("Create Session", False, f"Exception: {str(e)}")
-
-        # Test Get Sessions - GET /api/portal/sessions
-        try:
-            response = requests.get(
-                f"{self.portal_url}/sessions",
-                timeout=10
-            )
+            response = self.session.get(f"{API_URL}/portal/sessions")
             
             if response.status_code == 200:
                 sessions = response.json()
-                if isinstance(sessions, list):
-                    # Check if our created session is in the list
-                    created_session = None
-                    if self.test_data["session_id"]:
-                        created_session = next(
-                            (s for s in sessions if s.get("id") == self.test_data["session_id"]), 
-                            None
-                        )
-                    
-                    if created_session:
-                        self.log_result(
-                            "Get Sessions", 
-                            True, 
-                            f"Found {len(sessions)} sessions, including created session '{created_session['name']}'"
-                        )
-                    else:
-                        self.log_result(
-                            "Get Sessions", 
-                            True, 
-                            f"Retrieved {len(sessions)} sessions (created session not yet visible)"
-                        )
+                if sessions:
+                    # Use first available session
+                    session_id = sessions[0]["id"]
+                    self.test_data["session_id"] = session_id
+                    return self.log_test("Get Existing Session", True, 
+                        f"Using session: {session_id}")
                 else:
-                    self.log_result("Get Sessions", False, f"Expected list, got: {type(sessions)}")
+                    return self.log_test("Get Existing Session", False, 
+                        "No existing sessions found")
             else:
-                self.log_result("Get Sessions", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Get Existing Session", False, 
+                    f"Failed to get sessions: {response.status_code}")
                 
         except Exception as e:
-            self.log_result("Get Sessions", False, f"Exception: {str(e)}")
-
-    def test_sync_api(self):
-        """Test 4: Sync API - POST /api/sync/"""
-        print("\n=== TESTING SYNC API ===")
-        
-        if not self.test_data["client_id"] or not self.test_data["session_id"]:
-            self.log_result("Sync API", False, "Missing client_id or session_id from previous tests")
-            return
-
+            return self.log_test("Get Existing Session", False, f"Exception: {str(e)}")
+    
+    def test_sync_data_generation(self):
+        """Test syncing data to generate raw logs (First sync)"""
         try:
-            sync_data = {
-                "device_name": "Test-Scanner-01",
-                "sync_password": "test123",
-                "client_id": self.test_data["client_id"],
-                "session_id": self.test_data["session_id"],
-                "locations": [
-                    {
-                        "id": "loc-001",
-                        "name": "Warehouse A",
-                        "items": [
-                            {
-                                "barcode": "8901234567890",
-                                "productName": "Test Product",
-                                "price": 100,
-                                "quantity": 5,
-                                "scannedAt": "2026-02-21T10:00:00Z"
-                            }
-                        ]
-                    }
-                ],
-                "clear_after_sync": False
+            session_id = self.test_data.get("session_id")
+            if not session_id:
+                return self.log_test("Sync Data Generation", False, "No session ID available")
+            
+            sync_payload = {
+                "device_name": "RawLogTestScanner",
+                "sync_password": "testpass",
+                "session_id": session_id,
+                "locations": [{
+                    "name": "TestLocation-RawLog",
+                    "items": [
+                        {"barcode": "1111111111111", "product_name": "Test Item 1", "quantity": 10},
+                        {"barcode": "2222222222222", "product_name": "Test Item 2", "quantity": 5}
+                    ],
+                    "total_quantity": 15,
+                    "submitted_at": "2026-02-21T10:00:00Z"
+                }]
             }
             
-            response = requests.post(
-                f"{self.sync_url}/",
-                json=sync_data,
-                headers={"Content-Type": "application/json"},
-                timeout=15
-            )
+            response = self.session.post(f"{API_URL}/sync/", json=sync_payload)
             
             if response.status_code == 200:
                 data = response.json()
-                if "message" in data and "locations_synced" in data:
-                    self.log_result(
-                        "Sync API", 
-                        True, 
-                        f"Synced {data['locations_synced']} locations. Message: {data['message']}"
-                    )
-                else:
-                    self.log_result("Sync API", False, f"Invalid response structure: {data}")
+                return self.log_test("Sync Data Generation", True, 
+                    f"First sync successful: {data.get('locations_synced', 0)} locations synced")
             else:
-                self.log_result("Sync API", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Sync Data Generation", False, 
+                    f"Sync failed: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            self.log_result("Sync API", False, f"Exception: {str(e)}")
-
-    def test_dashboard(self):
-        """Test 5: Dashboard - GET /api/portal/dashboard"""
-        print("\n=== TESTING DASHBOARD ===")
-        
+            return self.log_test("Sync Data Generation", False, f"Exception: {str(e)}")
+    
+    def test_get_all_sync_logs(self):
+        """Test GET /api/portal/sync-logs - Get all sync logs"""
         try:
-            response = requests.get(
-                f"{self.portal_url}/dashboard",
-                timeout=10
-            )
+            response = self.session.get(f"{API_URL}/portal/sync-logs")
             
             if response.status_code == 200:
-                data = response.json()
-                if "stats" in data and "recent_syncs" in data:
-                    stats = data["stats"]
-                    self.log_result(
-                        "Dashboard", 
-                        True, 
-                        f"Stats - Clients: {stats.get('clients', 0)}, Active Sessions: {stats.get('active_sessions', 0)}, Devices: {stats.get('devices', 0)}, Recent Syncs: {len(data.get('recent_syncs', []))}"
-                    )
+                logs = response.json()
+                if logs:
+                    # Verify log structure
+                    log = logs[0]
+                    required_fields = ["id", "device_name", "session_id", "client_id", 
+                                     "synced_at", "raw_payload", "location_count", 
+                                     "total_items", "total_quantity"]
+                    
+                    missing_fields = [f for f in required_fields if f not in log]
+                    if missing_fields:
+                        return self.log_test("Get All Sync Logs", False, 
+                            f"Missing fields: {missing_fields}")
+                    
+                    # Store log ID for detail test
+                    self.test_data["log_id"] = log["id"]
+                    
+                    return self.log_test("Get All Sync Logs", True, 
+                        f"Retrieved {len(logs)} sync logs with all required fields")
                 else:
-                    self.log_result("Dashboard", False, f"Invalid response structure: {data}")
+                    return self.log_test("Get All Sync Logs", False, 
+                        "No sync logs found")
             else:
-                self.log_result("Dashboard", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Get All Sync Logs", False, 
+                    f"Request failed: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            self.log_result("Dashboard", False, f"Exception: {str(e)}")
-
-    def test_reports(self):
-        """Test 6: Reports - GET /api/portal/reports/{session_id}/daily-progress"""
-        print("\n=== TESTING REPORTS ===")
-        
-        if not self.test_data["session_id"]:
-            self.log_result("Daily Progress Report", False, "No session_id available from previous test")
-            return
-
+            return self.log_test("Get All Sync Logs", False, f"Exception: {str(e)}")
+    
+    def test_filter_logs_by_session(self):
+        """Test GET /api/portal/sync-logs?session_id= - Filter logs by session"""
         try:
-            response = requests.get(
-                f"{self.portal_url}/reports/{self.test_data['session_id']}/daily-progress",
-                timeout=10
-            )
+            session_id = self.test_data.get("session_id")
+            if not session_id:
+                return self.log_test("Filter Logs by Session", False, "No session ID available")
+            
+            response = self.session.get(f"{API_URL}/portal/sync-logs?session_id={session_id}")
             
             if response.status_code == 200:
-                report_data = response.json()
-                if isinstance(report_data, list):
-                    self.log_result(
-                        "Daily Progress Report", 
-                        True, 
-                        f"Retrieved daily progress report with {len(report_data)} entries"
-                    )
-                    # Show details if we have synced data
-                    for entry in report_data:
-                        if entry.get("locations", 0) > 0:
-                            print(f"   Date: {entry.get('date')}, Locations: {entry.get('locations')}, Items: {entry.get('items')}, Quantity: {entry.get('quantity')}")
+                logs = response.json()
+                if logs:
+                    # Verify all logs belong to the session
+                    for log in logs:
+                        if log.get("session_id") != session_id:
+                            return self.log_test("Filter Logs by Session", False, 
+                                f"Found log with different session_id: {log.get('session_id')}")
+                    
+                    return self.log_test("Filter Logs by Session", True, 
+                        f"Retrieved {len(logs)} logs filtered by session {session_id}")
                 else:
-                    self.log_result("Daily Progress Report", False, f"Expected list, got: {type(report_data)}")
+                    return self.log_test("Filter Logs by Session", False, 
+                        "No logs found for this session")
             else:
-                self.log_result("Daily Progress Report", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Filter Logs by Session", False, 
+                    f"Request failed: {response.status_code} - {response.text}")
                 
         except Exception as e:
-            self.log_result("Daily Progress Report", False, f"Exception: {str(e)}")
-
-    def test_basic_endpoints(self):
-        """Test basic legacy endpoints to ensure backward compatibility"""
-        print("\n=== TESTING BASIC ENDPOINTS (Legacy) ===")
-        
-        # Test root endpoint
+            return self.log_test("Filter Logs by Session", False, f"Exception: {str(e)}")
+    
+    def test_get_log_detail(self):
+        """Test GET /api/portal/sync-logs/{log_id} - Get log detail"""
         try:
-            response = requests.get(f"{self.api_url}/", timeout=10)
+            log_id = self.test_data.get("log_id")
+            if not log_id:
+                return self.log_test("Get Log Detail", False, "No log ID available")
+            
+            response = self.session.get(f"{API_URL}/portal/sync-logs/{log_id}")
+            
             if response.status_code == 200:
-                data = response.json()
-                if data.get("message") == "Hello World":
-                    self.log_result("Basic Root Endpoint", True, "Returns 'Hello World'")
-                else:
-                    self.log_result("Basic Root Endpoint", False, f"Unexpected message: {data}")
+                log = response.json()
+                
+                # Verify log has raw_payload with locations and items
+                raw_payload = log.get("raw_payload", {})
+                locations = raw_payload.get("locations", [])
+                
+                if not locations:
+                    return self.log_test("Get Log Detail", False, 
+                        "Raw payload missing locations data")
+                
+                # Verify first location has items
+                first_location = locations[0]
+                items = first_location.get("items", [])
+                
+                if not items:
+                    return self.log_test("Get Log Detail", False, 
+                        "Location missing items data")
+                
+                return self.log_test("Get Log Detail", True, 
+                    f"Retrieved detailed log with {len(locations)} locations and {len(items)} items in first location")
             else:
-                self.log_result("Basic Root Endpoint", False, f"Status {response.status_code}: {response.text}")
+                return self.log_test("Get Log Detail", False, 
+                    f"Request failed: {response.status_code} - {response.text}")
+                
         except Exception as e:
-            self.log_result("Basic Root Endpoint", False, f"Exception: {str(e)}")
-
+            return self.log_test("Get Log Detail", False, f"Exception: {str(e)}")
+    
+    def test_resync_same_location(self):
+        """Test re-sync (location replacement + raw log preservation)"""
+        try:
+            session_id = self.test_data.get("session_id")
+            if not session_id:
+                return self.log_test("Re-sync Same Location", False, "No session ID available")
+            
+            # Get current log count
+            response = self.session.get(f"{API_URL}/portal/sync-logs")
+            if response.status_code != 200:
+                return self.log_test("Re-sync Same Location", False, 
+                    "Failed to get current log count")
+            
+            initial_log_count = len(response.json())
+            
+            # Re-sync the same location with different data
+            resync_payload = {
+                "device_name": "RawLogTestScanner",
+                "sync_password": "testpass",
+                "session_id": session_id,
+                "locations": [{
+                    "name": "TestLocation-RawLog",  # Same location name
+                    "items": [
+                        {"barcode": "1111111111111", "product_name": "Test Item 1 Updated", "quantity": 12},
+                        {"barcode": "3333333333333", "product_name": "New Item 3", "quantity": 7}
+                    ],
+                    "total_quantity": 19,
+                    "submitted_at": "2026-02-21T11:00:00Z"
+                }]
+            }
+            
+            response = self.session.post(f"{API_URL}/sync/", json=resync_payload)
+            
+            if response.status_code != 200:
+                return self.log_test("Re-sync Same Location", False, 
+                    f"Re-sync failed: {response.status_code} - {response.text}")
+            
+            # Verify logs increased (append-only behavior)
+            time.sleep(1)  # Brief pause for data consistency
+            response = self.session.get(f"{API_URL}/portal/sync-logs")
+            
+            if response.status_code == 200:
+                new_logs = response.json()
+                new_log_count = len(new_logs)
+                
+                if new_log_count <= initial_log_count:
+                    return self.log_test("Re-sync Same Location", False, 
+                        f"Log count did not increase: {initial_log_count} -> {new_log_count}")
+                
+                return self.log_test("Re-sync Same Location", True, 
+                    f"Re-sync successful, logs preserved (append-only): {initial_log_count} -> {new_log_count}")
+            else:
+                return self.log_test("Re-sync Same Location", False, 
+                    "Failed to verify log count after re-sync")
+                
+        except Exception as e:
+            return self.log_test("Re-sync Same Location", False, f"Exception: {str(e)}")
+    
+    def test_verify_both_syncs_preserved(self):
+        """Verify both original sync and re-sync are preserved in raw logs"""
+        try:
+            session_id = self.test_data.get("session_id")
+            if not session_id:
+                return self.log_test("Verify Both Syncs Preserved", False, "No session ID available")
+            
+            # Get logs for this session
+            response = self.session.get(f"{API_URL}/portal/sync-logs?session_id={session_id}")
+            
+            if response.status_code != 200:
+                return self.log_test("Verify Both Syncs Preserved", False, 
+                    f"Failed to get session logs: {response.status_code}")
+            
+            logs = response.json()
+            
+            # Should have at least 2 logs for this session now
+            session_logs = [log for log in logs if log.get("session_id") == session_id]
+            
+            if len(session_logs) < 2:
+                return self.log_test("Verify Both Syncs Preserved", False, 
+                    f"Expected at least 2 logs, found {len(session_logs)}")
+            
+            # Verify raw payloads are different (indicating both syncs preserved)
+            payloads = [log.get("raw_payload", {}) for log in session_logs[:2]]
+            
+            # Check that we have different item data in the payloads
+            first_items = payloads[0].get("locations", [{}])[0].get("items", [])
+            second_items = payloads[1].get("locations", [{}])[0].get("items", [])
+            
+            if first_items == second_items:
+                return self.log_test("Verify Both Syncs Preserved", False, 
+                    "Raw payloads appear identical - syncs may not be preserved")
+            
+            return self.log_test("Verify Both Syncs Preserved", True, 
+                f"Both syncs preserved in raw logs: {len(session_logs)} logs found with different payloads")
+                
+        except Exception as e:
+            return self.log_test("Verify Both Syncs Preserved", False, f"Exception: {str(e)}")
+    
     def run_all_tests(self):
-        """Run all test suites in sequence"""
-        print("🚀 STARTING AUDIX ADMIN PORTAL BACKEND API TESTING")
-        print(f"Backend URL: {self.base_url}")
-        print("=" * 60)
+        """Execute all tests in the correct order"""
+        print("🧪 Starting Sync Raw Logs Feature Testing...")
+        print(f"🌐 Backend URL: {BASE_URL}")
+        print("=" * 80)
         
-        # Run tests in dependency order
-        self.test_basic_endpoints()
-        self.test_portal_authentication()
-        self.test_client_management()
-        self.test_audit_session_management()
-        self.test_sync_api()
-        self.test_dashboard()
-        self.test_reports()
+        # Test sequence following the review request flow
+        tests = [
+            self.test_portal_login,
+            self.test_get_existing_session,
+            self.test_sync_data_generation,
+            self.test_get_all_sync_logs,
+            self.test_filter_logs_by_session,
+            self.test_get_log_detail,
+            self.test_resync_same_location,
+            self.test_verify_both_syncs_preserved,
+        ]
+        
+        passed = 0
+        total = len(tests)
+        
+        for test in tests:
+            if test():
+                passed += 1
+            print()  # Add spacing between tests
         
         # Print summary
-        print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
-        print("=" * 60)
+        print("=" * 80)
+        print(f"📊 TEST SUMMARY: {passed}/{total} tests passed")
+        print()
         
-        total_tests = self.passed_tests + self.failed_tests
-        print(f"Total Tests: {total_tests}")
-        print(f"✅ Passed: {self.passed_tests}")
-        print(f"❌ Failed: {self.failed_tests}")
-        
-        if self.failed_tests > 0:
-            print("\n❌ FAILED TESTS:")
-            for result in self.test_results:
-                if not result["success"]:
-                    print(f"   - {result['test']}: {result['details']}")
-        
-        success_rate = (self.passed_tests / total_tests * 100) if total_tests > 0 else 0
-        print(f"\nSuccess Rate: {success_rate:.1f}%")
-        
-        if self.failed_tests == 0:
-            print("\n🎉 ALL TESTS PASSED! AUDIX Admin Portal backend is working correctly.")
+        if passed == total:
+            print("🎉 ALL SYNC RAW LOGS TESTS PASSED!")
             return True
         else:
-            print(f"\n⚠️  {self.failed_tests} test(s) failed. Please check the backend implementation.")
+            print("❌ SOME TESTS FAILED - Check logs above for details")
             return False
 
-
-def main():
-    """Main function to run the test suite"""
-    tester = AudixBackendTester()
-    success = tester.run_all_tests()
-    
-    # Exit with appropriate code
-    sys.exit(0 if success else 1)
-
-
 if __name__ == "__main__":
-    main()
+    test_suite = SyncRawLogsTestSuite()
+    success = test_suite.run_all_tests()
+    sys.exit(0 if success else 1)
