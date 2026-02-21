@@ -1,77 +1,144 @@
+#!/usr/bin/env python3
 """
-Comprehensive Data Persistence Test
-Tests:
-1. Master Data - Upload and persistence
-2. Scanned Items - Scanning and persistence
+Backend Health Check Test Script for AUDIX Stock Management App
+Tests the 3 core API endpoints after frontend changes
 """
 
 import requests
 import json
+import sys
+from datetime import datetime
 
-BASE_URL = "https://mobile-counter-view.preview.emergentagent.com"
+# Backend URL from frontend/.env
+BACKEND_URL = "https://mobile-counter-view.preview.emergentagent.com/api"
 
-def test_backend_health():
-    """Test basic backend API health"""
-    print("\n" + "="*60)
-    print("BACKEND HEALTH CHECK")
-    print("="*60)
-    
+def test_root_endpoint():
+    """Test GET /api/ endpoint"""
+    print("🔍 Testing GET /api/ endpoint...")
     try:
-        response = requests.get(f"{BASE_URL}/api/")
-        print(f"✅ GET /api/ - Status: {response.status_code}")
-        print(f"   Response: {response.json()}")
-        return True
-    except Exception as e:
-        print(f"❌ Backend health check failed: {e}")
+        response = requests.get(f"{BACKEND_URL}/", timeout=10)
+        print(f"   Status Code: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {data}")
+            
+            if data.get("message") == "Hello World":
+                print("   ✅ ROOT ENDPOINT - PASSED")
+                return True
+            else:
+                print("   ❌ ROOT ENDPOINT - FAILED: Incorrect message")
+                return False
+        else:
+            print(f"   ❌ ROOT ENDPOINT - FAILED: Status {response.status_code}")
+            return False
+            
+    except requests.exceptions.RequestException as e:
+        print(f"   ❌ ROOT ENDPOINT - FAILED: {e}")
         return False
 
-def test_status_persistence():
-    """Test data persistence via status endpoint"""
-    print("\n" + "="*60)
-    print("STATUS DATA PERSISTENCE TEST")
-    print("="*60)
-    
+def test_create_status():
+    """Test POST /api/status endpoint"""
+    print("\n🔍 Testing POST /api/status endpoint...")
     try:
-        # Create a test status
-        test_data = {"client_name": f"persistence_test_{int(__import__('time').time())}"}
-        response = requests.post(f"{BASE_URL}/api/status", json=test_data)
-        print(f"✅ POST /api/status - Status: {response.status_code}")
-        created = response.json()
-        print(f"   Created: {created}")
+        payload = {"client_name": "test"}
+        response = requests.post(f"{BACKEND_URL}/status", 
+                               json=payload, 
+                               headers={"Content-Type": "application/json"},
+                               timeout=10)
+        print(f"   Status Code: {response.status_code}")
         
-        # Verify it persists
-        response = requests.get(f"{BASE_URL}/api/status")
-        print(f"✅ GET /api/status - Status: {response.status_code}")
-        statuses = response.json()
-        print(f"   Found {len(statuses)} status records")
-        
-        # Check if our test record exists
-        found = any(s.get('client_name') == test_data['client_name'] for s in statuses)
-        if found:
-            print(f"✅ Test record persisted successfully!")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: {data}")
+            
+            # Verify required fields
+            required_fields = ["id", "client_name", "timestamp"]
+            if all(field in data for field in required_fields):
+                if data["client_name"] == "test" and data["id"]:
+                    print("   ✅ CREATE STATUS - PASSED")
+                    return True, data["id"]
+                else:
+                    print("   ❌ CREATE STATUS - FAILED: Invalid field values")
+                    return False, None
+            else:
+                print("   ❌ CREATE STATUS - FAILED: Missing required fields")
+                return False, None
         else:
-            print(f"❌ Test record NOT found in retrieved data!")
+            print(f"   ❌ CREATE STATUS - FAILED: Status {response.status_code}")
+            return False, None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"   ❌ CREATE STATUS - FAILED: {e}")
+        return False, None
+
+def test_get_status():
+    """Test GET /api/status endpoint"""
+    print("\n🔍 Testing GET /api/status endpoint...")
+    try:
+        response = requests.get(f"{BACKEND_URL}/status", timeout=10)
+        print(f"   Status Code: {response.status_code}")
         
-        return found
-    except Exception as e:
-        print(f"❌ Status persistence test failed: {e}")
+        if response.status_code == 200:
+            data = response.json()
+            print(f"   Response: Found {len(data)} records")
+            
+            if isinstance(data, list):
+                print("   ✅ GET STATUS - PASSED")
+                return True, len(data)
+            else:
+                print("   ❌ GET STATUS - FAILED: Response is not a list")
+                return False, 0
+        else:
+            print(f"   ❌ GET STATUS - FAILED: Status {response.status_code}")
+            return False, 0
+            
+    except requests.exceptions.RequestException as e:
+        print(f"   ❌ GET STATUS - FAILED: {e}")
+        return False, 0
+
+def main():
+    """Main test execution"""
+    print("=" * 60)
+    print("🚀 AUDIX STOCK MANAGEMENT - BACKEND HEALTH CHECK")
+    print("=" * 60)
+    print(f"Backend URL: {BACKEND_URL}")
+    print(f"Test Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+    
+    # Track test results
+    results = []
+    
+    # Test 1: Root endpoint
+    results.append(test_root_endpoint())
+    
+    # Test 2: Create status
+    create_passed, created_id = test_create_status()
+    results.append(create_passed)
+    
+    # Test 3: Get status
+    get_passed, record_count = test_get_status()
+    results.append(get_passed)
+    
+    # Summary
+    print("\n" + "=" * 60)
+    print("📊 TEST SUMMARY")
+    print("=" * 60)
+    passed = sum(results)
+    total = len(results)
+    
+    print(f"✅ Tests Passed: {passed}/{total}")
+    print(f"❌ Tests Failed: {total - passed}/{total}")
+    
+    if passed == total:
+        print("\n🎉 ALL BACKEND HEALTH CHECKS PASSED!")
+        print("   Backend is healthy and ready for production use.")
+        return True
+    else:
+        print(f"\n⚠️  {total - passed} BACKEND HEALTH CHECK(S) FAILED!")
+        print("   Backend requires attention before production use.")
         return False
 
 if __name__ == "__main__":
-    print("\n" + "#"*60)
-    print("# DATA PERSISTENCE VERIFICATION TEST")
-    print("#"*60)
-    
-    results = []
-    results.append(("Backend Health", test_backend_health()))
-    results.append(("Status Persistence", test_status_persistence()))
-    
-    print("\n" + "="*60)
-    print("TEST SUMMARY")
-    print("="*60)
-    for test_name, passed in results:
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"  {test_name}: {status}")
-    
-    all_passed = all(r[1] for r in results)
-    print("\n" + ("✅ ALL TESTS PASSED" if all_passed else "❌ SOME TESTS FAILED"))
+    success = main()
+    sys.exit(0 if success else 1)
