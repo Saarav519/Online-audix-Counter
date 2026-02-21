@@ -41,7 +41,10 @@ class PortalUser(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     username: str
     password_hash: str
-    role: str = "admin"  # admin, viewer
+    role: str = "viewer"  # admin, viewer
+    is_active: bool = True
+    is_approved: bool = False  # New users need admin approval
+    last_login: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PortalUserCreate(BaseModel):
