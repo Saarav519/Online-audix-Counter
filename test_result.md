@@ -1365,3 +1365,65 @@ test_plan:
         agent: "testing"
         comment: "✅ SYNC LOGS PORTAL ENDPOINTS WORKING - All endpoints tested and working correctly. GET /api/portal/sync-logs returns all logs with required fields. Filtering by session_id parameter working (retrieved logs only for specified session). GET /api/portal/sync-logs/{log_id} returns detailed log with complete raw_payload including locations and items data. Client_id filtering also confirmed working."
 
+  - agent: "testing"
+    message: |
+      ✅ PRIORITY LOGIC TESTING COMPLETED SUCCESSFULLY - CORRECTED REPORT PRIORITY VERIFIED
+      
+      🎯 **TESTING SCOPE**:
+      Comprehensive end-to-end testing of the CORRECTED report priority logic as requested:
+      "Test the CORRECTED report priority: Stock > Master > Physical scan data"
+      
+      Following the exact review request flow:
+      1. Portal Login (admin/admin123) 
+      2. Create Client (Priority Test Client, Code: PRI01)
+      3. Upload Master Products CSV (5 products: Rice, Oil, Sugar, Butter, Cheese)
+      4. Create Session (bin-wise variance mode)
+      5. Import Expected Stock WITH product details (3 scenarios for priority testing)
+      6. Sync Physical Data (2 locations with various items)
+      7. CRITICAL TESTING: All report endpoints for priority verification
+      
+      📊 **PRIORITY TEST RESULTS (16/16 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **SCENARIO A** - Barcode 1111111111111 (Stock WITH details + Master + Scanned):
+         - ✅ Uses STOCK details: "Stock Rice 10kg", "Stock Grocery", MRP:350, Cost:300
+         - ✅ NOT master details ("Master Rice 5kg", "Master Grocery")
+         - ✅ Priority working correctly: Stock > Master
+      
+      ✅ **SCENARIO B** - Barcode 2222222222222 (Stock WITHOUT details + Master + Scanned):
+         - ✅ Stock has empty description/category → FALLS BACK to master
+         - ✅ Uses MASTER details: "Master Oil 1L", "Master Cooking"
+         - ✅ Priority working correctly: Stock (empty) → Master fallback
+      
+      ✅ **SCENARIO C** - Barcode 3333333333333 (Stock WITH details + Master + NOT scanned):
+         - ✅ Uses STOCK details: "Stock Sugar Premium", "Stock Premium"
+         - ✅ Shows correct remark: "Not Scanned" 
+         - ✅ Priority working correctly: Stock > Master even when not scanned
+      
+      ✅ **SCENARIO D** - Barcode 4444444444444 (NOT in stock + Master + Scanned):
+         - ✅ Uses MASTER details: "Master Butter 500g", "Master Dairy"
+         - ✅ Shows correct remark: "In Master, Not in Stock"
+         - ✅ Priority working correctly: Master > Physical when no stock entry
+      
+      ✅ **SCENARIO E** - Barcode 9999999999999 (NOT in stock + NOT in master + Scanned):
+         - ✅ Uses PHYSICAL scan details: "Scan Unknown" (last resort)
+         - ✅ Shows correct remark: "Not in Master"
+         - ✅ Priority working correctly: Physical scan as final fallback
+      
+      🔍 **TECHNICAL VERIFICATION**:
+      ✅ Priority implementation in server.py lines 932-935 working correctly:
+         ```python
+         description = exp.get("description") or master_info.get("description") or phy.get("product_name", "")
+         category = exp.get("category") or master_info.get("category", "")
+         mrp = exp.get("mrp") or master_info.get("mrp", 0)  
+         cost = exp.get("cost") or master_info.get("cost", 0)
+         ```
+      
+      ✅ **ALL REPORT ENDPOINTS VERIFIED**:
+      - GET /api/portal/reports/{session_id}/detailed ✅
+      - GET /api/portal/reports/{session_id}/barcode-wise ✅  
+      - GET /api/portal/reports/{session_id}/category-summary ✅
+      
+      🌐 **BACKEND URL CONFIRMED**: https://data-sync-preview-5.preview.emergentagent.com
+      
+      🎉 **CONCLUSION**: The CORRECTED report priority logic is working PERFECTLY. All 5 test scenarios confirmed that product details follow the exact priority: Stock > Master > Physical scan data. The implementation correctly handles fallback scenarios and generates appropriate professional remarks for each case.
+
