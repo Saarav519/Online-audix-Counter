@@ -208,7 +208,7 @@ const VirtualizedItemRow = memo(({ index, style, data }) => {
         setEditQuantity={setEditQuantity}
         onQuantityUpdate={handleQuantityUpdate}
         onDelete={handleDelete}
-        isSingleSkuMode={isSingleSkuMode}
+        singleSkuMode={isSingleSkuMode}
         isLocationLocked={isLocationLocked}
         onStartEdit={(id, qty) => {
           setEditingItemId(id);
