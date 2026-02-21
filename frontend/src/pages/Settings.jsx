@@ -153,6 +153,68 @@ const Settings = () => {
     });
   };
 
+  // Get next backup number for today
+  const getNextBackupNumber = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const backupKey = `audix_backup_count_${today}`;
+    const currentCount = parseInt(localStorage.getItem(backupKey) || '0', 10);
+    const nextCount = currentCount + 1;
+    localStorage.setItem(backupKey, nextCount.toString());
+    return nextCount;
+  };
+
+  // Get ordinal suffix (1st, 2nd, 3rd, etc.)
+  const getOrdinalSuffix = (num) => {
+    const j = num % 10;
+    const k = num % 100;
+    if (j === 1 && k !== 11) return 'st';
+    if (j === 2 && k !== 12) return 'nd';
+    if (j === 3 && k !== 13) return 'rd';
+    return 'th';
+  };
+
+  // Create backup CSV file
+  const createBackupFile = (locationsToSync) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const backupNum = getNextBackupNumber();
+      const ordinal = getOrdinalSuffix(backupNum);
+      const filename = `${today}_${backupNum}${ordinal}_Backup.csv`;
+
+      // Build CSV content (same format as export)
+      let csvContent = 'Location,Barcode,Product Name,Price,Quantity,Scanned At\n';
+      
+      locationsToSync.forEach(location => {
+        location.items.forEach(item => {
+          // Get product name from master if available
+          const masterProduct = masterProducts?.find(p => p.barcode === item.barcode);
+          const productName = item.productName || masterProduct?.name || '';
+          const price = item.price || masterProduct?.price || '';
+          
+          // Format barcode to preserve in Excel
+          const formattedBarcode = `="${item.barcode}"`;
+          
+          csvContent += `"${location.name}",${formattedBarcode},"${productName}",${price},${item.quantity},"${item.scannedAt}"\n`;
+        });
+      });
+
+      // Create and download the file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log(`Backup created: ${filename}`);
+    } catch (error) {
+      console.error('Failed to create backup:', error);
+    }
+  };
+
   const handleManualSync = () => {
     setManualSyncPassword('');
     setShowSyncPasswordModal(true);
