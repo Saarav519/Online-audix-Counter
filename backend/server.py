@@ -680,15 +680,13 @@ async def get_bin_wise_report(session_id: str):
 
 @portal_router.get("/reports/{session_id}/detailed")
 async def get_detailed_report(session_id: str):
-    """Detailed item-wise report with values"""
-    # Get expected stock
+    """Detailed item-wise report with values, accuracy%, remarks"""
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_map = {}
     for e in expected:
-        key = f"{e['location']}|{e['barcode']}"
+        key = f"{e.get('location', '')}|{e['barcode']}"
         expected_map[key] = e
     
-    # Get synced data
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_map = {}
     for s in synced:
@@ -704,7 +702,6 @@ async def get_detailed_report(session_id: str):
                 }
             physical_map[key]["quantity"] += item["quantity"]
     
-    # Combine all items
     all_keys = set(expected_map.keys()) | set(physical_map.keys())
     
     report = []
@@ -721,6 +718,7 @@ async def get_detailed_report(session_id: str):
         location = exp.get("location") or phy.get("location", "")
         barcode = exp.get("barcode") or phy.get("barcode", "")
         description = exp.get("description") or phy.get("product_name", "")
+        category = exp.get("category", "")
         mrp = exp.get("mrp", 0)
         cost = exp.get("cost", 0)
         
@@ -731,6 +729,11 @@ async def get_detailed_report(session_id: str):
         stock_value = stock_qty * cost
         physical_value = physical_qty * cost
         diff_value = diff_qty * cost
+        
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = key in expected_map
+        scanned = key in physical_map
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
         
         totals["stock_qty"] += stock_qty
         totals["stock_value"] += stock_value
@@ -743,6 +746,7 @@ async def get_detailed_report(session_id: str):
             "location": location,
             "barcode": barcode,
             "description": description,
+            "category": category,
             "mrp": mrp,
             "cost": cost,
             "stock_qty": stock_qty,
@@ -750,8 +754,340 @@ async def get_detailed_report(session_id: str):
             "physical_qty": physical_qty,
             "physical_value": physical_value,
             "diff_qty": diff_qty,
-            "diff_value": diff_value
+            "diff_value": diff_value,
+            "accuracy_pct": accuracy,
+            "remark": remark
         })
+    
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
+    return {"report": report, "totals": totals}
+
+
+@portal_router.get("/reports/{session_id}/barcode-wise")
+async def get_barcode_wise_report(session_id: str):
+    """Barcode-wise variance: Pivots by barcode across all locations, ignores location dimension"""
+    expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    
+    # Pivot expected by barcode (sum across locations)
+    expected_by_barcode = {}
+    for e in expected:
+        bc = e["barcode"]
+        if bc not in expected_by_barcode:
+            expected_by_barcode[bc] = {
+                "barcode": bc,
+                "description": e.get("description", ""),
+                "category": e.get("category", ""),
+                "mrp": e.get("mrp", 0),
+                "cost": e.get("cost", 0),
+                "qty": 0
+            }
+        expected_by_barcode[bc]["qty"] += e.get("qty", 0)
+    
+    # Pivot physical by barcode (sum across all synced locations)
+    synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    physical_by_barcode = {}
+    for s in synced:
+        for item in s["items"]:
+            bc = item["barcode"]
+            if bc not in physical_by_barcode:
+                physical_by_barcode[bc] = {
+                    "barcode": bc,
+                    "product_name": item.get("product_name", ""),
+                    "quantity": 0
+                }
+            physical_by_barcode[bc]["quantity"] += item["quantity"]
+    
+    all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    
+    report = []
+    totals = {
+        "stock_qty": 0, "stock_value": 0,
+        "physical_qty": 0, "physical_value": 0,
+        "diff_qty": 0, "diff_value": 0
+    }
+    
+    for bc in sorted(all_barcodes):
+        exp = expected_by_barcode.get(bc, {})
+        phy = physical_by_barcode.get(bc, {})
+        
+        description = exp.get("description") or phy.get("product_name", "")
+        category = exp.get("category", "")
+        mrp = exp.get("mrp", 0)
+        cost = exp.get("cost", 0)
+        
+        stock_qty = exp.get("qty", 0)
+        physical_qty = phy.get("quantity", 0)
+        diff_qty = physical_qty - stock_qty
+        
+        stock_value = stock_qty * cost
+        physical_value = physical_qty * cost
+        diff_value = diff_qty * cost
+        
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = bc in expected_by_barcode
+        scanned = bc in physical_by_barcode
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        
+        totals["stock_qty"] += stock_qty
+        totals["stock_value"] += stock_value
+        totals["physical_qty"] += physical_qty
+        totals["physical_value"] += physical_value
+        totals["diff_qty"] += diff_qty
+        totals["diff_value"] += diff_value
+        
+        report.append({
+            "barcode": bc,
+            "description": description,
+            "category": category,
+            "mrp": mrp,
+            "cost": cost,
+            "stock_qty": stock_qty,
+            "stock_value": stock_value,
+            "physical_qty": physical_qty,
+            "physical_value": physical_value,
+            "diff_qty": diff_qty,
+            "diff_value": diff_value,
+            "accuracy_pct": accuracy,
+            "remark": remark
+        })
+    
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
+    return {"report": report, "totals": totals}
+
+
+@portal_router.get("/reports/{session_id}/article-wise")
+async def get_article_wise_report(session_id: str):
+    """Article-wise variance: Groups barcodes by article_code, calculates variance at article level"""
+    expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    
+    # Build barcode -> article mapping and aggregate expected by article
+    barcode_to_article = {}
+    expected_by_article = {}
+    for e in expected:
+        bc = e["barcode"]
+        article_code = e.get("article_code", "") or bc  # fallback to barcode if no article
+        article_name = e.get("article_name", "") or e.get("description", "")
+        category = e.get("category", "")
+        cost = e.get("cost", 0)
+        mrp = e.get("mrp", 0)
+        
+        barcode_to_article[bc] = article_code
+        
+        if article_code not in expected_by_article:
+            expected_by_article[article_code] = {
+                "article_code": article_code,
+                "article_name": article_name,
+                "category": category,
+                "barcodes": set(),
+                "mrp": mrp,
+                "cost": cost,
+                "qty": 0
+            }
+        expected_by_article[article_code]["barcodes"].add(bc)
+        expected_by_article[article_code]["qty"] += e.get("qty", 0)
+    
+    # Aggregate physical by article
+    synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    physical_by_article = {}
+    unmapped_barcodes = {}
+    
+    for s in synced:
+        for item in s["items"]:
+            bc = item["barcode"]
+            article_code = barcode_to_article.get(bc, None)
+            
+            if article_code is None:
+                # Barcode not in master - track as unmapped
+                if bc not in unmapped_barcodes:
+                    unmapped_barcodes[bc] = {
+                        "barcode": bc,
+                        "product_name": item.get("product_name", ""),
+                        "quantity": 0
+                    }
+                unmapped_barcodes[bc]["quantity"] += item["quantity"]
+            else:
+                if article_code not in physical_by_article:
+                    physical_by_article[article_code] = 0
+                physical_by_article[article_code] += item["quantity"]
+    
+    # Build report from expected articles
+    report = []
+    totals = {
+        "stock_qty": 0, "stock_value": 0,
+        "physical_qty": 0, "physical_value": 0,
+        "diff_qty": 0, "diff_value": 0
+    }
+    
+    all_article_codes = set(expected_by_article.keys()) | set(physical_by_article.keys())
+    
+    for ac in sorted(all_article_codes):
+        exp = expected_by_article.get(ac, {})
+        
+        article_code = ac
+        article_name = exp.get("article_name", "")
+        category = exp.get("category", "")
+        barcodes = list(exp.get("barcodes", set()))
+        mrp = exp.get("mrp", 0)
+        cost = exp.get("cost", 0)
+        
+        stock_qty = exp.get("qty", 0)
+        physical_qty = physical_by_article.get(ac, 0)
+        diff_qty = physical_qty - stock_qty
+        
+        stock_value = stock_qty * cost
+        physical_value = physical_qty * cost
+        diff_value = diff_qty * cost
+        
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = ac in expected_by_article
+        scanned = ac in physical_by_article
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        
+        totals["stock_qty"] += stock_qty
+        totals["stock_value"] += stock_value
+        totals["physical_qty"] += physical_qty
+        totals["physical_value"] += physical_value
+        totals["diff_qty"] += diff_qty
+        totals["diff_value"] += diff_value
+        
+        report.append({
+            "article_code": article_code,
+            "article_name": article_name,
+            "category": category,
+            "barcodes": barcodes,
+            "barcode_count": len(barcodes),
+            "mrp": mrp,
+            "cost": cost,
+            "stock_qty": stock_qty,
+            "stock_value": stock_value,
+            "physical_qty": physical_qty,
+            "physical_value": physical_value,
+            "diff_qty": diff_qty,
+            "diff_value": diff_value,
+            "accuracy_pct": accuracy,
+            "remark": remark
+        })
+    
+    # Add unmapped barcodes as "No Article" entries
+    for bc, data in sorted(unmapped_barcodes.items()):
+        physical_qty = data["quantity"]
+        accuracy = 0.0
+        remark = generate_remark(0, physical_qty, accuracy, in_master=False, scanned=True)
+        
+        totals["physical_qty"] += physical_qty
+        totals["diff_qty"] += physical_qty
+        
+        report.append({
+            "article_code": "UNMAPPED",
+            "article_name": f"Not in Master ({bc})",
+            "category": "Unmapped",
+            "barcodes": [bc],
+            "barcode_count": 1,
+            "mrp": 0,
+            "cost": 0,
+            "stock_qty": 0,
+            "stock_value": 0,
+            "physical_qty": physical_qty,
+            "physical_value": 0,
+            "diff_qty": physical_qty,
+            "diff_value": 0,
+            "accuracy_pct": accuracy,
+            "remark": remark
+        })
+    
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
+    return {"report": report, "totals": totals}
+
+
+@portal_router.get("/reports/{session_id}/category-summary")
+async def get_category_summary(session_id: str):
+    """Category-wise summary: Groups all data by category"""
+    expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    
+    # Build barcode -> category mapping from expected
+    barcode_info = {}
+    expected_by_category = {}
+    for e in expected:
+        bc = e["barcode"]
+        cat = e.get("category", "") or "Uncategorized"
+        cost = e.get("cost", 0)
+        
+        barcode_info[bc] = {"category": cat, "cost": cost}
+        
+        if cat not in expected_by_category:
+            expected_by_category[cat] = {"qty": 0, "value": 0, "item_count": 0}
+        expected_by_category[cat]["qty"] += e.get("qty", 0)
+        expected_by_category[cat]["value"] += e.get("qty", 0) * cost
+        expected_by_category[cat]["item_count"] += 1
+    
+    # Aggregate physical by category
+    synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    physical_by_category = {}
+    
+    for s in synced:
+        for item in s["items"]:
+            bc = item["barcode"]
+            info = barcode_info.get(bc, {"category": "Unmapped", "cost": 0})
+            cat = info["category"]
+            cost = info["cost"]
+            
+            if cat not in physical_by_category:
+                physical_by_category[cat] = {"qty": 0, "value": 0}
+            physical_by_category[cat]["qty"] += item["quantity"]
+            physical_by_category[cat]["value"] += item["quantity"] * cost
+    
+    all_categories = set(expected_by_category.keys()) | set(physical_by_category.keys())
+    
+    report = []
+    totals = {
+        "stock_qty": 0, "stock_value": 0,
+        "physical_qty": 0, "physical_value": 0,
+        "diff_qty": 0, "diff_value": 0,
+        "item_count": 0
+    }
+    
+    for cat in sorted(all_categories):
+        exp = expected_by_category.get(cat, {"qty": 0, "value": 0, "item_count": 0})
+        phy = physical_by_category.get(cat, {"qty": 0, "value": 0})
+        
+        stock_qty = exp["qty"]
+        stock_value = exp["value"]
+        physical_qty = phy["qty"]
+        physical_value = phy["value"]
+        diff_qty = physical_qty - stock_qty
+        diff_value = physical_value - stock_value
+        item_count = exp["item_count"]
+        
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = cat in expected_by_category
+        scanned = cat in physical_by_category
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        
+        totals["stock_qty"] += stock_qty
+        totals["stock_value"] += stock_value
+        totals["physical_qty"] += physical_qty
+        totals["physical_value"] += physical_value
+        totals["diff_qty"] += diff_qty
+        totals["diff_value"] += diff_value
+        totals["item_count"] += item_count
+        
+        report.append({
+            "category": cat,
+            "item_count": item_count,
+            "stock_qty": stock_qty,
+            "stock_value": round(stock_value, 2),
+            "physical_qty": physical_qty,
+            "physical_value": round(physical_value, 2),
+            "diff_qty": diff_qty,
+            "diff_value": round(diff_value, 2),
+            "accuracy_pct": accuracy,
+            "remark": remark
+        })
+    
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
+    totals["stock_value"] = round(totals["stock_value"], 2)
+    totals["physical_value"] = round(totals["physical_value"], 2)
+    totals["diff_value"] = round(totals["diff_value"], 2)
     
     return {"report": report, "totals": totals}
 
