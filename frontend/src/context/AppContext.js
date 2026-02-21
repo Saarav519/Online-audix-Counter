@@ -888,11 +888,15 @@ export const AppProvider = ({ children }) => {
   // Create a temporary location object WITHOUT saving to state
   // Used in Dynamic mode - location is only saved when items are submitted
   const createTempLocation = (scannedCode) => {
-    // Use the scanned code directly as the location name
-    // No prefix added - the name will be exactly what the user scanned
+    // Look up master location for human-readable name
+    const masterLoc = masterLocations.find(
+      ml => ml.code.toLowerCase() === scannedCode.toLowerCase()
+    );
+    const locationName = masterLoc ? masterLoc.name : scannedCode;
+    
     return {
       id: `loc_temp_${Date.now()}`,
-      name: scannedCode,  // Use scanned code as name directly
+      name: locationName,
       code: scannedCode,
       status: 'active',
       itemCount: 0,
