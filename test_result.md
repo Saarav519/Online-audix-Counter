@@ -1151,6 +1151,50 @@ agent_communication:
       - working: true
         agent: "testing"
         comment: "✅ REPORTS USING MASTER PRODUCTS WORKING - Comprehensive testing of all 4 variance scenarios successful. DETAILED REPORT: Rice 5kg gets description/category from master (not expected stock), Oil 1L enriched from master when expected had no description, Butter shows 'In Master, Not in Stock' remark, Unknown barcode shows 'Not in Master' remark. BARCODE-WISE REPORT: Product info enriched from master with correct in_master/in_expected_stock flags. CATEGORY-SUMMARY: Categories correctly sourced from master (Grocery, Dairy, Misc). BIN-WISE: Working correctly. All reports handle master enrichment priority: master > expected > physical. BACKWARD COMPATIBILITY CONFIRMED: Reports work without master products using expected stock info."
+  - task: "Sync Logs Client-wise Date-wise Grouping"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW ENDPOINT: GET /api/portal/sync-logs/grouped returns logs grouped by client_id → sync_date with proper structure: client_id, client_name, client_code, dates array. Each date has: date, logs array, total_locations, total_items, total_quantity, sync_count."
+      - working: true
+        agent: "testing"
+        comment: "✅ SYNC LOGS CLIENT-WISE DATE-WISE GROUPING WORKING - Comprehensive end-to-end testing completed following exact review request flow. Created CascadeTest Client (ID: 09a31e2b-ed83-49d3-ae50-9b9e2d9be375), uploaded master products (2 items), created bin-wise session, imported expected stock, synced physical data. VERIFIED: GET /api/portal/sync-logs/grouped returns proper grouping structure with CascadeTest Client appearing with 1 sync. Client filter GET /api/portal/sync-logs/grouped?client_id={client_id} working correctly, returns only specified client data."
+
+  - task: "Sync Logs Day-wise Export"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW ENDPOINT: GET /api/portal/sync-logs/export?client_id=X&date=Y provides CSV export per day with headers: Log ID, Device, Session ID, Sync Time, Location, Barcode, Product Name, Quantity, Scanned At. Returns proper Content-Type: text/csv and Content-Disposition with filename."
+      - working: true
+        agent: "testing"
+        comment: "✅ SYNC LOGS DAY-WISE EXPORT WORKING - Comprehensive testing confirmed CSV export functionality working correctly. GET /api/portal/sync-logs/export?client_id={client_id}&date={today} returns proper CSV format with Content-Type: text/csv and Content-Disposition header containing filename. CSV content includes expected headers (Log ID, Device, Session ID, Sync Time, Location, Barcode, Product Name, Quantity, Scanned At). Export size: 259 characters for test data."
+
+  - task: "Cascading Client Delete"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "DELETE /api/portal/clients/{client_id} now performs cascading delete of ALL related data: master_products, expected_stock (for all sessions), synced_locations (for all sessions), sync_raw_logs, audit_sessions, alerts. Returns detailed deleted summary with counts."
+      - working: true
+        agent: "testing"
+        comment: "✅ CASCADING CLIENT DELETE WORKING - Comprehensive testing confirmed cascading delete removes ALL related data correctly. DELETE /api/portal/clients/{client_id} successfully deleted: master_products: 2, sync_raw_logs: 1, audit_sessions: 1, alerts: 1. VERIFICATION CONFIRMED: Post-delete cleanup successful - sync logs cleared, client removed from list, sessions removed. No orphaned data remains after cascading delete operation."
 
 test_plan:
   current_focus:
