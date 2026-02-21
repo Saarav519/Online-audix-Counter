@@ -5,8 +5,6 @@ import { AppProvider, useApp } from "./context/AppContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import Locations from "./pages/Locations";
 import ScanItems from "./pages/ScanItems";
 import MasterData from "./pages/MasterData";
 import Reports from "./pages/Reports";
@@ -19,9 +17,7 @@ const useRoutePersistence = () => {
   const location = useLocation();
   
   useEffect(() => {
-    // Save current path and search params to localStorage
     const fullPath = location.pathname + location.search;
-    // Don't save login page
     if (location.pathname !== '/login') {
       localStorage.setItem('audix_last_route', fullPath);
     }
@@ -36,13 +32,10 @@ const RouteRestorer = () => {
   const hasRestoredRef = React.useRef(false);
   
   useEffect(() => {
-    // Only restore once, when authenticated and on home page
-    if (isAuthenticated && location.pathname === '/' && !hasRestoredRef.current) {
+    if (isAuthenticated && location.pathname === '/reports' && !hasRestoredRef.current) {
       hasRestoredRef.current = true;
       const lastRoute = localStorage.getItem('audix_last_route');
-      // If there's a saved route and it's not the home page or login, navigate to it
-      if (lastRoute && lastRoute !== '/' && lastRoute !== '/login') {
-        // Use setTimeout to avoid navigation during render
+      if (lastRoute && lastRoute !== '/' && lastRoute !== '/login' && lastRoute !== '/reports' && lastRoute !== '/locations') {
         setTimeout(() => {
           navigate(lastRoute, { replace: true });
         }, 0);
@@ -64,24 +57,22 @@ const ProtectedRoute = ({ children }) => {
   return <Layout>{children}</Layout>;
 };
 
-// Public Route Component (redirects to dashboard if already logged in)
+// Public Route Component (redirects to reports if already logged in)
 const PublicRoute = ({ children }) => {
   const { isAuthenticated } = useApp();
   
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/reports" replace />;
   }
   
   return children;
 };
 
 function AppRoutes() {
-  // Enable route persistence
   useRoutePersistence();
   
   return (
     <>
-      {/* Route restorer - silently restores last route on app load */}
       <RouteRestorer />
       
       <Routes>
@@ -93,21 +84,15 @@ function AppRoutes() {
             </PublicRoute>
           }
         />
+        {/* Default route redirects to Reports */}
         <Route
           path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/reports" replace />}
         />
+        {/* Legacy /locations route redirects to Reports */}
         <Route
           path="/locations"
-          element={
-            <ProtectedRoute>
-              <Locations />
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/reports" replace />}
         />
         <Route
           path="/scan"
@@ -141,7 +126,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/reports" replace />} />
       </Routes>
     </>
   );
