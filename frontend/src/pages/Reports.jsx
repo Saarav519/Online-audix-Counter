@@ -660,17 +660,19 @@ COLD-01,Cold Storage Unit 1`;
     const selectionSuffix = isAllSelected ? 'all_locations' : `${selectedLocations.length}_locations`;
     const filename = `stock_report_${selectionSuffix}_${new Date().toISOString().split('T')[0]}.csv`;
 
+    // Download file (suppress default alert, we'll show our own)
+    await downloadCSV(csv, filename, false);
+
     // Show export summary with location count
     const exportedLocationNames = [...new Set(allExportItems.map(i => i.locationName))];
     alert(
-      `✅ EXPORT SUMMARY\n\n` +
+      `✅ FILE EXPORTED SUCCESSFULLY!\n\n` +
       `📊 Locations exported: ${exportedLocationNames.length}\n` +
       `📦 Total items: ${allExportItems.length}\n` +
       `🔢 Total quantity: ${allExportItems.reduce((sum, i) => sum + i.quantity, 0)}\n\n` +
-      `📁 File: ${filename}`
+      `📄 File: ${filename}\n` +
+      `📁 Check your Downloads folder`
     );
-
-    await downloadCSV(csv, filename);
   };
 
   const handleEmailReport = () => {
