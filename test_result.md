@@ -1208,6 +1208,55 @@ test_plan:
   - agent: "main"
     message: |
       NEW CHANGES IMPLEMENTED:
+  - agent: "testing"
+    message: |
+      ✅ SYNC LOGS GROUPING, DAY-WISE EXPORT & CASCADING CLIENT DELETE COMPREHENSIVE TESTING COMPLETED - ALL FEATURES WORKING PERFECTLY
+      
+      🎯 **TESTING SCOPE (Per Review Request)**:
+      Comprehensive testing of 3 critical backend features following the exact test flow specified:
+      1. Sync Logs Grouping (client-wise date-wise)
+      2. Day-wise Export functionality  
+      3. Cascading Client Delete with cleanup verification
+      
+      📊 **FINAL TEST RESULTS (11/11 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **TEST FLOW EXECUTED**:
+      1. Portal Login: admin/admin123 ✅ (User ID: 2f11a731-3648-43a8-931c-b2b0201b77a6)
+      2. Create Client: CascadeTest Client (Code: CASC13823) ✅ (ID: 09a31e2b-ed83-49d3-ae50-9b9e2d9be375)  
+      3. Upload Master Products: 2 products (Product A, Product B) ✅
+      4. Create Session: bin-wise variance mode ✅ (ID: fd0822e7-2023-4926-b30f-cb58cad247c3)
+      5. Import Expected Stock: Bin-A location with barcode 1111111111111, qty 50 ✅
+      6. Sync Physical Data: test-cascade device, qty 45 ✅
+      
+      ✅ **SYNC LOGS GROUPING VERIFICATION**:
+      - GET /api/portal/sync-logs/grouped ✅ Returns proper client → date grouping structure
+      - CascadeTest Client found with 1 sync in grouped data ✅
+      - Each client group has: client_id, client_name, client_code, dates array ✅
+      - Each date has: date, logs, total_locations, total_items, total_quantity, sync_count ✅
+      - Client filter GET /api/portal/sync-logs/grouped?client_id={client_id} ✅ Returns only specified client
+      
+      ✅ **DAY-WISE EXPORT VERIFICATION**:
+      - GET /api/portal/sync-logs/export?client_id={client_id}&date={today} ✅ 
+      - Content-Type: text/csv ✅
+      - Content-Disposition header with filename ✅  
+      - CSV headers present: Log ID, Device, Session ID, Sync Time, Location, Barcode, Product Name, Quantity, Scanned At ✅
+      - Export size: 259 characters for test data ✅
+      
+      ✅ **CASCADING DELETE VERIFICATION**:
+      - DELETE /api/portal/clients/{client_id} ✅ Returns deleted summary
+      - Deleted counts: master_products: 2, sync_raw_logs: 1, audit_sessions: 1, alerts: 1 ✅
+      - Post-delete verification: sync logs cleared, client removed, sessions removed ✅
+      - No orphaned data remains after cascading delete ✅
+      
+      🌐 **BACKEND URL CONFIRMED**: https://data-sync-preview-5.preview.emergentagent.com
+      
+      🔍 **NEW ENDPOINTS VERIFIED WORKING**:
+      - GET /api/portal/sync-logs/grouped (NEW - client-wise date-wise grouping)
+      - GET /api/portal/sync-logs/grouped?client_id=X (NEW - with client filter) 
+      - GET /api/portal/sync-logs/export?client_id=X&date=Y (NEW - day-wise CSV export)
+      - DELETE /api/portal/clients/{client_id} (ENHANCED - cascading delete with cleanup)
+      
+      🎉 **CONCLUSION**: ALL THREE REQUESTED FEATURES ARE FULLY OPERATIONAL AND PRODUCTION-READY. Sync logs grouping provides proper client-date hierarchy, day-wise export delivers CSV with all required headers and proper HTTP response formatting, and cascading delete ensures complete cleanup of all related data with verification confirmed.
       
       1. SYNC LOGS ENHANCEMENT:
          - NEW ENDPOINT: GET /api/portal/sync-logs/grouped (returns logs grouped by client_id → sync_date)
