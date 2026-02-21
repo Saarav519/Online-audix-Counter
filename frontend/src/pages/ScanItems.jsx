@@ -141,7 +141,7 @@ const ScannedItemRow = memo(({
               let val = e.target.value;
               // In Single SKU mode, clamp to max = item.quantity (only decrease allowed)
               if (singleSkuMode && val !== '') {
-                const numVal = parseInt(val);
+                const numVal = parseFloat(val);
                 if (!isNaN(numVal) && numVal > item.quantity) {
                   val = String(item.quantity);
                 }
