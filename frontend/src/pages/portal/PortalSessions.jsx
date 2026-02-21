@@ -86,7 +86,7 @@ export default function PortalSessions() {
 
       toast.success('Session created!');
       setShowDialog(false);
-      setFormData({ client_id: '', name: '', start_date: new Date().toISOString().split('T')[0] });
+      setFormData({ client_id: '', name: '', variance_mode: 'bin-wise', start_date: new Date().toISOString().split('T')[0] });
       fetchData();
     } catch (error) {
       toast.error(error.message);
