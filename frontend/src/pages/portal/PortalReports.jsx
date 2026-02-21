@@ -603,6 +603,17 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 
 // ============ Article-wise Table ============
 function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon }) {
+  const [expandedRows, setExpandedRows] = React.useState(new Set());
+
+  const toggleRow = (index) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) newSet.delete(index);
+      else newSet.add(index);
+      return newSet;
+    });
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -610,12 +621,13 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <BarChart3 className="w-5 h-5 text-purple-500" />
           Article-wise Variance Report
         </h3>
-        <p className="text-xs text-gray-500 mt-1">Barcodes grouped by article, variance at article level</p>
+        <p className="text-xs text-gray-500 mt-1">Barcodes grouped by article, variance at article level. Click on a row to view barcodes.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
+              <th className="w-8 py-3 px-2"></th>
               <th className="text-left py-3 px-3 font-medium text-gray-600">Article Code</th>
               <th className="text-left py-3 px-3 font-medium text-gray-600">Article Name</th>
               <th className="text-left py-3 px-3 font-medium text-gray-600">Category</th>
@@ -630,44 +642,74 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           </thead>
           <tbody>
             {data.report.map((row, i) => (
-              <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 ${row.article_code === 'UNMAPPED' ? 'bg-red-50/50' : ''}`}>
-                <td className="py-2 px-3 font-mono text-xs font-medium">{row.article_code}</td>
-                <td className="py-2 px-3">{row.article_name || '-'}</td>
-                <td className="py-2 px-3">
-                  {row.category ? (
-                    <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span>
-                  ) : '-'}
-                </td>
-                <td className="py-2 px-3 text-right text-xs text-gray-500">{row.barcode_count}</td>
-                <td className="py-2 px-3 text-right">{row.stock_qty}</td>
-                <td className="py-2 px-3 text-right">{row.physical_qty}</td>
-                <td className="py-2 px-3 text-right">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
-                    {getVarianceIcon(row.diff_qty)}
-                    {row.diff_qty > 0 ? '+' : ''}{row.diff_qty}
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
-                    {row.diff_value > 0 ? '+' : ''}{(row.diff_value || 0).toFixed(2)}
-                  </span>
-                </td>
-                <td className="py-2 px-3 text-right">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
-                    {row.accuracy_pct}%
-                  </span>
-                </td>
-                <td className="py-2 px-3">
-                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                    {getRemarkIcon(row.remark)}
-                    <span className="truncate max-w-[200px]" title={row.remark}>{row.remark}</span>
-                  </div>
-                </td>
-              </tr>
+              <React.Fragment key={i}>
+                <tr 
+                  className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${row.article_code === 'UNMAPPED' ? 'bg-red-50/50' : ''}`}
+                  onClick={() => toggleRow(i)}
+                >
+                  <td className="py-2 px-2 text-center">
+                    <span className={`inline-block transition-transform duration-200 text-gray-400 ${expandedRows.has(i) ? 'rotate-90' : ''}`}>
+                      &#9654;
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 font-mono text-xs font-medium">{row.article_code}</td>
+                  <td className="py-2 px-3">{row.article_name || '-'}</td>
+                  <td className="py-2 px-3">
+                    {row.category ? (
+                      <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span>
+                    ) : '-'}
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span>
+                  </td>
+                  <td className="py-2 px-3 text-right">{row.stock_qty}</td>
+                  <td className="py-2 px-3 text-right">{row.physical_qty}</td>
+                  <td className="py-2 px-3 text-right">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
+                      {getVarianceIcon(row.diff_qty)}
+                      {row.diff_qty > 0 ? '+' : ''}{row.diff_qty}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
+                      {row.diff_value > 0 ? '+' : ''}{(row.diff_value || 0).toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
+                      {row.accuracy_pct}%
+                    </span>
+                  </td>
+                  <td className="py-2 px-3">
+                    <div className="flex items-center gap-1 text-xs text-gray-600">
+                      {getRemarkIcon(row.remark)}
+                      <span className="truncate max-w-[200px]" title={row.remark}>{row.remark}</span>
+                    </div>
+                  </td>
+                </tr>
+                {expandedRows.has(i) && (
+                  <tr className="bg-purple-50/50">
+                    <td colSpan="11" className="py-2 px-6">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        <span className="text-xs font-medium text-purple-700 mr-1">Barcodes:</span>
+                        {(row.barcodes || []).map((bc, j) => (
+                          <span key={j} className="inline-flex items-center px-2.5 py-1 bg-white border border-purple-200 rounded-md text-xs font-mono text-purple-800 shadow-sm">
+                            {bc}
+                          </span>
+                        ))}
+                        {(!row.barcodes || row.barcodes.length === 0) && (
+                          <span className="text-xs text-gray-400 italic">No barcodes</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
           <tfoot className="bg-gray-50 font-semibold text-sm">
             <tr>
+              <td className="py-3 px-2"></td>
               <td colSpan="4" className="py-3 px-3">TOTALS</td>
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
