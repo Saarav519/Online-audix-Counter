@@ -202,10 +202,6 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
       }
       
       lastKeyTimeRef.current = currentTime;
-        bufferRef.current = '';
-      }
-      
-      lastKeyTimeRef.current = currentTime;
 
       // BLOCKING MODE: If manual input is disabled, prevent default for ALL printable keys
       // This ensures they don't appear in the input field, but we still capture them in buffer
