@@ -50,7 +50,7 @@ class PortalUser(BaseModel):
 class PortalUserCreate(BaseModel):
     username: str
     password: str
-    role: str = "admin"
+    role: str = "viewer"
 
 class PortalUserLogin(BaseModel):
     username: str
