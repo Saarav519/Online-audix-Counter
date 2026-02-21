@@ -164,17 +164,6 @@ export default function PortalLogin() {
               )}
             </Button>
           </form>
-
-          {/* Back to App */}
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              className="text-sm text-gray-500 hover:text-emerald-600"
-            >
-              ← Back to Scanner App
-            </button>
-          </div>
         </div>
       </div>
     </div>
