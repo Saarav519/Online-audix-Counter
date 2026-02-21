@@ -319,12 +319,48 @@ async def update_client(client_id: str, client: ClientCreate):
 
 @portal_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str):
+    """Delete client and ALL related data (cascading delete)"""
     result = await db.clients.delete_one({"id": client_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Client not found")
-    # Also delete master products for this client
-    await db.master_products.delete_many({"client_id": client_id})
-    return {"message": "Client deleted"}
+    
+    # Get all session IDs for this client (needed for session-level data cleanup)
+    sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(100000)
+    session_ids = [s["id"] for s in sessions]
+    
+    # Cascading delete — remove ALL related data
+    deleted_summary = {}
+    
+    # 1. Master products
+    r = await db.master_products.delete_many({"client_id": client_id})
+    deleted_summary["master_products"] = r.deleted_count
+    
+    # 2. Expected stock for all sessions of this client
+    if session_ids:
+        r = await db.expected_stock.delete_many({"session_id": {"$in": session_ids}})
+        deleted_summary["expected_stock"] = r.deleted_count
+    
+    # 3. Synced locations for all sessions of this client
+    if session_ids:
+        r = await db.synced_locations.delete_many({"session_id": {"$in": session_ids}})
+        deleted_summary["synced_locations"] = r.deleted_count
+    
+    # 4. Sync raw logs for this client
+    r = await db.sync_raw_logs.delete_many({"client_id": client_id})
+    deleted_summary["sync_raw_logs"] = r.deleted_count
+    
+    # 5. Audit sessions for this client
+    r = await db.audit_sessions.delete_many({"client_id": client_id})
+    deleted_summary["audit_sessions"] = r.deleted_count
+    
+    # 6. Alerts for this client
+    r = await db.alerts.delete_many({"client_id": client_id})
+    deleted_summary["alerts"] = r.deleted_count
+    
+    return {
+        "message": "Client and all related data deleted",
+        "deleted": deleted_summary
+    }
 
 # ==================== MASTER PRODUCT ROUTES (Client-Level) ====================
 
