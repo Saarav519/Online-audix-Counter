@@ -679,6 +679,192 @@ const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Cloud Sync Configuration */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Cloud className="w-5 h-5 text-emerald-600" />
+            Cloud Sync
+            {isOnline ? (
+              <span className="ml-2 flex items-center gap-1 text-xs text-emerald-600">
+                <Wifi className="w-3 h-3" /> Online
+              </span>
+            ) : (
+              <span className="ml-2 flex items-center gap-1 text-xs text-red-500">
+                <WifiOff className="w-3 h-3" /> Offline
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription>Sync data to admin portal for reporting</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Device Name */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-slate-500" />
+              Device Name
+            </Label>
+            <Input
+              placeholder="e.g., Scanner-01"
+              value={syncConfig.deviceName}
+              onChange={(e) => handleSyncConfigChange('deviceName', e.target.value)}
+            />
+            <p className="text-xs text-slate-500">Unique name to identify this device in the portal</p>
+          </div>
+
+          {/* Client Selection */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-slate-500" />
+              Client
+            </Label>
+            <select
+              value={syncConfig.clientId}
+              onChange={(e) => {
+                handleSyncConfigChange('clientId', e.target.value);
+                handleSyncConfigChange('sessionId', ''); // Reset session when client changes
+              }}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+            >
+              <option value="">Select Client</option>
+              {clients.map(client => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Session Selection */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-slate-500" />
+              Audit Session
+            </Label>
+            <select
+              value={syncConfig.sessionId}
+              onChange={(e) => handleSyncConfigChange('sessionId', e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+              disabled={!syncConfig.clientId}
+            >
+              <option value="">Select Session</option>
+              {sessions.map(session => (
+                <option key={session.id} value={session.id}>{session.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sync Password */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Lock className="w-4 h-4 text-slate-500" />
+              Sync Password
+            </Label>
+            <Input
+              type="password"
+              placeholder="Enter sync password"
+              value={syncConfig.syncPassword}
+              onChange={(e) => handleSyncConfigChange('syncPassword', e.target.value)}
+            />
+            <p className="text-xs text-slate-500">Required for manual sync (auto-sync doesn't prompt)</p>
+          </div>
+
+          <Separator />
+
+          {/* Sync Options */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Auto-Sync When Online</Label>
+              <p className="text-sm text-slate-500">
+                Automatically sync data when internet is available
+              </p>
+            </div>
+            <Switch
+              checked={syncConfig.autoSync}
+              onCheckedChange={(checked) => handleSyncConfigChange('autoSync', checked)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-base">Clear Data After Sync</Label>
+              <p className="text-sm text-slate-500">
+                Remove synced locations from device after upload
+              </p>
+            </div>
+            <Switch
+              checked={syncConfig.clearAfterSync}
+              onCheckedChange={(checked) => handleSyncConfigChange('clearAfterSync', checked)}
+            />
+          </div>
+
+          <Separator />
+
+          {/* Last Sync & Manual Sync Button */}
+          <div className="p-4 bg-slate-50 rounded-xl space-y-3">
+            {lastSyncTime && (
+              <p className="text-sm text-slate-600">
+                Last sync: {new Date(lastSyncTime).toLocaleString()}
+              </p>
+            )}
+            <Button
+              onClick={handleManualSync}
+              disabled={syncing || !syncConfig.deviceName || !syncConfig.sessionId}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              {syncing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Cloud className="w-4 h-4 mr-2" />
+                  Sync Now
+                </>
+              )}
+            </Button>
+            {(!syncConfig.deviceName || !syncConfig.sessionId) && (
+              <p className="text-xs text-amber-600 text-center">
+                Configure device name, client, and session to enable sync
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Manual Sync Password Modal */}
+      <Dialog open={showSyncPasswordModal} onOpenChange={setShowSyncPasswordModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Sync Password</DialogTitle>
+            <DialogDescription>
+              Confirm your sync password to upload data to the portal
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="syncPassword">Sync Password</Label>
+              <Input
+                id="syncPassword"
+                type="password"
+                placeholder="Enter sync password"
+                value={manualSyncPassword}
+                onChange={(e) => setManualSyncPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && confirmManualSync()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSyncPasswordModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmManualSync} className="bg-emerald-600 hover:bg-emerald-700">
+              <Cloud className="w-4 h-4 mr-2" />
+              Sync Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Change Password Modal */}
       <Dialog open={showPasswordModal} onOpenChange={(open) => {
         setShowPasswordModal(open);
