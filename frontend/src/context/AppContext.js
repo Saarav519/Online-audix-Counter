@@ -1084,6 +1084,25 @@ export const AppProvider = ({ children }) => {
     setMasterLocations(prev => prev.filter(l => l.code !== code));
   };
 
+  // Clear ALL master products
+  const clearMasterProducts = async () => {
+    setMasterProducts([]);
+    localStorage.removeItem('audix_master_products');
+    try { await MasterProductsDB.clear(); } catch (e) { /* ignore */ }
+  };
+
+  // Clear ALL master locations
+  const clearMasterLocations = async () => {
+    setMasterLocations([]);
+    localStorage.removeItem('audix_master_locations');
+    try { await MasterLocationsDB.clear(); } catch (e) { /* ignore */ }
+  };
+
+  // Clear ALL authorization users
+  const clearAuthUsers = () => {
+    localStorage.removeItem('audix_authorization_users');
+  };
+
   // Import users from CSV data - FOR AUTHORIZATION ONLY
   // These users can only authorize actions like delete/reopen, NOT login
   const importAuthorizationUsers = (usersData) => {
