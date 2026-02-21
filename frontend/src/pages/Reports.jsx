@@ -348,6 +348,9 @@ const Reports = () => {
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const filename = `stock_report_preassigned_${new Date().toISOString().split('T')[0]}.csv`;
 
+    // Download file (suppress default alert, we'll show our own)
+    await downloadCSV(csv, filename, false);
+
     // Show export summary with location count
     const exportedLocationNames = [...new Set(allItems.map(i => i.locationName))];
     const locationsWithData = preassignedLocationData.filter(d => 
@@ -355,15 +358,14 @@ const Reports = () => {
     ).length;
 
     alert(
-      `✅ EXPORT SUMMARY\n\n` +
+      `✅ FILE EXPORTED SUCCESSFULLY!\n\n` +
       `📊 Locations with data: ${locationsWithData} of ${masterLocations.length}\n` +
       `📍 Locations exported: ${exportedLocationNames.length}\n` +
       `📦 Total items: ${allItems.length}\n` +
       `🔢 Total quantity: ${allItems.reduce((sum, i) => sum + i.quantity, 0)}\n\n` +
-      `📁 File: ${filename}`
+      `📄 File: ${filename}\n` +
+      `📁 Check your Downloads folder`
     );
-
-    await downloadCSV(csv, filename);
   };
 
   const handlePreassignedEmailReport = () => {
