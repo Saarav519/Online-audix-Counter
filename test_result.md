@@ -694,6 +694,28 @@ agent_communication:
       - ADDITIONAL GAP DETECTION: If timeSinceLastSubmit < 100ms AND timeDiff > 30ms, reset buffer
         (catches the narrow window between Enter of scan 1 and first char of scan 2)
 
+  - agent: "main"
+    message: |
+      Fixed TWO critical bugs in ScanItems.jsx:
+      
+      BUG 1: Location name not showing at top after scanning
+      BUG 2: Submitted items not appearing in Reports
+      
+      ROOT CAUSE: The URL sync useEffect (line 734) cleared tempLocation whenever navigate() was called.
+      When scanning a new temp location, the flow was:
+      1. scanLocation() creates temp → setTempLocation(temp)
+      2. navigate('/scan?location=temp_id') changes URL
+      3. URL sync effect sees new URL → runs cleanup → setTempLocation(null) ← BUG!
+      4. selectedLocation = null → name blank
+      5. On submit: tempLocation is null → saveTempLocation never called → location never saved
+      
+      FIXES APPLIED:
+      1. Update prevUrlLocationRef BEFORE navigate() in both handleHardwareScan and handleLocationScan
+         so URL sync effect doesn't trigger for same-session navigation
+      2. Added tempLocationRef safety check in URL sync effect - preserves tempLocation if it matches URL
+      3. Added guard in auto-confirm timer to skip if location already selected (prevents double-processing)
+      4. Cancel pending auto-confirm timer when selectedLocationId changes
+
   - agent: "testing"
     message: |
       ✅ BACKEND HEALTH CHECK POST-SCANNER-HOOK-CHANGES COMPLETED - ALL SYSTEMS HEALTHY
