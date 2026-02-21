@@ -103,13 +103,38 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Fix barcode overlap during fast scanning:
-  When scanning fast, barcodes overlap - e.g., a 13-digit barcode becomes 26 digits or more.
-  Root cause: useHardwareScanner hook's cooldown mechanism was never activated after processing scans,
-  and no auto-submit timer or max buffer length guard existed.
+  Test the AUDIX Admin Portal backend APIs to verify the sync and portal functionality:
+
+  Backend URL: https://mobile-counter-scan.preview.emergentagent.com
+
+  Test the following endpoints:
+
+  1. **Portal Authentication**:
+     - POST /api/portal/login with {"username": "admin", "password": "admin123"}
+     - Should return user info with id, username, role
+
+  2. **Client Management**:
+     - POST /api/portal/clients - Create a test client: {"name": "Test Client", "code": "TC01", "address": "Test Address"}
+     - GET /api/portal/clients - Should return the created client
+
+  3. **Audit Session Management**:
+     - POST /api/portal/sessions - Create a session with the client_id from step 2
+     - GET /api/portal/sessions - Should return the created session
+
+  4. **Sync API**:
+     - POST /api/sync/ - Test syncing data with location and item data
+     - Should accept device credentials and sync location/item data
+
+  5. **Dashboard**:
+     - GET /api/portal/dashboard - Should return stats and recent syncs
+
+  6. **Reports**:
+     - GET /api/portal/reports/{session_id}/daily-progress - Should show the synced data
+
+  Focus on verifying the core sync flow works end-to-end.
 
 backend:
-  - task: "Dynamic Mode Location Submission Backend Analysis"
+  - task: "AUDIX Admin Portal Backend API Testing"
     implemented: true
     working: true
     file: "server.py"
@@ -119,19 +144,13 @@ backend:
     status_history:
       - working: "NA"
         agent: "testing"
-        comment: "Initial analysis - Backend has basic status endpoints but location/item storage is frontend-only (localStorage/IndexedDB). Need to test backend role in location submission flow."
+        comment: "Initial comprehensive testing of AUDIX Admin Portal backend APIs including portal authentication, client management, audit sessions, sync API, dashboard, and reports."
+      - working: false
+        agent: "testing"
+        comment: "❌ INITIAL TESTING FAILED: Found MongoDB ObjectId serialization issue causing 500 errors in client creation endpoint. Error: ValueError - ObjectId object is not iterable. Portal login and dashboard working but client/session creation failing."
       - working: true
         agent: "testing"
-        comment: "✅ COMPREHENSIVE BACKEND ANALYSIS COMPLETED. Backend is healthy and working correctly. CRITICAL FINDING: The reported location submission issue is NOT a backend problem. This is a frontend-only application where all location/item data is stored in localStorage and React state. Backend has NO endpoints for location/item management. The user's Dynamic Mode location submission issue must be resolved through frontend debugging - likely React state management or localStorage sync problems."
-      - working: true
-        agent: "testing"
-        comment: "✅ BACKEND API RE-VERIFICATION COMPLETED (2026-02-21). All 3 requested endpoints tested and working perfectly: GET /api/ returns 'Hello World', POST /api/status creates records with UUID/timestamp, GET /api/status retrieves all records. Data persistence via MongoDB working correctly. Backend infrastructure is solid and ready for production use."
-      - working: true
-        agent: "testing"
-        comment: "✅ BACKEND HEALTH CHECK POST-SCANNER-HOOK-CHANGES COMPLETED (2026-02-21 13:58). Quick health check after frontend-only scanner hook changes confirmed all 3 endpoints working perfectly: GET /api/ returns 'Hello World', POST /api/status creates records with UUID (44ef9c55-dc87-4dc7-bc02-c8eadd7a1fa1, 776a2220-c9df-4cbf-b544-d91eb1280aa6), GET /api/status retrieves all records. Frontend barcode overlap fixes had NO impact on backend functionality. All API endpoints remain fully operational."
-      - working: true
-        agent: "testing"
-        comment: "✅ BACKEND HEALTH CHECK RE-VERIFICATION COMPLETED (2026-02-21 14:21). User requested specific health check of 3 core endpoints after frontend ScanItems.jsx changes. ALL TESTS PASSED: 1) GET /api/ returns {'message': 'Hello World'} (Status: 200), 2) POST /api/status with {'client_name': 'test'} creates record with UUID 99aec7df-a721-4339-ba3f-11da1a7bc10e and timestamp (Status: 200), 3) GET /api/status retrieves all 4 persisted records (Status: 200). Both Python backend_test.py and direct curl commands confirm perfect backend health. Frontend scanner hook barcode overlap fixes had ZERO impact on backend infrastructure. All API endpoints remain fully operational and ready for production."
+        comment: "✅ COMPREHENSIVE AUDIX ADMIN PORTAL BACKEND TESTING COMPLETED - ALL 9 TESTS PASSED (100% Success Rate). Fixed MongoDB ObjectId serialization issue in client and session creation endpoints. VERIFIED WORKING: 1) Portal Login (admin/admin123 → User ID: 74955dc9-b30f-4aec-9304-66739a6f6700), 2) Client Management (Create: Client ID 942359fe-3271-4eee-af24-0d723662f95f, Get: Found 2 clients), 3) Audit Sessions (Create: Session ID 87528447-2ec4-47cc-abd9-494743410339, Get: Found 1 session), 4) Sync API (Synced 1 location with 1 item, quantity 5), 5) Dashboard (Stats: 2 clients, 1 active session, 1 device, 1 recent sync), 6) Daily Progress Report (Retrieved report showing 2026-02-21 sync data). CORE SYNC FLOW END-TO-END WORKING: Client creation → Session creation → Data sync → Reports display. Backend ready for production use."
 
 frontend:
   - task: "Pre-Assigned Mode Location List Scrolling"
