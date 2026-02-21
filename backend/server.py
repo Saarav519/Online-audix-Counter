@@ -1240,18 +1240,28 @@ async def get_article_wise_report(session_id: str):
 
 @portal_router.get("/reports/{session_id}/category-summary")
 async def get_category_summary(session_id: str):
-    """Category-wise summary: Groups all data by category"""
+    """Category-wise summary: Groups all data by category. Uses master products for category info."""
+    # Load master products for category enrichment
+    master_by_barcode = await get_master_for_session(session_id)
+    
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     
-    # Build barcode -> category mapping from expected
+    # Build barcode -> category mapping (master priority, then expected stock)
     barcode_info = {}
+    # First from master
+    for bc, m in master_by_barcode.items():
+        barcode_info[bc] = {"category": m.get("category", "") or "Uncategorized", "cost": m.get("cost", 0)}
+    
     expected_by_category = {}
     for e in expected:
         bc = e["barcode"]
-        cat = e.get("category", "") or "Uncategorized"
-        cost = e.get("cost", 0)
-        
-        barcode_info[bc] = {"category": cat, "cost": cost}
+        # Use master category if available, else expected stock's category
+        if bc not in barcode_info:
+            cat = e.get("category", "") or "Uncategorized"
+            cost = e.get("cost", 0)
+            barcode_info[bc] = {"category": cat, "cost": cost}
+        cat = barcode_info[bc]["category"]
+        cost = barcode_info[bc]["cost"]
         
         if cat not in expected_by_category:
             expected_by_category[cat] = {"qty": 0, "value": 0, "item_count": 0}
