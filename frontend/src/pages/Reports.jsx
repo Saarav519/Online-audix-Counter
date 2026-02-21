@@ -479,7 +479,7 @@ COLD-01,Cold Storage Unit 1`;
       {/* Selection Bar */}
       <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-1.5 mb-2">
         <span className="text-xs font-medium text-slate-600">
-          {isAllSelected ? `All ${filteredLocations.length} locations` : `${selectedLocations.filter(id => id !== 'all').length} selected`}
+          {isAllSelected ? `All ${filteredLocations.length} locations` : selectedLocations.length > 0 ? `${selectedLocations.length} selected` : 'None selected'}
         </span>
         <div className="flex gap-1">
           {!isAllSelected ? (
@@ -487,9 +487,7 @@ COLD-01,Cold Storage Unit 1`;
               <Check className="w-3 h-3 mr-1" />All
             </Button>
           ) : (
-            <Button variant="ghost" size="sm" onClick={() => {
-              if (filteredLocations.length > 0) setSelectedLocations([filteredLocations[0].id]);
-            }} className="h-6 text-xs text-slate-500 px-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedLocations([])} className="h-6 text-xs text-slate-500 px-2">
               <X className="w-3 h-3 mr-1" />Clear
             </Button>
           )}
