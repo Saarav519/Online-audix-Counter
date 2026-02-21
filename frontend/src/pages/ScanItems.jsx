@@ -1154,6 +1154,8 @@ const ScanItems = () => {
           // Don't allow increase - revert to current quantity
           setEditingItemId(null);
           setEditQuantity('');
+          // Refocus barcode input
+          setTimeout(() => { if (barcodeInputRef.current) barcodeInputRef.current.focus(); }, 50);
           return;
         }
       }
@@ -1161,6 +1163,8 @@ const ScanItems = () => {
     }
     setEditingItemId(null);
     setEditQuantity('');
+    // Auto-focus barcode input so user can scan next item immediately
+    setTimeout(() => { if (barcodeInputRef.current) barcodeInputRef.current.focus(); }, 50);
   };
 
   const handleQuantityIncrement = (itemId, currentQty) => {
