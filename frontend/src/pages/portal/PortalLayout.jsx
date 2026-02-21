@@ -6,6 +6,7 @@ import {
   FolderOpen, 
   Smartphone, 
   FileBarChart, 
+  Users,
   LogOut,
   Database
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/portal/devices', icon: Smartphone, label: 'Devices' },
   { to: '/portal/reports', icon: FileBarChart, label: 'Reports' },
   { to: '/portal/sync-logs', icon: Database, label: 'Sync Logs' },
+  { to: '/portal/users', icon: Users, label: 'Users' },
 ];
 
 export default function PortalLayout() {
