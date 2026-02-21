@@ -1062,21 +1062,34 @@ async def get_barcode_wise_report(session_id: str):
 
 @portal_router.get("/reports/{session_id}/article-wise")
 async def get_article_wise_report(session_id: str):
-    """Article-wise variance: Groups barcodes by article_code, calculates variance at article level"""
+    """Article-wise variance: Groups barcodes by article_code from master, calculates variance at article level"""
+    # Load master products for article mapping and product info
+    master_by_barcode = await get_master_for_session(session_id)
+    
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     
-    # Build barcode -> article mapping and aggregate expected by article
+    # Build barcode -> article mapping from MASTER PRODUCTS (priority) then expected stock
     barcode_to_article = {}
     expected_by_article = {}
+    
+    # First, map from master products (authoritative source for article mapping)
+    for bc, m in master_by_barcode.items():
+        article_code = m.get("article_code", "") or bc
+        barcode_to_article[bc] = article_code
+    
+    # Then process expected stock for quantities
     for e in expected:
         bc = e["barcode"]
-        article_code = e.get("article_code", "") or bc  # fallback to barcode if no article
-        article_name = e.get("article_name", "") or e.get("description", "")
-        category = e.get("category", "")
-        cost = e.get("cost", 0)
-        mrp = e.get("mrp", 0)
-        
+        # Use master article mapping if available, else fallback to expected stock's article_code
+        article_code = barcode_to_article.get(bc) or e.get("article_code", "") or bc
         barcode_to_article[bc] = article_code
+        
+        # Get product info from master (priority) then expected
+        master_info = master_by_barcode.get(bc, {})
+        article_name = master_info.get("article_name") or master_info.get("description") or e.get("article_name", "") or e.get("description", "")
+        category = master_info.get("category") or e.get("category", "")
+        cost = master_info.get("cost") or e.get("cost", 0)
+        mrp = master_info.get("mrp") or e.get("mrp", 0)
         
         if article_code not in expected_by_article:
             expected_by_article[article_code] = {
@@ -1102,14 +1115,35 @@ async def get_article_wise_report(session_id: str):
             article_code = barcode_to_article.get(bc, None)
             
             if article_code is None:
-                # Barcode not in master - track as unmapped
-                if bc not in unmapped_barcodes:
-                    unmapped_barcodes[bc] = {
-                        "barcode": bc,
-                        "product_name": item.get("product_name", ""),
-                        "quantity": 0
-                    }
-                unmapped_barcodes[bc]["quantity"] += item["quantity"]
+                # Barcode not in master AND not in expected stock - track as unmapped
+                in_prod_master = bc in master_by_barcode
+                if in_prod_master:
+                    # It's in master but not in expected - use master's article code
+                    master_info = master_by_barcode[bc]
+                    article_code = master_info.get("article_code", "") or bc
+                    barcode_to_article[bc] = article_code
+                    if article_code not in expected_by_article:
+                        expected_by_article[article_code] = {
+                            "article_code": article_code,
+                            "article_name": master_info.get("article_name", master_info.get("description", "")),
+                            "category": master_info.get("category", ""),
+                            "barcodes": set(),
+                            "mrp": master_info.get("mrp", 0),
+                            "cost": master_info.get("cost", 0),
+                            "qty": 0
+                        }
+                    expected_by_article[article_code]["barcodes"].add(bc)
+                    if article_code not in physical_by_article:
+                        physical_by_article[article_code] = 0
+                    physical_by_article[article_code] += item["quantity"]
+                else:
+                    if bc not in unmapped_barcodes:
+                        unmapped_barcodes[bc] = {
+                            "barcode": bc,
+                            "product_name": item.get("product_name", ""),
+                            "quantity": 0
+                        }
+                    unmapped_barcodes[bc]["quantity"] += item["quantity"]
             else:
                 if article_code not in physical_by_article:
                     physical_by_article[article_code] = 0
