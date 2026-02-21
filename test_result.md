@@ -105,7 +105,7 @@
 user_problem_statement: |
   Test the AUDIX Admin Portal backend APIs to verify the sync and portal functionality:
 
-  Backend URL: https://offline-sync-portal.preview.emergentagent.com
+  Backend URL: https://data-sync-preview-5.preview.emergentagent.com
 
   Test the following endpoints:
 
@@ -365,7 +365,7 @@ agent_communication:
       - **Solution**: Modified endpoints to return Pydantic model data instead of raw MongoDB documents
       - **Files Fixed**: /app/backend/server.py (lines 279, 331)
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://data-sync-preview-5.preview.emergentagent.com
       
       🎯 **CORE SYNC FLOW VERIFICATION**:
       END-TO-END WORKING: Client Creation → Session Creation → Device Sync → Data Storage → Reports Display
@@ -441,7 +441,7 @@ agent_communication:
       ✅ Category summary correctly groups by category field
       ✅ All totals include accuracy_pct
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://data-sync-preview-5.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/reports/{session_id}/barcode-wise (NEW)
@@ -630,7 +630,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://offline-sync-portal.preview.emergentagent.com/api
+      - Backend URL: https://data-sync-preview-5.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
@@ -663,7 +663,7 @@ agent_communication:
       - ✅ MongoDB integration: Working correctly
       - ✅ CORS configuration: Properly configured
       
-      🌐 BACKEND URL VERIFIED: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL VERIFIED: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📝 TECHNICAL DETAILS:
       - FastAPI server running on proper port with supervisor
@@ -760,7 +760,7 @@ agent_communication:
       - ✅ UUID generation: Working correctly for record IDs
       - ✅ Timestamp generation: UTC timezone format working
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📋 TECHNICAL STATUS:
       - FastAPI server: Running correctly
@@ -789,7 +789,7 @@ agent_communication:
       - ✅ MongoDB persistence: Records stored and retrieved successfully
       - ✅ Response format: Valid JSON with proper schema validation
       
-      🌐 BACKEND URL STABLE: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -819,7 +819,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:33:30.957335Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -893,7 +893,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:58:02.146587Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -978,7 +978,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T14:21:01.130532Z)
       - ✅ MongoDB integration: Data persisting correctly (4 total records now)
       
-      🌐 BACKEND URL STABLE: https://offline-sync-portal.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://data-sync-preview-5.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -1190,7 +1190,7 @@ test_plan:
       ✅ Re-sync replaces location data in synced_locations but preserves all raw logs
       ✅ Raw payload contains complete sync data: locations, items, device info, timestamps
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://data-sync-preview-5.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/sync-logs (NEW) - with client_id, session_id, limit filters

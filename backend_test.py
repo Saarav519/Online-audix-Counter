@@ -11,7 +11,7 @@ from datetime import datetime
 import time
 
 # Backend URL from frontend .env
-BASE_URL = "https://offline-sync-portal.preview.emergentagent.com"
+BASE_URL = "https://data-sync-preview-5.preview.emergentagent.com"
 API_URL = f"{BASE_URL}/api"
 
 class SyncRawLogsTestSuite:
