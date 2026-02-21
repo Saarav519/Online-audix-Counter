@@ -59,10 +59,13 @@ class SyncRawLogsTestSuite:
                 sessions = response.json()
                 if sessions:
                     # Use first available session
-                    session_id = sessions[0]["id"]
+                    session = sessions[0]
+                    session_id = session["id"]
+                    client_id = session["client_id"]
                     self.test_data["session_id"] = session_id
+                    self.test_data["client_id"] = client_id
                     return self.log_test("Get Existing Session", True, 
-                        f"Using session: {session_id}")
+                        f"Using session: {session_id}, client: {client_id}")
                 else:
                     return self.log_test("Get Existing Session", False, 
                         "No existing sessions found")
