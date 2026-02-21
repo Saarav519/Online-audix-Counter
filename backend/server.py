@@ -1016,12 +1016,12 @@ async def get_barcode_wise_report(session_id: str):
         exp = expected_by_barcode.get(bc, {})
         phy = physical_by_barcode.get(bc, {})
         
-        # Enrich from master products (priority: master > expected stock > physical)
+        # Product info priority: Stock (expected) > Master (fallback) > Physical scan (last resort)
         master_info = master_by_barcode.get(bc, {})
-        description = master_info.get("description") or phy.get("product_name", "")
-        category = master_info.get("category", "")
-        mrp = master_info.get("mrp", 0)
-        cost = master_info.get("cost", 0)
+        description = exp.get("description") or master_info.get("description") or phy.get("product_name", "")
+        category = exp.get("category") or master_info.get("category", "")
+        mrp = exp.get("mrp") or master_info.get("mrp", 0)
+        cost = exp.get("cost") or master_info.get("cost", 0)
         
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
