@@ -786,12 +786,14 @@ async def get_sync_logs(client_id: str = None, session_id: str = None, date: str
 
 @portal_router.get("/sync-logs/grouped")
 async def get_sync_logs_grouped(client_id: str = None, limit: int = 500):
-    """Get sync logs grouped by client_id and sync_date for the admin portal view."""
+    """Get sync logs grouped by client_id and sync_date for the admin portal view.
+    Does NOT include raw_payload to keep response lightweight for large datasets."""
     query = {}
     if client_id:
         query["client_id"] = client_id
     
-    logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", -1).to_list(limit)
+    # Exclude raw_payload from the response to avoid sending large data to frontend
+    logs = await db.sync_raw_logs.find(query, {"_id": 0, "raw_payload": 0}).sort("synced_at", -1).to_list(limit)
     
     # Also fetch client names for display
     all_client_ids = list(set(log.get("client_id", "") for log in logs if log.get("client_id")))
