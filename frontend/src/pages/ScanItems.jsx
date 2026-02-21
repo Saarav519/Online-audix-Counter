@@ -436,6 +436,7 @@ const ScanItems = () => {
   // Refs for fast scanning - avoid re-renders during rapid scanning
   const selectedLocationIdRef = useRef(selectedLocationId);
   const waitingForLocationScanRef = useRef(waitingForLocationScan);
+  const tempLocationRef = useRef(tempLocation);
   const isSingleSkuModeRef = useRef(settings.singleSkuScanning);
   const quantityInputRef2 = useRef(quantityInput);
   const lastScanTimeRef = useRef(0);
