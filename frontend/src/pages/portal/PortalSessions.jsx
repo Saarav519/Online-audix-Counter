@@ -398,8 +398,37 @@ export default function PortalSessions() {
             </p>
             
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">CSV Format:</p>
-              <code className="text-xs text-gray-600 block">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">CSV Format:</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const sampleCSV = `Location,Barcode,Description,MRP,Cost,Qty
+Bin-A01,8901234567890,Rice 5kg,280,250,100
+Bin-A01,8901234567891,Oil 1L,180,150,50
+Bin-A02,8901234567892,Sugar 1kg,55,45,75
+Warehouse-B,8901234567893,Flour 10kg,520,480,200
+Warehouse-B,8901234567894,Salt 1kg,25,20,150
+Cold-Storage,8901234567895,Butter 500g,280,240,80
+Cold-Storage,8901234567896,Cheese 200g,180,150,60`;
+                    const blob = new Blob([sampleCSV], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'sample_expected_stock.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('Sample file downloaded!');
+                  }}
+                  className="text-emerald-600 hover:text-emerald-700"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-1" />
+                  Download Sample
+                </Button>
+              </div>
+              <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
                 Location,Barcode,Description,MRP,Cost,Qty
               </code>
               <p className="text-xs text-gray-500 mt-2">
