@@ -218,8 +218,9 @@ class SyncRawLogsTestSuite:
         """Test re-sync (location replacement + raw log preservation)"""
         try:
             session_id = self.test_data.get("session_id")
-            if not session_id:
-                return self.log_test("Re-sync Same Location", False, "No session ID available")
+            client_id = self.test_data.get("client_id")
+            if not session_id or not client_id:
+                return self.log_test("Re-sync Same Location", False, "No session ID or client ID available")
             
             # Get current log count
             response = self.session.get(f"{API_URL}/portal/sync-logs")
@@ -233,6 +234,7 @@ class SyncRawLogsTestSuite:
             resync_payload = {
                 "device_name": "RawLogTestScanner",
                 "sync_password": "testpass",
+                "client_id": client_id,
                 "session_id": session_id,
                 "locations": [{
                     "name": "TestLocation-RawLog",  # Same location name
