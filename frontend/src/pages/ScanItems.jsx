@@ -1019,6 +1019,8 @@ const ScanItems = () => {
   // Handle barcode scan - auto-add when Enter is pressed
   const handleBarcodeKeyDown = (e) => {
     if (e.key === 'Enter' && barcodeInput.trim()) {
+      // Skip if hardware scanner hook already processed this Enter (within 150ms)
+      if (Date.now() - lastHookScanTimeRef.current < 150) return;
       // Cancel any pending auto-process since Enter was pressed explicitly
       if (barcodeAutoProcessTimerRef.current) {
         clearTimeout(barcodeAutoProcessTimerRef.current);
