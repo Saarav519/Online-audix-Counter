@@ -833,7 +833,7 @@ const Settings = () => {
               value={syncConfig.syncPassword}
               onChange={(e) => handleSyncConfigChange('syncPassword', e.target.value)}
             />
-            <p className="text-xs text-slate-500">Required for manual sync (auto-sync doesn't prompt)</p>
+            <p className="text-xs text-slate-500">Required to sync data to portal</p>
           </div>
 
           <Separator />
