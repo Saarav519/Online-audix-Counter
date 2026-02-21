@@ -757,7 +757,8 @@ const ScanItems = () => {
       loadedLocationRef.current = null; // Force reload items for new location
       // IMPORTANT: Only clear tempLocation if the new URL location is NOT the current temp
       // This prevents the URL sync from clearing tempLocation when navigating within the same scan session
-      if (tempLocation && tempLocation.id === urlLocation) {
+      const currentTemp = tempLocationRef.current;
+      if (currentTemp && currentTemp.id === urlLocation) {
         // Keep tempLocation - it matches the URL (same session navigation)
       } else {
         setTempLocation(null);
