@@ -77,6 +77,31 @@ const MasterData = () => {
   // Active tab state
   const [activeTab, setActiveTab] = useState('products');
 
+  // Clear Master Data state
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearOptions, setClearOptions] = useState({
+    products: true,
+    locations: true,
+    authUsers: true,
+  });
+
+  const handleClearMasterData = async () => {
+    if (clearOptions.products) {
+      await clearMasterProducts();
+    }
+    if (clearOptions.locations) {
+      await clearMasterLocations();
+    }
+    if (clearOptions.authUsers) {
+      clearAuthUsers();
+    }
+    setShowClearModal(false);
+    // Reset options for next time
+    setClearOptions({ products: true, locations: true, authUsers: true });
+  };
+
+  const anyClearSelected = clearOptions.products || clearOptions.locations || clearOptions.authUsers;
+
   // Location Master state
   const [locSearchTerm, setLocSearchTerm] = useState('');
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
