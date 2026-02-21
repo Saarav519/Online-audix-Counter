@@ -1,16 +1,25 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
-import ScanItems from "./pages/ScanItems";
-import MasterData from "./pages/MasterData";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
 import { Toaster } from "./components/ui/sonner";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+
+// Lazy-load heavy pages - only loaded when navigated to
+const ScanItems = React.lazy(() => import("./pages/ScanItems"));
+const MasterData = React.lazy(() => import("./pages/MasterData"));
+const Reports = React.lazy(() => import("./pages/Reports"));
+const Settings = React.lazy(() => import("./pages/Settings"));
+
+// Minimal loading fallback for lazy routes
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+  </div>
+);
 
 // Route Persistence Hook - saves current route to localStorage
 const useRoutePersistence = () => {
