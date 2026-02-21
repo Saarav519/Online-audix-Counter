@@ -18,8 +18,6 @@ const navItems = [
   { to: '/portal/devices', icon: Smartphone, label: 'Devices' },
   { to: '/portal/reports', icon: FileBarChart, label: 'Reports' },
   { to: '/portal/sync-logs', icon: Database, label: 'Sync Logs' },
-  { to: '/portal/alerts', icon: Bell, label: 'Alerts' },
-  { to: '/portal/settings', icon: Settings, label: 'Settings' },
 ];
 
 export default function PortalLayout() {
