@@ -1697,6 +1697,10 @@ async def get_dashboard():
     active_sessions = await db.audit_sessions.count_documents({"status": "active"})
     total_devices = await db.devices.count_documents({"is_active": True})
     
+    # Get registered users count
+    total_users = await db.portal_users.count_documents({})
+    pending_users = await db.portal_users.count_documents({"is_approved": False})
+    
     # Get recent syncs
     recent_syncs = await db.synced_locations.find(
         {}, {"_id": 0}
@@ -1705,15 +1709,13 @@ async def get_dashboard():
     # Get device status
     devices = await db.devices.find({"is_active": True}, {"_id": 0, "sync_password_hash": 0}).to_list(100)
     
-    # Get unread alerts
-    unread_alerts = await db.alerts.count_documents({"is_read": False})
-    
     return {
         "stats": {
             "clients": clients_count,
             "active_sessions": active_sessions,
             "devices": total_devices,
-            "unread_alerts": unread_alerts
+            "total_users": total_users,
+            "pending_users": pending_users
         },
         "recent_syncs": recent_syncs,
         "devices": devices
