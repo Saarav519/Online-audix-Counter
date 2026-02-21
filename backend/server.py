@@ -878,7 +878,6 @@ async def export_sync_logs(client_id: str, date: str):
     
     csv_content = output.getvalue()
     
-    from fastapi.responses import StreamingResponse
     return StreamingResponse(
         iter([csv_content]),
         media_type="text/csv",
