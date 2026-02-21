@@ -375,6 +375,8 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    variance_mode = session.get("variance_mode", "bin-wise")
+    
     # Read CSV file
     content = await file.read()
     decoded = content.decode('utf-8')
@@ -383,17 +385,23 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
     # Clear existing expected stock for this session
     await db.expected_stock.delete_many({"session_id": session_id})
     
-    # Import new expected stock
+    # Import new expected stock based on variance mode
     records = []
     for row in reader:
+        # Normalize column names (case-insensitive, strip whitespace)
+        norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
+        
         expected = ExpectedStock(
             session_id=session_id,
-            location=row.get('Location', ''),
-            barcode=row.get('Barcode', ''),
-            description=row.get('Description', ''),
-            mrp=float(row.get('MRP', 0)),
-            cost=float(row.get('Cost', 0)),
-            qty=float(row.get('Qty', 0))
+            location=norm_row.get('location', ''),
+            barcode=norm_row.get('barcode', ''),
+            description=norm_row.get('description', ''),
+            category=norm_row.get('category', ''),
+            article_code=norm_row.get('article_code', ''),
+            article_name=norm_row.get('article_name', ''),
+            mrp=float(norm_row.get('mrp', 0) or 0),
+            cost=float(norm_row.get('cost', 0) or 0),
+            qty=float(norm_row.get('qty', 0) or 0)
         )
         doc = expected.model_dump()
         doc['imported_at'] = doc['imported_at'].isoformat()
@@ -408,7 +416,11 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
         {"$set": {"expected_stock_imported": True}}
     )
     
-    return {"message": f"Imported {len(records)} expected stock records"}
+    return {
+        "message": f"Imported {len(records)} expected stock records",
+        "variance_mode": variance_mode,
+        "record_count": len(records)
+    }
 
 @portal_router.get("/sessions/{session_id}/expected-stock")
 async def get_expected_stock(session_id: str):
