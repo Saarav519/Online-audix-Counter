@@ -1542,7 +1542,9 @@ const ScanItems = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-emerald-800 truncate">{selectedLocation?.name}</p>
-              <p className="text-[10px] text-emerald-600 font-mono">{selectedLocation?.code}</p>
+              {selectedLocation?.code && selectedLocation.code !== selectedLocation.name && (
+                <p className="text-[10px] text-emerald-600 font-mono">{selectedLocation?.code}</p>
+              )}
             </div>
             <Button
               variant="ghost"
