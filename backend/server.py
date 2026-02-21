@@ -894,6 +894,42 @@ async def get_sync_log_detail(log_id: str):
         raise HTTPException(status_code=404, detail="Sync log not found")
     return log
 
+@portal_router.get("/sync-logs/{log_id}/export")
+async def export_single_sync_log(log_id: str):
+    """Export a single sync log as CSV"""
+    log = await db.sync_raw_logs.find_one({"id": log_id}, {"_id": 0})
+    if not log:
+        raise HTTPException(status_code=404, detail="Sync log not found")
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Log ID", "Device", "Session ID", "Sync Time", "Location", "Barcode", "Product Name", "Quantity", "Scanned At"])
+    
+    for loc in (log.get("raw_payload", {}).get("locations", [])):
+        loc_name = loc.get("name", loc.get("location_name", "Unknown"))
+        for item in loc.get("items", []):
+            writer.writerow([
+                log.get("id", ""),
+                log.get("device_name", ""),
+                log.get("session_id", ""),
+                log.get("synced_at", ""),
+                loc_name,
+                item.get("barcode", ""),
+                item.get("product_name", item.get("productName", "")),
+                item.get("quantity", 0),
+                item.get("scanned_at", item.get("scannedAt", ""))
+            ])
+    
+    csv_content = output.getvalue()
+    device = log.get("device_name", "unknown")
+    date = log.get("sync_date", "unknown")
+    
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=sync_{device}_{date}_{log_id[:8]}.csv"}
+    )
+
 # ==================== REPORTS HELPER FUNCTIONS ====================
 
 async def get_master_for_session(session_id: str) -> dict:
