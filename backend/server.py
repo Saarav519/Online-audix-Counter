@@ -579,21 +579,56 @@ async def get_sync_config():
         "sessions": sessions
     }
 
+# ==================== REPORTS HELPER FUNCTIONS ====================
+
+def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
+    """Calculate percentage accuracy"""
+    if expected_qty == 0 and physical_qty == 0:
+        return 100.0
+    if expected_qty == 0:
+        return 0.0
+    accuracy = (min(physical_qty, expected_qty) / expected_qty) * 100
+    return round(min(accuracy, 100.0), 1)
+
+def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, in_master: bool = True, scanned: bool = True) -> str:
+    """Generate professional remark based on variance"""
+    if not in_master:
+        return "Not in Master — Extra item found during physical count"
+    if not scanned:
+        return "Not Scanned — Item exists in master but was not counted"
+    diff = physical_qty - expected_qty
+    if diff == 0:
+        return "Exact Match — Physical count matches expected stock"
+    if accuracy >= 98:
+        return "Within Tolerance — Minor variance, negligible impact"
+    if accuracy >= 90:
+        if diff > 0:
+            return f"Slight Surplus — {abs(diff):.0f} units over expected ({accuracy}% accuracy)"
+        else:
+            return f"Slight Shortage — {abs(diff):.0f} units under expected ({accuracy}% accuracy)"
+    if accuracy >= 75:
+        if diff > 0:
+            return f"Surplus Detected — {abs(diff):.0f} units excess ({accuracy}% accuracy)"
+        else:
+            return f"Shortage Detected — {abs(diff):.0f} units deficit ({accuracy}% accuracy)"
+    if diff > 0:
+        return f"High Surplus — {abs(diff):.0f} units excess, requires investigation ({accuracy}% accuracy)"
+    else:
+        return f"Critical Shortage — {abs(diff):.0f} units deficit, immediate attention needed ({accuracy}% accuracy)"
+
 # ==================== REPORTS ROUTES ====================
 
 @portal_router.get("/reports/{session_id}/bin-wise")
 async def get_bin_wise_report(session_id: str):
-    """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty"""
-    # Get expected stock grouped by location
+    """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty, Accuracy%, Remarks"""
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_by_location = {}
     for e in expected:
-        loc = e["location"]
+        loc = e.get("location", "Unknown")
         if loc not in expected_by_location:
             expected_by_location[loc] = 0
-        expected_by_location[loc] += e["qty"]
+        expected_by_location[loc] += e.get("qty", 0)
     
-    # Get synced data grouped by location
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_by_location = {}
     for s in synced:
@@ -602,7 +637,6 @@ async def get_bin_wise_report(session_id: str):
             physical_by_location[loc] = 0
         physical_by_location[loc] += s["total_quantity"]
     
-    # Combine all locations
     all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
     
     report = []
@@ -614,6 +648,10 @@ async def get_bin_wise_report(session_id: str):
         stock_qty = expected_by_location.get(loc, 0)
         physical_qty = physical_by_location.get(loc, 0)
         diff_qty = physical_qty - stock_qty
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = loc in expected_by_location
+        scanned = loc in physical_by_location
+        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
         
         total_stock += stock_qty
         total_physical += physical_qty
@@ -623,15 +661,20 @@ async def get_bin_wise_report(session_id: str):
             "location": loc,
             "stock_qty": stock_qty,
             "physical_qty": physical_qty,
-            "difference_qty": diff_qty
+            "difference_qty": diff_qty,
+            "accuracy_pct": accuracy,
+            "remark": remark
         })
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
     
     return {
         "report": report,
         "totals": {
             "stock_qty": total_stock,
             "physical_qty": total_physical,
-            "difference_qty": total_diff
+            "difference_qty": total_diff,
+            "accuracy_pct": total_accuracy
         }
     }
 
