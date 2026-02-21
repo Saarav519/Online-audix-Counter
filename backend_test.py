@@ -80,12 +80,14 @@ class SyncRawLogsTestSuite:
         """Test syncing data to generate raw logs (First sync)"""
         try:
             session_id = self.test_data.get("session_id")
-            if not session_id:
-                return self.log_test("Sync Data Generation", False, "No session ID available")
+            client_id = self.test_data.get("client_id")
+            if not session_id or not client_id:
+                return self.log_test("Sync Data Generation", False, "No session ID or client ID available")
             
             sync_payload = {
                 "device_name": "RawLogTestScanner",
                 "sync_password": "testpass",
+                "client_id": client_id,
                 "session_id": session_id,
                 "locations": [{
                     "name": "TestLocation-RawLog",
