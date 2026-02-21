@@ -350,6 +350,19 @@ async def update_session_status(session_id: str, status: str):
         raise HTTPException(status_code=404, detail="Session not found")
     return {"message": f"Session status updated to {status}"}
 
+@portal_router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str):
+    # Delete all related data first
+    await db.expected_stock.delete_many({"session_id": session_id})
+    await db.synced_locations.delete_many({"session_id": session_id})
+    await db.alerts.delete_many({"session_id": session_id})
+    
+    # Delete the session
+    result = await db.audit_sessions.delete_one({"id": session_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"message": "Session and all related data deleted"}
+
 @portal_router.post("/sessions/{session_id}/import-expected")
 async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
     # Verify session exists
