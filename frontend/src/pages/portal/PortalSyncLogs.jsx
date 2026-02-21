@@ -299,7 +299,7 @@ export default function PortalSyncLogs() {
                                       variant="outline"
                                       size="sm"
                                       className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 h-7 text-xs"
-                                      onClick={() => handleExportSingleLog(log, clientGroup.client_name)}
+                                      onClick={() => handleExportSingleLog(log.id, log.device_name, log.sync_date)}
                                     >
                                       <Download className="w-3 h-3 mr-1" />
                                       Export
