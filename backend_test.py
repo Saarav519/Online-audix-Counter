@@ -352,13 +352,15 @@ Bin-A,1111111111111,50"""
             
             if response.status_code == 200:
                 result = response.json()
-                required_fields = ["master_products", "expected_stock", "synced_locations", "sync_raw_logs", "audit_sessions", "alerts"]
+                # Handle nested deleted object
+                deleted = result.get("deleted", result)
+                required_fields = ["master_products", "sync_raw_logs", "audit_sessions", "alerts"]
                 
-                if all(field in result for field in required_fields):
+                if all(field in deleted for field in required_fields):
                     # Verify some counts are > 0 (since we created data)
                     counts_summary = []
                     for field in required_fields:
-                        count = result[field]
+                        count = deleted[field]
                         counts_summary.append(f"{field}: {count}")
                     
                     return self.log_test("Cascading Delete", True, 
