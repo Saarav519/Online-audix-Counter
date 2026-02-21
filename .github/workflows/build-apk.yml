@@ -68,21 +68,24 @@ jobs:
 
       - name: Build Debug APK
         working-directory: ./frontend/android
-        run: |
-          echo "=== Starting Gradle assembleDebug ==="
-          ./gradlew assembleDebug --no-daemon --stacktrace
-          echo "=== Gradle build completed ==="
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Verify APK generated
+      - name: Find and collect APK
         run: |
-          echo "=== Searching for APK files ==="
-          find frontend/android -name "*.apk" -type f
-          echo "=== APK search complete ==="
+          echo "=== Searching for ALL APK files ==="
+          find . -name "*.apk" -type f 2>/dev/null
+          echo "=== Checking expected path ==="
+          ls -la frontend/android/app/build/outputs/apk/debug/ 2>/dev/null || echo "Expected debug APK directory NOT found"
+          echo "=== Collecting APK to artifact folder ==="
+          mkdir -p apk-output
+          find frontend/android -name "*.apk" -type f -exec cp {} apk-output/ \;
+          echo "=== Files in apk-output ==="
+          ls -la apk-output/
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Audix-APK
-          path: frontend/android/**/*.apk
+          path: apk-output/
           retention-days: 90
           if-no-files-found: error
