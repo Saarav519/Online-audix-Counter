@@ -754,6 +754,20 @@ async def get_sync_log_detail(log_id: str):
 
 # ==================== REPORTS HELPER FUNCTIONS ====================
 
+async def get_master_for_session(session_id: str) -> dict:
+    """Load master products indexed by barcode for the session's client"""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        return {}
+    client_id = session.get("client_id", "")
+    if not client_id:
+        return {}
+    master_products = await db.master_products.find({"client_id": client_id}, {"_id": 0}).to_list(500000)
+    master_by_barcode = {}
+    for m in master_products:
+        master_by_barcode[m["barcode"]] = m
+    return master_by_barcode
+
 def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
     """Calculate percentage accuracy"""
     if expected_qty == 0 and physical_qty == 0:
