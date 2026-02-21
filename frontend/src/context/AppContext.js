@@ -1324,6 +1324,8 @@ export const AppProvider = ({ children }) => {
     getAuthorizationUsers,
     getAllUsers,
     getNextPendingLocation,
+    getOrCreateAssignedLocation,
+    getNextSequentialLocation,
     getProductByBarcode,
     // getStorageInfo is stable (imported function) - not included in deps
     isLoadingMasterData,
