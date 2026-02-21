@@ -77,6 +77,7 @@ class AuditSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_id: str
     name: str  # e.g., "July 2026 Stock Count"
+    variance_mode: str = "bin-wise"  # bin-wise, barcode-wise, article-wise
     start_date: datetime
     end_date: Optional[datetime] = None
     status: str = "active"  # active, completed, archived
@@ -86,6 +87,7 @@ class AuditSession(BaseModel):
 class AuditSessionCreate(BaseModel):
     client_id: str
     name: str
+    variance_mode: str = "bin-wise"  # bin-wise, barcode-wise, article-wise
     start_date: datetime
     end_date: Optional[datetime] = None
 
@@ -94,12 +96,15 @@ class ExpectedStock(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
-    location: str
+    location: str = ""
     barcode: str
-    description: str
-    mrp: float
-    cost: float
-    qty: float
+    description: str = ""
+    category: str = ""
+    article_code: str = ""
+    article_name: str = ""
+    mrp: float = 0
+    cost: float = 0
+    qty: float = 0
     imported_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Device Model
