@@ -1146,6 +1146,58 @@ test_plan:
       - working: "NA"
         agent: "main"
         comment: "GET /api/portal/sync-logs with client_id, session_id, limit filters. GET /api/portal/sync-logs/{log_id} for detail."
+  - agent: "testing"
+    message: |
+      ✅ SYNC RAW LOGS FEATURE COMPREHENSIVE TESTING COMPLETED - ALL TESTS PASSED (8/8)
+      
+      🎯 **TESTING SCOPE**:
+      Comprehensive testing of the new Sync Raw Logs feature following exact review request flow:
+      1. Portal Login (admin/admin123)
+      2. Sync test data to generate raw logs (first sync)  
+      3. Test all sync logs endpoints (GET all, filter by session, get detail)
+      4. Test re-sync functionality (location replacement + raw log preservation)
+      5. Verify both syncs are preserved in raw logs (append-only behavior)
+      
+      📊 **SYNC RAW LOGS TEST RESULTS (8/8 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **PORTAL AUTHENTICATION**: admin/admin123 credentials working correctly
+      
+      ✅ **SESSION RETRIEVAL**: Using existing session 96fe41ad-d2e2-4307-b23e-7aa51ce2f501, client be02e8e5-1396-4c43-84b7-f12864a22161
+      
+      ✅ **SYNC DATA GENERATION**: First sync successful (1 location synced with 2 items)
+         - Raw log created with complete payload preservation
+      
+      ✅ **GET ALL SYNC LOGS**: Retrieved sync logs with all required fields
+         - Verified presence of: id, device_name, session_id, client_id, synced_at, raw_payload, location_count, total_items, total_quantity
+      
+      ✅ **FILTER LOGS BY SESSION**: Session filtering working correctly  
+         - All retrieved logs belong to specified session ID
+      
+      ✅ **GET LOG DETAIL**: Detailed log retrieval working perfectly
+         - Raw payload contains complete locations and items data (1 location with 2 items)
+      
+      ✅ **RE-SYNC SAME LOCATION**: Re-sync successful with append-only behavior
+         - Log count increased from 1 to 2 (logs preserved, not overwritten)
+      
+      ✅ **VERIFY BOTH SYNCS PRESERVED**: Raw logs audit trail working correctly
+         - Both syncs preserved with different payloads (2 logs found with different item data)
+      
+      🔍 **CRITICAL VERIFICATION POINTS CONFIRMED**:
+      ✅ Raw logs stored in sync_raw_logs collection with complete payload preservation
+      ✅ Append-only behavior: new syncs create additional logs, never overwrite existing ones
+      ✅ GET /api/portal/sync-logs endpoint working with optional filtering (client_id, session_id, limit)
+      ✅ GET /api/portal/sync-logs/{log_id} endpoint returns detailed log with full raw_payload
+      ✅ Re-sync replaces location data in synced_locations but preserves all raw logs
+      ✅ Raw payload contains complete sync data: locations, items, device info, timestamps
+      
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal.preview.emergentagent.com
+      
+      🎯 **NEW ENDPOINTS VERIFIED WORKING**:
+      - GET /api/portal/sync-logs (NEW) - with client_id, session_id, limit filters
+      - GET /api/portal/sync-logs/{log_id} (NEW) - detailed log retrieval
+      - POST /api/sync/ (ENHANCED) - now stores raw logs alongside processing
+      
+      🎉 **CONCLUSION**: SYNC RAW LOGS FEATURE IS FULLY OPERATIONAL AND PRODUCTION-READY. Complete audit trail functionality working with proper append-only storage, filtering capabilities, and detailed log retrieval. The feature successfully preserves all sync history while allowing location data updates as requested.
       - working: true
         agent: "testing"
         comment: "✅ SYNC LOGS PORTAL ENDPOINTS WORKING - All endpoints tested and working correctly. GET /api/portal/sync-logs returns all logs with required fields. Filtering by session_id parameter working (retrieved logs only for specified session). GET /api/portal/sync-logs/{log_id} returns detailed log with complete raw_payload including locations and items data. Client_id filtering also confirmed working."
