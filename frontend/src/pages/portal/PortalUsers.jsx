@@ -9,10 +9,13 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  X
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -21,8 +24,13 @@ export default function PortalUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all'); // all, pending, active, disabled
+  const [filter, setFilter] = useState('all');
   const currentUser = JSON.parse(localStorage.getItem('portalUser') || '{}');
+
+  // Auth confirmation state
+  const [authDialog, setAuthDialog] = useState(null); // { action, userId, username, label }
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -41,46 +49,75 @@ export default function PortalUsers() {
     fetchUsers();
   }, []);
 
+  // ---- Verify admin password before sensitive actions ----
+  const verifyAdminAndExecute = async () => {
+    if (!authPassword) {
+      toast.error('Please enter your admin password');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      // Verify admin credentials
+      const verifyRes = await fetch(`${BACKEND_URL}/api/portal/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: currentUser.username, password: authPassword })
+      });
+
+      if (!verifyRes.ok) {
+        toast.error('Incorrect admin password');
+        setAuthLoading(false);
+        return;
+      }
+
+      // Execute the action
+      const { action, userId } = authDialog;
+      let response;
+
+      if (action === 'delete') {
+        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}`, { method: 'DELETE' });
+      } else if (action === 'disable') {
+        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+      } else if (action === 'enable') {
+        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+      } else if (action === 'reject') {
+        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/reject`, { method: 'PUT' });
+      }
+
+      if (response && response.ok) {
+        const data = await response.json();
+        toast.success(data.message || 'Action completed');
+        fetchUsers();
+      } else if (response) {
+        const data = await response.json();
+        toast.error(data.detail || 'Action failed');
+      }
+
+      setAuthDialog(null);
+      setAuthPassword('');
+    } catch (error) {
+      toast.error('Action failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const requestAuth = (action, userId, username, label) => {
+    setAuthDialog({ action, userId, username, label });
+    setAuthPassword('');
+  };
+
+  // ---- Actions that don't need auth ----
   const handleApprove = async (userId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/approve`, {
-        method: 'PUT'
-      });
+      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/approve`, { method: 'PUT' });
       if (response.ok) {
-        toast.success('User approved');
+        toast.success('User approved — they can now login');
         fetchUsers();
       }
     } catch (error) {
       toast.error('Failed to approve user');
-    }
-  };
-
-  const handleReject = async (userId) => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/reject`, {
-        method: 'PUT'
-      });
-      if (response.ok) {
-        toast.success('User rejected');
-        fetchUsers();
-      }
-    } catch (error) {
-      toast.error('Failed to reject user');
-    }
-  };
-
-  const handleToggleActive = async (userId) => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/toggle-active`, {
-        method: 'PUT'
-      });
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(data.message);
-        fetchUsers();
-      }
-    } catch (error) {
-      toast.error('Failed to toggle user status');
     }
   };
 
@@ -100,42 +137,20 @@ export default function PortalUsers() {
     }
   };
 
-  const handleDelete = async (userId, username) => {
-    if (!window.confirm(`Are you sure you want to delete user "${username}"? This cannot be undone.`)) return;
-    
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        toast.success('User deleted');
-        fetchUsers();
-      } else {
-        const data = await response.json();
-        toast.error(data.detail || 'Failed to delete user');
-      }
-    } catch (error) {
-      toast.error('Failed to delete user');
-    }
-  };
-
   const formatDate = (isoString) => {
     if (!isoString) return 'Never';
     const date = new Date(isoString);
     return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.username.toLowerCase().includes(search.toLowerCase());
     if (filter === 'pending') return matchesSearch && !user.is_approved;
-    if (filter === 'active') return matchesSearch && user.is_active && user.is_approved;
-    if (filter === 'disabled') return matchesSearch && !user.is_active;
+    if (filter === 'active') return matchesSearch && user.is_active !== false && user.is_approved !== false;
+    if (filter === 'disabled') return matchesSearch && user.is_active === false;
     return matchesSearch;
   });
 
@@ -145,6 +160,82 @@ export default function PortalUsers() {
 
   return (
     <div className="p-6">
+      {/* Auth Confirmation Dialog */}
+      {authDialog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  authDialog.action === 'delete' ? 'bg-red-100' : 'bg-amber-100'
+                }`}>
+                  <Lock className={`w-5 h-5 ${
+                    authDialog.action === 'delete' ? 'text-red-600' : 'text-amber-600'
+                  }`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Authorization Required</h3>
+                  <p className="text-sm text-gray-500">Enter admin password to confirm</p>
+                </div>
+              </div>
+              <button onClick={() => { setAuthDialog(null); setAuthPassword(''); }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className={`p-3 rounded-lg mb-4 ${
+              authDialog.action === 'delete' ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'
+            }`}>
+              <p className={`text-sm font-medium ${
+                authDialog.action === 'delete' ? 'text-red-800' : 'text-amber-800'
+              }`}>
+                {authDialog.label}
+              </p>
+              <p className={`text-xs mt-1 ${
+                authDialog.action === 'delete' ? 'text-red-600' : 'text-amber-600'
+              }`}>
+                User: <strong>{authDialog.username}</strong>
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <Label htmlFor="auth-password">Admin Password</Label>
+              <Input
+                id="auth-password"
+                type="password"
+                placeholder="Enter your admin password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && verifyAdminAndExecute()}
+                className="mt-1"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setAuthDialog(null); setAuthPassword(''); }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={verifyAdminAndExecute}
+                disabled={authLoading || !authPassword}
+                className={`flex-1 ${
+                  authDialog.action === 'delete' 
+                    ? 'bg-red-500 hover:bg-red-600 text-white' 
+                    : 'bg-amber-500 hover:bg-amber-600 text-white'
+                }`}
+              >
+                {authLoading ? 'Verifying...' : 'Confirm'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -197,12 +288,7 @@ export default function PortalUsers() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search users..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+          <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
         </div>
         <div className="flex bg-gray-100 rounded-lg p-1">
           {[
@@ -252,6 +338,7 @@ export default function PortalUsers() {
                   const isPending = user.is_approved === false;
                   const isDisabled = user.is_active === false;
                   const isAdmin = user.role === 'admin';
+                  const isDefaultAdmin = user.username === 'admin';
 
                   return (
                     <tr key={user.id} className={`hover:bg-gray-50 ${isPending ? 'bg-amber-50/50' : ''} ${isDisabled ? 'bg-red-50/30' : ''}`}>
@@ -267,6 +354,7 @@ export default function PortalUsers() {
                             <p className="font-medium text-gray-900">
                               {user.username}
                               {isCurrentUser && <span className="ml-2 text-xs text-emerald-600">(You)</span>}
+                              {isDefaultAdmin && <span className="ml-2 text-xs text-blue-500">(Default)</span>}
                             </p>
                             <p className="text-xs text-gray-400">{user.id.substring(0, 8)}...</p>
                           </div>
@@ -275,8 +363,8 @@ export default function PortalUsers() {
 
                       {/* Role */}
                       <td className="px-6 py-4">
-                        {isCurrentUser || user.username === 'admin' ? (
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        {isCurrentUser || isDefaultAdmin ? (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                             isAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
                           }`}>
                             {isAdmin && <Shield className="w-3 h-3" />}
@@ -286,7 +374,7 @@ export default function PortalUsers() {
                           <select
                             value={user.role}
                             onChange={(e) => handleChangeRole(user.id, e.target.value)}
-                            className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white"
+                            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white cursor-pointer"
                           >
                             <option value="viewer">viewer</option>
                             <option value="admin">admin</option>
@@ -297,17 +385,17 @@ export default function PortalUsers() {
                       {/* Status */}
                       <td className="px-6 py-4">
                         {isPending ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
                             <AlertCircle className="w-3 h-3" />
                             Pending
                           </span>
                         ) : isDisabled ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
                             <XCircle className="w-3 h-3" />
                             Disabled
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
                             <CheckCircle className="w-3 h-3" />
                             Active
                           </span>
@@ -324,56 +412,74 @@ export default function PortalUsers() {
                         {formatDate(user.created_at)}
                       </td>
 
-                      {/* Actions */}
+                      {/* Actions - Clear labeled buttons */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Pending user actions */}
                           {isPending && (
                             <>
                               <Button
-                                variant="ghost"
                                 size="sm"
                                 onClick={() => handleApprove(user.id)}
-                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                title="Approve"
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8 px-3"
                               >
-                                <UserCheck className="w-4 h-4 mr-1" />
+                                <UserCheck className="w-3.5 h-3.5 mr-1" />
                                 Approve
                               </Button>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleReject(user.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Reject"
+                                onClick={() => requestAuth('reject', user.id, user.username, `Reject user "${user.username}"? They will not be able to login.`)}
+                                className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-8 px-3"
                               >
-                                <UserX className="w-4 h-4" />
+                                <UserX className="w-3.5 h-3.5 mr-1" />
+                                Reject
                               </Button>
                             </>
                           )}
-                          {!isPending && !isCurrentUser && user.username !== 'admin' && (
+
+                          {/* Active/Disabled user actions */}
+                          {!isPending && !isCurrentUser && !isDefaultAdmin && (
+                            <>
+                              {isDisabled ? (
+                                <Button
+                                  size="sm"
+                                  onClick={() => requestAuth('enable', user.id, user.username, `Enable user "${user.username}"? They will be able to login again.`)}
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8 px-3"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5 mr-1" />
+                                  Enable
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => requestAuth('disable', user.id, user.username, `Disable user "${user.username}"? They will not be able to login.`)}
+                                  className="border-amber-200 text-amber-600 hover:bg-amber-50 text-xs h-8 px-3"
+                                >
+                                  <UserX className="w-3.5 h-3.5 mr-1" />
+                                  Disable
+                                </Button>
+                              )}
+                            </>
+                          )}
+
+                          {/* Delete - always available for non-admin, non-self users */}
+                          {!isCurrentUser && !isDefaultAdmin && (
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              onClick={() => handleToggleActive(user.id)}
-                              className={isDisabled 
-                                ? "text-emerald-600 hover:bg-emerald-50" 
-                                : "text-amber-600 hover:bg-amber-50"
-                              }
-                              title={isDisabled ? 'Enable' : 'Disable'}
+                              onClick={() => requestAuth('delete', user.id, user.username, `Permanently delete user "${user.username}"? This action cannot be undone.`)}
+                              className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-8 px-3"
                             >
-                              {isDisabled ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
+                              <Trash2 className="w-3.5 h-3.5 mr-1" />
+                              Delete
                             </Button>
                           )}
-                          {!isCurrentUser && user.username !== 'admin' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(user.id, user.username)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+
+                          {/* Protected user - no actions */}
+                          {(isCurrentUser || isDefaultAdmin) && !isPending && (
+                            <span className="text-xs text-gray-400 italic">Protected</span>
                           )}
                         </div>
                       </td>
