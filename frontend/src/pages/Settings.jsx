@@ -838,34 +838,12 @@ const Settings = () => {
 
           <Separator />
 
-          {/* Sync Options */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Auto-Sync When Online</Label>
-              <p className="text-sm text-slate-500">
-                Automatically sync data when internet is available
-              </p>
-            </div>
-            <Switch
-              checked={syncConfig.autoSync}
-              onCheckedChange={(checked) => handleSyncConfigChange('autoSync', checked)}
-            />
+          {/* Sync Info */}
+          <div className="p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>After sync:</strong> A backup CSV file will be downloaded automatically and synced data will be removed from Reports.
+            </p>
           </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base">Clear Data After Sync</Label>
-              <p className="text-sm text-slate-500">
-                Remove synced locations from device after upload
-              </p>
-            </div>
-            <Switch
-              checked={syncConfig.clearAfterSync}
-              onCheckedChange={(checked) => handleSyncConfigChange('clearAfterSync', checked)}
-            />
-          </div>
-
-          <Separator />
 
           {/* Last Sync & Manual Sync Button */}
           <div className="p-4 bg-slate-50 rounded-xl space-y-3">
