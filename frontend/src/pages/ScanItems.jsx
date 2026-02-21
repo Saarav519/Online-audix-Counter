@@ -1622,9 +1622,9 @@ const ScanItems = () => {
                 <Input
                   ref={popupQuantityRef}
                   type="number"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  min="1"
+                  inputMode="decimal"
+                  step="any"
+                  min="0.01"
                   value={popupQuantity}
                   onChange={(e) => {
                     const val = e.target.value;
