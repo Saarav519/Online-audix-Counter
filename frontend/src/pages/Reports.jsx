@@ -117,6 +117,12 @@ const Reports = () => {
   // ---- Success ----
   const [deleteSuccess, setDeleteSuccess] = useState(false);
 
+  // ---- Export Auth (password-only) ----
+  const [showExportAuthModal, setShowExportAuthModal] = useState(false);
+  const [exportAuthPassword, setExportAuthPassword] = useState('');
+  const [exportAuthError, setExportAuthError] = useState('');
+  const [pendingExportAction, setPendingExportAction] = useState(null); // 'csv' | 'email' | 'csv-preassigned' | 'email-preassigned'
+
   // ---- Preassigned Mode: Scan Location ----
   const [locationScanInput, setLocationScanInput] = useState('');
   const [locationScanError, setLocationScanError] = useState('');
