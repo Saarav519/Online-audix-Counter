@@ -1278,7 +1278,9 @@ export const AppProvider = ({ children }) => {
     getProductByBarcode,
     getStorageInfo,
     isLoadingMasterData,
-    playSound
+    playSound,
+    hideBottomNav,
+    setHideBottomNav
   }), [
     user,
     isAuthenticated,
@@ -1289,6 +1291,7 @@ export const AppProvider = ({ children }) => {
     sessions,
     settings,
     currentSession,
+    hideBottomNav,
     login,
     logout,
     verifyCredentials,
