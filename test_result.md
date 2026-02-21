@@ -1101,9 +1101,7 @@ agent_communication:
         comment: "✅ ACCURACY % AND REMARKS IN EXISTING REPORTS WORKING - Bin-wise report: Found 4 locations with accuracy_pct and remark fields present, Total accuracy: 49.2%. Sample remark: 'Not Scanned — Item exists in master but was not counted'. Detailed report: Found 7 items with category, accuracy_pct and remark fields present. Professional contextual remarks working correctly."
 
 test_plan:
-  current_focus:
-    - "Sync Raw Logs Storage"
-    - "Sync Logs Portal Endpoint"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
