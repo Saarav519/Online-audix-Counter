@@ -76,7 +76,8 @@ const Reports = () => {
     renameLocation,
     getOrCreateAssignedLocation,
     playSound,
-    getMasterLocationByCode
+    getMasterLocationByCode,
+    user
   } = useApp();
 
   // ---- Search ----
