@@ -214,13 +214,15 @@ function AppRoutes() {
           <Route index element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
         </Route>
 
-        {/* Scanner App Routes */}
+        {/* Scanner App Routes - Mobile Only */}
         <Route
           path="/login"
           element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
+            <MobileOnlyGuard>
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            </MobileOnlyGuard>
           }
         />
         {/* Default route redirects to Reports */}
