@@ -754,18 +754,34 @@ agent_communication:
       Added "Clear Master Data" option inside Master Data page:
       
       1. ✅ Added "Clear Data" button (red outline) in Master Data page header
-      2. ✅ Confirmation dialog with checkboxes to selectively clear:
-         - Products (shows count)
-         - Locations (shows count)
-         - Authorization Users (shows count)
-      3. ✅ Warning message about permanent deletion
-      4. ✅ "Clear Selected" red button only enabled when at least one option is checked
-      5. ✅ Cancel button to dismiss
-      6. ✅ Exported clearMasterProducts, clearMasterLocations, clearAuthUsers from AppContext
+      2. ✅ Confirmation dialog with checkboxes to selectively clear Products, Locations, Auth Users
+      3. ✅ Exported clearMasterProducts, clearMasterLocations, clearAuthUsers from AppContext
       
       Files modified:
       - /app/frontend/src/context/AppContext.js - Exported clear functions in context value
       - /app/frontend/src/pages/MasterData.jsx - Added Clear Data button and confirmation dialog
+
+  - agent: "main"
+    message: |
+      Performance optimization - made app lighter without changing any features:
+      
+      1. ✅ Removed 30 unused dependencies from package.json (recharts, axios, date-fns, zod, 
+         react-hook-form, embla-carousel, cmdk, vaul, react-day-picker, input-otp, 
+         react-resizable-panels, react-window, next-themes, 16 unused @radix-ui packages)
+      2. ✅ Deleted 27 unused shadcn/ui component files (kept only 18 actually used)
+      3. ✅ Added React.lazy() code splitting for ScanItems, MasterData, Reports, Settings pages
+      4. ✅ Optimized CSV export blob download (removed nested setTimeout chains)
+      5. ✅ Added buildCSV helper for efficient array-join based CSV generation
+      6. ✅ Removed redundant localStorage writes for master products/locations (IndexedDB only)
+      7. ✅ Simplified sonner.jsx to remove next-themes dependency
+      8. ✅ Export alert kept as requested by user
+      
+      Files modified:
+      - /app/frontend/package.json - Removed 30 unused dependencies
+      - /app/frontend/src/components/ui/sonner.jsx - Simplified (removed next-themes)
+      - /app/frontend/src/App.js - Added React.lazy() + Suspense for route code splitting
+      - /app/frontend/src/utils/fileDownload.js - Optimized export, added buildCSV helper
+      - /app/frontend/src/context/AppContext.js - Removed redundant localStorage writes
       
       🔍 ENDPOINTS RE-TESTED (2026-02-21 14:21):
       1. GET /api/ → ✅ Returns {"message": "Hello World"} (Status: 200)
