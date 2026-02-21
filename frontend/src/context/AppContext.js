@@ -1270,6 +1270,8 @@ export const AppProvider = ({ children }) => {
     getAuthorizationUsers,
     getAllUsers,
     getNextPendingLocation,
+    getOrCreateAssignedLocation,
+    getNextSequentialLocation,
     getProductByBarcode,
     getStorageInfo,
     isLoadingMasterData,
