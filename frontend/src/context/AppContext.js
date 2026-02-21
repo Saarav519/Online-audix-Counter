@@ -315,13 +315,7 @@ export const AppProvider = ({ children }) => {
       MasterProductsDB.importAll(masterProducts)
         .then(() => console.log('✅ Master products saved to IndexedDB'))
         .catch(err => {
-          console.warn('IndexedDB save failed, using localStorage fallback:', err);
-          // Fallback to localStorage (may fail for large data)
-          try {
-            localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
-          } catch (e) {
-            console.error('localStorage also failed:', e);
-          }
+          console.warn('IndexedDB save failed:', err);
         });
     }, 500); // 500ms debounce
     
