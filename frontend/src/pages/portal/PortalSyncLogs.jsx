@@ -25,7 +25,6 @@ export default function PortalSyncLogs() {
   const [loading, setLoading] = useState(false);
   const [expandedClient, setExpandedClient] = useState(null);
   const [expandedDate, setExpandedDate] = useState(null);
-  const [expandedLog, setExpandedLog] = useState(null);
 
   useEffect(() => {
     fetchClients();
