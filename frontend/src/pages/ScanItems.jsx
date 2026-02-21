@@ -677,6 +677,8 @@ const ScanItems = () => {
         clearTimeout(barcodeAutoProcessTimerRef.current);
         barcodeAutoProcessTimerRef.current = null;
       }
+      // Mark that hardware hook just processed - prevents input handler from double-processing
+      lastHookScanTimeRef.current = Date.now();
       
       // Check if "Ask Quantity Before Adding" is ON
       if (askQuantityRef.current) {
