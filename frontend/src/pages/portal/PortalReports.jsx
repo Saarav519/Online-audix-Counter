@@ -259,25 +259,25 @@ export default function PortalReports() {
               <tbody>
                 {reportData.report.map((row, index) => (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="py-3 px-4 font-medium">{row.location}</td>
-                    <td className="py-3 px-4 text-right">{row.stock_qty}</td>
-                    <td className="py-3 px-4 text-right">{row.physical_qty}</td>
+                    <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
+                    <td className="py-3 px-4 text-right">{row.stock_qty || 0}</td>
+                    <td className="py-3 px-4 text-right">{row.physical_qty || 0}</td>
                     <td className="py-3 px-4 text-right">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${getVarianceClass(row.difference_qty)}`}>
-                        {getVarianceIcon(row.difference_qty)}
-                        {row.difference_qty > 0 ? '+' : ''}{row.difference_qty}
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${getVarianceClass(row.difference_qty || 0)}`}>
+                        {getVarianceIcon(row.difference_qty || 0)}
+                        {(row.difference_qty || 0) > 0 ? '+' : ''}{row.difference_qty || 0}
                       </span>
                     </td>
                   </tr>
                 ))}
                 <tr className="bg-gray-50 font-semibold">
                   <td className="py-3 px-4">TOTAL</td>
-                  <td className="py-3 px-4 text-right">{reportData.totals.stock_qty}</td>
-                  <td className="py-3 px-4 text-right">{reportData.totals.physical_qty}</td>
+                  <td className="py-3 px-4 text-right">{reportData.totals?.stock_qty || 0}</td>
+                  <td className="py-3 px-4 text-right">{reportData.totals?.physical_qty || 0}</td>
                   <td className="py-3 px-4 text-right">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${getVarianceClass(reportData.totals.difference_qty)}`}>
-                      {getVarianceIcon(reportData.totals.difference_qty)}
-                      {reportData.totals.difference_qty > 0 ? '+' : ''}{reportData.totals.difference_qty}
+                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded ${getVarianceClass(reportData.totals?.difference_qty || 0)}`}>
+                      {getVarianceIcon(reportData.totals?.difference_qty || 0)}
+                      {(reportData.totals?.difference_qty || 0) > 0 ? '+' : ''}{reportData.totals?.difference_qty || 0}
                     </span>
                   </td>
                 </tr>
