@@ -1,6 +1,7 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useDeviceDetection } from '../hooks/useDeviceDetection';
 import { downloadCSV, getCSVAcceptTypes } from '../utils/fileDownload';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -8,6 +9,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
+import { Progress } from '../components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -45,16 +47,22 @@ import {
   UserCheck,
   AlertCircle,
   MoreVertical,
-  Edit3
+  Edit3,
+  ChevronRight,
+  Target,
+  ListOrdered
 } from 'lucide-react';
 
 const Reports = () => {
   const navigate = useNavigate();
+  const { isScanner, isSmallScreen } = useDeviceDetection();
+  const showScannerMode = isScanner || isSmallScreen;
   const {
     locations,
     scannedItems,
     currentSession,
     masterProducts,
+    masterLocations,
     settings,
     addLocation,
     deleteLocation,
@@ -65,7 +73,10 @@ const Reports = () => {
     importAssignedLocations,
     clearAssignedLocations,
     verifyAuthorizationCredentials,
-    renameLocation
+    renameLocation,
+    getOrCreateAssignedLocation,
+    playSound,
+    getMasterLocationByCode
   } = useApp();
 
   // ---- Search ----
@@ -106,9 +117,223 @@ const Reports = () => {
   // ---- Success ----
   const [deleteSuccess, setDeleteSuccess] = useState(false);
 
+  // ---- Preassigned Mode: Scan Location ----
+  const [locationScanInput, setLocationScanInput] = useState('');
+  const [locationScanError, setLocationScanError] = useState('');
+  const [locationScanSuccess, setLocationScanSuccess] = useState('');
+  const locationScanInputRef = useRef(null);
+  const locationScanTimeRef = useRef(0);
+  const locationScanAutoTimerRef = useRef(null);
+
   const isPreAssignedMode = settings.locationScanMode === 'preassigned';
 
-  // ============ MODE-FILTERED & SORTED LOCATIONS ============
+  // ============ PREASSIGNED MODE: Build location data from masterLocations ============
+  const preassignedLocationData = useMemo(() => {
+    if (!isPreAssignedMode) return [];
+    return masterLocations.map((ml, index) => {
+      const assignedLoc = locations.find(l =>
+        l.isAssigned && l.code.toLowerCase() === ml.code.toLowerCase()
+      );
+      const items = assignedLoc ? (scannedItems[assignedLoc.id] || []) : [];
+      const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
+      return {
+        serialNo: index + 1,
+        masterLocation: ml,
+        assignedLocation: assignedLoc,
+        isSubmitted: assignedLoc?.isSubmitted || false,
+        isStarted: items.length > 0,
+        itemCount: items.length,
+        totalQuantity: totalQty
+      };
+    });
+  }, [isPreAssignedMode, masterLocations, locations, scannedItems]);
+
+  // Active location = first unsubmitted in sequence
+  const activeLocationCode = useMemo(() => {
+    const firstUnsubmitted = preassignedLocationData.find(d => !d.isSubmitted);
+    return firstUnsubmitted?.masterLocation.code || null;
+  }, [preassignedLocationData]);
+
+  // Progress stats
+  const preassignedStats = useMemo(() => {
+    if (!isPreAssignedMode) return null;
+    let totalItems = 0;
+    let totalQty = 0;
+    const uniqueBarcodes = new Set();
+    const completedCount = preassignedLocationData.filter(d => d.isSubmitted).length;
+
+    preassignedLocationData.forEach(d => {
+      if (d.assignedLocation) {
+        const items = scannedItems[d.assignedLocation.id] || [];
+        totalItems += items.length;
+        totalQty += items.reduce((sum, i) => sum + i.quantity, 0);
+        items.forEach(i => uniqueBarcodes.add(i.barcode));
+      }
+    });
+
+    return {
+      totalLocations: masterLocations.length,
+      completedLocations: completedCount,
+      totalItems,
+      totalQuantity: totalQty,
+      uniqueProducts: uniqueBarcodes.size,
+      progressPercent: masterLocations.length > 0
+        ? Math.round((completedCount / masterLocations.length) * 100)
+        : 0
+    };
+  }, [isPreAssignedMode, preassignedLocationData, scannedItems, masterLocations.length]);
+
+  // Filtered preassigned locations (search)
+  const filteredPreassignedData = useMemo(() => {
+    if (!searchTerm.trim()) return preassignedLocationData;
+    const term = searchTerm.toLowerCase();
+    return preassignedLocationData.filter(d =>
+      d.masterLocation.name.toLowerCase().includes(term) ||
+      d.masterLocation.code.toLowerCase().includes(term)
+    );
+  }, [preassignedLocationData, searchTerm]);
+
+  // Report items for preassigned export
+  const preassignedReportItems = useMemo(() => {
+    if (!isPreAssignedMode) return [];
+    return preassignedLocationData.flatMap(d => {
+      if (!d.assignedLocation) return [];
+      const items = scannedItems[d.assignedLocation.id] || [];
+      return items.map(item => ({
+        ...item,
+        locationName: d.masterLocation.name || d.masterLocation.code,
+        locationId: d.assignedLocation.id
+      }));
+    });
+  }, [isPreAssignedMode, preassignedLocationData, scannedItems]);
+
+  // Cleanup scan timers on unmount
+  useEffect(() => {
+    return () => {
+      if (locationScanAutoTimerRef.current) {
+        clearTimeout(locationScanAutoTimerRef.current);
+      }
+    };
+  }, []);
+
+  // ============ PREASSIGNED: Scan Location Handlers ============
+  const handlePreassignedLocationScan = useCallback((code) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+
+    // Validate against masterLocations
+    const masterLoc = masterLocations.find(
+      ml => ml.code.toLowerCase() === trimmed.toLowerCase()
+    );
+
+    if (!masterLoc) {
+      setLocationScanError(`Location "${trimmed}" not found in Location Master`);
+      setLocationScanSuccess('');
+      playSound(false);
+      setLocationScanInput('');
+      return;
+    }
+
+    // Find or create assigned location
+    const assignedLoc = getOrCreateAssignedLocation(masterLoc.code, masterLoc.name);
+
+    if (assignedLoc.isSubmitted) {
+      setLocationScanError(`"${masterLoc.name}" is already submitted & locked`);
+      setLocationScanSuccess('');
+      playSound(false);
+      setLocationScanInput('');
+      return;
+    }
+
+    // Navigate to scan page
+    setLocationScanError('');
+    setLocationScanSuccess('');
+    setLocationScanInput('');
+    playSound(true);
+    navigate(`/scan?location=${assignedLoc.id}`);
+  }, [masterLocations, getOrCreateAssignedLocation, playSound, navigate]);
+
+  const handleLocationScanInputChange = (e) => {
+    const newValue = e.target.value;
+    setLocationScanInput(newValue);
+    setLocationScanError('');
+
+    const currentTime = Date.now();
+    const timeDiff = currentTime - locationScanTimeRef.current;
+    const charsAdded = newValue.length - locationScanInput.length;
+    locationScanTimeRef.current = currentTime;
+
+    if (locationScanAutoTimerRef.current) {
+      clearTimeout(locationScanAutoTimerRef.current);
+      locationScanAutoTimerRef.current = null;
+    }
+
+    // Scanner detection: rapid input or multiple chars at once
+    if (newValue.trim() && (charsAdded > 2 || (timeDiff < 80 && charsAdded > 0))) {
+      locationScanAutoTimerRef.current = setTimeout(() => {
+        const finalValue = locationScanInputRef.current?.value?.trim();
+        if (finalValue) {
+          handlePreassignedLocationScan(finalValue);
+        }
+      }, 300);
+    }
+  };
+
+  const handleLocationScanKeyDown = (e) => {
+    if (e.key === 'Enter' && locationScanInput.trim()) {
+      if (locationScanAutoTimerRef.current) {
+        clearTimeout(locationScanAutoTimerRef.current);
+        locationScanAutoTimerRef.current = null;
+      }
+      handlePreassignedLocationScan(locationScanInput.trim());
+    }
+  };
+
+  // ============ PREASSIGNED: Location Tap Handler ============
+  const handlePreassignedLocationTap = (locData) => {
+    const { masterLocation, assignedLocation, isSubmitted } = locData;
+
+    if (isSubmitted && assignedLocation) {
+      // Show reopen option
+      setSelectedLocation(assignedLocation);
+      setShowReopenModal(true);
+      return;
+    }
+
+    // Open for scanning
+    const assignedLoc = getOrCreateAssignedLocation(masterLocation.code, masterLocation.name);
+    navigate(`/scan?location=${assignedLoc.id}`);
+  };
+
+  // ============ PREASSIGNED: Export CSV ============
+  const handlePreassignedExportCSV = async () => {
+    if (preassignedReportItems.length === 0) return;
+    const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
+    const rows = preassignedReportItems.map(item => {
+      const masterProduct = masterProducts.find(p => p.barcode === item.barcode);
+      return [
+        `"${item.locationName}"`,
+        item.barcode,
+        `"${item.productName}"`,
+        masterProduct?.price?.toFixed(2) || '0.00',
+        item.quantity,
+        `"${new Date(item.scannedAt).toLocaleString()}"`
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const filename = `stock_report_preassigned_${new Date().toISOString().split('T')[0]}.csv`;
+    await downloadCSV(csv, filename);
+  };
+
+  const handlePreassignedEmailReport = () => {
+    const subject = encodeURIComponent(`Stock Count Report - ${currentSession?.name || 'Audix'}`);
+    const body = encodeURIComponent(
+      `Stock Count Report\n\nSession: ${currentSession?.name}\nMode: Pre-Assigned\nLocations: ${preassignedStats?.totalLocations || 0}\nCompleted: ${preassignedStats?.completedLocations || 0}\nTotal Items: ${preassignedStats?.totalItems || 0}\nTotal Quantity: ${preassignedStats?.totalQuantity || 0}\nUnique Products: ${preassignedStats?.uniqueProducts || 0}\n\nPlease find the detailed report attached.`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  };
+
+  // ============ MODE-FILTERED & SORTED LOCATIONS (Dynamic mode) ============
   const modeFilteredLocations = useMemo(() => {
     return locations.filter(loc => {
       if (isPreAssignedMode) {
@@ -137,7 +362,7 @@ const Reports = () => {
     );
   }, [sortedLocations, searchTerm]);
 
-  // ============ STATS ============
+  // ============ STATS (Dynamic mode) ============
   const getLocationStats = (locationId) => {
     const items = scannedItems[locationId] || [];
     return {
@@ -146,7 +371,7 @@ const Reports = () => {
     };
   };
 
-  // Items for selected locations (for export)
+  // Items for selected locations (for export - Dynamic mode)
   const reportItems = useMemo(() => {
     const locsToUse = isAllSelected ? filteredLocations : filteredLocations.filter(l => selectedLocations.includes(l.id));
     return locsToUse.flatMap(loc => {
@@ -164,7 +389,7 @@ const Reports = () => {
 
   const assignedLocationsCount = locations.filter(loc => loc.isAssigned).length;
 
-  // ============ SELECTION HANDLERS ============
+  // ============ SELECTION HANDLERS (Dynamic mode) ============
   const handleLocationToggle = (locationId) => {
     if (locationId === 'all') {
       if (isAllSelected) {
@@ -330,7 +555,7 @@ COLD-01,Cold Storage Unit 1`;
     }
   };
 
-  // ============ EXPORT ============
+  // ============ EXPORT (Dynamic mode) ============
   const getMasterProductDetails = (barcode) => masterProducts.find(p => p.barcode === barcode) || null;
 
   const handleExportCSV = async () => {
@@ -362,7 +587,322 @@ COLD-01,Cold Storage Unit 1`;
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
-  // ============ RENDER ============
+  // ================================================================
+  // ============ PREASSIGNED MODE RENDER ============
+  // ================================================================
+  if (isPreAssignedMode) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <ListOrdered className="w-5 h-5 text-blue-600" />
+              Locations
+            </h1>
+            <p className="text-xs text-slate-500">Guided sequential scanning</p>
+          </div>
+          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
+            Pre-Assigned
+          </Badge>
+        </div>
+
+        {/* Scan Location Bar */}
+        <Card className="border-2 border-blue-200 shadow-sm mb-3 bg-blue-50/50">
+          <CardContent className="p-3">
+            <Label className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1.5">
+              <ScanBarcode className="w-3.5 h-3.5" />
+              Scan Location Barcode
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                ref={locationScanInputRef}
+                placeholder="Scan or type location code..."
+                value={locationScanInput}
+                onChange={handleLocationScanInputChange}
+                onKeyDown={handleLocationScanKeyDown}
+                className="h-11 text-base font-mono flex-1 bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500"
+                autoComplete="off"
+              />
+              <Button
+                onClick={() => handlePreassignedLocationScan(locationScanInput.trim())}
+                disabled={!locationScanInput.trim()}
+                className="h-11 px-4 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            </div>
+            {locationScanError && (
+              <div className="mt-2 p-2 bg-red-50 text-red-600 text-xs rounded-lg flex items-center gap-1.5 border border-red-200">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                {locationScanError}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Progress */}
+        {masterLocations.length > 0 && preassignedStats && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-slate-600">
+                Progress: {preassignedStats.completedLocations} of {preassignedStats.totalLocations} locations
+              </span>
+              <span className="text-xs font-bold text-blue-700">
+                {preassignedStats.progressPercent}%
+              </span>
+            </div>
+            <Progress value={preassignedStats.progressPercent} className="h-2.5" />
+          </div>
+        )}
+
+        {/* Stats Row */}
+        {preassignedStats && (
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-2 text-center">
+                <p className="text-lg font-bold text-slate-800">{preassignedStats.totalLocations}</p>
+                <p className="text-[10px] text-slate-500">Locations</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-2 text-center">
+                <p className="text-lg font-bold text-emerald-600">{preassignedStats.completedLocations}</p>
+                <p className="text-[10px] text-slate-500">Done</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-2 text-center">
+                <p className="text-lg font-bold text-slate-800">{preassignedStats.totalItems}</p>
+                <p className="text-[10px] text-slate-500">Items</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-2 text-center">
+                <p className="text-lg font-bold text-slate-800">{preassignedStats.totalQuantity}</p>
+                <p className="text-[10px] text-slate-500">Quantity</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreassignedExportCSV}
+            disabled={preassignedReportItems.length === 0}
+          >
+            <Download className="w-4 h-4 mr-1" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePreassignedEmailReport}
+            disabled={preassignedReportItems.length === 0}
+          >
+            <Mail className="w-4 h-4 mr-1" />
+            Email
+          </Button>
+        </div>
+
+        {/* Search */}
+        {masterLocations.length > 6 && (
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder="Search locations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 text-sm border-slate-200"
+            />
+          </div>
+        )}
+
+        {/* Location List */}
+        <div className="flex-1 overflow-hidden" style={{ minHeight: '200px' }}>
+          <div className="h-full overflow-y-auto rounded-lg border border-slate-200 bg-white" style={{ WebkitOverflowScrolling: 'touch' }}>
+            {masterLocations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4">
+                <MapPin className="w-12 h-12 text-slate-300 mb-4" />
+                <p className="text-slate-500 font-medium text-center">No locations in Location Master</p>
+                <p className="text-xs text-slate-400 mt-1 text-center">
+                  Go to Master Data → Locations tab to import locations
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => navigate('/master-data')}
+                >
+                  <Package className="w-4 h-4 mr-1" />
+                  Go to Master Data
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredPreassignedData.map((locData) => {
+                  const { serialNo, masterLocation, assignedLocation, isSubmitted, isStarted, itemCount, totalQuantity: locQty } = locData;
+                  const isActive = masterLocation.code === activeLocationCode;
+
+                  return (
+                    <div
+                      key={masterLocation.code}
+                      className={`flex items-center gap-2.5 px-3 py-3 transition-all cursor-pointer active:bg-slate-100 ${
+                        isSubmitted
+                          ? 'bg-emerald-50/60'
+                          : isActive
+                            ? 'bg-blue-50 border-l-4 border-l-blue-500'
+                            : isStarted
+                              ? 'bg-amber-50/40'
+                              : 'bg-white'
+                      }`}
+                      onClick={() => handlePreassignedLocationTap(locData)}
+                    >
+                      {/* Serial Number / Status Icon */}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isSubmitted
+                          ? 'bg-emerald-500'
+                          : isActive
+                            ? 'bg-blue-500'
+                            : isStarted
+                              ? 'bg-amber-400'
+                              : 'bg-slate-200'
+                      }`}>
+                        {isSubmitted ? (
+                          <Check className="w-5 h-5 text-white" />
+                        ) : isActive ? (
+                          <Target className="w-4 h-4 text-white" />
+                        ) : (
+                          <span className={`text-sm font-bold ${isStarted ? 'text-white' : 'text-slate-500'}`}>
+                            {serialNo}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Location Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-semibold text-sm truncate ${
+                            isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
+                          }`}>
+                            {masterLocation.name || masterLocation.code}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-slate-400 font-mono">{masterLocation.code}</span>
+                          {isSubmitted && (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] px-1.5 py-0">
+                              <Lock className="w-2.5 h-2.5 mr-0.5" />
+                              Submitted
+                            </Badge>
+                          )}
+                          {isActive && !isSubmitted && (
+                            <Badge className="bg-blue-100 text-blue-700 border-0 text-[10px] px-1.5 py-0">
+                              Next
+                            </Badge>
+                          )}
+                          {isStarted && !isSubmitted && !isActive && (
+                            <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] px-1.5 py-0">
+                              In Progress
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="text-center min-w-[44px] flex-shrink-0">
+                        <p className={`text-base font-bold ${
+                          isSubmitted ? 'text-emerald-700' : locQty > 0 ? 'text-slate-700' : 'text-slate-300'
+                        }`}>{locQty}</p>
+                        <p className="text-[10px] text-slate-400">Qty</p>
+                      </div>
+
+                      {/* Arrow / Lock Icon */}
+                      <div className="flex-shrink-0">
+                        {isSubmitted ? (
+                          <Lock className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <ChevronRight className={`w-5 h-5 ${isActive ? 'text-blue-500' : 'text-slate-300'}`} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ============ MODALS (shared) ============ */}
+
+        {/* Reopen Location Modal */}
+        <Dialog open={showReopenModal} onOpenChange={setShowReopenModal}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />Reopen Location?
+              </DialogTitle>
+              <DialogDescription>This location has been submitted. Reopening will allow editing.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-sm text-slate-600"><strong>Location:</strong> {selectedLocation?.name}</p>
+              <p className="text-sm text-slate-500 mt-2">You will need to authenticate to proceed.</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancel</Button>
+              <Button onClick={handleReopenConfirm} className="bg-amber-500 hover:bg-amber-600">Continue</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Authentication Modal */}
+        <Dialog open={showAuthModal} onOpenChange={(open) => {
+          setShowAuthModal(open);
+          if (!open) {
+            setAuthCredentials({ userId: '', password: '' });
+            setAuthError('');
+          }
+        }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lock className="w-5 h-5 text-amber-600" />Authorization Required
+              </DialogTitle>
+              <DialogDescription>Enter your credentials to proceed.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              {authError && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />{authError}
+                </p>
+              )}
+              <div>
+                <Label htmlFor="auth-userId">User ID</Label>
+                <Input id="auth-userId" type="text" value={authCredentials.userId} onChange={(e) => { setAuthCredentials({ ...authCredentials, userId: e.target.value }); setAuthError(''); }} placeholder="Enter user ID" className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="auth-password">Password</Label>
+                <Input id="auth-password" type="password" value={authCredentials.password} onChange={(e) => { setAuthCredentials({ ...authCredentials, password: e.target.value }); setAuthError(''); }} placeholder="Enter password" className="mt-1" onKeyPress={(e) => e.key === 'Enter' && handleAuthSubmit()} />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setShowAuthModal(false)}>Cancel</Button>
+              <Button onClick={handleAuthSubmit} disabled={!authCredentials.userId || !authCredentials.password} className="bg-emerald-600 hover:bg-emerald-700">
+                Authorize
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
+
+  // ================================================================
+  // ============ DYNAMIC MODE RENDER (existing - unchanged) ============
+  // ================================================================
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
