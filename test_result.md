@@ -930,15 +930,18 @@ agent_communication:
 
   - task: "Variance Mode on Audit Sessions"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added variance_mode field to AuditSession and AuditSessionCreate models. Sessions can now be created with bin-wise, barcode-wise, or article-wise mode."
+      - working: true
+        agent: "testing"
+        comment: "✅ VARIANCE MODE SESSIONS WORKING - Successfully created 3 sessions with different variance modes: Session A (bin-wise ID: 96fe41ad-d2e2-4307-b23e-7aa51ce2f501), Session B (barcode-wise ID: ffc26df8-47b9-4fa8-99e7-e376eae9f0a2), Session C (article-wise ID: 5b12352d-7fed-49cf-b363-a3c8f0b3905b). All sessions correctly store variance_mode field in database."
 
   - task: "CSV Import with Category and Article fields"
     implemented: true
