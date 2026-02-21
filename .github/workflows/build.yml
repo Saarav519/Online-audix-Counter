@@ -81,28 +81,46 @@ jobs:
         working-directory: frontend
         run: npx cap sync android
 
+      - name: Download Gradle Wrapper JAR
+        working-directory: frontend/android
+        run: |
+          mkdir -p gradle/wrapper
+          curl -L -o gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.0.2/gradle/wrapper/gradle-wrapper.jar
+
       - name: Make gradlew executable
         working-directory: frontend/android
         run: chmod +x ./gradlew
 
       - name: Build Debug APK
         working-directory: frontend/android
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK files
+        run: |
+          echo "=== Searching for all APK files ==="
+          find frontend/android -name "*.apk" -type f 2>/dev/null
+          echo "=== Done ==="
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: audix-android-debug-apk
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          path: frontend/android/**/*.apk
           retention-days: 30
 
       - name: Build Release APK (unsigned)
         working-directory: frontend/android
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Find Release APK files
+        run: |
+          echo "=== Searching for all APK files ==="
+          find frontend/android -name "*.apk" -type f 2>/dev/null
+          echo "=== Done ==="
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: audix-android-release-apk
-          path: frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: frontend/android/**/*.apk
           retention-days: 30
