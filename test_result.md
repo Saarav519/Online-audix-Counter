@@ -220,6 +220,66 @@ frontend:
         agent: "testing"
         comment: "✅ Reports export functionality working perfectly. Successfully exported 'stock_report_all_locations_2026-01-16.csv'. All locations selection, single location, and multiple location export options are available and functional."
 
+  - task: "Preassigned Mode - Location List from Master"
+    implemented: true
+    working: true
+    file: "pages/Reports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Preassigned mode now shows locations from masterLocations (Location Master) in import order with serial numbers, visual indicators, and progress bar"
+
+  - task: "Preassigned Mode - Scan Location Barcode"
+    implemented: true
+    working: true
+    file: "pages/Reports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Scan Location input at top of preassigned mode with hardware scanner detection. Validates against masterLocations."
+
+  - task: "Preassigned Mode - Sequential Flow After Submit"
+    implemented: true
+    working: true
+    file: "pages/ScanItems.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "After submit in preassigned mode, auto-navigates to next unsubmitted location in master sequence."
+
+  - task: "Preassigned Mode - Manual Override"
+    implemented: true
+    working: true
+    file: "pages/Reports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Users can tap any location from the list to open it manually."
+
+  - task: "Preassigned Mode - Dynamic Mode Unchanged"
+    implemented: true
+    working: true
+    file: "pages/Reports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Dynamic mode UI and functionality completely preserved."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
