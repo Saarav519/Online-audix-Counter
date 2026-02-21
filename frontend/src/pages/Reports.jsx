@@ -168,9 +168,7 @@ const Reports = () => {
   const handleLocationToggle = (locationId) => {
     if (locationId === 'all') {
       if (isAllSelected) {
-        if (filteredLocations.length > 0) {
-          setSelectedLocations([filteredLocations[0].id]);
-        }
+        setSelectedLocations([]);
       } else {
         setSelectedLocations(['all']);
       }
@@ -178,8 +176,7 @@ const Reports = () => {
       setSelectedLocations(prev => {
         const newSelection = prev.filter(id => id !== 'all');
         if (newSelection.includes(locationId)) {
-          const filtered = newSelection.filter(id => id !== locationId);
-          return filtered.length === 0 ? ['all'] : filtered;
+          return newSelection.filter(id => id !== locationId);
         } else {
           return [...newSelection, locationId];
         }
