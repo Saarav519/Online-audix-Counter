@@ -448,6 +448,7 @@ const ScanItems = () => {
   const locationAutoConfirmTimerRef = useRef(null);
   const barcodeInputTimeRef = useRef(0);
   const barcodeAutoProcessTimerRef = useRef(null);
+  const lastHookScanTimeRef = useRef(0); // Track when hardware hook last processed a barcode
   
   // Keep askQuantityRef in sync
   useEffect(() => {
