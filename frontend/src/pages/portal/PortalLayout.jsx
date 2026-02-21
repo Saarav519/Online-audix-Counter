@@ -6,8 +6,6 @@ import {
   FolderOpen, 
   Smartphone, 
   FileBarChart, 
-  Bell, 
-  Settings, 
   LogOut,
   Database
 } from 'lucide-react';
