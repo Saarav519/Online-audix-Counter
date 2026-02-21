@@ -1100,8 +1100,56 @@ agent_communication:
         agent: "testing"
         comment: "✅ ACCURACY % AND REMARKS IN EXISTING REPORTS WORKING - Bin-wise report: Found 4 locations with accuracy_pct and remark fields present, Total accuracy: 49.2%. Sample remark: 'Not Scanned — Item exists in master but was not counted'. Detailed report: Found 7 items with category, accuracy_pct and remark fields present. Professional contextual remarks working correctly."
 
+  - agent: "main"
+    message: |
+      MASTER PRODUCTS (CLIENT-LEVEL) FEATURE IMPLEMENTATION:
+      
+      BACKEND CHANGES (server.py):
+      1. New MasterProduct model: barcode, description, category, mrp, cost, article_code, article_name
+      2. Client model updated with master_imported and master_product_count fields
+      3. NEW ENDPOINT: POST /api/portal/clients/{client_id}/import-master - CSV upload
+      4. NEW ENDPOINT: GET /api/portal/clients/{client_id}/master-products - List with pagination
+      5. NEW ENDPOINT: GET /api/portal/clients/{client_id}/master-products/stats - Stats
+      6. NEW ENDPOINT: DELETE /api/portal/clients/{client_id}/master-products - Clear
+      7. New helper: get_master_for_session() loads master by barcode for session's client
+      8. Updated generate_remark() with in_product_master and in_expected_stock params
+      9. UPDATED: detailed, barcode-wise, article-wise, category-summary reports use master for product info
+      10. Reports now handle 4 scenarios: in_master+in_stock+scanned, in_master+in_stock+not_scanned, in_master+not_in_stock+scanned, not_in_master+scanned
+      
+      FRONTEND CHANGES:
+      1. PortalClients.jsx - Added Upload Master button, View Master, master stats display per client
+      2. PortalSessions.jsx - Simplified expected stock import to quantities only (Barcode+Qty)
+      
+      NEEDS TESTING: All new master product endpoints and updated report endpoints.
+
+  - task: "Master Products Import (Client-Level)"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New endpoints: POST import-master, GET master-products, GET stats, DELETE clear. Replaces on re-upload. CSV format: Barcode,Description,Category,MRP,Cost,Article_Code,Article_Name"
+
+  - task: "Reports Using Master Products for Product Info"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated detailed, barcode-wise, article-wise, category-summary reports to use master products (by client_id) for product info enrichment. Expected stock only provides quantities. 4 variance scenarios handled."
+
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Master Products Import (Client-Level)"
+    - "Reports Using Master Products for Product Info"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
