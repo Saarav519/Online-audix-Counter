@@ -214,6 +214,18 @@ function AppRoutes() {
         >
           <Route index element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
         </Route>
+        <Route
+          path="/portal/sync-logs"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalSyncLogs /></Suspense>} />
+        </Route>
 
         {/* Scanner App Routes - Mobile Only */}
         <Route
