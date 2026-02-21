@@ -722,6 +722,37 @@ const ScanItems = () => {
   // When manual entry is ON, both hook and input field work
   useHardwareScanner(handleHardwareScan, !isLocationLocked, settings.allowManualBarcodeEntry !== false);
 
+  // ============================================
+  // URL SYNC: Handle sequential navigation in preassigned mode
+  // When URL changes (e.g., after submit auto-navigates to next location),
+  // sync the state with the new URL param
+  // ============================================
+  const prevUrlLocationRef = useRef(searchParams.get('location'));
+  useEffect(() => {
+    const urlLocation = searchParams.get('location');
+    if (urlLocation && urlLocation !== prevUrlLocationRef.current) {
+      prevUrlLocationRef.current = urlLocation;
+      // New location from URL (sequential navigation after submit)
+      setSelectedLocationId(urlLocation);
+      setLocationInput('');
+      setBarcodeInput('');
+      setLastScanResult(null);
+      setWaitingForLocationScan(false);
+      loadedLocationRef.current = null; // Force reload items for new location
+      setTempLocation(null);
+      setTempScannedItems([]);
+      setEditingItemId(null);
+      setEditQuantity('');
+      setScanCount(0);
+      // Focus barcode input for new location
+      setTimeout(() => {
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+      }, 200);
+    }
+  }, [searchParams]);
+
   // In Pre-Assigned mode, redirect to Locations page if no location is selected
   // Scan Items should only be accessed by opening a location from the Locations page
   useEffect(() => {
