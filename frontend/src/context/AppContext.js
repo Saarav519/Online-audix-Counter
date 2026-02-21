@@ -88,6 +88,9 @@ export const AppProvider = ({ children }) => {
   });
   const [currentSession, setCurrentSession] = useState(mockSessions[0]);
 
+  // UI state: hide bottom nav during active scanning
+  const [hideBottomNav, setHideBottomNav] = useState(false);
+
   // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
   // CRITICAL: This must complete BEFORE any auto-save can run
