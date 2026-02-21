@@ -1145,7 +1145,7 @@ const ScanItems = () => {
 
   // Update quantity in TEMP state
   const handleQuantityUpdate = (itemId) => {
-    const newQty = parseInt(editQuantity);
+    const newQty = parseFloat(editQuantity);
     if (newQty > 0) {
       // In Single SKU mode, only allow DECREASE (not increase)
       if (isSingleSkuMode) {
