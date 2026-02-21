@@ -63,6 +63,8 @@ class Client(BaseModel):
     contact_phone: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
+    master_imported: bool = False
+    master_product_count: int = 0
 
 class ClientCreate(BaseModel):
     name: str
