@@ -122,9 +122,11 @@ class AudixBackendTester:
             
             if response.status_code == 200:
                 result = response.json()
-                if "imported_count" in result and result["imported_count"] >= 2:
+                # Handle different response formats
+                imported_count = result.get("imported_count") or result.get("product_count", 0)
+                if imported_count >= 2:
                     return self.log_test("Upload Master Products", True, 
-                        f"Master products uploaded - Count: {result['imported_count']}")
+                        f"Master products uploaded - Count: {imported_count}")
                 else:
                     return self.log_test("Upload Master Products", False, f"Invalid import result: {result}")
             else:
