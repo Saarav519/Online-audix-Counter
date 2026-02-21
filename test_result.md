@@ -990,15 +990,18 @@ agent_communication:
 
   - task: "Category-wise Summary Report"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "New endpoint GET /api/portal/reports/{session_id}/category-summary. Groups all data by category field from master. Shows item count, stock/physical qty/value, diff, accuracy, remarks."
+      - working: true
+        agent: "testing"
+        comment: "✅ CATEGORY-WISE SUMMARY REPORT WORKING - GET /api/portal/reports/{session_id}/category-summary endpoint successfully groups data by category. Session A: 3 categories (Dairy, Grocery, Unmapped), Total accuracy: 49.2%. Session C: 3 categories (Bottoms, Clothing, Unmapped), Total accuracy: 100.0%. All records have category, accuracy_pct fields."
 
   - task: "Accuracy % and Remarks in Existing Reports"
     implemented: true
