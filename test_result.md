@@ -1153,21 +1153,32 @@ agent_communication:
         comment: "✅ REPORTS USING MASTER PRODUCTS WORKING - Comprehensive testing of all 4 variance scenarios successful. DETAILED REPORT: Rice 5kg gets description/category from master (not expected stock), Oil 1L enriched from master when expected had no description, Butter shows 'In Master, Not in Stock' remark, Unknown barcode shows 'Not in Master' remark. BARCODE-WISE REPORT: Product info enriched from master with correct in_master/in_expected_stock flags. CATEGORY-SUMMARY: Categories correctly sourced from master (Grocery, Dairy, Misc). BIN-WISE: Working correctly. All reports handle master enrichment priority: master > expected > physical. BACKWARD COMPATIBILITY CONFIRMED: Reports work without master products using expected stock info."
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Sync Logs Client-wise Date-wise Grouping"
+    - "Cascading Client Delete"
+    - "Sync Logs Day-wise Export"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
   - agent: "main"
     message: |
-      ADDITIONAL CHANGES implemented per user request:
+      NEW CHANGES IMPLEMENTED:
       
-      1. Article-wise report - Expandable barcode rows: Click on any article row to see actual barcodes
-      2. Raw Sync Logs: Added sync_raw_logs collection that stores every sync as-is (append-only audit trail)
-         - NEW ENDPOINT: GET /api/portal/sync-logs?client_id=&session_id=&limit= 
-         - NEW ENDPOINT: GET /api/portal/sync-logs/{log_id}
-      3. New PortalSyncLogs.jsx page with client/session filter and expandable raw payload view
-      4. Added Sync Logs link in portal sidebar navigation
+      1. SYNC LOGS ENHANCEMENT:
+         - NEW ENDPOINT: GET /api/portal/sync-logs/grouped (returns logs grouped by client_id → sync_date)
+         - NEW ENDPOINT: GET /api/portal/sync-logs/export?client_id=X&date=Y (CSV export per day)
+         - Updated GET /api/portal/sync-logs to support date filter parameter
+         - Frontend PortalSyncLogs.jsx: 3-level accordion: Client → Date → Individual logs
+         - Each date row has "Export Day" button for CSV download
+      
+      2. CASCADING CLIENT DELETE:
+         - DELETE /api/portal/clients/{client_id} now deletes ALL related data:
+           master_products, expected_stock (for all sessions), synced_locations (for all sessions),
+           sync_raw_logs, audit_sessions, alerts
+         - Returns detailed deleted summary
+      
+      NEEDS TESTING: grouped sync-logs endpoint, export endpoint, cascading delete
       5. Confirmed: Re-sync of a location replaces old data in synced_locations but raw logs preserved
       
       NEEDS TESTING: Sync raw logs endpoints
