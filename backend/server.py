@@ -275,6 +275,21 @@ async def login_portal_user(credentials: PortalUserLogin):
     if not verify_password(credentials.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    # Check if user is active
+    if not user.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Your account has been disabled. Contact admin.")
+    
+    # Check if user is approved
+    if not user.get("is_approved", True):
+        raise HTTPException(status_code=403, detail="Your account is pending admin approval.")
+    
+    # Update last_login
+    now = datetime.now(timezone.utc).isoformat()
+    await db.portal_users.update_one(
+        {"id": user["id"]},
+        {"$set": {"last_login": now}}
+    )
+    
     return {
         "message": "Login successful",
         "user": {
