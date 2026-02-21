@@ -1569,6 +1569,7 @@ const ScanItems = () => {
                       setEditQuantity={setEditQuantity}
                       onQuantityUpdate={handleQuantityUpdate}
                       onDelete={handleDelete}
+                      singleSkuMode={isSingleSkuMode}
                       isLocationLocked={isLocationLocked}
                       onStartEdit={(id, qty) => {
                         setEditingItemId(id);
