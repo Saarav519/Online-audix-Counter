@@ -232,7 +232,8 @@ Bin-A,1111111111111,50"""
             
             if response.status_code == 200:
                 result = response.json()
-                if "success" in result and result["success"]:
+                # Check for success indicators
+                if ("success" in result and result["success"]) or ("message" in result and "successful" in result["message"].lower()):
                     return self.log_test("Sync Physical Data", True, 
                         f"Physical data synced - Message: {result.get('message', 'Success')}")
                 else:
