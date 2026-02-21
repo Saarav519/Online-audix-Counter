@@ -345,6 +345,32 @@ const Reports = () => {
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
 
+  // ============ EXPORT AUTH (password-only) ============
+  const handleExportAuthRequest = (action) => {
+    setPendingExportAction(action);
+    setExportAuthPassword('');
+    setExportAuthError('');
+    setShowExportAuthModal(true);
+  };
+
+  const handleExportAuthSubmit = () => {
+    // Verify password against logged-in user
+    const result = verifyAuthorizationCredentials(user?.userId || 'admin', exportAuthPassword);
+    if (result.success) {
+      setShowExportAuthModal(false);
+      setExportAuthError('');
+      setExportAuthPassword('');
+      // Execute the pending export action
+      if (pendingExportAction === 'csv') handleExportCSV();
+      else if (pendingExportAction === 'email') handleEmailReport();
+      else if (pendingExportAction === 'csv-preassigned') handlePreassignedExportCSV();
+      else if (pendingExportAction === 'email-preassigned') handlePreassignedEmailReport();
+      setPendingExportAction(null);
+    } else {
+      setExportAuthError('Incorrect password');
+    }
+  };
+
   // ============ MODE-FILTERED & SORTED LOCATIONS (Dynamic mode) ============
   const modeFilteredLocations = useMemo(() => {
     return locations.filter(loc => {
