@@ -604,6 +604,28 @@ async def get_sync_config():
         "sessions": sessions
     }
 
+# ==================== SYNC RAW LOGS ROUTES ====================
+
+@portal_router.get("/sync-logs")
+async def get_sync_logs(client_id: str = None, session_id: str = None, limit: int = 100):
+    """Get raw sync logs, optionally filtered by client and/or session"""
+    query = {}
+    if client_id:
+        query["client_id"] = client_id
+    if session_id:
+        query["session_id"] = session_id
+    
+    logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", -1).to_list(limit)
+    return logs
+
+@portal_router.get("/sync-logs/{log_id}")
+async def get_sync_log_detail(log_id: str):
+    """Get detailed raw sync log by ID"""
+    log = await db.sync_raw_logs.find_one({"id": log_id}, {"_id": 0})
+    if not log:
+        raise HTTPException(status_code=404, detail="Sync log not found")
+    return log
+
 # ==================== REPORTS HELPER FUNCTIONS ====================
 
 def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
