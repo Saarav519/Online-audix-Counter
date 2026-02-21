@@ -1719,17 +1719,19 @@ const ScanItems = () => {
           >
             {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
           </Badge>
-          <div className="flex items-center gap-2 px-3 py-1.5 border rounded-full bg-white">
-            <Label htmlFor="ask-qty-toggle-desktop" className="text-xs text-slate-600 cursor-pointer whitespace-nowrap">
-              Ask Quantity Before Adding
-            </Label>
-            <Switch
-              id="ask-qty-toggle-desktop"
-              checked={askQuantityBeforeAdding}
-              onCheckedChange={handleToggleAskQuantity}
-              className="data-[state=checked]:bg-emerald-600"
-            />
-          </div>
+          {!isSingleSkuMode && (
+            <div className="flex items-center gap-2 px-3 py-1.5 border rounded-full bg-white">
+              <Label htmlFor="ask-qty-toggle-desktop" className="text-xs text-slate-600 cursor-pointer whitespace-nowrap">
+                Ask Quantity Before Adding
+              </Label>
+              <Switch
+                id="ask-qty-toggle-desktop"
+                checked={askQuantityBeforeAdding}
+                onCheckedChange={handleToggleAskQuantity}
+                className="data-[state=checked]:bg-emerald-600"
+              />
+            </div>
+          )}
           {selectedLocationId && !isLocationLocked && locationItems.length > 0 && (
             <Button
               onClick={handleSubmitLocation}
