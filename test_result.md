@@ -975,15 +975,18 @@ agent_communication:
 
   - task: "Article-wise Variance Report"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "New endpoint GET /api/portal/reports/{session_id}/article-wise. Groups barcodes by article_code from master. Handles unmapped barcodes (not in master). Returns accuracy%, remarks."
+      - working: true
+        agent: "testing"
+        comment: "✅ ARTICLE-WISE VARIANCE REPORT WORKING - GET /api/portal/reports/{session_id}/article-wise endpoint successfully groups barcodes by article_code. Found 4 article groups including 1 UNMAPPED barcode (9999999999999, Qty: 3.0). Sample article ART001 contains 2 barcodes. All records have article_code, barcodes array, accuracy_pct, and remark fields."
 
   - task: "Category-wise Summary Report"
     implemented: true
