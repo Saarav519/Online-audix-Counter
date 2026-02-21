@@ -740,7 +740,7 @@ export const AppProvider = ({ children }) => {
   const renameLocation = (locationId, newName) => {
     setLocations(prev => prev.map(loc =>
       loc.id === locationId
-        ? { ...loc, name: newName, lastUpdated: new Date().toISOString() }
+        ? { ...loc, name: newName, code: newName, lastUpdated: new Date().toISOString() }
         : loc
     ));
   };
