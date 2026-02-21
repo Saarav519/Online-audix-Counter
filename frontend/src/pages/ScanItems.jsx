@@ -92,6 +92,7 @@ const ScannedItemRow = memo(({
   setEditQuantity, 
   onQuantityUpdate, 
   onDelete,
+  singleSkuMode,
   isLocationLocked,
   onStartEdit,
   onDirectQuantityChange
@@ -120,11 +121,16 @@ const ScannedItemRow = memo(({
             ref={inlineInputRef}
             type="number"
             min="1"
+            max={singleSkuMode ? item.quantity : undefined}
             inputMode="numeric"
             pattern="[0-9]*"
             value={isEditing ? editQuantity : item.quantity}
             data-qty-input="true"
-            className="w-16 h-8 text-center text-sm font-bold p-1 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className={`w-16 h-8 text-center text-sm font-bold p-1 rounded border focus:outline-none focus:ring-2 ${
+              singleSkuMode 
+                ? 'border-amber-300 bg-amber-50 text-amber-700 focus:ring-amber-500 focus:border-amber-500' 
+                : 'border-emerald-300 bg-emerald-50 text-emerald-700 focus:ring-emerald-500 focus:border-emerald-500'
+            }`}
             onFocus={(e) => {
               e.stopPropagation();
               onStartEdit(item.id, String(item.quantity));
@@ -132,7 +138,15 @@ const ScannedItemRow = memo(({
             }}
             onChange={(e) => {
               e.stopPropagation();
-              setEditQuantity(e.target.value);
+              let val = e.target.value;
+              // In Single SKU mode, clamp to max = item.quantity (only decrease allowed)
+              if (singleSkuMode && val !== '') {
+                const numVal = parseInt(val);
+                if (!isNaN(numVal) && numVal > item.quantity) {
+                  val = String(item.quantity);
+                }
+              }
+              setEditQuantity(val);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
