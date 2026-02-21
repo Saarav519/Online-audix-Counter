@@ -476,19 +476,24 @@ agent_communication:
       
   - agent: "main"
     message: |
-      Fixed Manual Entry mode behavior for hardware scanners:
+      Implemented merge of Locations into Reports & removed Dashboard:
       
-      1. ✅ Manual Entry OFF now STRICTLY blocks manual typing
-         - Updated `useHardwareScanner` hook to intercept and `preventDefault` all printable keys when manual entry is disabled.
-         - Prevents characters from appearing in the input field.
-         - Still captures these keys in the background buffer for scanner detection.
+      1. ✅ Dashboard removed: No longer a route, not imported in App.js
+      2. ✅ Locations page merged into Reports: All features (search, add, import, rename, scan, submit & lock, delete) now in Reports.jsx
+      3. ✅ After login redirects to /reports instead of /
+      4. ✅ Bottom nav: Master, Scan, Reports, Settings (4 items)
+      5. ✅ /locations route redirects to /reports for backward compatibility
+      6. ✅ ScanItems.jsx navigate('/locations') → navigate('/reports')
       
-      2. ✅ Hardware Scanning still works when Manual Entry is OFF
-         - The background buffer analyzes typing speed.
-         - Fast input (Scanner) is processed and added.
-         - Slow input (Manual) is discarded.
-         - This solves the "Typo error on Enter" issue because the input field remains empty.
-         
       Files modified:
-      - /app/frontend/src/hooks/useDeviceDetection.js - Added strict blocking logic
-      - /app/frontend/src/pages/ScanItems.jsx - Passed manual entry setting to hook
+      - /app/frontend/src/pages/Reports.jsx - Complete rewrite merging Locations features
+      - /app/frontend/src/App.js - Removed Dashboard/Locations routes, default → /reports
+      - /app/frontend/src/components/Layout.jsx - Updated nav items, removed Dashboard/Locations
+      - /app/frontend/src/pages/ScanItems.jsx - Updated navigation references
+      
+      Testing agent should verify:
+      - Login redirects to /reports
+      - Bottom nav has 4 items (Master, Scan, Reports, Settings)
+      - Reports page shows location list with three-dots menu
+      - /locations redirects to /reports
+      - Backend API endpoints still work
