@@ -407,13 +407,19 @@ export default function PortalSessions() {
 
       {/* Import Expected Stock Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import Expected Stock</DialogTitle>
+            <DialogTitle>Import Master / Expected Stock</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Upload a CSV file with expected stock data for: <strong>{importingSession?.name}</strong>
+              Upload CSV for: <strong>{importingSession?.name}</strong>
+              {importingSession?.variance_mode && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                  {importingSession.variance_mode === 'bin-wise' ? 'Bin-wise' : 
+                   importingSession.variance_mode === 'barcode-wise' ? 'Barcode-wise' : 'Article-wise'}
+                </span>
+              )}
             </p>
             
             <div className="bg-gray-50 rounded-lg p-4">
@@ -424,20 +430,43 @@ export default function PortalSessions() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    const sampleCSV = `Location,Barcode,Description,MRP,Cost,Qty
-Bin-A01,8901234567890,Rice 5kg,280,250,100
-Bin-A01,8901234567891,Oil 1L,180,150,50
-Bin-A02,8901234567892,Sugar 1kg,55,45,75
-Warehouse-B,8901234567893,Flour 10kg,520,480,200
-Warehouse-B,8901234567894,Salt 1kg,25,20,150
-Cold-Storage,8901234567895,Butter 500g,280,240,80
-Cold-Storage,8901234567896,Cheese 200g,180,150,60`;
+                    const mode = importingSession?.variance_mode || 'bin-wise';
+                    let sampleCSV = '';
+                    let filename = '';
+                    
+                    if (mode === 'bin-wise') {
+                      sampleCSV = `Location,Barcode,Description,Category,MRP,Cost,Qty
+Bin-A01,8901234567890,Rice 5kg,Grocery,280,250,100
+Bin-A01,8901234567891,Oil 1L,Grocery,180,150,50
+Bin-A02,8901234567892,Sugar 1kg,Grocery,55,45,75
+Warehouse-B,8901234567893,Flour 10kg,Grocery,520,480,200
+Cold-Storage,8901234567895,Butter 500g,Dairy,280,240,80`;
+                      filename = 'sample_binwise_stock.csv';
+                    } else if (mode === 'barcode-wise') {
+                      sampleCSV = `Barcode,Description,Category,MRP,Cost,Qty
+8901234567890,Rice 5kg,Grocery,280,250,100
+8901234567891,Oil 1L,Grocery,180,150,50
+8901234567892,Sugar 1kg,Grocery,55,45,75
+8901234567893,Flour 10kg,Grocery,520,480,200
+8901234567895,Butter 500g,Dairy,280,240,0`;
+                      filename = 'sample_barcodewise_stock.csv';
+                    } else {
+                      sampleCSV = `Article_Code,Article_Name,Barcode,Description,Category,MRP,Cost,Qty
+ART001,Red T-Shirt,8901234567890,Red T-Shirt Size M,Clothing,499,250,10
+ART001,Red T-Shirt,8901234567891,Red T-Shirt Size L,Clothing,499,250,8
+ART002,Blue Jeans,8901234567892,Blue Jeans 32,Bottoms,999,500,5
+ART003,White Shirt,8901234567893,White Shirt XL,Clothing,699,350,0`;
+                      filename = 'sample_articlewise_stock.csv';
+                    }
+                    
                     const blob = new Blob([sampleCSV], { type: 'text/csv' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'sample_expected_stock.csv';
+                    a.download = filename;
+                    document.body.appendChild(a);
                     a.click();
+                    document.body.removeChild(a);
                     URL.revokeObjectURL(url);
                     toast.success('Sample file downloaded!');
                   }}
@@ -448,10 +477,14 @@ Cold-Storage,8901234567896,Cheese 200g,180,150,60`;
                 </Button>
               </div>
               <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
-                Location,Barcode,Description,MRP,Cost,Qty
+                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'Location, Barcode, Description, Category, MRP, Cost, Qty'}
+                {importingSession?.variance_mode === 'barcode-wise' && 'Barcode, Description, Category, MRP, Cost, Qty'}
+                {importingSession?.variance_mode === 'article-wise' && 'Article_Code, Article_Name, Barcode, Description, Category, MRP, Cost, Qty'}
               </code>
               <p className="text-xs text-gray-500 mt-2">
-                Example: Bin-A01,8901234567890,Rice 5kg,280,250,100
+                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'Include all items per location/bin. Items not in master will be flagged as extra.'}
+                {importingSession?.variance_mode === 'barcode-wise' && 'One row per barcode. Qty=0 for items in master but not in stock.'}
+                {importingSession?.variance_mode === 'article-wise' && 'Multiple barcodes per article. Qty=0 for items in master but not in stock.'}
               </p>
             </div>
 
