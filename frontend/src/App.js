@@ -238,41 +238,49 @@ function AppRoutes() {
         <Route
           path="/scan"
           element={
-            <ProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <ScanItems />
-              </Suspense>
-            </ProtectedRoute>
+            <MobileOnlyGuard>
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <ScanItems />
+                </Suspense>
+              </ProtectedRoute>
+            </MobileOnlyGuard>
           }
         />
         <Route
           path="/master-data"
           element={
-            <ProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <MasterData />
-              </Suspense>
-            </ProtectedRoute>
+            <MobileOnlyGuard>
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <MasterData />
+                </Suspense>
+              </ProtectedRoute>
+            </MobileOnlyGuard>
           }
         />
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <Reports />
-              </Suspense>
-            </ProtectedRoute>
+            <MobileOnlyGuard>
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <Reports />
+                </Suspense>
+              </ProtectedRoute>
+            </MobileOnlyGuard>
           }
         />
         <Route
           path="/settings"
           element={
-            <ProtectedRoute>
-              <Suspense fallback={<PageLoader />}>
-                <Settings />
-              </Suspense>
-            </ProtectedRoute>
+            <MobileOnlyGuard>
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <Settings />
+                </Suspense>
+              </ProtectedRoute>
+            </MobileOnlyGuard>
           }
         />
         <Route path="*" element={<Navigate to="/reports" replace />} />
