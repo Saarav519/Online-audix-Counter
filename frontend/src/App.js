@@ -107,17 +107,18 @@ function AppRoutes() {
       <RouteRestorer />
       
       <Routes>
-        {/* Portal Routes */}
+        {/* Portal Login - exact match only */}
         <Route
           path="/portal"
           element={
             <Suspense fallback={<PageLoader />}>
-              <PortalLogin />
+              <PortalLoginWrapper />
             </Suspense>
           }
         />
+        {/* Portal Protected Routes */}
         <Route
-          path="/portal/*"
+          path="/portal/dashboard"
           element={
             <PortalProtectedRoute>
               <Suspense fallback={<PageLoader />}>
@@ -126,13 +127,79 @@ function AppRoutes() {
             </PortalProtectedRoute>
           }
         >
-          <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><PortalDashboard /></Suspense>} />
-          <Route path="clients" element={<Suspense fallback={<PageLoader />}><PortalClients /></Suspense>} />
-          <Route path="sessions" element={<Suspense fallback={<PageLoader />}><PortalSessions /></Suspense>} />
-          <Route path="devices" element={<Suspense fallback={<PageLoader />}><PortalDevices /></Suspense>} />
-          <Route path="reports" element={<Suspense fallback={<PageLoader />}><PortalReports /></Suspense>} />
-          <Route path="alerts" element={<Suspense fallback={<PageLoader />}><PortalAlerts /></Suspense>} />
-          <Route path="settings" element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalDashboard /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/clients"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalClients /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/sessions"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalSessions /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/devices"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalDevices /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/reports"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalReports /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/alerts"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalAlerts /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/settings"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalSettings /></Suspense>} />
         </Route>
 
         {/* Scanner App Routes */}
