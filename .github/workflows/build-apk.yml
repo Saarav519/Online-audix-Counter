@@ -66,9 +66,15 @@ jobs:
         working-directory: ./frontend/android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Find APK files
+        run: |
+          echo "=== Searching for APK files ==="
+          find frontend/android -name "*.apk" -type f 2>/dev/null
+          echo "=== Done ==="
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Audix-APK
-          path: frontend/android/app/build/outputs/apk/debug/*.apk
+          path: frontend/android/**/*.apk
           retention-days: 90
