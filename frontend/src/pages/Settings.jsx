@@ -30,7 +30,14 @@ import {
   MapPin,
   Sparkles,
   Shield,
-  LogIn
+  LogIn,
+  Cloud,
+  RefreshCw,
+  Smartphone,
+  Building2,
+  FolderOpen,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 const Settings = () => {
