@@ -778,15 +778,26 @@ def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
     return round(min(accuracy, 100.0), 1)
 
 def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, in_master: bool = True, scanned: bool = True, in_product_master: bool = True, in_expected_stock: bool = True) -> str:
-    """Generate professional remark based on variance"""
-    if not in_product_master and not in_expected_stock:
-        return "Not in Master — Extra item found during physical count"
+    """Generate professional remark based on variance.
+    
+    Flow: Scanned barcodes checked against stock first, then master, then unknown.
+    - in_expected_stock: barcode exists in expected stock (quantities file)
+    - in_product_master: barcode exists in master product catalog
+    - scanned: barcode was physically scanned
+    """
+    # Case: Not in stock AND not in master → completely unknown item
+    if not in_expected_stock and not in_product_master and scanned:
+        return "Not in Master — Unknown item found during physical count"
+    
+    # Case: In master but NOT in stock → product exists in catalog but no expected qty
     if in_product_master and not in_expected_stock and scanned:
         return "In Master, Not in Stock — Product exists in catalog but had no expected stock"
-    if not in_master and not in_product_master:
-        return "Not in Master — Extra item found during physical count"
-    if not in_master:
-        return "Not in Master — Extra item found during physical count"
+    
+    # Case: In stock but NOT scanned
+    if not scanned and in_expected_stock:
+        return "Not Scanned — Item has expected stock but was not counted"
+    
+    # Case: Not in stock, not scanned (shouldn't appear but handle gracefully)
     if not scanned:
         return "Not Scanned — Item exists in master but was not counted"
     diff = physical_qty - expected_qty
