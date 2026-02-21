@@ -1774,6 +1774,408 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ==================== SEED TEST DATA ====================
+
+async def seed_test_data():
+    """Seed the database with test data if empty. Runs on startup."""
+    
+    # Check if data already exists
+    client_count = await db.clients.count_documents({})
+    if client_count > 0:
+        logger.info(f"Database already has {client_count} clients. Skipping seed.")
+        return
+    
+    logger.info("Seeding test data...")
+    
+    now = datetime.now(timezone.utc)
+    today = now.strftime("%Y-%m-%d")
+    
+    # 1. Create admin user
+    admin_exists = await db.portal_users.find_one({"username": "admin"})
+    if not admin_exists:
+        admin_user = {
+            "id": str(uuid.uuid4()),
+            "username": "admin",
+            "password_hash": hash_password("admin123"),
+            "role": "admin",
+            "created_at": now.isoformat()
+        }
+        await db.portal_users.insert_one(admin_user)
+        logger.info("Created admin user (admin/admin123)")
+    
+    # 2. Create Clients
+    client_a_id = str(uuid.uuid4())
+    client_b_id = str(uuid.uuid4())
+    
+    clients = [
+        {
+            "id": client_a_id,
+            "name": "Reliance Retail",
+            "code": "RR001",
+            "address": "Navi Mumbai, Maharashtra",
+            "contact_person": "Mukesh Shah",
+            "contact_phone": "+91 9876543210",
+            "created_at": now.isoformat(),
+            "is_active": True,
+            "master_imported": True,
+            "master_product_count": 12
+        },
+        {
+            "id": client_b_id,
+            "name": "DMart Stores",
+            "code": "DM002",
+            "address": "Powai, Mumbai",
+            "contact_person": "Radhika Patel",
+            "contact_phone": "+91 9988776655",
+            "created_at": now.isoformat(),
+            "is_active": True,
+            "master_imported": True,
+            "master_product_count": 8
+        }
+    ]
+    await db.clients.insert_many(clients)
+    logger.info("Created 2 test clients")
+    
+    # 3. Upload Master Products for Client A (Reliance Retail)
+    master_a = [
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901030793097", "description": "Tata Salt 1kg", "category": "Grocery", "article_code": "ART001", "article_name": "Salt & Spices", "mrp": 28, "cost": 22, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901030795098", "description": "Tata Tea Gold 500g", "category": "Beverages", "article_code": "ART002", "article_name": "Tea", "mrp": 285, "cost": 240, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901063095434", "description": "Aashirvaad Atta 10kg", "category": "Grocery", "article_code": "ART003", "article_name": "Flour", "mrp": 520, "cost": 450, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901058858082", "description": "Fortune Soyabean Oil 1L", "category": "Grocery", "article_code": "ART004", "article_name": "Cooking Oil", "mrp": 180, "cost": 155, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901725133542", "description": "Amul Butter 500g", "category": "Dairy", "article_code": "ART005", "article_name": "Dairy Products", "mrp": 280, "cost": 245, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901725130206", "description": "Amul Milk 1L", "category": "Dairy", "article_code": "ART006", "article_name": "Dairy Products", "mrp": 66, "cost": 56, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901262150125", "description": "Maggi Noodles 4-pack", "category": "Packaged Food", "article_code": "ART007", "article_name": "Instant Food", "mrp": 56, "cost": 48, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8902519002256", "description": "Parle-G Biscuits 800g", "category": "Packaged Food", "article_code": "ART008", "article_name": "Biscuits", "mrp": 100, "cost": 85, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901491101653", "description": "Surf Excel Matic 2kg", "category": "Home Care", "article_code": "ART009", "article_name": "Detergent", "mrp": 450, "cost": 380, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901023024580", "description": "Colgate MaxFresh 150g", "category": "Personal Care", "article_code": "ART010", "article_name": "Oral Care", "mrp": 120, "cost": 98, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901138511159", "description": "Dettol Soap 125g", "category": "Personal Care", "article_code": "ART011", "article_name": "Bath & Body", "mrp": 58, "cost": 46, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_a_id, "barcode": "8901764511159", "description": "Cadbury Dairy Milk 50g", "category": "Confectionery", "article_code": "ART012", "article_name": "Chocolates", "mrp": 50, "cost": 42, "imported_at": now.isoformat()},
+    ]
+    await db.master_products.insert_many(master_a)
+    
+    # Master Products for Client B (DMart)
+    master_b = [
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901030793097", "description": "Tata Salt 1kg", "category": "Grocery", "article_code": "ART001", "article_name": "Salt", "mrp": 28, "cost": 22, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901063095434", "description": "Aashirvaad Atta 10kg", "category": "Grocery", "article_code": "ART002", "article_name": "Flour", "mrp": 520, "cost": 450, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901058858082", "description": "Fortune Oil 1L", "category": "Grocery", "article_code": "ART003", "article_name": "Oil", "mrp": 180, "cost": 155, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901725133542", "description": "Amul Butter 500g", "category": "Dairy", "article_code": "ART004", "article_name": "Dairy", "mrp": 280, "cost": 245, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901262150125", "description": "Maggi 4-pack", "category": "Packaged Food", "article_code": "ART005", "article_name": "Noodles", "mrp": 56, "cost": 48, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8902519002256", "description": "Parle-G 800g", "category": "Packaged Food", "article_code": "ART006", "article_name": "Biscuits", "mrp": 100, "cost": 85, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901491101653", "description": "Surf Excel 2kg", "category": "Home Care", "article_code": "ART007", "article_name": "Detergent", "mrp": 450, "cost": 380, "imported_at": now.isoformat()},
+        {"id": str(uuid.uuid4()), "client_id": client_b_id, "barcode": "8901023024580", "description": "Colgate 150g", "category": "Personal Care", "article_code": "ART008", "article_name": "Oral Care", "mrp": 120, "cost": 98, "imported_at": now.isoformat()},
+    ]
+    await db.master_products.insert_many(master_b)
+    logger.info("Created master products for both clients")
+    
+    # 4. Create Audit Sessions
+    session_a1_id = str(uuid.uuid4())
+    session_a2_id = str(uuid.uuid4())
+    session_b1_id = str(uuid.uuid4())
+    
+    sessions = [
+        {
+            "id": session_a1_id,
+            "name": "Q1 2026 - Warehouse Audit",
+            "client_id": client_a_id,
+            "client_name": "Reliance Retail",
+            "variance_mode": "bin-wise",
+            "status": "active",
+            "created_at": now.isoformat(),
+            "expected_stock_imported": True
+        },
+        {
+            "id": session_a2_id,
+            "name": "Q1 2026 - Store Front Audit",
+            "client_id": client_a_id,
+            "client_name": "Reliance Retail",
+            "variance_mode": "barcode-wise",
+            "status": "active",
+            "created_at": now.isoformat(),
+            "expected_stock_imported": True
+        },
+        {
+            "id": session_b1_id,
+            "name": "Feb 2026 - Main Store Audit",
+            "client_id": client_b_id,
+            "client_name": "DMart Stores",
+            "variance_mode": "bin-wise",
+            "status": "active",
+            "created_at": now.isoformat(),
+            "expected_stock_imported": True
+        }
+    ]
+    await db.audit_sessions.insert_many(sessions)
+    logger.info("Created 3 audit sessions")
+    
+    # 5. Import Expected Stock for Session A1 (bin-wise)
+    expected_a1 = [
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-A01", "barcode": "8901030793097", "description": "Tata Salt 1kg", "category": "Grocery", "mrp": 28, "cost": 22, "qty": 200},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-A01", "barcode": "8901030795098", "description": "Tata Tea Gold 500g", "category": "Beverages", "mrp": 285, "cost": 240, "qty": 80},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-A01", "barcode": "8901063095434", "description": "Aashirvaad Atta 10kg", "category": "Grocery", "mrp": 520, "cost": 450, "qty": 50},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-A02", "barcode": "8901058858082", "description": "Fortune Oil 1L", "category": "Grocery", "mrp": 180, "cost": 155, "qty": 120},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-A02", "barcode": "8901725133542", "description": "Amul Butter 500g", "category": "Dairy", "mrp": 280, "cost": 245, "qty": 60},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Cold-Storage", "barcode": "8901725130206", "description": "Amul Milk 1L", "category": "Dairy", "mrp": 66, "cost": 56, "qty": 300},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-B01", "barcode": "8901262150125", "description": "Maggi Noodles", "category": "Packaged Food", "mrp": 56, "cost": 48, "qty": 150},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-B01", "barcode": "8902519002256", "description": "Parle-G Biscuits", "category": "Packaged Food", "mrp": 100, "cost": 85, "qty": 100},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-C01", "barcode": "8901491101653", "description": "Surf Excel", "category": "Home Care", "mrp": 450, "cost": 380, "qty": 40},
+        {"id": str(uuid.uuid4()), "session_id": session_a1_id, "location": "Rack-C01", "barcode": "8901023024580", "description": "Colgate MaxFresh", "category": "Personal Care", "mrp": 120, "cost": 98, "qty": 90},
+    ]
+    await db.expected_stock.insert_many(expected_a1)
+    
+    # Expected Stock for Session A2 (barcode-wise)
+    expected_a2 = [
+        {"id": str(uuid.uuid4()), "session_id": session_a2_id, "location": "", "barcode": "8901030793097", "description": "Tata Salt 1kg", "category": "Grocery", "mrp": 28, "cost": 22, "qty": 50},
+        {"id": str(uuid.uuid4()), "session_id": session_a2_id, "location": "", "barcode": "8901262150125", "description": "Maggi Noodles", "category": "Packaged Food", "mrp": 56, "cost": 48, "qty": 30},
+        {"id": str(uuid.uuid4()), "session_id": session_a2_id, "location": "", "barcode": "8901764511159", "description": "Dairy Milk 50g", "category": "Confectionery", "mrp": 50, "cost": 42, "qty": 100},
+    ]
+    await db.expected_stock.insert_many(expected_a2)
+    
+    # Expected Stock for Session B1 (bin-wise)
+    expected_b1 = [
+        {"id": str(uuid.uuid4()), "session_id": session_b1_id, "location": "Aisle-1", "barcode": "8901030793097", "description": "Tata Salt 1kg", "category": "Grocery", "mrp": 28, "cost": 22, "qty": 100},
+        {"id": str(uuid.uuid4()), "session_id": session_b1_id, "location": "Aisle-1", "barcode": "8901063095434", "description": "Atta 10kg", "category": "Grocery", "mrp": 520, "cost": 450, "qty": 30},
+        {"id": str(uuid.uuid4()), "session_id": session_b1_id, "location": "Aisle-2", "barcode": "8901262150125", "description": "Maggi 4-pack", "category": "Packaged Food", "mrp": 56, "cost": 48, "qty": 80},
+        {"id": str(uuid.uuid4()), "session_id": session_b1_id, "location": "Aisle-2", "barcode": "8902519002256", "description": "Parle-G 800g", "category": "Packaged Food", "mrp": 100, "cost": 85, "qty": 60},
+        {"id": str(uuid.uuid4()), "session_id": session_b1_id, "location": "Aisle-3", "barcode": "8901491101653", "description": "Surf Excel 2kg", "category": "Home Care", "mrp": 450, "cost": 380, "qty": 25},
+    ]
+    await db.expected_stock.insert_many(expected_b1)
+    logger.info("Created expected stock for all sessions")
+    
+    # 6. Create Synced Physical Data (simulating scanner sync)
+    # Session A1: Warehouse Audit synced data
+    synced_a1 = [
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_a1_id,
+            "location_name": "Rack-A01",
+            "total_quantity": 315,
+            "items": [
+                {"barcode": "8901030793097", "product_name": "Tata Salt 1kg", "quantity": 195, "scanned_at": now.isoformat()},
+                {"barcode": "8901030795098", "product_name": "Tata Tea Gold", "quantity": 78, "scanned_at": now.isoformat()},
+                {"barcode": "8901063095434", "product_name": "Aashirvaad Atta", "quantity": 42, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_a1_id,
+            "location_name": "Rack-A02",
+            "total_quantity": 192,
+            "items": [
+                {"barcode": "8901058858082", "product_name": "Fortune Oil 1L", "quantity": 118, "scanned_at": now.isoformat()},
+                {"barcode": "8901725133542", "product_name": "Amul Butter", "quantity": 57, "scanned_at": now.isoformat()},
+                {"barcode": "8901138511159", "product_name": "Dettol Soap", "quantity": 17, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_a1_id,
+            "location_name": "Cold-Storage",
+            "total_quantity": 288,
+            "items": [
+                {"barcode": "8901725130206", "product_name": "Amul Milk 1L", "quantity": 288, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_a1_id,
+            "location_name": "Rack-B01",
+            "total_quantity": 265,
+            "items": [
+                {"barcode": "8901262150125", "product_name": "Maggi Noodles", "quantity": 145, "scanned_at": now.isoformat()},
+                {"barcode": "8902519002256", "product_name": "Parle-G", "quantity": 98, "scanned_at": now.isoformat()},
+                {"barcode": "5901234123457", "product_name": "Unknown Import Item", "quantity": 22, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_a1_id,
+            "location_name": "Rack-C01",
+            "total_quantity": 128,
+            "items": [
+                {"barcode": "8901491101653", "product_name": "Surf Excel", "quantity": 38, "scanned_at": now.isoformat()},
+                {"barcode": "8901023024580", "product_name": "Colgate", "quantity": 90, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+    ]
+    await db.synced_locations.insert_many(synced_a1)
+    
+    # Session B1: DMart audit synced data
+    synced_b1 = [
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_b1_id,
+            "location_name": "Aisle-1",
+            "total_quantity": 135,
+            "items": [
+                {"barcode": "8901030793097", "product_name": "Tata Salt", "quantity": 102, "scanned_at": now.isoformat()},
+                {"barcode": "8901063095434", "product_name": "Atta 10kg", "quantity": 28, "scanned_at": now.isoformat()},
+                {"barcode": "8901725133542", "product_name": "Amul Butter", "quantity": 5, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_b1_id,
+            "location_name": "Aisle-2",
+            "total_quantity": 138,
+            "items": [
+                {"barcode": "8901262150125", "product_name": "Maggi", "quantity": 75, "scanned_at": now.isoformat()},
+                {"barcode": "8902519002256", "product_name": "Parle-G", "quantity": 63, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "session_id": session_b1_id,
+            "location_name": "Aisle-3",
+            "total_quantity": 22,
+            "items": [
+                {"barcode": "8901491101653", "product_name": "Surf Excel", "quantity": 22, "scanned_at": now.isoformat()},
+            ],
+            "synced_at": now.isoformat()
+        },
+    ]
+    await db.synced_locations.insert_many(synced_b1)
+    logger.info("Created synced physical data for sessions")
+    
+    # 7. Create Sync Raw Logs
+    sync_logs = [
+        {
+            "id": str(uuid.uuid4()),
+            "device_name": "CipherLab-WH01",
+            "client_id": client_a_id,
+            "session_id": session_a1_id,
+            "sync_date": today,
+            "synced_at": now.isoformat(),
+            "raw_payload": {
+                "locations": [
+                    {"name": "Rack-A01", "items": [
+                        {"barcode": "8901030793097", "product_name": "Tata Salt 1kg", "quantity": 195, "scanned_at": now.isoformat()},
+                        {"barcode": "8901030795098", "product_name": "Tata Tea Gold", "quantity": 78, "scanned_at": now.isoformat()},
+                        {"barcode": "8901063095434", "product_name": "Aashirvaad Atta", "quantity": 42, "scanned_at": now.isoformat()},
+                    ]},
+                    {"name": "Rack-A02", "items": [
+                        {"barcode": "8901058858082", "product_name": "Fortune Oil 1L", "quantity": 118, "scanned_at": now.isoformat()},
+                        {"barcode": "8901725133542", "product_name": "Amul Butter", "quantity": 57, "scanned_at": now.isoformat()},
+                        {"barcode": "8901138511159", "product_name": "Dettol Soap", "quantity": 17, "scanned_at": now.isoformat()},
+                    ]},
+                ],
+                "device_name": "CipherLab-WH01",
+                "session_id": session_a1_id,
+                "client_id": client_a_id
+            },
+            "location_count": 2,
+            "total_items": 6,
+            "total_quantity": 507,
+            "action": "sync"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "device_name": "CipherLab-WH01",
+            "client_id": client_a_id,
+            "session_id": session_a1_id,
+            "sync_date": today,
+            "synced_at": now.isoformat(),
+            "raw_payload": {
+                "locations": [
+                    {"name": "Cold-Storage", "items": [
+                        {"barcode": "8901725130206", "product_name": "Amul Milk 1L", "quantity": 288, "scanned_at": now.isoformat()},
+                    ]},
+                    {"name": "Rack-B01", "items": [
+                        {"barcode": "8901262150125", "product_name": "Maggi Noodles", "quantity": 145, "scanned_at": now.isoformat()},
+                        {"barcode": "8902519002256", "product_name": "Parle-G", "quantity": 98, "scanned_at": now.isoformat()},
+                        {"barcode": "5901234123457", "product_name": "Unknown Import Item", "quantity": 22, "scanned_at": now.isoformat()},
+                    ]},
+                    {"name": "Rack-C01", "items": [
+                        {"barcode": "8901491101653", "product_name": "Surf Excel", "quantity": 38, "scanned_at": now.isoformat()},
+                        {"barcode": "8901023024580", "product_name": "Colgate", "quantity": 90, "scanned_at": now.isoformat()},
+                    ]},
+                ],
+                "device_name": "CipherLab-WH01",
+                "session_id": session_a1_id,
+                "client_id": client_a_id
+            },
+            "location_count": 3,
+            "total_items": 6,
+            "total_quantity": 681,
+            "action": "sync"
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "device_name": "Newland-DM01",
+            "client_id": client_b_id,
+            "session_id": session_b1_id,
+            "sync_date": today,
+            "synced_at": now.isoformat(),
+            "raw_payload": {
+                "locations": [
+                    {"name": "Aisle-1", "items": [
+                        {"barcode": "8901030793097", "product_name": "Tata Salt", "quantity": 102, "scanned_at": now.isoformat()},
+                        {"barcode": "8901063095434", "product_name": "Atta 10kg", "quantity": 28, "scanned_at": now.isoformat()},
+                        {"barcode": "8901725133542", "product_name": "Amul Butter", "quantity": 5, "scanned_at": now.isoformat()},
+                    ]},
+                    {"name": "Aisle-2", "items": [
+                        {"barcode": "8901262150125", "product_name": "Maggi", "quantity": 75, "scanned_at": now.isoformat()},
+                        {"barcode": "8902519002256", "product_name": "Parle-G", "quantity": 63, "scanned_at": now.isoformat()},
+                    ]},
+                    {"name": "Aisle-3", "items": [
+                        {"barcode": "8901491101653", "product_name": "Surf Excel", "quantity": 22, "scanned_at": now.isoformat()},
+                    ]},
+                ],
+                "device_name": "Newland-DM01",
+                "session_id": session_b1_id,
+                "client_id": client_b_id
+            },
+            "location_count": 3,
+            "total_items": 6,
+            "total_quantity": 295,
+            "action": "sync"
+        },
+    ]
+    await db.sync_raw_logs.insert_many(sync_logs)
+    logger.info("Created sync raw logs")
+    
+    # 8. Create a Device
+    device = {
+        "id": str(uuid.uuid4()),
+        "device_name": "CipherLab-WH01",
+        "device_type": "CipherLab RK25",
+        "sync_password_hash": hash_password("audix2024"),
+        "last_sync": now.isoformat(),
+        "is_active": True,
+        "registered_at": now.isoformat(),
+        "client_id": client_a_id
+    }
+    await db.devices.insert_one(device)
+    
+    device2 = {
+        "id": str(uuid.uuid4()),
+        "device_name": "Newland-DM01",
+        "device_type": "Newland MT90",
+        "sync_password_hash": hash_password("audix2024"),
+        "last_sync": now.isoformat(),
+        "is_active": True,
+        "registered_at": now.isoformat(),
+        "client_id": client_b_id
+    }
+    await db.devices.insert_one(device2)
+    logger.info("Created 2 test devices")
+    
+    logger.info("=== Seed data complete! ===")
+    logger.info("Portal login: admin / admin123")
+    logger.info(f"Clients: Reliance Retail (RR001), DMart Stores (DM002)")
+    logger.info(f"Sessions: 3 audit sessions with expected stock and physical data")
+
+@app.on_event("startup")
+async def startup_event():
+    """Run seed data on startup"""
+    await seed_test_data()
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
