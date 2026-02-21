@@ -273,6 +273,11 @@ export default function PortalSessions() {
                       <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(session.status)}`}>
                         {session.status}
                       </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                        {session.variance_mode === 'bin-wise' ? 'Bin-wise' : 
+                         session.variance_mode === 'barcode-wise' ? 'Barcode-wise' : 
+                         session.variance_mode === 'article-wise' ? 'Article-wise' : 'Bin-wise'}
+                      </span>
                       {session.expected_stock_imported && (
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
                           Stock Imported
