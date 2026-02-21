@@ -61,8 +61,11 @@ export const buildCSV = (headers, rows) => {
  * Download CSV file
  * On Android: Saves to Audix_Exports folder in Documents
  * On Desktop: Standard download
+ * @param {string} csvContent - CSV content to download
+ * @param {string} filename - Name of the file
+ * @param {boolean} showAlert - Whether to show download confirmation alert (default: true)
  */
-export const downloadCSV = async (csvContent, filename) => {
+export const downloadCSV = async (csvContent, filename, showAlert = true) => {
   // Add BOM for Excel compatibility
   const BOM = '\uFEFF';
   const content = BOM + csvContent;
@@ -89,13 +92,15 @@ export const downloadCSV = async (csvContent, filename) => {
         directory: Directory.Documents
       });
       
-      alert(
-        '✅ FILE EXPORTED SUCCESSFULLY!\n\n' +
-        '📄 File: ' + filename + '\n\n' +
-        '📁 Location: Documents/' + APP_FOLDER + '\n\n' +
-        'Open your File Manager app and go to:\n' +
-        'Internal Storage → Documents → ' + APP_FOLDER
-      );
+      if (showAlert) {
+        alert(
+          '✅ FILE EXPORTED SUCCESSFULLY!\n\n' +
+          '📄 File: ' + filename + '\n\n' +
+          '📁 Location: Documents/' + APP_FOLDER + '\n\n' +
+          'Open your File Manager app and go to:\n' +
+          'Internal Storage → Documents → ' + APP_FOLDER
+        );
+      }
       
       return { success: true, path: result.uri };
     } catch (err) {
@@ -110,12 +115,14 @@ export const downloadCSV = async (csvContent, filename) => {
           encoding: Encoding.UTF8
         });
         
-        alert(
-          '✅ FILE EXPORTED SUCCESSFULLY!\n\n' +
-          '📄 File: ' + filename + '\n\n' +
-          '📁 Location: Downloads folder\n\n' +
-          'Open your File Manager app and check Downloads.'
-        );
+        if (showAlert) {
+          alert(
+            '✅ FILE EXPORTED SUCCESSFULLY!\n\n' +
+            '📄 File: ' + filename + '\n\n' +
+            '📁 Location: Downloads folder\n\n' +
+            'Open your File Manager app and check Downloads.'
+          );
+        }
         
         return { success: true };
       } catch (err2) {
@@ -123,12 +130,12 @@ export const downloadCSV = async (csvContent, filename) => {
       }
       
       // Fallback to blob download
-      return downloadViaBlob(content, filename, true);
+      return downloadViaBlob(content, filename, showAlert);
     }
   }
   
   // For all other environments (browser, mobile browser, desktop)
-  return downloadViaBlob(content, filename, true);
+  return downloadViaBlob(content, filename, showAlert);
 };
 
 /**
