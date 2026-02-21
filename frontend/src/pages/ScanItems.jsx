@@ -243,7 +243,8 @@ const ScanItems = () => {
     getOrCreateAssignedLocation,
     getNextSequentialLocation,
     clearLocationItems,
-    getProductByBarcode
+    getProductByBarcode,
+    setHideBottomNav
   } = useApp();
 
   // Initialize selectedLocationId from URL param or localStorage
