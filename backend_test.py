@@ -145,7 +145,8 @@ class AudixBackendTester:
             session_data = {
                 "client_id": self.client_id,
                 "name": "CascadeTest Session",
-                "variance_mode": "bin-wise"
+                "variance_mode": "bin-wise",
+                "start_date": datetime.now().strftime("%Y-%m-%d")
             }
             
             response = self.session.post(f"{API_BASE}/portal/sessions", json=session_data)
