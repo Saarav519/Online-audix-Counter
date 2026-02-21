@@ -1198,6 +1198,21 @@ test_plan:
       - working: "NA"
         agent: "main"
         comment: "GET /api/portal/sync-logs with client_id, session_id, limit filters. GET /api/portal/sync-logs/{log_id} for detail."
+
+  - task: "Priority Logic Testing - Stock > Master > Physical"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "Comprehensive end-to-end testing of the CORRECTED report priority logic as requested. Testing all 5 scenarios: Stock WITH details, Stock WITHOUT details (fallback to master), Stock WITH details but not scanned, Master only (not in stock), Physical scan only (not in master/stock)."
+      - working: true
+        agent: "testing"
+        comment: "✅ PRIORITY LOGIC COMPREHENSIVE TESTING COMPLETED - ALL TESTS PASSED (16/16 - 100% SUCCESS RATE). Verified the corrected priority: Stock > Master > Physical scan data working perfectly across all report endpoints. TESTED SCENARIOS: (a) Barcode 1111111111111 - Stock details WITH full info → correctly uses STOCK details ('Stock Rice 10kg', 'Stock Grocery', MRP:350, Cost:300), (b) Barcode 2222222222222 - Stock WITHOUT details → correctly FALLS BACK to master ('Master Oil 1L', 'Master Cooking'), (c) Barcode 3333333333333 - Stock details but NOT scanned → uses STOCK details ('Stock Sugar Premium') with 'Not Scanned' remark, (d) Barcode 4444444444444 - NOT in stock but IN master → uses MASTER details ('Master Butter 500g') with 'In Master, Not in Stock' remark, (e) Barcode 9999999999999 - NOT in master, NOT in stock → uses PHYSICAL scan ('Scan Unknown') with 'Not in Master' remark. ENDPOINTS VERIFIED: GET /api/portal/reports/{session_id}/detailed, /barcode-wise, /category-summary all correctly implement priority logic. Priority implementation in server.py lines 932-935 working correctly."
   - agent: "testing"
     message: |
       ✅ SYNC RAW LOGS FEATURE COMPREHENSIVE TESTING COMPLETED - ALL TESTS PASSED (8/8)
