@@ -14,6 +14,17 @@ const MasterData = React.lazy(() => import("./pages/MasterData"));
 const Reports = React.lazy(() => import("./pages/Reports"));
 const Settings = React.lazy(() => import("./pages/Settings"));
 
+// Portal pages (lazy-loaded)
+const PortalLogin = React.lazy(() => import("./pages/portal/PortalLogin"));
+const PortalLayout = React.lazy(() => import("./pages/portal/PortalLayout"));
+const PortalDashboard = React.lazy(() => import("./pages/portal/PortalDashboard"));
+const PortalClients = React.lazy(() => import("./pages/portal/PortalClients"));
+const PortalSessions = React.lazy(() => import("./pages/portal/PortalSessions"));
+const PortalDevices = React.lazy(() => import("./pages/portal/PortalDevices"));
+const PortalReports = React.lazy(() => import("./pages/portal/PortalReports"));
+const PortalAlerts = React.lazy(() => import("./pages/portal/PortalAlerts"));
+const PortalSettings = React.lazy(() => import("./pages/portal/PortalSettings"));
+
 // Minimal loading fallback for lazy routes
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[50vh]">
