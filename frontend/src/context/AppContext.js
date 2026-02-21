@@ -169,12 +169,7 @@ export const AppProvider = ({ children }) => {
       MasterLocationsDB.importAll(masterLocations)
         .then(() => console.log('✅ Master locations saved to IndexedDB'))
         .catch(err => {
-          console.warn('IndexedDB master locations save failed, using localStorage fallback:', err);
-          try {
-            localStorage.setItem('audix_master_locations', JSON.stringify(masterLocations));
-          } catch (e) {
-            console.warn('localStorage fallback also failed:', e);
-          }
+          console.warn('IndexedDB master locations save failed:', err);
         });
     }, 300);
 
