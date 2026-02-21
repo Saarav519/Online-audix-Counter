@@ -3,8 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection } from '../hooks/useDeviceDetection';
 import {
-  LayoutDashboard,
-  MapPin,
   Package,
   ScanBarcode,
   Settings,
