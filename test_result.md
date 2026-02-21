@@ -1101,8 +1101,48 @@ agent_communication:
         comment: "✅ ACCURACY % AND REMARKS IN EXISTING REPORTS WORKING - Bin-wise report: Found 4 locations with accuracy_pct and remark fields present, Total accuracy: 49.2%. Sample remark: 'Not Scanned — Item exists in master but was not counted'. Detailed report: Found 7 items with category, accuracy_pct and remark fields present. Professional contextual remarks working correctly."
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Sync Raw Logs Storage"
+    - "Sync Logs Portal Endpoint"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+  - agent: "main"
+    message: |
+      ADDITIONAL CHANGES implemented per user request:
+      
+      1. Article-wise report - Expandable barcode rows: Click on any article row to see actual barcodes
+      2. Raw Sync Logs: Added sync_raw_logs collection that stores every sync as-is (append-only audit trail)
+         - NEW ENDPOINT: GET /api/portal/sync-logs?client_id=&session_id=&limit= 
+         - NEW ENDPOINT: GET /api/portal/sync-logs/{log_id}
+      3. New PortalSyncLogs.jsx page with client/session filter and expandable raw payload view
+      4. Added Sync Logs link in portal sidebar navigation
+      5. Confirmed: Re-sync of a location replaces old data in synced_locations but raw logs preserved
+      
+      NEEDS TESTING: Sync raw logs endpoints
+
+  - task: "Sync Raw Logs Storage"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added raw sync log storage in sync endpoint. Every sync stores full raw_payload before processing. Append-only, never overwritten."
+
+  - task: "Sync Logs Portal Endpoint"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "GET /api/portal/sync-logs with client_id, session_id, limit filters. GET /api/portal/sync-logs/{log_id} for detail."
 
