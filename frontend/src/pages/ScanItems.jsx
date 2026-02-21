@@ -705,7 +705,7 @@ const ScanItems = () => {
   // Scan Items should only be accessed by opening a location from the Locations page
   useEffect(() => {
     if (settings.locationScanMode === 'preassigned' && !searchParams.get('location')) {
-      navigate('/locations');
+      navigate('/reports');
     }
   }, [settings.locationScanMode, searchParams, navigate]);
 
@@ -1216,7 +1216,7 @@ const ScanItems = () => {
     if (settings.locationScanMode === 'preassigned') {
       // In Pre-Assigned mode, navigate back to Locations page
       // This will show the list view with next pending location ready to open
-      navigate('/locations');
+      navigate('/reports');
       return;
     }
     
