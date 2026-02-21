@@ -1035,10 +1035,22 @@ const ScanItems = () => {
   // ============================================
   const handleBarcodeInputChange = (e) => {
     const newValue = e.target.value;
+    const currentTime = Date.now();
+    
+    // CRITICAL: If hardware scanner hook JUST processed a scan (within 150ms),
+    // ignore this change event - it's from stale input field chars being appended
+    // after the hook already handled the barcode
+    if (currentTime - lastHookScanTimeRef.current < 150) {
+      // Force clear the input field to prevent accumulation
+      if (barcodeInputRef.current) {
+        barcodeInputRef.current.value = '';
+      }
+      setBarcodeInput('');
+      return;
+    }
     
     if (settings.allowManualBarcodeEntry === false) {
       // When manual entry is DISABLED, detect scanner vs manual input
-      const currentTime = Date.now();
       const timeDiff = currentTime - barcodeInputTimeRef.current;
       const charsAdded = newValue.length - barcodeInput.length;
       barcodeInputTimeRef.current = currentTime;
@@ -1055,6 +1067,8 @@ const ScanItems = () => {
         
         // Auto-process after scanner finishes (some scanners don't send Enter)
         barcodeAutoProcessTimerRef.current = setTimeout(() => {
+          // Skip if hardware hook already handled this
+          if (Date.now() - lastHookScanTimeRef.current < 150) return;
           const finalValue = barcodeInputRef.current?.value?.trim();
           if (finalValue && selectedLocationId) {
             if (askQuantityBeforeAdding) {
