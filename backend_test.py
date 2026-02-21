@@ -190,7 +190,7 @@ Bin-A,1111111111111,50"""
             if response.status_code == 200:
                 result = response.json()
                 # Handle different response formats
-                imported_count = result.get("imported_count") or result.get("expected_stock_count", 0)
+                imported_count = result.get("imported_count") or result.get("record_count", 0)
                 if imported_count >= 1:
                     return self.log_test("Import Expected Stock", True, 
                         f"Expected stock imported - Count: {imported_count}")
