@@ -90,39 +90,20 @@ export default function PortalSyncLogs() {
     }
   };
 
-  const handleExportSingleLog = (log, clientName) => {
+  const handleExportSingleLog = async (logId, deviceName, syncDate) => {
     try {
-      const locations = log.raw_payload?.locations || [];
-      let csvRows = ['Log ID,Device,Session ID,Sync Time,Location,Barcode,Product Name,Quantity,Scanned At'];
-      
-      for (const loc of locations) {
-        const locName = loc.name || loc.location_name || 'Unknown';
-        for (const item of (loc.items || [])) {
-          csvRows.push([
-            log.id || '',
-            log.device_name || '',
-            log.session_id || '',
-            log.synced_at || '',
-            locName,
-            item.barcode || '',
-            item.product_name || item.productName || '',
-            item.quantity || 0,
-            item.scanned_at || item.scannedAt || ''
-          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
-        }
-      }
-      
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const response = await fetch(`${BACKEND_URL}/api/portal/sync-logs/${logId}/export`);
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `sync_${log.device_name}_${log.sync_date}_${log.id.substring(0, 8)}.csv`;
+      a.download = `sync_${deviceName}_${syncDate}_${logId.substring(0, 8)}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(`Exported sync log (${log.total_items} items)`);
+      toast.success('Sync log exported!');
     } catch (error) {
       toast.error('Failed to export log');
       console.error(error);
