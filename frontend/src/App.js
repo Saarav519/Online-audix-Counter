@@ -88,6 +88,17 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Portal Login Wrapper - redirects to dashboard if already logged in
+const PortalLoginWrapper = () => {
+  const portalUser = localStorage.getItem('portalUser');
+  
+  if (portalUser) {
+    return <Navigate to="/portal/dashboard" replace />;
+  }
+  
+  return <PortalLogin />;
+};
+
 // Portal Auth Guard
 const PortalProtectedRoute = ({ children }) => {
   const portalUser = localStorage.getItem('portalUser');
