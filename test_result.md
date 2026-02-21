@@ -103,12 +103,10 @@
 #====================================================================================================
 
 user_problem_statement: |
-  Merge Locations into Reports & Remove Dashboard:
-  1. Remove Dashboard page completely - after login, go directly to Reports
-  2. Remove Locations page - merge all location features into Reports page
-  3. Reports page now serves as unified hub: location management + export/reporting
-  4. Bottom nav: Master, Scan, Reports, Settings (4 items, no Dashboard/Locations)
-  5. All changes in mobile/scanner view only
+  Fix barcode overlap during fast scanning:
+  When scanning fast, barcodes overlap - e.g., a 13-digit barcode becomes 26 digits or more.
+  Root cause: useHardwareScanner hook's cooldown mechanism was never activated after processing scans,
+  and no auto-submit timer or max buffer length guard existed.
 
 backend:
   - task: "Dynamic Mode Location Submission Backend Analysis"
