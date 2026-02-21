@@ -249,7 +249,8 @@ export default function PortalSessions() {
                 key={session.id}
                 className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
               >
-                <div className="flex items-center justify-between">
+                {/* Header Row */}
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getStatusColor(session.status)}`}>
                       <StatusIcon className="w-6 h-6" />
@@ -262,70 +263,71 @@ export default function PortalSessions() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(session.start_date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(session.status)}`}>
-                          {session.status}
-                        </span>
-                        {session.expected_stock_imported && (
-                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                            Stock Imported
-                          </span>
-                        )}
-                      </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-sm text-gray-500">
+                      <Calendar className="w-4 h-4" />
+                      {new Date(session.start_date).toLocaleDateString()}
                     </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setImportingSession(session);
-                          setShowImportDialog(true);
-                        }}
-                      >
-                        <Upload className="w-4 h-4 mr-1" />
-                        Import Stock
-                      </Button>
-                      
-                      {session.status === 'active' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStatusChange(session.id, 'completed')}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Complete
-                        </Button>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(session.status)}`}>
+                        {session.status}
+                      </span>
+                      {session.expected_stock_imported && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                          Stock Imported
+                        </span>
                       )}
-                      
-                      {session.status === 'completed' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStatusChange(session.id, 'archived')}
-                        >
-                          <Archive className="w-4 h-4 mr-1" />
-                          Archive
-                        </Button>
-                      )}
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteSession(session.id, session.name)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Delete
-                      </Button>
                     </div>
                   </div>
+                </div>
+
+                {/* Action Buttons Row */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setImportingSession(session);
+                        setShowImportDialog(true);
+                      }}
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Import Stock
+                    </Button>
+                    
+                    {session.status === 'active' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStatusChange(session.id, 'completed')}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Complete
+                      </Button>
+                    )}
+                    
+                    {session.status === 'completed' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStatusChange(session.id, 'archived')}
+                      >
+                        <Archive className="w-4 h-4 mr-1" />
+                        Archive
+                      </Button>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteSession(session.id, session.name)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Delete
+                  </Button>
                 </div>
               </div>
             );
