@@ -845,6 +845,31 @@ const Settings = () => {
             </p>
           </div>
 
+          {/* Pending Sync Count */}
+          {(() => {
+            const pendingLocations = locations.filter(loc => 
+              scannedItems.some(item => item.locationId === loc.id)
+            );
+            const pendingItems = scannedItems.length;
+            const pendingQty = scannedItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            
+            if (pendingLocations.length > 0) {
+              return (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm font-medium text-amber-800">Ready to sync:</p>
+                  <p className="text-sm text-amber-700">
+                    {pendingLocations.length} location{pendingLocations.length !== 1 ? 's' : ''} • {pendingItems} item{pendingItems !== 1 ? 's' : ''} • {pendingQty} qty
+                  </p>
+                </div>
+              );
+            }
+            return (
+              <div className="p-3 bg-slate-100 rounded-lg">
+                <p className="text-sm text-slate-500">No data to sync</p>
+              </div>
+            );
+          })()}
+
           {/* Last Sync & Manual Sync Button */}
           <div className="p-4 bg-slate-50 rounded-xl space-y-3">
             {lastSyncTime && (
