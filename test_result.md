@@ -317,6 +317,39 @@ test_plan:
   test_priority: "high_first"
 
 agent_communication:
+  - agent: "main"
+    message: |
+      Implemented User Management & Portal Login enhancements:
+      
+      BACKEND CHANGES (server.py):
+      1. PortalUser model updated with: is_active, is_approved, last_login fields
+      2. New users register as viewer role with is_approved=False (needs admin approval)
+      3. Login now checks is_active and is_approved status, tracks last_login
+      4. NEW: POST /api/portal/reset-password - Public password reset by username
+      5. NEW: GET /api/portal/users - List all registered users
+      6. NEW: PUT /api/portal/users/{user_id}/approve - Approve pending user
+      7. NEW: PUT /api/portal/users/{user_id}/reject - Reject/unapprove user
+      8. NEW: PUT /api/portal/users/{user_id}/toggle-active - Enable/disable user
+      9. NEW: PUT /api/portal/users/{user_id}/role - Change role (admin/viewer)
+      10. NEW: DELETE /api/portal/users/{user_id} - Delete user (cannot delete default admin)
+      11. Dashboard updated: replaced unread_alerts with total_users + pending_users
+      
+      FRONTEND CHANGES:
+      1. PortalLogin.jsx - 3 tabs: Sign In, Register, Reset Password
+      2. NEW: PortalUsers.jsx - Full user management page with stats, search, filter, approve/reject/toggle/delete
+      3. PortalDashboard.jsx - "Unread Alerts" replaced with "Users" stat card
+      4. PortalLayout.jsx - Added "Users" to sidebar navigation
+      5. App.js - Added /portal/users route
+      6. Removed: Alerts and Settings pages from sidebar and routes
+      
+      Testing agent should verify:
+      - GET /api/portal/users returns list of users
+      - POST /api/portal/register creates user with is_approved=false
+      - POST /api/portal/login rejects unapproved users
+      - PUT /api/portal/users/{id}/approve works
+      - POST /api/portal/reset-password works
+      - DELETE /api/portal/users/{id} works (not on admin)
+      - GET /api/portal/dashboard returns total_users instead of unread_alerts
   - agent: "testing"
     message: |
       ✅ AUDIX ADMIN PORTAL BACKEND COMPREHENSIVE TESTING COMPLETED - ALL SYSTEMS WORKING PERFECTLY
