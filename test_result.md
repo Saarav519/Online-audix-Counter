@@ -371,6 +371,88 @@ agent_communication:
       END-TO-END WORKING: Client Creation → Session Creation → Device Sync → Data Storage → Reports Display
       
       🎉 **CONCLUSION**: AUDIX Admin Portal backend is fully operational and ready for production use. All requested endpoints working correctly with proper authentication, data persistence, and error handling.
+  - agent: "testing"
+    message: |
+      ✅ VARIANCE MODE FEATURE COMPREHENSIVE TESTING COMPLETED - ALL NEW FEATURES WORKING PERFECTLY (19/19 TESTS PASSED)
+      
+      🎯 **NEW VARIANCE MODE TESTING SCOPE**:
+      Tested complete variance mode functionality following exact review request flow:
+      1. Portal Login (testadmin/test123) 
+      2. Client Creation (Variance Test Client)
+      3. 3 Sessions with different variance modes (bin-wise, barcode-wise, article-wise)
+      4. CSV Import for each session (different formats based on variance mode)
+      5. Physical data sync for all sessions
+      6. All report endpoints with field verification
+      
+      📊 **VARIANCE MODE TEST RESULTS (19/19 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **PORTAL AUTHENTICATION**: testadmin user registration and login working
+         - New User ID: a1d38dad-f28f-49f4-a0bc-3ce93da57228
+      
+      ✅ **CLIENT CREATION**: Variance Test Client created successfully
+         - Client ID: be02e8e5-1396-4c43-84b7-f12864a22161, Code: VTC1771708835
+      
+      ✅ **VARIANCE MODE SESSIONS**: All 3 variance modes working correctly
+         - Session A (bin-wise): 96fe41ad-d2e2-4307-b23e-7aa51ce2f501
+         - Session B (barcode-wise): ffc26df8-47b9-4fa8-99e7-e376eae9f0a2  
+         - Session C (article-wise): 5b12352d-7fed-49cf-b363-a3c8f0b3905b
+      
+      ✅ **CSV IMPORT FORMATS**: All 3 CSV formats imported successfully
+         - Bin-wise: Location, Barcode, Category fields (4 records)
+         - Barcode-wise: Barcode, Category fields (4 records)
+         - Article-wise: Article_Code, Article_Name, Category fields (4 records)
+      
+      ✅ **PHYSICAL DATA SYNC**: Sync working for all sessions
+         - Each session synced 1 location with mixed data including unmapped barcode
+      
+      ✅ **REPORT ENDPOINTS WITH FIELD VERIFICATION**:
+      
+      **BIN-WISE REPORTS** (/api/portal/reports/{session_id}/bin-wise):
+         - ✅ Found 4 locations with accuracy_pct and remark fields
+         - ✅ Total accuracy: 49.2%
+         - ✅ Sample remark: "Not Scanned — Item exists in master but was not counted"
+      
+      **DETAILED REPORTS** (/api/portal/reports/{session_id}/detailed):
+         - ✅ Found 7 items with category, accuracy_pct, and remark fields
+         - ✅ Professional contextual remarks working correctly
+      
+      **BARCODE-WISE REPORTS** (/api/portal/reports/{session_id}/barcode-wise):
+         - ✅ Found 5 unique barcodes with proper pivoting/aggregation across locations
+         - ✅ Sample: Barcode 8901234567890, Stock: 100.0, Physical: 95.0
+         - ✅ accuracy_pct and remark fields present in all records
+      
+      **ARTICLE-WISE REPORTS** (/api/portal/reports/{session_id}/article-wise):
+         - ✅ Found 4 article groups correctly grouped by article_code
+         - ✅ Unmapped barcodes handling: 1 barcode (9999999999999) with 'UNMAPPED' article_code
+         - ✅ Sample article ART001 contains 2 barcodes as expected
+         - ✅ All records have article_code, barcodes array, accuracy_pct, and remark fields
+      
+      **CATEGORY SUMMARY REPORTS** (/api/portal/reports/{session_id}/category-summary):
+         - ✅ Session A: 3 categories (Dairy, Grocery, Unmapped), Total accuracy: 49.2%
+         - ✅ Session C: 3 categories (Bottoms, Clothing, Unmapped), Total accuracy: 100.0%
+         - ✅ Proper category grouping working for both Grocery and Clothing/Bottoms categories
+      
+      🔍 **CRITICAL VERIFICATION POINTS CONFIRMED**:
+      ✅ accuracy_pct field present and correct in all report responses
+      ✅ remark field contains professional text (e.g., "Exact Match", "Shortage Detected", "Not in Master")
+      ✅ Barcode-wise mode correctly pivots/aggregates across locations
+      ✅ Article-wise mode correctly groups barcodes by article_code  
+      ✅ Unmapped barcodes appear with "UNMAPPED" article_code as expected
+      ✅ Category summary correctly groups by category field
+      ✅ All totals include accuracy_pct
+      
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal.preview.emergentagent.com
+      
+      🎯 **NEW ENDPOINTS VERIFIED WORKING**:
+      - GET /api/portal/reports/{session_id}/barcode-wise (NEW)
+      - GET /api/portal/reports/{session_id}/article-wise (NEW)
+      - GET /api/portal/reports/{session_id}/category-summary (NEW)
+      - POST /api/portal/sessions (ENHANCED with variance_mode field)
+      - POST /api/portal/sessions/{session_id}/import-expected (ENHANCED with category/article fields)
+      - GET /api/portal/reports/{session_id}/bin-wise (ENHANCED with accuracy_pct, remark)
+      - GET /api/portal/reports/{session_id}/detailed (ENHANCED with category, accuracy_pct, remark)
+      
+      🎉 **CONCLUSION**: VARIANCE MODE FEATURE IS FULLY OPERATIONAL AND PRODUCTION-READY. All 3 variance modes (bin-wise, barcode-wise, article-wise) working correctly with proper CSV import handling, data pivoting/grouping, professional remarks generation, and accuracy calculations. The feature successfully handles unmapped barcodes and provides comprehensive reporting capabilities as requested.
   - agent: "main"
     message: |
       Fixed two issues reported by user:
