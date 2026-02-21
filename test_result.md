@@ -1124,15 +1124,18 @@ agent_communication:
 
   - task: "Master Products Import (Client-Level)"
     implemented: true
-    working: "NA"
+    working: true
     file: "server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "New endpoints: POST import-master, GET master-products, GET stats, DELETE clear. Replaces on re-upload. CSV format: Barcode,Description,Category,MRP,Cost,Article_Code,Article_Name"
+      - working: true
+        agent: "testing"
+        comment: "✅ MASTER PRODUCTS IMPORT WORKING - Comprehensive testing successful. POST /api/portal/clients/{client_id}/import-master endpoint correctly imports CSV with 6 products (Rice, Oil, Sugar, Flour, Butter, Extra Item). Master products stored by client_id with proper field mapping. Client flags updated: master_imported=true, master_product_count=6. CSV parsing handles case-insensitive columns and normalizes field names."
 
   - task: "Reports Using Master Products for Product Info"
     implemented: true
