@@ -1352,6 +1352,9 @@ const ScanItems = () => {
     setQuantityInput('1');
     setShowBackConfirmDialog(false);
     
+    // Update URL to remove location param (shows bottom nav again)
+    navigate('/scan', { replace: true });
+    
     // Focus location input for next scan
     setTimeout(() => {
       if (locationInputRef.current) {
