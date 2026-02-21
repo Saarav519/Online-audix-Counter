@@ -34,18 +34,14 @@ const Layout = ({ children }) => {
   const showScannerMode = isScanner || isSmallScreen;
 
   // Filter nav items based on mode
-  // In Pre-Assigned mode, hide Scan Items from sidebar - it should only be accessed via opening a location
   const navItems = useMemo(() => {
     const baseItems = [
-      { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-      { path: '/locations', icon: MapPin, label: 'Locations' },
-      { path: '/scan', icon: ScanBarcode, label: 'Scan Items', hideInPreAssigned: true },
       { path: '/master-data', icon: Package, label: 'Master Data' },
+      { path: '/scan', icon: ScanBarcode, label: 'Scan Items', hideInPreAssigned: true },
       { path: '/reports', icon: FileSpreadsheet, label: 'Reports' },
       { path: '/settings', icon: Settings, label: 'Settings' },
     ];
     
-    // Filter out Scan Items in Pre-Assigned mode
     if (settings?.locationScanMode === 'preassigned') {
       return baseItems.filter(item => !item.hideInPreAssigned);
     }
