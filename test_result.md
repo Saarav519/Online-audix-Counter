@@ -906,3 +906,109 @@ agent_communication:
       - No errors or warnings in backend logs
       
       🎯 CONCLUSION: Frontend scanner hook changes (barcode overlap fixes in ScanItems.jsx) had ZERO impact on backend functionality. All requested API endpoints are healthy and operational.
+
+  - agent: "main"
+    message: |
+      VARIANCE MODE FEATURE IMPLEMENTATION - New feature added to support 3 variance calculation modes:
+      
+      BACKEND CHANGES (server.py):
+      1. AuditSession model - Added variance_mode field (bin-wise, barcode-wise, article-wise)
+      2. ExpectedStock model - Added category, article_code, article_name fields
+      3. CSV Import endpoint - Updated to handle all 3 formats with case-insensitive column mapping
+      4. Helper functions - calc_accuracy() and generate_remark() for professional remarks
+      5. NEW ENDPOINT: GET /api/portal/reports/{session_id}/barcode-wise - Barcode-level variance (pivots by barcode across locations)
+      6. NEW ENDPOINT: GET /api/portal/reports/{session_id}/article-wise - Article-level variance (groups barcodes by article)
+      7. NEW ENDPOINT: GET /api/portal/reports/{session_id}/category-summary - Category-wise summary
+      8. UPDATED: bin-wise and detailed reports now include accuracy%, remarks, category
+      
+      FRONTEND CHANGES:
+      1. PortalSessions.jsx - Added variance_mode dropdown in create session dialog, format-aware CSV import with sample downloads
+      2. PortalReports.jsx - Complete rewrite with 5 report types: bin-wise, detailed, barcode-wise, article-wise, category-summary
+      3. All reports show accuracy%, remarks columns, summary cards
+      
+      NEEDS TESTING: All new backend endpoints and the updated existing ones.
+
+  - task: "Variance Mode on Audit Sessions"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added variance_mode field to AuditSession and AuditSessionCreate models. Sessions can now be created with bin-wise, barcode-wise, or article-wise mode."
+
+  - task: "CSV Import with Category and Article fields"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated import-expected endpoint to handle all 3 CSV formats based on variance_mode. Added category, article_code, article_name fields. Case-insensitive column mapping."
+
+  - task: "Barcode-wise Variance Report"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New endpoint GET /api/portal/reports/{session_id}/barcode-wise. Pivots expected and physical data by barcode (summing across all locations). Returns accuracy%, professional remarks."
+
+  - task: "Article-wise Variance Report"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New endpoint GET /api/portal/reports/{session_id}/article-wise. Groups barcodes by article_code from master. Handles unmapped barcodes (not in master). Returns accuracy%, remarks."
+
+  - task: "Category-wise Summary Report"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New endpoint GET /api/portal/reports/{session_id}/category-summary. Groups all data by category field from master. Shows item count, stock/physical qty/value, diff, accuracy, remarks."
+
+  - task: "Accuracy % and Remarks in Existing Reports"
+    implemented: true
+    working: "NA"
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Updated bin-wise and detailed reports with accuracy_pct and remark fields. Helper functions calc_accuracy() and generate_remark() provide professional contextual remarks."
+
+test_plan:
+  current_focus:
+    - "Variance Mode on Audit Sessions"
+    - "CSV Import with Category and Article fields"
+    - "Barcode-wise Variance Report"
+    - "Article-wise Variance Report"
+    - "Category-wise Summary Report"
+    - "Accuracy % and Remarks in Existing Reports"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
