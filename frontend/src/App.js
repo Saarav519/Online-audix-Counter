@@ -107,7 +107,9 @@ function AppRoutes() {
           path="/scan"
           element={
             <ProtectedRoute>
-              <ScanItems />
+              <Suspense fallback={<PageLoader />}>
+                <ScanItems />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -115,7 +117,9 @@ function AppRoutes() {
           path="/master-data"
           element={
             <ProtectedRoute>
-              <MasterData />
+              <Suspense fallback={<PageLoader />}>
+                <MasterData />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -123,7 +127,9 @@ function AppRoutes() {
           path="/reports"
           element={
             <ProtectedRoute>
-              <Reports />
+              <Suspense fallback={<PageLoader />}>
+                <Reports />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -131,7 +137,9 @@ function AppRoutes() {
           path="/settings"
           element={
             <ProtectedRoute>
-              <Settings />
+              <Suspense fallback={<PageLoader />}>
+                <Settings />
+              </Suspense>
             </ProtectedRoute>
           }
         />
