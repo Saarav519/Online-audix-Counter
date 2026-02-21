@@ -88,16 +88,10 @@ export default function PortalDashboard() {
           color="emerald"
         />
         <StatsCard
-          icon={Smartphone}
-          label="Devices"
-          value={dashboardData.stats.devices}
+          icon={Users}
+          label="Users"
+          value={`${dashboardData.stats.total_users}${dashboardData.stats.pending_users > 0 ? ` (${dashboardData.stats.pending_users} pending)` : ''}`}
           color="purple"
-        />
-        <StatsCard
-          icon={Bell}
-          label="Unread Alerts"
-          value={dashboardData.stats.unread_alerts}
-          color="red"
         />
       </div>
 
