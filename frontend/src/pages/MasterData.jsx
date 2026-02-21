@@ -480,6 +480,10 @@ RT-SF,Retail Store Front,Front retail area`;
               </Button>
             </>
           )}
+          <Button variant="outline" onClick={() => setShowClearModal(true)} className="border-red-200 text-red-600 hover:bg-red-50">
+            <Trash2 className="w-4 h-4 mr-2" />
+            Clear Data
+          </Button>
         </div>
       </div>
 
