@@ -469,8 +469,17 @@ const ScanItems = () => {
     // If we have a selected location, we're not waiting for location scan
     if (selectedLocationId) {
       setWaitingForLocationScan(false);
+      // Also cancel any pending auto-confirm timer since location is already selected
+      if (locationAutoConfirmTimerRef.current) {
+        clearTimeout(locationAutoConfirmTimerRef.current);
+        locationAutoConfirmTimerRef.current = null;
+      }
     }
   }, [selectedLocationId]);
+  
+  useEffect(() => {
+    tempLocationRef.current = tempLocation;
+  }, [tempLocation]);
   
   useEffect(() => {
     waitingForLocationScanRef.current = waitingForLocationScan;
