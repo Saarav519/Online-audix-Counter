@@ -2003,13 +2003,14 @@ const ScanItems = () => {
                             <div className="flex items-center justify-center gap-1">
                               <Input
                                 type="number"
-                                min="1"
+                                min="0.01"
+                                step="any"
                                 max={isSingleSkuMode ? item.quantity : undefined}
                                 value={editQuantity}
                                 onChange={(e) => {
                                   let val = e.target.value;
                                   if (isSingleSkuMode && val !== '') {
-                                    const numVal = parseInt(val);
+                                    const numVal = parseFloat(val);
                                     if (!isNaN(numVal) && numVal > item.quantity) {
                                       val = String(item.quantity);
                                     }
