@@ -1229,6 +1229,21 @@ agent_communication:
         agent: "testing"
         comment: "✅ CASCADING CLIENT DELETE WORKING - Comprehensive testing confirmed cascading delete removes ALL related data correctly. DELETE /api/portal/clients/{client_id} successfully deleted: master_products: 2, sync_raw_logs: 1, audit_sessions: 1, alerts: 1. VERIFICATION CONFIRMED: Post-delete cleanup successful - sync logs cleared, client removed from list, sessions removed. No orphaned data remains after cascading delete operation."
 
+  - task: "User Management and Password Reset APIs"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented comprehensive user management system: POST /api/portal/register (pending approval), GET /api/portal/users, PUT /api/portal/users/{id}/approve, PUT /api/portal/users/{id}/toggle-active, PUT /api/portal/users/{id}/role, DELETE /api/portal/users/{id}, POST /api/portal/reset-password, enhanced POST /api/portal/login with approval/active checks, updated GET /api/portal/dashboard with total_users/pending_users."
+      - working: true
+        agent: "testing"
+        comment: "✅ USER MANAGEMENT AND PASSWORD RESET APIs COMPREHENSIVE TESTING COMPLETED - ALL 13 TESTS PASSED (100% Success Rate). VERIFIED WORKING: 1) GET /api/portal/users (Found 1 user including admin), 2) POST /api/portal/register (User ID: 65936f43-91b1-4e21-841e-141f1143a1c6 with pending approval), 3) POST /api/portal/login rejected unapproved user correctly, 4) PUT /api/portal/users/{id}/approve working, 5) POST /api/portal/login approved user successful, 6) POST /api/portal/reset-password successful, 7) POST /api/portal/login with new password working, 8) PUT /api/portal/users/{id}/toggle-active disabled user, 9) POST /api/portal/login rejected disabled user correctly, 10) PUT /api/portal/users/{id}/role changed to admin, 11) DELETE /api/portal/users/{id} successful, 12) DELETE admin user correctly prevented with 'Cannot delete the default admin user', 13) GET /api/portal/dashboard returns total_users: 1, pending_users: 0 (no unread_alerts). COMPLETE USER LIFECYCLE TESTED: Register → Pending → Approve → Login → Password Reset → Role Change → Disable/Enable → Delete with proper validation and security."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
