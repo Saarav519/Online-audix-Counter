@@ -1280,8 +1280,23 @@ const ScanItems = () => {
     
     // Check if we're in Pre-Assigned mode
     if (settings.locationScanMode === 'preassigned') {
-      // In Pre-Assigned mode, navigate back to Locations page
-      // This will show the list view with next pending location ready to open
+      // SEQUENTIAL FLOW: Auto-open next location in master order
+      const currentCode = selectedLocation?.code;
+      if (currentCode) {
+        const nextMasterLoc = getNextSequentialLocation(currentCode);
+        if (nextMasterLoc) {
+          // Create assigned location for next master location
+          const nextAssigned = getOrCreateAssignedLocation(nextMasterLoc.code, nextMasterLoc.name);
+          playSound(true);
+          // Small delay to let state updates propagate before navigation
+          setTimeout(() => {
+            navigate(`/scan?location=${nextAssigned.id}`, { replace: true });
+          }, 150);
+          return;
+        }
+      }
+      // No more locations in sequence - go back to reports
+      playSound(true);
       navigate('/reports');
       return;
     }
