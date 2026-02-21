@@ -1448,9 +1448,9 @@ const ScanItems = () => {
 
     // STEP 2: Barcode Scanning Screen (Mobile) - Only shown after location is selected
     return (
-      <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
+      <div className="flex flex-col" style={{ height: 'calc(100vh - 5rem)', minHeight: '400px' }}>
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pb-20 space-y-2" style={{ WebkitOverflowScrolling: 'touch' }}>
           {/* Location Info Header - Compact bar */}
           <div className="flex items-center gap-2 px-2 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100">
             <div className="w-7 h-7 bg-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
