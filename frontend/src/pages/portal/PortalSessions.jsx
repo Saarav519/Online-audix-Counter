@@ -1,0 +1,410 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Plus, 
+  Search, 
+  FolderOpen, 
+  Upload,
+  Play,
+  CheckCircle,
+  Archive,
+  FileSpreadsheet,
+  Calendar
+} from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+import { toast } from 'sonner';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+export default function PortalSessions() {
+  const [sessions, setSessions] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClient, setSelectedClient] = useState('');
+  const [showDialog, setShowDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importingSession, setImportingSession] = useState(null);
+  const [formData, setFormData] = useState({
+    client_id: '',
+    name: '',
+    start_date: new Date().toISOString().split('T')[0]
+  });
+  const fileInputRef = useRef(null);
+
+  const fetchData = async () => {
+    try {
+      const [sessionsRes, clientsRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/portal/sessions`),
+        fetch(`${BACKEND_URL}/api/portal/clients`)
+      ]);
+      
+      if (sessionsRes.ok) setSessions(await sessionsRes.json());
+      if (clientsRes.ok) setClients(await clientsRes.json());
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.client_id || !formData.name) {
+      toast.error('Client and Session Name are required');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          start_date: new Date(formData.start_date).toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Failed to create session');
+      }
+
+      toast.success('Session created!');
+      setShowDialog(false);
+      setFormData({ client_id: '', name: '', start_date: new Date().toISOString().split('T')[0] });
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleStatusChange = async (sessionId, status) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}/status?status=${status}`, {
+        method: 'PUT'
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+
+      toast.success(`Session marked as ${status}`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleImportExpected = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/api/portal/sessions/${importingSession.id}/import-expected`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.detail || 'Import failed');
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+      setShowImportDialog(false);
+      setImportingSession(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  const getClientName = (clientId) => {
+    const client = clients.find(c => c.id === clientId);
+    return client ? client.name : 'Unknown';
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'bg-emerald-100 text-emerald-700';
+      case 'completed': return 'bg-blue-100 text-blue-700';
+      case 'archived': return 'bg-gray-100 text-gray-600';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'active': return Play;
+      case 'completed': return CheckCircle;
+      case 'archived': return Archive;
+      default: return FolderOpen;
+    }
+  };
+
+  const filteredSessions = sessions.filter(session => {
+    const matchesSearch = session.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesClient = !selectedClient || session.client_id === selectedClient;
+    return matchesSearch && matchesClient;
+  });
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Audit Sessions</h1>
+          <p className="text-gray-500">Manage audit sessions for your clients</p>
+        </div>
+        <Button 
+          onClick={() => setShowDialog(true)}
+          className="bg-emerald-500 hover:bg-emerald-600"
+          disabled={clients.length === 0}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Session
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search sessions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <select
+          value={selectedClient}
+          onChange={(e) => setSelectedClient(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+        >
+          <option value="">All Clients</option>
+          {clients.map(client => (
+            <option key={client.id} value={client.id}>{client.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Sessions List */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Loading...</div>
+      ) : clients.length === 0 ? (
+        <div className="text-center py-12">
+          <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-gray-500">Create a client first to add sessions</p>
+        </div>
+      ) : filteredSessions.length === 0 ? (
+        <div className="text-center py-12">
+          <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+          <p className="text-gray-500">No sessions found</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredSessions.map((session) => {
+            const StatusIcon = getStatusIcon(session.status);
+            return (
+              <div
+                key={session.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getStatusColor(session.status)}`}>
+                      <StatusIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{session.name}</h3>
+                      <p className="text-sm text-gray-500">
+                        {getClientName(session.client_id)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <Calendar className="w-4 h-4" />
+                        {new Date(session.start_date).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(session.status)}`}>
+                          {session.status}
+                        </span>
+                        {session.expected_stock_imported && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                            Stock Imported
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setImportingSession(session);
+                          setShowImportDialog(true);
+                        }}
+                      >
+                        <Upload className="w-4 h-4 mr-1" />
+                        Import Stock
+                      </Button>
+                      
+                      {session.status === 'active' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStatusChange(session.id, 'completed')}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Complete
+                        </Button>
+                      )}
+                      
+                      {session.status === 'completed' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStatusChange(session.id, 'archived')}
+                        >
+                          <Archive className="w-4 h-4 mr-1" />
+                          Archive
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Session Dialog */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Audit Session</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="client">Client *</Label>
+              <select
+                id="client"
+                value={formData.client_id}
+                onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+              >
+                <option value="">Select Client</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>{client.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="name">Session Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="July 2026 Stock Count"
+              />
+            </div>
+            <div>
+              <Label htmlFor="start_date">Start Date</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-emerald-500 hover:bg-emerald-600">
+                Create Session
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Expected Stock Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Expected Stock</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Upload a CSV file with expected stock data for: <strong>{importingSession?.name}</strong>
+            </p>
+            
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">CSV Format:</p>
+              <code className="text-xs text-gray-600 block">
+                Location,Barcode,Description,MRP,Cost,Qty
+              </code>
+              <p className="text-xs text-gray-500 mt-2">
+                Example: Bin-A01,8901234567890,Rice 5kg,280,250,100
+              </p>
+            </div>
+
+            <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+              <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-sm text-gray-600 mb-4">
+                Drag & drop your CSV file here, or click to browse
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleImportExpected}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Select CSV File
+              </Button>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button type="button" variant="outline" onClick={() => setShowImportDialog(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
