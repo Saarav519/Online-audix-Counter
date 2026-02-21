@@ -276,7 +276,8 @@ async def create_client(client: ClientCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.clients.insert_one(doc)
     
-    return {"message": "Client created", "client": doc}
+    # Return the client data without MongoDB's _id field
+    return {"message": "Client created", "client": new_client.model_dump()}
 
 @portal_router.get("/clients/{client_id}")
 async def get_client(client_id: str):
