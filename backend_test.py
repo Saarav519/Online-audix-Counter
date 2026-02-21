@@ -42,10 +42,12 @@ class AudixBackendTester:
             
             if login_response.status_code == 200:
                 login_data = login_response.json()
-                if "id" in login_data and "username" in login_data:
-                    self.admin_token = login_data.get("id")
+                # Handle nested user object
+                user_data = login_data.get("user", login_data)
+                if "id" in user_data and "username" in user_data:
+                    self.admin_token = user_data.get("id")
                     return self.log_test("Portal Login", True, 
-                        f"Admin login successful - User ID: {login_data['id']}, Username: {login_data['username']}")
+                        f"Admin login successful - User ID: {user_data['id']}, Username: {user_data['username']}")
                 else:
                     return self.log_test("Portal Login", False, f"Invalid login response format: {login_data}")
             else:
