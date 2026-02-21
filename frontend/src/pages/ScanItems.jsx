@@ -1442,7 +1442,7 @@ const ScanItems = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Mode Badges + Ask Quantity Toggle */}
+          {/* Mode Badges + Ask Quantity Toggle (only when Single SKU is OFF) */}
           <div className="flex items-center justify-between px-1">
             <Badge 
               variant="outline" 
@@ -1452,17 +1452,19 @@ const ScanItems = () => {
             >
               {settings.locationScanMode === 'dynamic' ? 'Dynamic' : 'Pre-Assigned'}
             </Badge>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="ask-qty-toggle-mobile" className="text-xs text-slate-600 cursor-pointer">
-                Ask Qty
-              </Label>
-              <Switch
-                id="ask-qty-toggle-mobile"
-                checked={askQuantityBeforeAdding}
-                onCheckedChange={handleToggleAskQuantity}
-                className="data-[state=checked]:bg-emerald-600"
-              />
-            </div>
+            {!isSingleSkuMode && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="ask-qty-toggle-mobile" className="text-xs text-slate-600 cursor-pointer">
+                  Ask Qty
+                </Label>
+                <Switch
+                  id="ask-qty-toggle-mobile"
+                  checked={askQuantityBeforeAdding}
+                  onCheckedChange={handleToggleAskQuantity}
+                  className="data-[state=checked]:bg-emerald-600"
+                />
+              </div>
+            )}
           </div>
 
           {/* Barcode Scanner */}
