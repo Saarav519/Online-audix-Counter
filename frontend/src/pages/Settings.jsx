@@ -211,7 +211,7 @@ const Settings = () => {
           client_id: syncConfig.clientId,
           session_id: syncConfig.sessionId,
           locations: locationsToSync,
-          clear_after_sync: syncConfig.clearAfterSync
+          clear_after_sync: true
         })
       });
 
