@@ -244,19 +244,21 @@ const Settings = () => {
 
     try {
       // Prepare locations data for sync
-      const locationsToSync = locations.map(loc => ({
-        id: loc.id,
-        name: loc.name,
-        items: scannedItems
-          .filter(item => item.locationId === loc.id)
-          .map(item => ({
+      // scannedItems is an object keyed by locationId
+      const locationsToSync = locations.map(loc => {
+        const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
+        return {
+          id: loc.id,
+          name: loc.name,
+          items: items.map(item => ({
             barcode: item.barcode,
             productName: item.productName,
             price: item.price,
             quantity: item.quantity,
             scannedAt: item.scannedAt
           }))
-      })).filter(loc => loc.items.length > 0);
+        };
+      }).filter(loc => loc.items.length > 0);
 
       if (locationsToSync.length === 0) {
         if (isManual) alert('No data to sync');
