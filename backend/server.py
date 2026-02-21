@@ -769,16 +769,120 @@ async def get_sync_config():
 # ==================== SYNC RAW LOGS ROUTES ====================
 
 @portal_router.get("/sync-logs")
-async def get_sync_logs(client_id: str = None, session_id: str = None, limit: int = 100):
-    """Get raw sync logs, optionally filtered by client and/or session"""
+async def get_sync_logs(client_id: str = None, session_id: str = None, date: str = None, limit: int = 500):
+    """Get raw sync logs, optionally filtered by client, session, and/or date.
+    Returns logs grouped by client and date for the frontend."""
     query = {}
     if client_id:
         query["client_id"] = client_id
     if session_id:
         query["session_id"] = session_id
+    if date:
+        query["sync_date"] = date
     
     logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", -1).to_list(limit)
     return logs
+
+@portal_router.get("/sync-logs/grouped")
+async def get_sync_logs_grouped(client_id: str = None, limit: int = 500):
+    """Get sync logs grouped by client_id and sync_date for the admin portal view."""
+    query = {}
+    if client_id:
+        query["client_id"] = client_id
+    
+    logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", -1).to_list(limit)
+    
+    # Also fetch client names for display
+    all_client_ids = list(set(log.get("client_id", "") for log in logs if log.get("client_id")))
+    clients_list = await db.clients.find({"id": {"$in": all_client_ids}}, {"_id": 0, "id": 1, "name": 1, "code": 1}).to_list(1000)
+    client_map = {c["id"]: c for c in clients_list}
+    
+    # Group: client_id → sync_date → [logs]
+    grouped = {}
+    for log in logs:
+        cid = log.get("client_id", "unknown")
+        sd = log.get("sync_date", "unknown")
+        
+        if cid not in grouped:
+            client_info = client_map.get(cid, {})
+            grouped[cid] = {
+                "client_id": cid,
+                "client_name": client_info.get("name", "Unknown Client"),
+                "client_code": client_info.get("code", ""),
+                "dates": {}
+            }
+        
+        if sd not in grouped[cid]["dates"]:
+            grouped[cid]["dates"][sd] = {
+                "date": sd,
+                "logs": [],
+                "total_locations": 0,
+                "total_items": 0,
+                "total_quantity": 0,
+                "sync_count": 0
+            }
+        
+        day_group = grouped[cid]["dates"][sd]
+        day_group["logs"].append(log)
+        day_group["total_locations"] += log.get("location_count", 0)
+        day_group["total_items"] += log.get("total_items", 0)
+        day_group["total_quantity"] += log.get("total_quantity", 0)
+        day_group["sync_count"] += 1
+    
+    # Convert to sorted list
+    result = []
+    for cid in sorted(grouped.keys()):
+        client_group = grouped[cid]
+        dates_list = []
+        for sd in sorted(client_group["dates"].keys(), reverse=True):
+            dates_list.append(client_group["dates"][sd])
+        client_group["dates"] = dates_list
+        result.append(client_group)
+    
+    return result
+
+@portal_router.get("/sync-logs/export")
+async def export_sync_logs(client_id: str, date: str):
+    """Export sync logs for a specific client and date as CSV"""
+    query = {"client_id": client_id, "sync_date": date}
+    logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", 1).to_list(100000)
+    
+    if not logs:
+        raise HTTPException(status_code=404, detail="No logs found for this client and date")
+    
+    # Get client name
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "name": 1, "code": 1})
+    client_name = client.get("name", "Unknown") if client else "Unknown"
+    
+    # Build CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Log ID", "Device", "Session ID", "Sync Time", "Location", "Barcode", "Product Name", "Quantity", "Scanned At"])
+    
+    for log in logs:
+        for loc in (log.get("raw_payload", {}).get("locations", [])):
+            loc_name = loc.get("name", loc.get("location_name", "Unknown"))
+            for item in loc.get("items", []):
+                writer.writerow([
+                    log.get("id", ""),
+                    log.get("device_name", ""),
+                    log.get("session_id", ""),
+                    log.get("synced_at", ""),
+                    loc_name,
+                    item.get("barcode", ""),
+                    item.get("product_name", item.get("productName", "")),
+                    item.get("quantity", 0),
+                    item.get("scanned_at", item.get("scannedAt", ""))
+                ])
+    
+    csv_content = output.getvalue()
+    
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=sync_logs_{client_name}_{date}.csv"}
+    )
 
 @portal_router.get("/sync-logs/{log_id}")
 async def get_sync_log_detail(log_id: str):
