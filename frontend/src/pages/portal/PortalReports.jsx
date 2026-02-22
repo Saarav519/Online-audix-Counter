@@ -340,7 +340,10 @@ export default function PortalReports() {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (varianceCategory !== 'all') count++;
-    count += Object.keys(columnFilters).length;
+    // Only count column filters that have actual inclusions (not empty arrays)
+    Object.values(columnFilters).forEach(v => {
+      if (v && v.length > 0) count++;
+    });
     return count;
   }, [varianceCategory, columnFilters]);
 
