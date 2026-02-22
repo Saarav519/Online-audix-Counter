@@ -1752,7 +1752,8 @@ async def get_bin_wise_report(session_id: str):
             "total_locations": len(report),
             "completed": count_completed,
             "empty_bins": count_empty,
-            "pending": count_pending
+            "pending": count_pending,
+            "conflicts": count_conflict
         }
     }
 
