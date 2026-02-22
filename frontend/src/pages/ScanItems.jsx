@@ -1333,11 +1333,6 @@ const ScanItems = () => {
     setShowSubmitModal(true);
   };
 
-  // Handle "Mark as Empty" button click
-  const handleMarkAsEmpty = () => {
-    setShowEmptyBinModal(true);
-  };
-
   // Auto-mark location as empty when location barcode is rescanned
   const handleAutoMarkEmpty = () => {
     let finalLocationId = selectedLocationId;
