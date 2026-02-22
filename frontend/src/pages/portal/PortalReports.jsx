@@ -53,6 +53,19 @@ function filterByVarianceCategory(rows, category) {
 
 // Recalculate totals from filtered rows
 function recalcTotals(rows, reportType) {
+
+// Numeric columns that support < 0 / > 0 / = 0 filtering
+const NUMERIC_COLUMNS = new Set([
+  'stock_qty', 'physical_qty', 'difference_qty', 'diff_qty', 'accuracy_pct',
+  'mrp', 'cost', 'stock_value', 'physical_value', 'diff_value',
+  'item_count', 'barcode_count'
+]);
+
+const NUMERIC_CONDITIONS = [
+  { value: 'lt0', label: '< 0', desc: 'Less than zero' },
+  { value: 'eq0', label: '= 0', desc: 'Equal to zero' },
+  { value: 'gt0', label: '> 0', desc: 'Greater than zero' },
+];
   if (!rows || rows.length === 0) return null;
   const totals = { stock_qty: 0, physical_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0 };
   let stockValue = 0, physicalValue = 0, diffValue = 0, itemCount = 0;
