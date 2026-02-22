@@ -276,6 +276,24 @@ export const AppProvider = ({ children }) => {
   }, [scannedItems]);
 
   // ============================================
+  // CLEANUP: Remove orphaned scannedItems keys
+  // When locations change, clean up any scannedItems entries
+  // for location IDs that no longer exist in the locations array
+  // ============================================
+  useEffect(() => {
+    if (!locations || locations.length === 0) return;
+    const validIds = new Set(locations.map(l => l.id));
+    setScannedItems(prev => {
+      const orphanKeys = Object.keys(prev).filter(k => !validIds.has(k));
+      if (orphanKeys.length === 0) return prev; // no orphans, no update
+      const cleaned = { ...prev };
+      orphanKeys.forEach(k => delete cleaned[k]);
+      console.log(`🧹 Cleaned ${orphanKeys.length} orphaned scannedItems keys`);
+      return cleaned;
+    });
+  }, [locations]);
+
+  // ============================================
   // INDEXEDDB: Persist master products (supports 100MB+)
   // Only saves when master products change (not on every scan)
   // CRITICAL: Only saves AFTER IndexedDB has finished loading to prevent data loss
