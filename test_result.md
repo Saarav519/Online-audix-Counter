@@ -1790,6 +1790,62 @@ test_plan:
         agent: "main"
         comment: "Sortable headers with asc/desc arrows, filter dropdown on each column with unique value checkboxes and search. Composes with variance category filter."
 
+  - agent: "testing"
+    message: |
+      ✅ EMPTY BIN FEATURE BACKEND COMPREHENSIVE TESTING COMPLETED - ALL 6 TESTS PASSED (100% SUCCESS RATE)
+      
+      🎯 **TESTING SCOPE**:
+      Comprehensive testing of NEW Empty Bin feature backend APIs as specified in review request:
+      1. Get session ID and client ID from existing data
+      2. Test Empty Bin sync with both empty and normal locations  
+      3. Test Empty Bins Report Endpoint with field verification
+      4. Test Pending Locations Endpoint with summary validation
+      5. Test Consolidated Empty Bins Summary (global + client filter)
+      6. Test Dashboard Empty Bins integration
+      
+      📊 **EMPTY BIN TEST RESULTS (6/6 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **DATA SETUP**:
+      1. Get IDs ✅ Found Session ID: dd5b72be-bc78-4c56-a847-bb5deaac8ed6 (Q1 2026 - Warehouse Audit) and Client ID: 4cbc38a3-cb90-46d1-b689-375a716cd0eb (Reliance Retail)
+      
+      ✅ **SYNC API EMPTY BIN SUPPORT**:
+      2. Sync Empty Bins ✅ POST /api/sync/ successfully handled empty location sync with is_empty=true and empty_remarks fields
+         - Synced 2 locations: Rack-E01-TEST (empty with remarks) and Rack-F01-TEST (normal with 1 item)
+         - Empty location properly flagged and persisted
+      
+      ✅ **EMPTY BINS REPORT ENDPOINT**:
+      3. Empty Bins Report ✅ GET /api/portal/reports/{session_id}/empty-bins working correctly
+         - Returns required fields: total_empty_bins, by_date, all_empty_locations
+         - Found 2 empty bins including test location Rack-E01-TEST with is_empty=true
+         - Proper date grouping and location details with empty_remarks
+      
+      ✅ **PENDING LOCATIONS ENDPOINT**:
+      4. Pending Locations Report ✅ GET /api/portal/reports/{session_id}/pending-locations working correctly
+         - Returns proper summary: Expected=5, Completed=6, Empty=2, Pending=0
+         - Includes completed and empty_bins arrays with proper status tracking
+      
+      ✅ **CONSOLIDATED EMPTY BINS SUMMARY**:
+      5. Consolidated Empty Bins Summary ✅ GET /api/portal/empty-bins/summary working correctly
+         - Global summary: 2 empty bins across all clients/sessions
+         - Client filter: GET /api/portal/empty-bins/summary?client_id={client_id} working (returns 2 empty bins for test client)
+         - Returns required fields: total_empty_bins, by_client, by_date arrays
+      
+      ✅ **DASHBOARD EMPTY BINS INTEGRATION**:
+      6. Dashboard Empty Bins ✅ GET /api/portal/dashboard correctly includes empty bins count
+         - Dashboard stats shows empty_bins: 2 in stats object
+         - Empty bins count properly integrated alongside other metrics
+      
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
+      
+      🎯 **EMPTY BIN FEATURE VERIFICATION COMPLETE**:
+      ✅ SyncedLocation model correctly supports is_empty and empty_remarks fields
+      ✅ Sync API handles empty locations with proper data persistence  
+      ✅ All empty bin report endpoints return correct data structures and fields
+      ✅ Dashboard integration working for empty bins statistics
+      ✅ Client-filtered and global empty bin summaries working
+      ✅ Empty bin date grouping and location tracking working correctly
+      
+      🎉 **CONCLUSION**: EMPTY BIN FEATURE BACKEND IS FULLY OPERATIONAL AND PRODUCTION-READY. All requested Empty Bin APIs working correctly with proper data persistence, field validation, and integration with existing dashboard/reporting infrastructure.
 agent_communication:
   - agent: "testing"
     message: |
