@@ -506,6 +506,8 @@ export default function PortalReports() {
         options.push({ value: 'article-wise', label: 'Article-wise Variance' });
       }
       options.push({ value: 'category-summary', label: 'Category-wise Summary' });
+      options.push({ value: 'empty-bins', label: 'Empty Bins' });
+      options.push({ value: 'pending-locations', label: 'Pending Locations' });
       return options;
     }
     const mode = sessionInfo?.variance_mode || 'bin-wise';
