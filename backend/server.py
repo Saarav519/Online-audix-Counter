@@ -1584,9 +1584,13 @@ async def get_bin_wise_report(session_id: str):
             status = "empty_bin"
             count_empty += 1
             empty_info = empty_bin_map[loc]
-            empty_note = empty_info.get("empty_remarks", "")
+            empty_note = empty_info.get("empty_remarks", "").strip()
+            # Avoid double "Empty Bin" prefix if remarks already contain it
             if empty_note:
-                remark = f"Empty Bin — {empty_note}"
+                if empty_note.lower().startswith("empty bin"):
+                    remark = empty_note
+                else:
+                    remark = f"Empty Bin — {empty_note}"
             else:
                 remark = "Empty Bin — Location verified empty during physical count"
         elif not scanned and in_expected:
