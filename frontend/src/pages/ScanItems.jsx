@@ -771,7 +771,7 @@ const ScanItems = () => {
         }, 3000);
       }
     }
-  }, [scanLocation, addTempItem, playSound, showQtyPopup, handleAutoMarkEmpty]);
+  }, [scanLocation, addTempItem, playSound, showQtyPopup]);
 
   // Enable hardware scanner hook - always enabled when location is not locked
   // The hook captures ALL keyboard-based scanner input
