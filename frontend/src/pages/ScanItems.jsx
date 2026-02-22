@@ -688,7 +688,7 @@ const ScanItems = () => {
         setBarcodeInput('');
         
         // Auto-mark empty and submit
-        handleAutoMarkEmpty();
+        if (handleAutoMarkEmptyRef.current) handleAutoMarkEmptyRef.current();
         return;
       }
       
