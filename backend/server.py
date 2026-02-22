@@ -2509,6 +2509,9 @@ async def get_dashboard():
     # Get empty bins count
     empty_bins_count = await db.synced_locations.count_documents({"is_empty": True})
     
+    # Get pending conflicts count
+    pending_conflicts = await db.conflict_locations.count_documents({"status": "pending"})
+    
     # Get recent syncs
     recent_syncs = await db.synced_locations.find(
         {}, {"_id": 0}
