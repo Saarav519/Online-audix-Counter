@@ -243,9 +243,15 @@ const Settings = () => {
     setSyncing(true);
 
     try {
-      // Prepare locations data for sync
-      // scannedItems is an object keyed by locationId
-      const locationsToSync = locations.map(loc => {
+      // Filter locations by current scan mode (matching Reports page logic)
+      const isPreAssigned = settings.locationScanMode === 'preassigned';
+      const modeLocations = locations.filter(loc => {
+        if (isPreAssigned) return loc.isAssigned === true;
+        return loc.autoCreated === true || loc.isAssigned === false;
+      });
+
+      // Prepare locations data for sync — only mode-relevant locations
+      const locationsToSync = modeLocations.map(loc => {
         const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
         return {
           id: loc.id,
