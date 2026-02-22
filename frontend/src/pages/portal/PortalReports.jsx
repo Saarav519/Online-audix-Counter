@@ -289,6 +289,7 @@ export default function PortalReports() {
     setVarianceCategory('all');
     setSortConfig({ key: null, direction: 'asc' });
     setColumnFilters({});
+    setNumericFilters({});
   }, [selectedSession, reportType]);
 
   useEffect(() => {
