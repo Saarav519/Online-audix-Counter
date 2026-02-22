@@ -2,7 +2,7 @@
 """
 AUDIX User Management and Password Reset Backend API Testing
 Testing Flow as specified in review request.
-Backend URL: https://audix-counter.preview.emergentagent.com
+Backend URL: https://offline-sync-portal-2.preview.emergentagent.com
 """
 
 import requests
@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 
 # Backend configuration
-BACKEND_URL = "https://audix-counter.preview.emergentagent.com"
+BACKEND_URL = "https://offline-sync-portal-2.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class UserManagementTester:

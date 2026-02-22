@@ -105,7 +105,7 @@
 user_problem_statement: |
   Test the AUDIX Admin Portal backend APIs to verify the sync and portal functionality:
 
-  Backend URL: https://audix-counter.preview.emergentagent.com
+  Backend URL: https://offline-sync-portal-2.preview.emergentagent.com
 
   Test the following endpoints:
 
@@ -398,7 +398,7 @@ agent_communication:
       - **Solution**: Modified endpoints to return Pydantic model data instead of raw MongoDB documents
       - **Files Fixed**: /app/backend/server.py (lines 279, 331)
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎯 **CORE SYNC FLOW VERIFICATION**:
       END-TO-END WORKING: Client Creation → Session Creation → Device Sync → Data Storage → Reports Display
@@ -474,7 +474,7 @@ agent_communication:
       ✅ Category summary correctly groups by category field
       ✅ All totals include accuracy_pct
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/reports/{session_id}/barcode-wise (NEW)
@@ -663,7 +663,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://audix-counter.preview.emergentagent.com/api
+      - Backend URL: https://offline-sync-portal-2.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
@@ -696,7 +696,7 @@ agent_communication:
       - ✅ MongoDB integration: Working correctly
       - ✅ CORS configuration: Properly configured
       
-      🌐 BACKEND URL VERIFIED: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL VERIFIED: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📝 TECHNICAL DETAILS:
       - FastAPI server running on proper port with supervisor
@@ -793,7 +793,7 @@ agent_communication:
       - ✅ UUID generation: Working correctly for record IDs
       - ✅ Timestamp generation: UTC timezone format working
       
-      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📋 TECHNICAL STATUS:
       - FastAPI server: Running correctly
@@ -822,7 +822,7 @@ agent_communication:
       - ✅ MongoDB persistence: Records stored and retrieved successfully
       - ✅ Response format: Valid JSON with proper schema validation
       
-      🌐 BACKEND URL STABLE: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -852,7 +852,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:33:30.957335Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -926,7 +926,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:58:02.146587Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -1011,7 +1011,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T14:21:01.130532Z)
       - ✅ MongoDB integration: Data persisting correctly (4 total records now)
       
-      🌐 BACKEND URL STABLE: https://audix-counter.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://offline-sync-portal-2.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -1293,7 +1293,7 @@ test_plan:
       - Post-delete verification: sync logs cleared, client removed, sessions removed ✅
       - No orphaned data remains after cascading delete ✅
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🔍 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/sync-logs/grouped (NEW - client-wise date-wise grouping)
@@ -1347,7 +1347,7 @@ test_plan:
       ✅ **DASHBOARD STATS VERIFICATION**:
       13. GET /api/portal/dashboard ✅ Returns total_users: 1, pending_users: 0 (no unread_alerts field)
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🔍 **USER MANAGEMENT ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/users - Lists all users with proper field exclusion (password_hash hidden)
@@ -1475,7 +1475,7 @@ test_plan:
       ✅ Re-sync replaces location data in synced_locations but preserves all raw logs
       ✅ Raw payload contains complete sync data: locations, items, device info, timestamps
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/sync-logs (NEW) - with client_id, session_id, limit filters
@@ -1564,7 +1564,7 @@ test_plan:
       ✅ Backward compatibility: Reports still work without master products using expected stock info
       ✅ Master enrichment priority: Master > Expected Stock > Physical data
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - POST /api/portal/clients/{client_id}/import-master (NEW) - Master products CSV import
@@ -1641,7 +1641,7 @@ test_plan:
       - GET /api/portal/reports/{session_id}/barcode-wise ✅  
       - GET /api/portal/reports/{session_id}/category-summary ✅
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎉 **CONCLUSION**: The CORRECTED report priority logic is working PERFECTLY. All 5 test scenarios confirmed that product details follow the exact priority: Stock > Master > Physical scan data. The implementation correctly handles fallback scenarios and generates appropriate professional remarks for each case.
 
@@ -1697,7 +1697,7 @@ test_plan:
         comment: "Added 5 consolidated report endpoints that aggregate data across all sessions for a client. Endpoints: bin-wise, detailed, barcode-wise, article-wise, category-summary."
       - working: true
         agent: "testing"
-        comment: "✅ CONSOLIDATED REPORT ENDPOINTS COMPREHENSIVE TESTING COMPLETED - ALL 9 TESTS PASSED (100% Success Rate). VERIFIED WORKING: 1) Portal Login (admin/admin123 → User ID: 0092da74-db25-493b-a2b7-7e89242114df), 2) Client Selection (Found 2 clients, selected Reliance Retail ID: 1984740d-861d-4e26-a2d4-fa674bb1464b), 3) GET /api/portal/reports/consolidated/{client_id}/bin-wise (6 locations, Stock=1370, Physical=1188, Accuracy=86.7% with proper difference_qty field), 4) GET /api/portal/reports/consolidated/{client_id}/detailed (15 items with barcode/location/description/category/mrp/cost/accuracy_pct/remark), 5) GET /api/portal/reports/consolidated/{client_id}/barcode-wise (13 barcodes with proper aggregation across locations), 6) GET /api/portal/reports/consolidated/{client_id}/article-wise (13 articles with barcode grouping by article_code), 7) GET /api/portal/reports/consolidated/{client_id}/category-summary (8 categories with proper category-wise aggregation), 8) Sessions Retrieval (Found 2 sessions for Reliance Retail client), 9) Individual Session Reports (Backward compatibility confirmed - GET /api/portal/reports/{session_id}/bin-wise working). STRUCTURE VERIFICATION: All reports return proper 'report' array and 'totals' object with required fields (stock_qty, physical_qty, diff_qty/difference_qty, accuracy_pct). FIELD VALIDATION: Each report type contains appropriate fields (location/barcode/article_code/category + quantities + accuracy + professional remarks). CONSOLIDATION CONFIRMED: Data aggregated across all sessions for client. REMARKS QUALITY: Professional contextual remarks (e.g., 'Slight Shortage', 'Critical Shortage', 'Not in Master', 'Within Tolerance'). Backend URL: https://audix-counter.preview.emergentagent.com"
+        comment: "✅ CONSOLIDATED REPORT ENDPOINTS COMPREHENSIVE TESTING COMPLETED - ALL 9 TESTS PASSED (100% Success Rate). VERIFIED WORKING: 1) Portal Login (admin/admin123 → User ID: 0092da74-db25-493b-a2b7-7e89242114df), 2) Client Selection (Found 2 clients, selected Reliance Retail ID: 1984740d-861d-4e26-a2d4-fa674bb1464b), 3) GET /api/portal/reports/consolidated/{client_id}/bin-wise (6 locations, Stock=1370, Physical=1188, Accuracy=86.7% with proper difference_qty field), 4) GET /api/portal/reports/consolidated/{client_id}/detailed (15 items with barcode/location/description/category/mrp/cost/accuracy_pct/remark), 5) GET /api/portal/reports/consolidated/{client_id}/barcode-wise (13 barcodes with proper aggregation across locations), 6) GET /api/portal/reports/consolidated/{client_id}/article-wise (13 articles with barcode grouping by article_code), 7) GET /api/portal/reports/consolidated/{client_id}/category-summary (8 categories with proper category-wise aggregation), 8) Sessions Retrieval (Found 2 sessions for Reliance Retail client), 9) Individual Session Reports (Backward compatibility confirmed - GET /api/portal/reports/{session_id}/bin-wise working). STRUCTURE VERIFICATION: All reports return proper 'report' array and 'totals' object with required fields (stock_qty, physical_qty, diff_qty/difference_qty, accuracy_pct). FIELD VALIDATION: Each report type contains appropriate fields (location/barcode/article_code/category + quantities + accuracy + professional remarks). CONSOLIDATION CONFIRMED: Data aggregated across all sessions for client. REMARKS QUALITY: Professional contextual remarks (e.g., 'Slight Shortage', 'Critical Shortage', 'Not in Master', 'Within Tolerance'). Backend URL: https://offline-sync-portal-2.preview.emergentagent.com"
 
   - task: "Variance Category Quick Filter"
     implemented: true
@@ -1784,7 +1784,7 @@ agent_communication:
       - detailed/barcode-wise/article-wise/category-summary reports use "diff_qty" field
       - Both patterns working correctly in respective endpoints
       
-      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-2.preview.emergentagent.com
       
       🎯 **NEW CONSOLIDATED ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/reports/consolidated/{client_id}/bin-wise (NEW)
