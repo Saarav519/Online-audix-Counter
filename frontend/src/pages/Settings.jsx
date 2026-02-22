@@ -256,6 +256,8 @@ const Settings = () => {
         return {
           id: loc.id,
           name: loc.name,
+          is_empty: loc.isEmpty || false,
+          empty_remarks: loc.emptyRemarks || '',
           items: items.map(item => ({
             barcode: item.barcode,
             productName: item.productName,
@@ -264,7 +266,7 @@ const Settings = () => {
             scannedAt: item.scannedAt
           }))
         };
-      }).filter(loc => loc.items.length > 0);
+      }).filter(loc => loc.items.length > 0 || loc.is_empty);
 
       if (locationsToSync.length === 0) {
         if (isManual) alert('No data to sync');
