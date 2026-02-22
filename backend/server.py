@@ -2527,7 +2527,8 @@ async def get_dashboard():
             "devices": total_devices,
             "total_users": total_users,
             "pending_users": pending_users,
-            "empty_bins": empty_bins_count
+            "empty_bins": empty_bins_count,
+            "pending_conflicts": pending_conflicts
         },
         "recent_syncs": recent_syncs,
         "devices": devices
