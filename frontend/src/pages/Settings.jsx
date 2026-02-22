@@ -873,11 +873,13 @@ const Settings = () => {
             const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
             
             if (pendingLocations.length > 0) {
+              const emptyBinCount = pendingLocations.filter(loc => loc.isEmpty).length;
               return (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm font-medium text-amber-800">Ready to sync:</p>
                   <p className="text-sm text-amber-700">
                     {pendingLocations.length} location{pendingLocations.length !== 1 ? 's' : ''} • {pendingItems} item{pendingItems !== 1 ? 's' : ''} • {pendingQty} qty
+                    {emptyBinCount > 0 && ` • ${emptyBinCount} empty bin${emptyBinCount !== 1 ? 's' : ''}`}
                   </p>
                 </div>
               );
