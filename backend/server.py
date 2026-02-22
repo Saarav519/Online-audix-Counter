@@ -813,6 +813,8 @@ async def sync_data(sync_request: SyncRequest):
         location_id = loc_data.get("id", str(uuid.uuid4()))
         location_name = loc_data.get("name", "Unknown")
         items = loc_data.get("items", [])
+        loc_is_empty = loc_data.get("is_empty", False)
+        loc_empty_remarks = loc_data.get("empty_remarks", "")
         
         # Delete existing synced data for this location in this session
         await db.synced_locations.delete_many({
@@ -833,6 +835,12 @@ async def sync_data(sync_request: SyncRequest):
             ).model_dump())
             total_qty += item.get("quantity", 0)
         
+        # If location has 0 items and is_empty flag is set, mark it as empty
+        if loc_is_empty or (len(items) == 0 and loc_is_empty):
+            loc_is_empty = True
+            if not loc_empty_remarks:
+                loc_empty_remarks = "Location found empty during physical count"
+        
         # Create synced location
         synced_loc = SyncedLocation(
             session_id=sync_request.session_id,
@@ -843,6 +851,8 @@ async def sync_data(sync_request: SyncRequest):
             items=synced_items,
             total_items=len(synced_items),
             total_quantity=total_qty,
+            is_empty=loc_is_empty,
+            empty_remarks=loc_empty_remarks,
             sync_date=sync_date
         )
         
