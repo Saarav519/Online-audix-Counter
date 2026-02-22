@@ -39,7 +39,8 @@ import {
   Hash,
   Send,
   ArrowLeft,
-  ToggleRight
+  ToggleRight,
+  PackageX
 } from 'lucide-react';
 import { Switch } from '../components/ui/switch';
 
