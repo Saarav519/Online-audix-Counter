@@ -1099,6 +1099,15 @@ const ScanItems = () => {
           if (Date.now() - lastHookScanTimeRef.current < 150) return;
           const finalValue = barcodeInputRef.current?.value?.trim();
           if (finalValue && selectedLocationId) {
+            // Check if rescan of location barcode
+            const scLower = finalValue.toLowerCase();
+            const lcCode = (selectedLocationRef.current?.code || '').trim().toLowerCase();
+            const lcName = (selectedLocationRef.current?.name || '').trim().toLowerCase();
+            if (scLower && (scLower === lcCode || scLower === lcName)) {
+              setBarcodeInput('');
+              handleAutoMarkEmpty();
+              return;
+            }
             if (askQuantityBeforeAdding) {
               // Punching Mode: show popup
               showQtyPopup(finalValue);
