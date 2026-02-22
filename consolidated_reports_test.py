@@ -102,7 +102,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
@@ -156,7 +156,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
@@ -210,7 +210,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
@@ -264,7 +264,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
@@ -318,7 +318,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
@@ -402,7 +402,7 @@ class ConsolidatedReportsTester:
                     totals = data["totals"]
                     
                     # Check totals structure
-                    required_total_fields = ["stock_qty", "physical_qty", "diff_qty", "accuracy_pct"]
+                    required_total_fields = ["stock_qty", "physical_qty", "difference_qty", "accuracy_pct"]
                     missing_total_fields = [f for f in required_total_fields if f not in totals]
                     
                     if missing_total_fields:
