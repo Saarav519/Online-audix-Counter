@@ -1658,6 +1658,7 @@ async def get_bin_wise_report(session_id: str):
     count_completed = 0
     count_empty = 0
     count_pending = 0
+    count_conflict = 0
     
     for loc in sorted(all_locations):
         stock_qty = expected_by_location.get(loc, 0)
@@ -1667,9 +1668,35 @@ async def get_bin_wise_report(session_id: str):
         in_expected = loc in expected_by_location
         scanned = loc in physical_by_location
         is_empty_bin = loc in empty_bin_map
+        is_conflict = loc in conflict_map
         
         # Determine status and remark
-        if is_empty_bin:
+        if is_conflict:
+            # Conflict: duplicate scan from different devices — pending admin review
+            status = "conflict"
+            count_conflict += 1
+            cinfo = conflict_map[loc]
+            devices_str = ", ".join(cinfo["devices"])
+            remark = f"Conflict — Duplicate scan from {cinfo['entry_count']} devices ({devices_str}). Pending admin review."
+            # Conflict locations should NOT affect variance totals
+            physical_qty = 0
+            diff_qty = 0 - stock_qty
+            accuracy = 0.0
+            report.append({
+                "location": loc,
+                "stock_qty": stock_qty,
+                "physical_qty": 0,
+                "difference_qty": diff_qty,
+                "accuracy_pct": 0.0,
+                "remark": remark,
+                "status": status,
+                "is_empty": False,
+                "empty_remarks": "",
+                "conflict_id": cinfo["conflict_id"]
+            })
+            # Don't add to totals — conflict shouldn't affect variance
+            continue
+        elif is_empty_bin:
             # Empty Bin: location was physically visited and confirmed empty
             status = "empty_bin"
             count_empty += 1
