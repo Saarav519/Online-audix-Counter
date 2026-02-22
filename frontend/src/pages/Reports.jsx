@@ -50,7 +50,8 @@ import {
   Edit3,
   ChevronRight,
   Target,
-  ListOrdered
+  ListOrdered,
+  PackageX
 } from 'lucide-react';
 
 const Reports = () => {
