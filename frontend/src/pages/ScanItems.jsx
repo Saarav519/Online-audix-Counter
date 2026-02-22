@@ -1826,6 +1826,9 @@ const ScanItems = () => {
                   <ScanBarcode className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="text-slate-500 text-sm">No items scanned yet</p>
                   <p className="text-slate-400 text-xs mt-1">Start scanning barcodes</p>
+                  <p className="text-xs text-amber-600 bg-amber-50 rounded-lg py-1 px-2 mt-2 inline-block">
+                    If empty, rescan the location barcode
+                  </p>
                 </div>
               ) : (
                 <div 
