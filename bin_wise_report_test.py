@@ -210,7 +210,7 @@ class BinWiseReportTester:
                 "session_id": self.session_id,
                 "locations": [
                     {
-                        "location": "EMPTY-TEST-001",
+                        "name": "EMPTY-TEST-001",
                         "is_empty": True,
                         "empty_remarks": "Empty Bin — Verified no items during audit",
                         "items": []
