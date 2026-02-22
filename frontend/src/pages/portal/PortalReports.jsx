@@ -364,6 +364,16 @@ export default function PortalReports() {
   };
 
   const getReportTypeOptions = () => {
+    // If consolidated, show all report types
+    if (selectedSession === '__consolidated__') {
+      return [
+        { value: 'bin-wise', label: 'Bin-wise Summary' },
+        { value: 'detailed', label: 'Detailed Item-wise' },
+        { value: 'barcode-wise', label: 'Barcode-wise Variance' },
+        { value: 'article-wise', label: 'Article-wise Variance' },
+        { value: 'category-summary', label: 'Category-wise Summary' },
+      ];
+    }
     const mode = sessionInfo?.variance_mode || 'bin-wise';
     const options = [];
     
