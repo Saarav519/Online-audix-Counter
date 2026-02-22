@@ -845,12 +845,15 @@ COLD-01,Cold Storage Unit 1`;
                 {filteredPreassignedData.map((locData) => {
                   const { serialNo, masterLocation, assignedLocation, isSubmitted, isStarted, itemCount, totalQuantity: locQty } = locData;
                   const isActive = masterLocation.code === activeLocationCode;
+                  const isEmptyBin = assignedLocation?.isEmpty === true;
 
                   return (
                     <div
                       key={masterLocation.code}
                       className={`flex items-center gap-2.5 px-3 py-3 transition-all cursor-pointer active:bg-slate-100 ${
-                        isSubmitted
+                        isEmptyBin
+                          ? 'bg-amber-50/60'
+                          : isSubmitted
                           ? 'bg-emerald-50/60'
                           : isActive
                             ? 'bg-blue-50 border-l-4 border-l-blue-500'
@@ -862,7 +865,9 @@ COLD-01,Cold Storage Unit 1`;
                     >
                       {/* Serial Number / Status Icon */}
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isSubmitted
+                        isEmptyBin
+                          ? 'bg-amber-500'
+                          : isSubmitted
                           ? 'bg-emerald-500'
                           : isActive
                             ? 'bg-blue-500'
@@ -870,7 +875,9 @@ COLD-01,Cold Storage Unit 1`;
                               ? 'bg-amber-400'
                               : 'bg-slate-200'
                       }`}>
-                        {isSubmitted ? (
+                        {isEmptyBin ? (
+                          <PackageX className="w-4 h-4 text-white" />
+                        ) : isSubmitted ? (
                           <Check className="w-5 h-5 text-white" />
                         ) : isActive ? (
                           <Target className="w-4 h-4 text-white" />
@@ -885,14 +892,20 @@ COLD-01,Cold Storage Unit 1`;
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className={`font-semibold text-sm truncate ${
-                            isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
+                            isEmptyBin ? 'text-amber-800' : isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
                           }`}>
                             {masterLocation.name || masterLocation.code}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] text-slate-400 font-mono">{masterLocation.code}</span>
-                          {isSubmitted && (
+                          {isEmptyBin && (
+                            <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] px-1.5 py-0">
+                              <PackageX className="w-2.5 h-2.5 mr-0.5" />
+                              Empty Bin
+                            </Badge>
+                          )}
+                          {isSubmitted && !isEmptyBin && (
                             <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] px-1.5 py-0">
                               <Lock className="w-2.5 h-2.5 mr-0.5" />
                               Submitted
