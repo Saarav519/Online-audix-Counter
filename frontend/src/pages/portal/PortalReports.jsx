@@ -334,7 +334,13 @@ export default function PortalReports() {
     if (!selectedSession || !reportType) return;
     setLoading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/reports/${selectedSession}/${reportType}`);
+      let response;
+      if (selectedSession === '__consolidated__') {
+        // Consolidated: fetch from all sessions endpoint
+        response = await fetch(`${BACKEND_URL}/api/portal/reports/consolidated/${selectedClient}/${reportType}`);
+      } else {
+        response = await fetch(`${BACKEND_URL}/api/portal/reports/${selectedSession}/${reportType}`);
+      }
       if (response.ok) {
         setReportData(await response.json());
       }
