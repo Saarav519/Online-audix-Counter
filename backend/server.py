@@ -1114,6 +1114,369 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
 
 # ==================== REPORTS ROUTES ====================
 
+# ==================== CONSOLIDATED REPORT (all sessions for a client) ====================
+
+async def _get_all_session_ids_for_client(client_id: str):
+    """Get all session IDs for a client"""
+    sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(1000)
+    return [s["id"] for s in sessions]
+
+async def _load_master_for_client(client_id: str):
+    """Load master products indexed by barcode for a client"""
+    master_products = await db.master_products.find({"client_id": client_id}, {"_id": 0}).to_list(500000)
+    master_by_barcode = {}
+    for m in master_products:
+        master_by_barcode[m["barcode"]] = m
+    return master_by_barcode
+
+@portal_router.get("/reports/consolidated/{client_id}/bin-wise")
+async def get_consolidated_bin_wise(client_id: str):
+    """Consolidated bin-wise report across all sessions for a client"""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    if not session_ids:
+        return {"report": [], "totals": {"stock_qty": 0, "physical_qty": 0, "difference_qty": 0, "accuracy_pct": 100.0}}
+    
+    expected_by_location = {}
+    physical_by_location = {}
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for e in expected:
+            loc = e.get("location", "Unknown")
+            expected_by_location[loc] = expected_by_location.get(loc, 0) + e.get("qty", 0)
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            loc = s["location_name"]
+            physical_by_location[loc] = physical_by_location.get(loc, 0) + s["total_quantity"]
+    
+    all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
+    report = []
+    total_stock = 0
+    total_physical = 0
+    total_diff = 0
+    
+    for loc in sorted(all_locations):
+        stock_qty = expected_by_location.get(loc, 0)
+        physical_qty = physical_by_location.get(loc, 0)
+        diff_qty = physical_qty - stock_qty
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        remark = generate_remark(stock_qty, physical_qty, accuracy, loc in expected_by_location, loc in physical_by_location)
+        total_stock += stock_qty
+        total_physical += physical_qty
+        total_diff += diff_qty
+        report.append({"location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty, "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark})
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
+    return {"report": report, "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "difference_qty": total_diff, "accuracy_pct": total_accuracy}}
+
+@portal_router.get("/reports/consolidated/{client_id}/detailed")
+async def get_consolidated_detailed(client_id: str):
+    """Consolidated detailed item-wise report across all sessions for a client"""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    master_by_barcode = await _load_master_for_client(client_id)
+    
+    expected_map = {}  # key: loc|barcode
+    physical_map = {}  # key: loc|barcode
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for e in expected:
+            key = f"{e.get('location', '')}|{e['barcode']}"
+            if key not in expected_map:
+                expected_map[key] = {"qty": 0, "location": e.get("location", ""), "barcode": e["barcode"], "description": e.get("description", ""), "category": e.get("category", ""), "mrp": e.get("mrp", 0), "cost": e.get("cost", 0)}
+            expected_map[key]["qty"] += e.get("qty", 0)
+        
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            loc = s["location_name"]
+            for item in s.get("items", []):
+                key = f"{loc}|{item['barcode']}"
+                if key not in physical_map:
+                    physical_map[key] = {"qty": 0, "location": loc, "barcode": item["barcode"]}
+                physical_map[key]["qty"] += item.get("quantity", 0)
+    
+    all_keys = set(expected_map.keys()) | set(physical_map.keys())
+    report = []
+    total_stock = total_physical = total_diff = total_stock_value = total_physical_value = total_diff_value = 0
+    
+    for key in sorted(all_keys):
+        exp = expected_map.get(key, {})
+        phy = physical_map.get(key, {})
+        barcode = exp.get("barcode", "") or phy.get("barcode", "")
+        location = exp.get("location", "") or phy.get("location", "")
+        master = master_by_barcode.get(barcode, {})
+        
+        description = master.get("description", "") or exp.get("description", "")
+        category = master.get("category", "") or exp.get("category", "")
+        mrp = master.get("mrp", 0) or exp.get("mrp", 0) or 0
+        cost = master.get("cost", 0) or exp.get("cost", 0) or 0
+        
+        stock_qty = exp.get("qty", 0)
+        physical_qty = phy.get("qty", 0)
+        diff_qty = physical_qty - stock_qty
+        stock_value = stock_qty * cost
+        physical_value = physical_qty * cost
+        diff_value = diff_qty * cost
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = barcode in master_by_barcode
+        in_expected = key in expected_map
+        scanned = key in physical_map
+        remark = generate_remark(stock_qty, physical_qty, accuracy, True, scanned, in_master, in_expected)
+        
+        total_stock += stock_qty
+        total_physical += physical_qty
+        total_diff += diff_qty
+        total_stock_value += stock_value
+        total_physical_value += physical_value
+        total_diff_value += diff_value
+        
+        report.append({
+            "location": location, "barcode": barcode, "description": description, "category": category,
+            "mrp": mrp, "cost": cost, "stock_qty": stock_qty, "stock_value": round(stock_value, 2),
+            "physical_qty": physical_qty, "physical_value": round(physical_value, 2),
+            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+        })
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
+    return {
+        "report": report,
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "diff_qty": total_diff,
+                   "stock_value": round(total_stock_value, 2), "physical_value": round(total_physical_value, 2),
+                   "diff_value": round(total_diff_value, 2), "accuracy_pct": total_accuracy}
+    }
+
+@portal_router.get("/reports/consolidated/{client_id}/barcode-wise")
+async def get_consolidated_barcode_wise(client_id: str):
+    """Consolidated barcode-wise report across all sessions for a client"""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    master_by_barcode = await _load_master_for_client(client_id)
+    
+    expected_by_barcode = {}
+    physical_by_barcode = {}
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for e in expected:
+            bc = e["barcode"]
+            if bc not in expected_by_barcode:
+                expected_by_barcode[bc] = {"qty": 0, "description": e.get("description", ""), "category": e.get("category", ""), "mrp": e.get("mrp", 0), "cost": e.get("cost", 0)}
+            expected_by_barcode[bc]["qty"] += e.get("qty", 0)
+        
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            for item in s.get("items", []):
+                bc = item["barcode"]
+                physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
+    
+    all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    report = []
+    total_stock = total_physical = total_diff = total_stock_value = total_physical_value = total_diff_value = 0
+    
+    for bc in sorted(all_barcodes):
+        exp = expected_by_barcode.get(bc, {})
+        master = master_by_barcode.get(bc, {})
+        description = master.get("description", "") or exp.get("description", "")
+        category = master.get("category", "") or exp.get("category", "")
+        mrp = master.get("mrp", 0) or exp.get("mrp", 0) or 0
+        cost = master.get("cost", 0) or exp.get("cost", 0) or 0
+        
+        stock_qty = exp.get("qty", 0) if exp else 0
+        physical_qty = physical_by_barcode.get(bc, 0)
+        diff_qty = physical_qty - stock_qty
+        stock_value = stock_qty * cost
+        physical_value = physical_qty * cost
+        diff_value = diff_qty * cost
+        accuracy = calc_accuracy(stock_qty, physical_qty)
+        in_master = bc in master_by_barcode
+        in_expected = bc in expected_by_barcode
+        scanned = bc in physical_by_barcode
+        remark = generate_remark(stock_qty, physical_qty, accuracy, True, scanned, in_master, in_expected)
+        
+        total_stock += stock_qty
+        total_physical += physical_qty
+        total_diff += diff_qty
+        total_stock_value += stock_value
+        total_physical_value += physical_value
+        total_diff_value += diff_value
+        
+        report.append({
+            "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
+            "stock_qty": stock_qty, "stock_value": round(stock_value, 2),
+            "physical_qty": physical_qty, "physical_value": round(physical_value, 2),
+            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+        })
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
+    return {
+        "report": report,
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "diff_qty": total_diff,
+                   "stock_value": round(total_stock_value, 2), "physical_value": round(total_physical_value, 2),
+                   "diff_value": round(total_diff_value, 2), "accuracy_pct": total_accuracy}
+    }
+
+@portal_router.get("/reports/consolidated/{client_id}/article-wise")
+async def get_consolidated_article_wise(client_id: str):
+    """Consolidated article-wise report across all sessions for a client"""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    master_by_barcode = await _load_master_for_client(client_id)
+    
+    expected_by_barcode = {}
+    physical_by_barcode = {}
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for e in expected:
+            bc = e["barcode"]
+            if bc not in expected_by_barcode:
+                expected_by_barcode[bc] = {"qty": 0, "category": e.get("category", ""), "article_code": e.get("article_code", ""), "article_name": e.get("article_name", "")}
+            expected_by_barcode[bc]["qty"] += e.get("qty", 0)
+        
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            for item in s.get("items", []):
+                bc = item["barcode"]
+                physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
+    
+    all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    
+    # Group by article_code
+    article_groups = {}
+    for bc in all_barcodes:
+        master = master_by_barcode.get(bc, {})
+        exp = expected_by_barcode.get(bc, {})
+        article_code = master.get("article_code", "") or exp.get("article_code", "")
+        if not article_code:
+            article_code = "UNMAPPED"
+        if article_code not in article_groups:
+            article_groups[article_code] = {
+                "article_name": master.get("article_name", "") or exp.get("article_name", ""),
+                "category": master.get("category", "") or exp.get("category", "Unmapped" if article_code == "UNMAPPED" else ""),
+                "barcodes": [],
+                "stock_qty": 0, "physical_qty": 0,
+                "mrp": master.get("mrp", 0) or 0, "cost": master.get("cost", 0) or 0
+            }
+        article_groups[article_code]["barcodes"].append(bc)
+        article_groups[article_code]["stock_qty"] += expected_by_barcode.get(bc, {}).get("qty", 0)
+        article_groups[article_code]["physical_qty"] += physical_by_barcode.get(bc, 0)
+    
+    report = []
+    total_stock = total_physical = total_diff = total_stock_value = total_physical_value = total_diff_value = 0
+    
+    for code in sorted(article_groups.keys()):
+        g = article_groups[code]
+        diff_qty = g["physical_qty"] - g["stock_qty"]
+        cost = g["cost"]
+        stock_value = g["stock_qty"] * cost
+        physical_value = g["physical_qty"] * cost
+        diff_value = diff_qty * cost
+        accuracy = calc_accuracy(g["stock_qty"], g["physical_qty"])
+        remark = generate_remark(g["stock_qty"], g["physical_qty"], accuracy, code != "UNMAPPED", g["physical_qty"] > 0, code != "UNMAPPED", g["stock_qty"] > 0)
+        
+        total_stock += g["stock_qty"]
+        total_physical += g["physical_qty"]
+        total_diff += diff_qty
+        total_stock_value += stock_value
+        total_physical_value += physical_value
+        total_diff_value += diff_value
+        
+        report.append({
+            "article_code": code, "article_name": g["article_name"], "category": g["category"],
+            "barcodes": sorted(g["barcodes"]), "barcode_count": len(g["barcodes"]),
+            "mrp": g["mrp"], "cost": cost,
+            "stock_qty": g["stock_qty"], "stock_value": round(stock_value, 2),
+            "physical_qty": g["physical_qty"], "physical_value": round(physical_value, 2),
+            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+        })
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
+    return {
+        "report": report,
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "diff_qty": total_diff,
+                   "stock_value": round(total_stock_value, 2), "physical_value": round(total_physical_value, 2),
+                   "diff_value": round(total_diff_value, 2), "accuracy_pct": total_accuracy}
+    }
+
+@portal_router.get("/reports/consolidated/{client_id}/category-summary")
+async def get_consolidated_category_summary(client_id: str):
+    """Consolidated category summary across all sessions for a client"""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    master_by_barcode = await _load_master_for_client(client_id)
+    
+    expected_by_barcode = {}
+    physical_by_barcode = {}
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for e in expected:
+            bc = e["barcode"]
+            if bc not in expected_by_barcode:
+                expected_by_barcode[bc] = {"qty": 0, "category": e.get("category", ""), "cost": e.get("cost", 0)}
+            expected_by_barcode[bc]["qty"] += e.get("qty", 0)
+        
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            for item in s.get("items", []):
+                bc = item["barcode"]
+                physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
+    
+    all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    
+    # Group by category
+    cat_groups = {}
+    for bc in all_barcodes:
+        master = master_by_barcode.get(bc, {})
+        exp = expected_by_barcode.get(bc, {})
+        category = master.get("category", "") or exp.get("category", "")
+        if not category:
+            category = "Unmapped"
+        if category not in cat_groups:
+            cat_groups[category] = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "stock_value": 0, "physical_value": 0}
+        cost = master.get("cost", 0) or exp.get("cost", 0) or 0
+        stock_qty = expected_by_barcode.get(bc, {}).get("qty", 0)
+        physical_qty = physical_by_barcode.get(bc, 0)
+        cat_groups[category]["item_count"] += 1
+        cat_groups[category]["stock_qty"] += stock_qty
+        cat_groups[category]["physical_qty"] += physical_qty
+        cat_groups[category]["stock_value"] += stock_qty * cost
+        cat_groups[category]["physical_value"] += physical_qty * cost
+    
+    report = []
+    total_items = total_stock = total_physical = total_diff = 0
+    total_stock_value = total_physical_value = total_diff_value = 0
+    
+    for cat in sorted(cat_groups.keys()):
+        g = cat_groups[cat]
+        diff_qty = g["physical_qty"] - g["stock_qty"]
+        diff_value = g["physical_value"] - g["stock_value"]
+        accuracy = calc_accuracy(g["stock_qty"], g["physical_qty"])
+        remark = generate_remark(g["stock_qty"], g["physical_qty"], accuracy)
+        
+        total_items += g["item_count"]
+        total_stock += g["stock_qty"]
+        total_physical += g["physical_qty"]
+        total_diff += diff_qty
+        total_stock_value += g["stock_value"]
+        total_physical_value += g["physical_value"]
+        total_diff_value += diff_value
+        
+        report.append({
+            "category": cat, "item_count": g["item_count"],
+            "stock_qty": g["stock_qty"], "stock_value": round(g["stock_value"], 2),
+            "physical_qty": g["physical_qty"], "physical_value": round(g["physical_value"], 2),
+            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+        })
+    
+    total_accuracy = calc_accuracy(total_stock, total_physical)
+    return {
+        "report": report,
+        "totals": {"item_count": total_items, "stock_qty": total_stock, "physical_qty": total_physical,
+                   "diff_qty": total_diff, "stock_value": round(total_stock_value, 2),
+                   "physical_value": round(total_physical_value, 2), "diff_value": round(total_diff_value, 2),
+                   "accuracy_pct": total_accuracy}
+    }
+
+# ==================== INDIVIDUAL SESSION REPORTS ====================
+
 @portal_router.get("/reports/{session_id}/bin-wise")
 async def get_bin_wise_report(session_id: str):
     """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty, Accuracy%, Remarks"""
