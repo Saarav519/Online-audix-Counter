@@ -132,6 +132,13 @@ user_problem_statement: |
      - GET /api/portal/reports/{session_id}/daily-progress - Should show the synced data
 
   Focus on verifying the core sync flow works end-to-end.
+  
+  LATEST CHANGE: Updated bin-wise report to include empty bins and pending locations with proper status and remarks.
+  Test bin-wise endpoint: GET /api/portal/reports/{session_id}/bin-wise
+  - Should now return `status` (completed/empty_bin/pending), `is_empty`, `empty_remarks` fields per row
+  - Should return `summary` with `total_locations`, `completed`, `empty_bins`, `pending` counts
+  - Empty bins should have remark starting with "Empty Bin —"
+  - Pending locations should have remark starting with "Pending —"
 
 backend:
   - task: "AUDIX Admin Portal Backend API Testing"
