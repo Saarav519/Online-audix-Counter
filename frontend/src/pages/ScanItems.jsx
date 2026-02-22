@@ -1924,16 +1924,12 @@ const ScanItems = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-          <div className="flex gap-2">
-            {/* Mark as Empty Button */}
+          <div className="flex flex-col gap-2">
+            {/* Empty bin hint - show when no items scanned */}
             {!isLocationLocked && locationItems.length === 0 && tempScannedItems.length === 0 && (
-              <Button
-                onClick={handleMarkAsEmpty}
-                className="flex-1 h-12 text-base font-semibold bg-amber-500 hover:bg-amber-600 text-white"
-              >
-                <PackageX className="w-5 h-5 mr-2" />
-                Mark Empty
-              </Button>
+              <p className="text-xs text-amber-600 text-center bg-amber-50 rounded-lg py-1.5 px-2">
+                If your location is empty, rescan the location barcode
+              </p>
             )}
             {/* Submit Button - Main action */}
             <Button
