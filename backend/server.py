@@ -1491,7 +1491,8 @@ async def get_consolidated_category_summary(client_id: str):
 
 @portal_router.get("/reports/{session_id}/bin-wise")
 async def get_bin_wise_report(session_id: str):
-    """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty, Accuracy%, Remarks"""
+    """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty, Accuracy%, Remarks.
+    Includes empty bins and pending (not yet scanned) locations with proper status and remarks."""
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_by_location = {}
     for e in expected:
@@ -1502,11 +1503,21 @@ async def get_bin_wise_report(session_id: str):
     
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_by_location = {}
+    # Track empty bins: location_name → {is_empty, empty_remarks}
+    empty_bin_map = {}
     for s in synced:
         loc = s["location_name"]
         if loc not in physical_by_location:
             physical_by_location[loc] = 0
         physical_by_location[loc] += s["total_quantity"]
+        # Track empty bin status
+        if s.get("is_empty", False):
+            empty_bin_map[loc] = {
+                "is_empty": True,
+                "empty_remarks": s.get("empty_remarks", ""),
+                "device_name": s.get("device_name", ""),
+                "synced_at": s.get("synced_at", "")
+            }
     
     all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
     
@@ -1514,15 +1525,41 @@ async def get_bin_wise_report(session_id: str):
     total_stock = 0
     total_physical = 0
     total_diff = 0
+    count_completed = 0
+    count_empty = 0
+    count_pending = 0
     
     for loc in sorted(all_locations):
         stock_qty = expected_by_location.get(loc, 0)
         physical_qty = physical_by_location.get(loc, 0)
         diff_qty = physical_qty - stock_qty
         accuracy = calc_accuracy(stock_qty, physical_qty)
-        in_master = loc in expected_by_location
+        in_expected = loc in expected_by_location
         scanned = loc in physical_by_location
-        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master, scanned)
+        is_empty_bin = loc in empty_bin_map
+        
+        # Determine status and remark
+        if is_empty_bin:
+            # Empty Bin: location was physically visited and confirmed empty
+            status = "empty_bin"
+            count_empty += 1
+            empty_info = empty_bin_map[loc]
+            empty_note = empty_info.get("empty_remarks", "")
+            if empty_note:
+                remark = f"Empty Bin — {empty_note}"
+            else:
+                remark = "Empty Bin — Location verified empty during physical count"
+        elif not scanned and in_expected:
+            # Pending: in expected stock but not yet scanned at all
+            status = "pending"
+            count_pending += 1
+            remark = "Pending — Location not yet counted during physical audit"
+            accuracy = 0.0
+        else:
+            # Normal case: completed or extra location
+            status = "completed"
+            count_completed += 1
+            remark = generate_remark(stock_qty, physical_qty, accuracy, in_expected, scanned)
         
         total_stock += stock_qty
         total_physical += physical_qty
@@ -1534,7 +1571,10 @@ async def get_bin_wise_report(session_id: str):
             "physical_qty": physical_qty,
             "difference_qty": diff_qty,
             "accuracy_pct": accuracy,
-            "remark": remark
+            "remark": remark,
+            "status": status,
+            "is_empty": is_empty_bin,
+            "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""
         })
     
     total_accuracy = calc_accuracy(total_stock, total_physical)
@@ -1546,6 +1586,12 @@ async def get_bin_wise_report(session_id: str):
             "physical_qty": total_physical,
             "difference_qty": total_diff,
             "accuracy_pct": total_accuracy
+        },
+        "summary": {
+            "total_locations": len(report),
+            "completed": count_completed,
+            "empty_bins": count_empty,
+            "pending": count_pending
         }
     }
 
