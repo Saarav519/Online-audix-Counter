@@ -9,7 +9,7 @@ import io
 import sys
 
 # Backend URL
-BASE_URL = "https://offline-sync-portal-1.preview.emergentagent.com"
+BASE_URL = "https://audix-counter.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 def test_backward_compatibility():

@@ -105,7 +105,7 @@
 user_problem_statement: |
   Test the AUDIX Admin Portal backend APIs to verify the sync and portal functionality:
 
-  Backend URL: https://offline-sync-portal-1.preview.emergentagent.com
+  Backend URL: https://audix-counter.preview.emergentagent.com
 
   Test the following endpoints:
 
@@ -398,7 +398,7 @@ agent_communication:
       - **Solution**: Modified endpoints to return Pydantic model data instead of raw MongoDB documents
       - **Files Fixed**: /app/backend/server.py (lines 279, 331)
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🎯 **CORE SYNC FLOW VERIFICATION**:
       END-TO-END WORKING: Client Creation → Session Creation → Device Sync → Data Storage → Reports Display
@@ -474,7 +474,7 @@ agent_communication:
       ✅ Category summary correctly groups by category field
       ✅ All totals include accuracy_pct
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/reports/{session_id}/barcode-wise (NEW)
@@ -663,7 +663,7 @@ agent_communication:
       ✅ BACKEND VERIFICATION COMPLETED:
       - Created and executed comprehensive backend_test.py
       - Tested all available API endpoints: GET /api/, POST /api/status, GET /api/status
-      - Backend URL: https://offline-sync-portal-1.preview.emergentagent.com/api
+      - Backend URL: https://audix-counter.preview.emergentagent.com/api
       - All backend APIs working correctly with proper data persistence
       - MongoDB integration functioning properly
       - CORS configuration working
@@ -696,7 +696,7 @@ agent_communication:
       - ✅ MongoDB integration: Working correctly
       - ✅ CORS configuration: Properly configured
       
-      🌐 BACKEND URL VERIFIED: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL VERIFIED: https://audix-counter.preview.emergentagent.com/api
       
       📝 TECHNICAL DETAILS:
       - FastAPI server running on proper port with supervisor
@@ -793,7 +793,7 @@ agent_communication:
       - ✅ UUID generation: Working correctly for record IDs
       - ✅ Timestamp generation: UTC timezone format working
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
       
       📋 TECHNICAL STATUS:
       - FastAPI server: Running correctly
@@ -822,7 +822,7 @@ agent_communication:
       - ✅ MongoDB persistence: Records stored and retrieved successfully
       - ✅ Response format: Valid JSON with proper schema validation
       
-      🌐 BACKEND URL STABLE: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://audix-counter.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -852,7 +852,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:33:30.957335Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -926,7 +926,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T13:58:02.146587Z)
       - ✅ MongoDB integration: Data persisting correctly
       
-      🌐 BACKEND URL CONFIRMED: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL CONFIRMED: https://audix-counter.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running correctly via supervisor
@@ -1011,7 +1011,7 @@ agent_communication:
       - ✅ Timestamp format: UTC timezone working (2026-02-21T14:21:01.130532Z)
       - ✅ MongoDB integration: Data persisting correctly (4 total records now)
       
-      🌐 BACKEND URL STABLE: https://offline-sync-portal-1.preview.emergentagent.com/api
+      🌐 BACKEND URL STABLE: https://audix-counter.preview.emergentagent.com/api
       
       📋 INFRASTRUCTURE STATUS:
       - FastAPI server: Running properly via supervisor
@@ -1293,7 +1293,7 @@ test_plan:
       - Post-delete verification: sync logs cleared, client removed, sessions removed ✅
       - No orphaned data remains after cascading delete ✅
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🔍 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/sync-logs/grouped (NEW - client-wise date-wise grouping)
@@ -1347,7 +1347,7 @@ test_plan:
       ✅ **DASHBOARD STATS VERIFICATION**:
       13. GET /api/portal/dashboard ✅ Returns total_users: 1, pending_users: 0 (no unread_alerts field)
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🔍 **USER MANAGEMENT ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/users - Lists all users with proper field exclusion (password_hash hidden)
@@ -1475,7 +1475,7 @@ test_plan:
       ✅ Re-sync replaces location data in synced_locations but preserves all raw logs
       ✅ Raw payload contains complete sync data: locations, items, device info, timestamps
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - GET /api/portal/sync-logs (NEW) - with client_id, session_id, limit filters
@@ -1564,7 +1564,7 @@ test_plan:
       ✅ Backward compatibility: Reports still work without master products using expected stock info
       ✅ Master enrichment priority: Master > Expected Stock > Physical data
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🎯 **NEW ENDPOINTS VERIFIED WORKING**:
       - POST /api/portal/clients/{client_id}/import-master (NEW) - Master products CSV import
@@ -1641,7 +1641,7 @@ test_plan:
       - GET /api/portal/reports/{session_id}/barcode-wise ✅  
       - GET /api/portal/reports/{session_id}/category-summary ✅
       
-      🌐 **BACKEND URL CONFIRMED**: https://offline-sync-portal-1.preview.emergentagent.com
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
       
       🎉 **CONCLUSION**: The CORRECTED report priority logic is working PERFECTLY. All 5 test scenarios confirmed that product details follow the exact priority: Stock > Master > Physical scan data. The implementation correctly handles fallback scenarios and generates appropriate professional remarks for each case.
 
