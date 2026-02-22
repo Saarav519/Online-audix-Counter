@@ -2894,8 +2894,8 @@ async def seed_test_data():
     
     logger.info("=== Seed data complete! ===")
     logger.info("Portal login: admin / admin123")
-    logger.info(f"Clients: Reliance Retail (RR001), DMart Stores (DM002)")
-    logger.info(f"Sessions: 3 audit sessions with expected stock and physical data")
+    logger.info("Clients: Reliance Retail (RR001), DMart Stores (DM002)")
+    logger.info("Sessions: 3 audit sessions with expected stock and physical data")
 
 @app.on_event("startup")
 async def startup_event():
