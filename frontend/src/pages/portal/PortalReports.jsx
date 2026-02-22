@@ -668,7 +668,7 @@ function SummaryCard({ label, value, variant, isAccuracy, pct }) {
 }
 
 // ============ Bin-wise Table ============
-function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon }) {
+function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, getColumnValues }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -678,12 +678,12 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Location</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Stock Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Physical Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Difference</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Accuracy %</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600 min-w-[250px]">Remarks</th>
+              <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="difference_qty" label="Difference" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('difference_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="accuracy_pct" label="Accuracy %" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} className="min-w-[250px]" />
             </tr>
           </thead>
           <tbody>
