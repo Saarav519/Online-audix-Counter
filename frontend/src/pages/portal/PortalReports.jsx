@@ -1036,7 +1036,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Article-wise Table ============
-function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, getColumnValues }) {
+function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
   const [expandedRows, setExpandedRows] = React.useState(new Set());
 
   const toggleRow = (index) => {
@@ -1062,16 +1062,16 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <thead className="bg-gray-50">
             <tr>
               <th className="w-8 py-3 px-2"></th>
-              <SortableHeader column="article_code" label="Article Code" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_code')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="article_name" label="Article Name" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_name')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="barcode_count" label="Barcodes" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
-              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} className="min-w-[220px]" />
+              <SortableHeader column="article_code" label="Article Code" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_code')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="article_name" label="Article Name" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_name')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="barcode_count" label="Barcodes" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[220px]" />
             </tr>
           </thead>
           <tbody>
