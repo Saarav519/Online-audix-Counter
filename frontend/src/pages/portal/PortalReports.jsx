@@ -262,12 +262,18 @@ export default function PortalReports() {
     }));
   }, []);
 
-  // Column filter handler
+  // Column filter handler (INCLUSION MODEL)
+  // values = null → remove filter (all shown)
+  // values = [] → all unchecked (no filter, all shown)
+  // values = [items] → inclusion filter (only those items shown)
   const handleColumnFilter = useCallback((column, values) => {
     setColumnFilters(prev => {
       const next = { ...prev };
-      if (values.length === 0) delete next[column];
-      else next[column] = values;
+      if (values === null || values === undefined) {
+        delete next[column]; // Remove filter entirely
+      } else {
+        next[column] = values;
+      }
       return next;
     });
   }, []);
