@@ -1128,6 +1128,21 @@ agent_communication:
         agent: "testing"
         comment: "✅ VARIANCE MODE SESSIONS WORKING - Successfully created 3 sessions with different variance modes: Session A (bin-wise ID: 96fe41ad-d2e2-4307-b23e-7aa51ce2f501), Session B (barcode-wise ID: ffc26df8-47b9-4fa8-99e7-e376eae9f0a2), Session C (article-wise ID: 5b12352d-7fed-49cf-b363-a3c8f0b3905b). All sessions correctly store variance_mode field in database."
 
+  - task: "Bin-wise Report - Empty Bins and Pending Locations"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing" 
+        comment: "Comprehensive testing of bin-wise report endpoint to verify empty bins and pending locations functionality as specified in review request."
+      - working: true
+        agent: "testing"
+        comment: "✅ BIN-WISE REPORT WITH EMPTY BINS AND PENDING LOCATIONS COMPREHENSIVE TESTING COMPLETED - ALL 7 TESTS PASSED (100% SUCCESS RATE). VERIFIED WORKING: 1) Portal Login (admin/admin123 → User ID: 13600f37-448b-4ac8-8a4b-023c2c55c043), 2) Get Sessions (Found 3 sessions, using session ID: 8bb1ee6a-a3b3-48ee-b6a2-023fede4382d), 3) Bin-wise Report Structure (✅ All required fields present: status, is_empty, empty_remarks, summary object with total_locations, completed, empty_bins, pending counts), 4) Status and Remarks Verification (✅ Status distribution: completed=5, empty_bin=2, pending=0, Proper remark patterns with 'Empty Bin —' prefix), 5) Sync Empty Location (✅ Successfully synced empty location with is_empty=true and empty_remarks), 6) Empty Location in Report (✅ Empty location appears with status='empty_bin', is_empty=true, proper remarks), 7) Consolidated Bin-wise Report (✅ Working with proper summary counts). CRITICAL VERIFICATION: Empty bins and pending locations are NOT excluded from bin-wise variance report and have proper status/remarks as requested. Fixed sync payload issue: location data should use 'name' field, not 'location' field in sync request."
+
   - task: "CSV Import with Category and Article fields"
     implemented: true
     working: true
