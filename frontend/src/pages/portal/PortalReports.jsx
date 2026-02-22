@@ -604,6 +604,7 @@ export default function PortalReports() {
   };
 
   const getRemarkIcon = (remark) => {
+    if (remark.includes('Conflict')) return <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />;
     if (remark.includes('Empty Bin')) return <PackageX className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />;
     if (remark.includes('Pending')) return <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />;
     if (remark.includes('Exact Match')) return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />;
