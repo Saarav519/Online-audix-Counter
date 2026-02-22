@@ -2062,6 +2062,228 @@ async def get_daily_progress(session_id: str):
     
     return report
 
+# ==================== EMPTY BINS & PENDING LOCATIONS ROUTES ====================
+
+@portal_router.get("/reports/{session_id}/empty-bins")
+async def get_empty_bins(session_id: str):
+    """Get all empty bins for a session"""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    empty_locations = await db.synced_locations.find(
+        {"session_id": session_id, "is_empty": True},
+        {"_id": 0}
+    ).sort("synced_at", -1).to_list(100000)
+    
+    total_empty = len(empty_locations)
+    
+    # Group by date
+    by_date = {}
+    for loc in empty_locations:
+        d = loc.get("sync_date", "unknown")
+        if d not in by_date:
+            by_date[d] = []
+        by_date[d].append({
+            "location_id": loc.get("location_id", ""),
+            "location_name": loc.get("location_name", ""),
+            "device_name": loc.get("device_name", ""),
+            "empty_remarks": loc.get("empty_remarks", ""),
+            "synced_at": loc.get("synced_at", ""),
+            "sync_date": d
+        })
+    
+    dates = []
+    for d in sorted(by_date.keys(), reverse=True):
+        dates.append({
+            "date": d,
+            "count": len(by_date[d]),
+            "locations": by_date[d]
+        })
+    
+    return {
+        "session_id": session_id,
+        "session_name": session.get("name", ""),
+        "total_empty_bins": total_empty,
+        "by_date": dates,
+        "all_empty_locations": empty_locations
+    }
+
+@portal_router.get("/reports/{session_id}/pending-locations")
+async def get_pending_locations(session_id: str):
+    """Get pending (not yet scanned) locations for a session.
+    Compares expected stock locations with synced locations to find remaining work."""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get all expected locations from expected_stock
+    expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    expected_locations = set()
+    for rec in expected:
+        loc = rec.get("location", "").strip()
+        if loc:
+            expected_locations.add(loc)
+    
+    # Get all synced locations
+    synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    synced_location_names = set()
+    synced_map = {}
+    for s in synced:
+        name = s.get("location_name", "")
+        synced_location_names.add(name)
+        synced_map[name] = {
+            "location_name": name,
+            "total_items": s.get("total_items", 0),
+            "total_quantity": s.get("total_quantity", 0),
+            "is_empty": s.get("is_empty", False),
+            "empty_remarks": s.get("empty_remarks", ""),
+            "device_name": s.get("device_name", ""),
+            "synced_at": s.get("synced_at", ""),
+            "sync_date": s.get("sync_date", ""),
+            "status": "empty" if s.get("is_empty", False) else "completed"
+        }
+    
+    # Build location status list
+    all_locations = sorted(expected_locations | synced_location_names)
+    
+    completed = []
+    empty_bins = []
+    pending = []
+    
+    for loc_name in all_locations:
+        if loc_name in synced_map:
+            info = synced_map[loc_name]
+            if info["is_empty"]:
+                empty_bins.append({
+                    "location_name": loc_name,
+                    "status": "empty",
+                    "in_expected": loc_name in expected_locations,
+                    **info
+                })
+            else:
+                completed.append({
+                    "location_name": loc_name,
+                    "status": "completed",
+                    "in_expected": loc_name in expected_locations,
+                    **info
+                })
+        else:
+            # Location is in expected but not synced = pending
+            pending.append({
+                "location_name": loc_name,
+                "status": "pending",
+                "in_expected": True,
+                "total_items": 0,
+                "total_quantity": 0,
+                "is_empty": False,
+                "empty_remarks": "",
+                "device_name": "",
+                "synced_at": "",
+                "sync_date": ""
+            })
+    
+    total_expected = len(expected_locations)
+    total_synced = len(synced_location_names & expected_locations)  # Only count expected that are synced
+    total_completed = len(completed)
+    total_empty = len(empty_bins)
+    total_pending = len(pending)
+    completion_pct = round((total_synced / total_expected * 100), 1) if total_expected > 0 else 0
+    
+    # Group pending by day (using session start date + sequence)
+    return {
+        "session_id": session_id,
+        "session_name": session.get("name", ""),
+        "summary": {
+            "total_expected": total_expected,
+            "total_completed": total_completed,
+            "total_empty": total_empty,
+            "total_pending": total_pending,
+            "total_synced": total_synced + total_empty,
+            "completion_pct": completion_pct
+        },
+        "completed": completed,
+        "empty_bins": empty_bins,
+        "pending": pending
+    }
+
+@portal_router.get("/empty-bins/summary")
+async def get_empty_bins_summary(client_id: Optional[str] = None, date: Optional[str] = None):
+    """Consolidated empty bins summary across sessions - filterable by client and date"""
+    query = {"is_empty": True}
+    if date:
+        query["sync_date"] = date
+    
+    # If client_id, find all sessions for this client first
+    session_ids = None
+    if client_id:
+        sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(1000)
+        session_ids = [s["id"] for s in sessions]
+        query["session_id"] = {"$in": session_ids}
+    
+    empty_locations = await db.synced_locations.find(query, {"_id": 0}).sort("synced_at", -1).to_list(100000)
+    
+    # Enrich with client and session info
+    # Cache client and session names
+    client_cache = {}
+    session_cache = {}
+    
+    enriched = []
+    by_client = {}
+    by_date = {}
+    
+    for loc in empty_locations:
+        sid = loc.get("session_id", "")
+        
+        # Get session info
+        if sid not in session_cache:
+            sess = await db.audit_sessions.find_one({"id": sid}, {"_id": 0})
+            session_cache[sid] = sess or {}
+        sess = session_cache[sid]
+        cid = sess.get("client_id", "")
+        
+        # Get client info
+        if cid and cid not in client_cache:
+            cl = await db.clients.find_one({"id": cid}, {"_id": 0})
+            client_cache[cid] = cl or {}
+        cl = client_cache.get(cid, {})
+        
+        entry = {
+            "location_name": loc.get("location_name", ""),
+            "location_id": loc.get("location_id", ""),
+            "empty_remarks": loc.get("empty_remarks", ""),
+            "device_name": loc.get("device_name", ""),
+            "sync_date": loc.get("sync_date", ""),
+            "synced_at": loc.get("synced_at", ""),
+            "session_id": sid,
+            "session_name": sess.get("name", ""),
+            "client_id": cid,
+            "client_name": cl.get("name", ""),
+            "client_code": cl.get("code", "")
+        }
+        enriched.append(entry)
+        
+        # Group by client
+        if cid not in by_client:
+            by_client[cid] = {"client_name": cl.get("name", "Unknown"), "client_code": cl.get("code", ""), "count": 0, "locations": []}
+        by_client[cid]["count"] += 1
+        by_client[cid]["locations"].append(entry)
+        
+        # Group by date
+        d = loc.get("sync_date", "unknown")
+        if d not in by_date:
+            by_date[d] = {"date": d, "count": 0, "locations": []}
+        by_date[d]["count"] += 1
+        by_date[d]["locations"].append(entry)
+    
+    return {
+        "total_empty_bins": len(enriched),
+        "filter": {"client_id": client_id, "date": date},
+        "by_client": list(by_client.values()),
+        "by_date": [by_date[d] for d in sorted(by_date.keys(), reverse=True)],
+        "all_empty_bins": enriched
+    }
+
 # ==================== DASHBOARD ROUTES ====================
 
 @portal_router.get("/dashboard")
