@@ -80,8 +80,12 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
   
-  const currentFilters = activeFilters[column] || [];
-  const isAllSelected = currentFilters.length === 0;
+  // INCLUSION MODEL:
+  // activeFilters[column] = undefined/null → no filter, all shown, all boxes checked
+  // activeFilters[column] = [] → all boxes unchecked, but NO filter applied (all shown)
+  // activeFilters[column] = [some values] → inclusion filter, only those values shown
+  const currentChecked = activeFilters[column];
+  const isDefaultState = currentChecked === undefined || currentChecked === null;
   
   const filteredValues = useMemo(() => {
     if (!search) return allValues;
@@ -97,15 +101,38 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose]);
 
-  const toggleValue = (value) => {
-    const current = new Set(currentFilters);
-    if (current.has(value)) current.delete(value);
-    else current.add(value);
-    onFilterChange(column, Array.from(current));
+  const isChecked = (strVal) => {
+    if (isDefaultState) return true; // no filter → all checked
+    return currentChecked.includes(strVal);
   };
 
-  const selectAll = () => onFilterChange(column, []);
-  const clearAll = () => onFilterChange(column, allValues.map(String));
+  const toggleValue = (value) => {
+    const strVal = String(value);
+    if (isDefaultState) {
+      // Currently all selected → uncheck this one → include all EXCEPT this one
+      const newChecked = allValues.map(String).filter(v => v !== strVal);
+      onFilterChange(column, newChecked);
+    } else {
+      const current = new Set(currentChecked);
+      if (current.has(strVal)) {
+        current.delete(strVal);
+      } else {
+        current.add(strVal);
+      }
+      const arr = Array.from(current);
+      // If all selected again → remove filter entirely
+      if (arr.length === allValues.length) {
+        onFilterChange(column, null);
+      } else {
+        onFilterChange(column, arr);
+      }
+    }
+  };
+
+  // Select All → check all boxes → remove filter
+  const selectAll = () => onFilterChange(column, null);
+  // Clear All → uncheck all boxes → empty array (no active filter, data stays visible)
+  const clearAll = () => onFilterChange(column, []);
 
   return (
     <div ref={dropdownRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-64 max-h-80 flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -122,7 +149,7 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
       <div className="overflow-y-auto flex-1 p-1.5">
         {filteredValues.map((val, i) => {
           const strVal = String(val);
-          const checked = isAllSelected || !currentFilters.includes(strVal);
+          const checked = isChecked(strVal);
           return (
             <label key={i} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs">
               <input type="checkbox" checked={checked} onChange={() => toggleValue(strVal)} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5" />
