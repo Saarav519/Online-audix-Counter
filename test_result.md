@@ -303,6 +303,66 @@ frontend:
         agent: "main"
         comment: "Dynamic mode UI and functionality completely preserved."
 
+  - task: "Empty Bin - Backend API Endpoints"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added is_empty and empty_remarks fields to SyncedLocation model. Updated sync_data() to handle empty locations. New endpoints: GET /api/portal/reports/{session_id}/empty-bins, GET /api/portal/reports/{session_id}/pending-locations, GET /api/portal/empty-bins/summary. Dashboard now includes empty_bins count. Tested manually with curl - all endpoints working."
+
+  - task: "Empty Bin - Scanner Mark Empty Button"
+    implemented: true
+    working: "NA"
+    file: "pages/ScanItems.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added Mark as Empty button in scanner bottom action bar (visible when location has 0 items). Empty bin confirmation popup asks 'This bin is empty — Yes or No?' with location info. Also triggers on submit with 0 items."
+
+  - task: "Empty Bin - Portal Empty Bins Report"
+    implemented: true
+    working: "NA"
+    file: "pages/portal/PortalReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added Empty Bins and Pending Locations as new report types in the Portal Reports dropdown. EmptyBinsView shows summary cards and date-grouped empty bin list. PendingLocationsView shows progress bar, pending/completed/empty tables."
+
+  - task: "Empty Bin - Portal Dashboard Stats"
+    implemented: true
+    working: "NA"
+    file: "pages/portal/PortalDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Dashboard now shows 5 stat cards: Clients, Active Sessions, Devices, Empty Bins, Users. Empty bins count from backend API."
+
+  - task: "Empty Bin - Sync Sends Empty Flag"
+    implemented: true
+    working: "NA"
+    file: "pages/Settings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Sync payload now includes is_empty and empty_remarks from location state. Filter updated to include empty bins in sync count (loc.items.length > 0 || loc.is_empty)."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
