@@ -857,6 +857,11 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                 <Clock className="w-3 h-3" /> {summary.pending || 0} Pending
               </span>
+              {(summary.conflicts || 0) > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-700">
+                  <AlertTriangle className="w-3 h-3" /> {summary.conflicts} Conflicts
+                </span>
+              )}
             </div>
           )}
         </div>
