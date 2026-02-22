@@ -2235,6 +2235,9 @@ const ScanItems = () => {
                   ? 'Scan a barcode to add 1 unit at a time'
                   : 'Scan a barcode and enter quantity to add items'}
               </p>
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg py-1.5 px-3 mt-3 inline-block">
+                If your location is empty, rescan the location barcode
+              </p>
             </div>
           ) : (
             <div 
