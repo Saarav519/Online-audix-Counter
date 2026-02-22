@@ -251,6 +251,7 @@ export default function PortalReports() {
   const [varianceCategory, setVarianceCategory] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [columnFilters, setColumnFilters] = useState({});
+  const [numericFilters, setNumericFilters] = useState({});
 
   useEffect(() => {
     fetchClients();
