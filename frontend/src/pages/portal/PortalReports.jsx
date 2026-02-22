@@ -455,17 +455,25 @@ export default function PortalReports() {
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="text-gray-500">Variance analysis and audit reports</p>
         </div>
-        {reportData && (
-          <Button onClick={exportCSV} variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {activeFilterCount > 0 && (
+            <Button onClick={clearAllFilters} variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
+              <X className="w-3.5 h-3.5 mr-1" />
+              Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+            </Button>
+          )}
+          {filteredData && (
+            <Button onClick={exportCSV} variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
             <select
@@ -492,6 +500,9 @@ export default function PortalReports() {
               disabled={!selectedClient}
             >
               <option value="">Select Session</option>
+              {selectedClient && (
+                <option value="__consolidated__">All Sessions (Consolidated)</option>
+              )}
               {sessions.map(session => (
                 <option key={session.id} value={session.id}>
                   {session.name} ({session.variance_mode === 'bin-wise' ? 'Bin' : session.variance_mode === 'barcode-wise' ? 'Barcode' : session.variance_mode === 'article-wise' ? 'Article' : 'Bin'})
@@ -512,14 +523,42 @@ export default function PortalReports() {
               ))}
             </select>
           </div>
-          {sessionInfo && (
-            <div className="flex items-end">
-              <div className="px-3 py-2 bg-purple-50 rounded-lg text-sm text-purple-700 font-medium w-full text-center">
-                Mode: {sessionInfo.variance_mode === 'bin-wise' ? 'Bin-wise' : sessionInfo.variance_mode === 'barcode-wise' ? 'Barcode-wise' : 'Article-wise'}
-              </div>
-            </div>
-          )}
         </div>
+        {/* Variance Category Filter Row */}
+        {selectedSession && reportData && (
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-400" />
+              <span className="text-sm font-medium text-gray-600">Variance:</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {VARIANCE_CATEGORIES.map(cat => (
+                <button
+                  key={cat.value}
+                  onClick={() => setVarianceCategory(cat.value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    varianceCategory === cat.value
+                      ? cat.value === 'all' ? 'bg-gray-800 text-white'
+                        : cat.value === 'negative' ? 'bg-red-500 text-white'
+                        : cat.value === 'positive' ? 'bg-emerald-500 text-white'
+                        : cat.value === 'matched' ? 'bg-blue-500 text-white'
+                        : cat.value === 'in_system_not_found' ? 'bg-amber-500 text-white'
+                        : 'bg-purple-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  title={cat.description}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            {filteredData && reportData && (
+              <span className="text-xs text-gray-400 ml-auto">
+                Showing {filteredData.report.length} of {reportData.report.length} rows
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Daily Progress */}
