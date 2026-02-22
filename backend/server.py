@@ -1639,7 +1639,17 @@ async def get_bin_wise_report(session_id: str):
                 "synced_at": s.get("synced_at", "")
             }
     
-    all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
+    # Track conflict locations for this session
+    conflict_locs = await db.conflict_locations.find({"session_id": session_id, "status": "pending"}, {"_id": 0}).to_list(10000)
+    conflict_map = {}
+    for c in conflict_locs:
+        conflict_map[c["location_name"]] = {
+            "conflict_id": c["id"],
+            "entry_count": len(c.get("entries", [])),
+            "devices": [e.get("device_name", "Unknown") for e in c.get("entries", [])]
+        }
+    
+    all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys()) | set(conflict_map.keys())
     
     report = []
     total_stock = 0
