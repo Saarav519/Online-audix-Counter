@@ -397,7 +397,7 @@ export default function PortalReports() {
     const totals = recalcTotals(rows, reportType);
 
     return { report: rows, totals: totals || reportData.totals };
-  }, [reportData, varianceCategory, columnFilters, sortConfig, reportType]);
+  }, [reportData, varianceCategory, columnFilters, numericFilters, sortConfig, reportType]);
 
   // Get unique values for a column (from unfiltered data, for column filter dropdowns)
   const getColumnValues = useCallback((column) => {
