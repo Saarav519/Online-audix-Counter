@@ -15,7 +15,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 export default function PortalDashboard() {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState({
-    stats: { clients: 0, active_sessions: 0, devices: 0, total_users: 0, pending_users: 0 },
+    stats: { clients: 0, active_sessions: 0, devices: 0, total_users: 0, pending_users: 0, empty_bins: 0 },
     recent_syncs: [],
     devices: []
   });
