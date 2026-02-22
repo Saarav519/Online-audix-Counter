@@ -1322,8 +1322,8 @@ const ScanItems = () => {
     setShowEmptyBinModal(true);
   };
 
-  // Confirm empty bin submission
-  const confirmEmptyBin = () => {
+  // Auto-mark location as empty when location barcode is rescanned
+  const handleAutoMarkEmpty = () => {
     let finalLocationId = selectedLocationId;
     
     const existingLocationInList = locations.find(l => l.id === selectedLocationId);
@@ -1344,9 +1344,9 @@ const ScanItems = () => {
     }
     
     // Submit as empty with remarks
-    const emptyRemarks = `Location found empty — verified by ${user?.userId || 'user'} at ${new Date().toLocaleString()}`;
+    const settingsData = JSON.parse(localStorage.getItem('audix_user') || '{}');
+    const emptyRemarks = `Location found empty — verified by ${settingsData?.userId || 'user'} at ${new Date().toLocaleString()}`;
     submitLocation(finalLocationId, true, emptyRemarks);
-    setShowEmptyBinModal(false);
     
     // Clear temp items and temp location
     clearTempItems();
@@ -1356,7 +1356,10 @@ const ScanItems = () => {
     localStorage.removeItem('audix_temp_location');
     localStorage.removeItem(`audix_temp_items_${selectedLocationId}`);
     
-    console.log(`📭 Submitted EMPTY location: ${selectedLocation?.name} (${finalLocationId})`);
+    console.log(`📭 Auto-marked EMPTY location: ${selectedLocation?.name} (${finalLocationId})`);
+    
+    // Play success sound
+    playSound(true);
     
     // Handle navigation same as normal submit
     if (settings.locationScanMode === 'preassigned') {
@@ -1365,14 +1368,12 @@ const ScanItems = () => {
         const nextMasterLoc = getNextSequentialLocation(currentCode);
         if (nextMasterLoc) {
           const nextAssigned = getOrCreateAssignedLocation(nextMasterLoc.code, nextMasterLoc.name);
-          playSound(true);
           setTimeout(() => {
             navigate(`/scan?location=${nextAssigned.id}`, { replace: true });
           }, 150);
           return;
         }
       }
-      playSound(true);
       navigate('/reports');
       return;
     }
@@ -1383,7 +1384,6 @@ const ScanItems = () => {
     setBarcodeInput('');
     setLastScanResult(null);
     setLocationSuccess('Empty bin recorded! Scan a new location to continue.');
-    playSound(true);
     navigate('/scan', { replace: true });
     
     setTimeout(() => {
