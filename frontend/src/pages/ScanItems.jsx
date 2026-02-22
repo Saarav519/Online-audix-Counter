@@ -1405,6 +1405,8 @@ const ScanItems = () => {
       setTimeout(() => setLocationSuccess(null), 4000);
     }, 100);
   };
+  // Keep ref updated for use in useCallback
+  handleAutoMarkEmptyRef.current = handleAutoMarkEmpty;
 
   // ============================================
   // SUBMIT - This is when data gets SAVED to context
