@@ -205,12 +205,106 @@ export default function PortalReports() {
     }
   }, [selectedSession, sessions]);
 
+  // Reset filters when session or report type changes
+  useEffect(() => {
+    setVarianceCategory('all');
+    setSortConfig({ key: null, direction: 'asc' });
+    setColumnFilters({});
+  }, [selectedSession, reportType]);
+
   useEffect(() => {
     if (selectedSession && reportType) {
       fetchReport();
       fetchDailyProgress();
     }
   }, [selectedSession, reportType]);
+
+  // Sort handler
+  const handleSort = useCallback((column) => {
+    setSortConfig(prev => ({
+      key: column,
+      direction: prev.key === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  }, []);
+
+  // Column filter handler
+  const handleColumnFilter = useCallback((column, values) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (values.length === 0) delete next[column];
+      else next[column] = values;
+      return next;
+    });
+  }, []);
+
+  // Apply all filters: variance category → column filters → sort
+  const filteredData = useMemo(() => {
+    if (!reportData || !reportData.report) return null;
+    let rows = [...reportData.report];
+
+    // Step 1: Variance category filter
+    rows = filterByVarianceCategory(rows, varianceCategory);
+
+    // Step 2: Column filters
+    Object.entries(columnFilters).forEach(([col, excludedVals]) => {
+      if (excludedVals.length > 0) {
+        rows = rows.filter(row => {
+          const val = String(row[col] !== undefined && row[col] !== null ? row[col] : '');
+          return !excludedVals.includes(val);
+        });
+      }
+    });
+
+    // Step 3: Sort
+    if (sortConfig.key) {
+      rows.sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        // Handle nulls
+        if (aVal == null) aVal = '';
+        if (bVal == null) bVal = '';
+        // Numeric sort
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        // String sort
+        const aStr = String(aVal).toLowerCase();
+        const bStr = String(bVal).toLowerCase();
+        if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Recalculate totals for filtered data
+    const totals = recalcTotals(rows, reportType);
+
+    return { report: rows, totals: totals || reportData.totals };
+  }, [reportData, varianceCategory, columnFilters, sortConfig, reportType]);
+
+  // Get unique values for a column (from unfiltered data, for column filter dropdowns)
+  const getColumnValues = useCallback((column) => {
+    if (!reportData || !reportData.report) return [];
+    const vals = new Set();
+    reportData.report.forEach(row => {
+      const v = row[column];
+      vals.add(v !== undefined && v !== null ? String(v) : '');
+    });
+    return Array.from(vals).sort();
+  }, [reportData]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (varianceCategory !== 'all') count++;
+    count += Object.keys(columnFilters).length;
+    return count;
+  }, [varianceCategory, columnFilters]);
+
+  const clearAllFilters = () => {
+    setVarianceCategory('all');
+    setColumnFilters({});
+    setSortConfig({ key: null, direction: 'asc' });
+  };
 
   const fetchClients = async () => {
     try {
