@@ -266,9 +266,15 @@ export default function PortalReports() {
   useEffect(() => {
     if (selectedSession) {
       if (selectedSession === '__consolidated__') {
-        // Consolidated mode: show all report types
-        setSessionInfo({ variance_mode: 'bin-wise', name: 'All Sessions (Consolidated)' });
-        setReportType('bin-wise');
+        // Consolidated mode: determine primary variance mode from client's sessions
+        const modes = sessions.map(s => s.variance_mode || 'bin-wise');
+        const modeCount = {};
+        modes.forEach(m => { modeCount[m] = (modeCount[m] || 0) + 1; });
+        const primaryMode = Object.entries(modeCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'bin-wise';
+        setSessionInfo({ variance_mode: primaryMode, name: 'All Sessions (Consolidated)', session_modes: [...new Set(modes)] });
+        if (primaryMode === 'barcode-wise') setReportType('barcode-wise');
+        else if (primaryMode === 'article-wise') setReportType('article-wise');
+        else setReportType('bin-wise');
       } else {
         const session = sessions.find(s => s.id === selectedSession);
         setSessionInfo(session);
