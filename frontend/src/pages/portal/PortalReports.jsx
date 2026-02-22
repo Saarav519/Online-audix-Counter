@@ -738,7 +738,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
 }
 
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, getColumnValues }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -748,17 +748,17 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
         <table className="w-full text-xs">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Location</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Barcode</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Description</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Category</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">MRP</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Cost</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Stock</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Physical</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Diff</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Accuracy</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600 min-w-[200px]">Remarks</th>
+              <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="stock_qty" label="Stock" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="diff_qty" label="Diff" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} className="min-w-[200px]" />
             </tr>
           </thead>
           <tbody>
