@@ -169,6 +169,7 @@ const Reports = () => {
     let totalQty = 0;
     const uniqueBarcodes = new Set();
     const completedCount = preassignedLocationData.filter(d => d.isSubmitted).length;
+    const emptyCount = preassignedLocationData.filter(d => d.assignedLocation?.isEmpty === true).length;
 
     preassignedLocationData.forEach(d => {
       if (d.assignedLocation) {
@@ -182,6 +183,7 @@ const Reports = () => {
     return {
       totalLocations: masterLocations.length,
       completedLocations: completedCount,
+      emptyBins: emptyCount,
       totalItems,
       totalQuantity: totalQty,
       uniqueProducts: uniqueBarcodes.size,
