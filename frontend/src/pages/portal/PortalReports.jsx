@@ -166,7 +166,9 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
 // ============ Sortable + Filterable Header ============
 function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, className }) {
   const [showFilter, setShowFilter] = useState(false);
-  const isFiltered = activeFilters[column] && activeFilters[column].length > 0;
+  // Filter is "active" only when there's an inclusion list with actual items (not empty or null)
+  const currentFilter = activeFilters[column];
+  const isFiltered = currentFilter !== undefined && currentFilter !== null && currentFilter.length > 0 && currentFilter.length < (allValues || []).length;
   const isSorted = sortConfig.key === column;
   
   return (
