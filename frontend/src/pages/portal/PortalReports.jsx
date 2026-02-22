@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   FileBarChart, 
   Download,
@@ -9,12 +9,162 @@ import {
   BarChart3,
   AlertTriangle,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Filter,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Search,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+
+// ============ Variance Category Filter Options ============
+const VARIANCE_CATEGORIES = [
+  { value: 'all', label: 'All', description: 'Show all items' },
+  { value: 'negative', label: 'Overall Negative', description: 'Physical < Stock (Shortage)' },
+  { value: 'positive', label: 'Overall Positive', description: 'Physical > Stock (Surplus)' },
+  { value: 'matched', label: 'Overall Matched', description: 'Physical = Stock' },
+  { value: 'in_system_not_found', label: 'In System, Not Found', description: 'Stock > 0, Physical = 0' },
+  { value: 'found_not_in_system', label: 'Found, Not In System', description: 'Stock = 0, Physical > 0' },
+];
+
+// Filter rows by variance category
+function filterByVarianceCategory(rows, category) {
+  if (!rows || category === 'all') return rows;
+  return rows.filter(row => {
+    const stockQty = row.stock_qty || 0;
+    const physicalQty = row.physical_qty || 0;
+    const diffQty = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty !== undefined ? row.difference_qty : physicalQty - stockQty);
+    switch (category) {
+      case 'negative': return diffQty < 0;
+      case 'positive': return diffQty > 0;
+      case 'matched': return diffQty === 0 && (stockQty > 0 || physicalQty > 0);
+      case 'in_system_not_found': return stockQty > 0 && physicalQty === 0;
+      case 'found_not_in_system': return (stockQty === 0) && physicalQty > 0;
+      default: return true;
+    }
+  });
+}
+
+// Recalculate totals from filtered rows
+function recalcTotals(rows, reportType) {
+  if (!rows || rows.length === 0) return null;
+  const totals = { stock_qty: 0, physical_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0 };
+  let stockValue = 0, physicalValue = 0, diffValue = 0, itemCount = 0;
+  rows.forEach(row => {
+    totals.stock_qty += (row.stock_qty || 0);
+    totals.physical_qty += (row.physical_qty || 0);
+    const d = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty || 0);
+    totals.diff_qty += d;
+    totals.difference_qty += d;
+    stockValue += (row.stock_value || 0);
+    physicalValue += (row.physical_value || 0);
+    diffValue += (row.diff_value || 0);
+    itemCount += (row.item_count || 0);
+  });
+  totals.stock_value = stockValue;
+  totals.physical_value = physicalValue;
+  totals.diff_value = diffValue;
+  totals.item_count = itemCount;
+  totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.physical_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.physical_qty === 0 ? 100 : 0);
+  return totals;
+}
+
+// ============ Column Filter Dropdown ============
+function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, onClose }) {
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef(null);
+  
+  const currentFilters = activeFilters[column] || [];
+  const isAllSelected = currentFilters.length === 0;
+  
+  const filteredValues = useMemo(() => {
+    if (!search) return allValues;
+    const lower = search.toLowerCase();
+    return allValues.filter(v => String(v).toLowerCase().includes(lower));
+  }, [allValues, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const toggleValue = (value) => {
+    const current = new Set(currentFilters);
+    if (current.has(value)) current.delete(value);
+    else current.add(value);
+    onFilterChange(column, Array.from(current));
+  };
+
+  const selectAll = () => onFilterChange(column, []);
+  const clearAll = () => onFilterChange(column, allValues.map(String));
+
+  return (
+    <div ref={dropdownRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-64 max-h-80 flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="p-2 border-b border-gray-100">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" autoFocus />
+        </div>
+        <div className="flex gap-2 mt-1.5">
+          <button className="text-xs text-emerald-600 hover:underline" onClick={selectAll}>Select All</button>
+          <button className="text-xs text-red-500 hover:underline" onClick={clearAll}>Clear All</button>
+        </div>
+      </div>
+      <div className="overflow-y-auto flex-1 p-1.5">
+        {filteredValues.map((val, i) => {
+          const strVal = String(val);
+          const checked = isAllSelected || !currentFilters.includes(strVal);
+          return (
+            <label key={i} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs">
+              <input type="checkbox" checked={checked} onChange={() => toggleValue(strVal)} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5" />
+              <span className="truncate">{strVal || '(empty)'}</span>
+            </label>
+          );
+        })}
+        {filteredValues.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No values found</p>}
+      </div>
+    </div>
+  );
+}
+
+// ============ Sortable + Filterable Header ============
+function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, className }) {
+  const [showFilter, setShowFilter] = useState(false);
+  const isFiltered = activeFilters[column] && activeFilters[column].length > 0;
+  const isSorted = sortConfig.key === column;
+  
+  return (
+    <th className={`py-3 px-3 font-medium text-gray-600 relative group ${align === 'right' ? 'text-right' : 'text-left'} ${className || ''}`}>
+      <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+        <button className="flex items-center gap-0.5 hover:text-emerald-600 transition-colors" onClick={() => onSort(column)}>
+          <span className="select-none">{label}</span>
+          {isSorted ? (
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-500" /> : <ArrowDown className="w-3 h-3 text-emerald-500" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
+        </button>
+        {allValues && allValues.length > 0 && (
+          <button className={`ml-0.5 p-0.5 rounded hover:bg-gray-100 ${isFiltered ? 'text-emerald-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'} transition-all`} onClick={(e) => { e.stopPropagation(); setShowFilter(!showFilter); }}>
+            <Filter className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      {showFilter && (
+        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} onClose={() => setShowFilter(false)} />
+      )}
+    </th>
+  );
+}
 
 export default function PortalReports() {
   const [clients, setClients] = useState([]);
@@ -26,6 +176,9 @@ export default function PortalReports() {
   const [reportData, setReportData] = useState(null);
   const [dailyProgress, setDailyProgress] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [varianceCategory, setVarianceCategory] = useState('all');
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [columnFilters, setColumnFilters] = useState({});
 
   useEffect(() => {
     fetchClients();
