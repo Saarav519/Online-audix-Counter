@@ -404,7 +404,7 @@ export default function PortalReports() {
     // Recalculate totals for filtered data
     const totals = recalcTotals(rows, reportType);
 
-    return { report: rows, totals: totals || reportData.totals };
+    return { report: rows, totals: totals || reportData.totals, summary: reportData.summary };
   }, [reportData, varianceCategory, columnFilters, numericFilters, sortConfig, reportType]);
 
   // Get unique values for a column (from unfiltered data, for column filter dropdowns)
