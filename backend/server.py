@@ -166,6 +166,8 @@ class SyncedLocation(BaseModel):
     items: List[SyncedItem]
     total_items: int
     total_quantity: float
+    is_empty: bool = False
+    empty_remarks: str = ""
     synced_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     sync_date: str  # Date string for grouping (YYYY-MM-DD)
 
