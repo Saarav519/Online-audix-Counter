@@ -425,6 +425,7 @@ export default function PortalReports() {
   const clearAllFilters = () => {
     setVarianceCategory('all');
     setColumnFilters({});
+    setNumericFilters({});
     setSortConfig({ key: null, direction: 'asc' });
   };
 
