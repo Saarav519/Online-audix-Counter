@@ -75,7 +75,7 @@ export default function PortalDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StatsCard
           icon={Building2}
           label="Clients"
@@ -93,6 +93,12 @@ export default function PortalDashboard() {
           label="Devices"
           value={dashboardData.stats.devices}
           color="purple"
+        />
+        <StatsCard
+          icon={PackageX}
+          label="Empty Bins"
+          value={dashboardData.stats.empty_bins}
+          color="amber"
         />
         <StatsCard
           icon={Users}
