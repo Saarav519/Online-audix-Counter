@@ -865,7 +865,7 @@ const Settings = () => {
             });
             // Only count items from mode-relevant locations with data
             const pendingLocations = modeLocations.filter(loc => 
-              scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0
+              (scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0) || loc.isEmpty
             );
             // Derive items ONLY from valid mode-filtered locations
             const allItems = pendingLocations.flatMap(loc => scannedItems[loc.id] || []);
