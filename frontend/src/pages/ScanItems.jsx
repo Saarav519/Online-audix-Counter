@@ -1220,6 +1220,19 @@ const ScanItems = () => {
   const handleScan = () => {
     if (!barcodeInput.trim() || !selectedLocationId) return;
     
+    // ===== CHECK: Is this a RESCAN of the current location? =====
+    const scannedLower = barcodeInput.trim().toLowerCase();
+    const locCode = (selectedLocation?.code || '').trim().toLowerCase();
+    const locName = (selectedLocation?.name || '').trim().toLowerCase();
+    
+    if (scannedLower && (scannedLower === locCode || scannedLower === locName)) {
+      // Location barcode rescanned → Mark as Empty
+      console.log(`📭 Location barcode rescanned via manual: "${barcodeInput.trim()}" → Marking EMPTY`);
+      setBarcodeInput('');
+      handleAutoMarkEmpty();
+      return;
+    }
+    
     if (askQuantityBeforeAdding) {
       // Punching Mode: show quantity popup
       const checkResult = showQtyPopup(barcodeInput.trim());
