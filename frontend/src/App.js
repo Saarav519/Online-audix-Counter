@@ -203,6 +203,18 @@ function AppRoutes() {
           <Route index element={<Suspense fallback={<PageLoader />}><PortalSyncLogs /></Suspense>} />
         </Route>
         <Route
+          path="/portal/conflicts"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalConflicts /></Suspense>} />
+        </Route>
+        <Route
           path="/portal/users"
           element={
             <PortalProtectedRoute>
