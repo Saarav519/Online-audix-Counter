@@ -371,7 +371,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "AUDIX Admin Portal Backend API Testing"
+    - "Empty Bin - Backend API Endpoints"
+    - "Empty Bin - Scanner Mark Empty Button"
+    - "Empty Bin - Portal Empty Bins Report"
+    - "Empty Bin - Portal Dashboard Stats"
+    - "Empty Bin - Sync Sends Empty Flag"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
