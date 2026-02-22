@@ -376,16 +376,12 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Empty Bin - Backend API Endpoints"
-    - "Empty Bin - Scanner Mark Empty Button"
-    - "Empty Bin - Portal Empty Bins Report"
-    - "Empty Bin - Portal Dashboard Stats"
-    - "Empty Bin - Sync Sends Empty Flag"
+    - "Bin-wise Report - Empty Bins and Pending Locations"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
