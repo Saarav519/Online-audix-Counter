@@ -1947,36 +1947,6 @@ const ScanItems = () => {
           </div>
         </div>
 
-        {/* Empty Bin Confirmation Modal */}
-        <Dialog open={showEmptyBinModal} onOpenChange={setShowEmptyBinModal}>
-          <DialogContent className="max-w-[90vw] rounded-xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <PackageX className="w-5 h-5 text-amber-500" />
-                This bin is empty?
-              </DialogTitle>
-              <DialogDescription>
-                No items were scanned for this location. Confirm if this bin is empty.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-3 space-y-2">
-              <p className="text-sm"><strong>Location:</strong> {selectedLocation?.name}</p>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-sm text-amber-800 font-medium">This will be recorded as an empty bin with zero items and synced to the portal.</p>
-              </div>
-            </div>
-            <DialogFooter className="flex-row gap-2">
-              <Button variant="outline" onClick={() => setShowEmptyBinModal(false)} className="flex-1">
-                No, Go Back
-              </Button>
-              <Button onClick={confirmEmptyBin} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white">
-                <PackageX className="w-4 h-4 mr-2" />
-                Yes, It's Empty
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Submit Confirmation Modal */}
         <Dialog open={showSubmitModal} onOpenChange={setShowSubmitModal}>
           <DialogContent className="max-w-[90vw] rounded-xl">
