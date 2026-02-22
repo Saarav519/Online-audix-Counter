@@ -513,6 +513,7 @@ export default function PortalReports() {
     if (mode === 'bin-wise') {
       options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
       options.push({ value: 'detailed', label: 'Detailed Item-wise' });
+      options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
     } else if (mode === 'barcode-wise') {
       options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
     } else if (mode === 'article-wise') {
