@@ -286,14 +286,17 @@ export default function PortalReports() {
     // Step 1: Variance category filter
     rows = filterByVarianceCategory(rows, varianceCategory);
 
-    // Step 2: Column filters
-    Object.entries(columnFilters).forEach(([col, excludedVals]) => {
-      if (excludedVals.length > 0) {
+    // Step 2: Column filters (INCLUSION MODEL)
+    // Only filter when there's a non-empty inclusion list
+    Object.entries(columnFilters).forEach(([col, checkedVals]) => {
+      if (checkedVals && checkedVals.length > 0) {
+        // Inclusion filter: only show rows whose value is in the checked list
         rows = rows.filter(row => {
           const val = String(row[col] !== undefined && row[col] !== null ? row[col] : '');
-          return !excludedVals.includes(val);
+          return checkedVals.includes(val);
         });
       }
+      // If checkedVals is null/undefined/[] → no filter → all data shown
     });
 
     // Step 3: Sort
