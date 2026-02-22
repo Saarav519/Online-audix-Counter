@@ -39,7 +39,7 @@ def debug_sync_and_report():
         "session_id": session_id,
         "locations": [
             {
-                "location": unique_location,
+                "name": unique_location,
                 "is_empty": True,
                 "empty_remarks": "Empty Bin — Debug test location",
                 "items": []
