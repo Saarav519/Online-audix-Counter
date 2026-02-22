@@ -1030,7 +1030,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Category Summary Table ============
-function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon }) {
+function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, getColumnValues }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1044,16 +1044,16 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left py-3 px-4 font-medium text-gray-600">Category</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Items</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Stock Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Stock Value</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Physical Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Physical Value</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Diff Qty</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Diff Value</th>
-              <th className="text-right py-3 px-4 font-medium text-gray-600">Accuracy</th>
-              <th className="text-left py-3 px-4 font-medium text-gray-600 min-w-[220px]">Remarks</th>
+              <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="item_count" label="Items" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('item_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="stock_value" label="Stock Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="physical_value" label="Physical Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} className="min-w-[220px]" />
             </tr>
           </thead>
           <tbody>
