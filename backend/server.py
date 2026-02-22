@@ -2298,6 +2298,9 @@ async def get_dashboard():
     total_users = await db.portal_users.count_documents({})
     pending_users = await db.portal_users.count_documents({"is_approved": False})
     
+    # Get empty bins count
+    empty_bins_count = await db.synced_locations.count_documents({"is_empty": True})
+    
     # Get recent syncs
     recent_syncs = await db.synced_locations.find(
         {}, {"_id": 0}
@@ -2312,7 +2315,8 @@ async def get_dashboard():
             "active_sessions": active_sessions,
             "devices": total_devices,
             "total_users": total_users,
-            "pending_users": pending_users
+            "pending_users": pending_users,
+            "empty_bins": empty_bins_count
         },
         "recent_syncs": recent_syncs,
         "devices": devices
