@@ -1290,3 +1290,250 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
     </div>
   );
 }
+
+// ============ Empty Bins View ============
+function EmptyBinsView({ data }) {
+  if (!data) return <div className="text-center py-8 text-gray-500">Loading...</div>;
+  
+  const emptyLocations = data.all_empty_locations || [];
+  const byDate = data.by_date || [];
+  
+  if (emptyLocations.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
+          <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-1">No Empty Bins Found</h3>
+        <p className="text-gray-500">All scanned locations have items. No bins were marked as empty.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-amber-700">{data.total_empty_bins || 0}</p>
+          <p className="text-sm text-amber-600 mt-1">Total Empty Bins</p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-blue-700">{byDate.length}</p>
+          <p className="text-sm text-blue-600 mt-1">Days with Empty Bins</p>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center">
+          <p className="text-lg font-bold text-gray-700 truncate">{data.session_name || '-'}</p>
+          <p className="text-sm text-gray-500 mt-1">Session</p>
+        </div>
+      </div>
+
+      {/* By Date */}
+      {byDate.map((dateGroup) => (
+        <div key={dateGroup.date} className="bg-white border rounded-xl overflow-hidden">
+          <div className="bg-amber-50 px-4 py-3 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-amber-600" />
+              <span className="font-semibold text-amber-800">{dateGroup.date}</span>
+            </div>
+            <span className="text-sm text-amber-600 font-medium">{dateGroup.count} empty bin{dateGroup.count !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="divide-y">
+            {dateGroup.locations.map((loc, idx) => (
+              <div key={idx} className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{loc.location_name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{loc.empty_remarks || 'Marked as empty'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">{loc.device_name}</p>
+                  <p className="text-xs text-gray-400">{loc.synced_at ? new Date(loc.synced_at).toLocaleTimeString() : ''}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============ Pending Locations View ============
+function PendingLocationsView({ data }) {
+  if (!data) return <div className="text-center py-8 text-gray-500">Loading...</div>;
+  
+  const summary = data.summary || {};
+  const pending = data.pending || [];
+  const completed = data.completed || [];
+  const emptyBins = data.empty_bins || [];
+  
+  return (
+    <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-blue-700">{summary.total_expected || 0}</p>
+          <p className="text-xs text-blue-600">Total Expected</p>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-emerald-700">{summary.total_completed || 0}</p>
+          <p className="text-xs text-emerald-600">Completed</p>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-amber-700">{summary.total_empty || 0}</p>
+          <p className="text-xs text-amber-600">Empty Bins</p>
+        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-red-700">{summary.total_pending || 0}</p>
+          <p className="text-xs text-red-600">Pending</p>
+        </div>
+        <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-purple-700">{summary.completion_pct || 0}%</p>
+          <p className="text-xs text-purple-600">Completion</p>
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="bg-white border rounded-xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-gray-700">Overall Progress</span>
+          <span className="text-sm text-gray-500">
+            {(summary.total_completed || 0) + (summary.total_empty || 0)} of {summary.total_expected || 0} locations done
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3">
+          <div
+            className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all"
+            style={{ width: `${Math.min(summary.completion_pct || 0, 100)}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Pending Locations */}
+      {pending.length > 0 && (
+        <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
+          <div className="bg-red-50 px-4 py-3 border-b">
+            <h3 className="font-semibold text-red-800 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Pending Locations ({pending.length})
+            </h3>
+            <p className="text-xs text-red-600 mt-0.5">These locations have not been scanned yet — need physical verification</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="py-2 px-4 text-left">#</th>
+                  <th className="py-2 px-4 text-left">Location Name</th>
+                  <th className="py-2 px-4 text-center">Status</th>
+                  <th className="py-2 px-4 text-center">In Expected</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {pending.map((loc, idx) => (
+                  <tr key={idx} className="hover:bg-red-50/30">
+                    <td className="py-2.5 px-4 text-sm text-gray-500">{idx + 1}</td>
+                    <td className="py-2.5 px-4 text-sm font-medium text-gray-900">{loc.location_name}</td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">Pending</span>
+                    </td>
+                    <td className="py-2.5 px-4 text-center">
+                      {loc.in_expected ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-gray-300 mx-auto" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Empty Bins */}
+      {emptyBins.length > 0 && (
+        <div className="bg-white border border-amber-200 rounded-xl overflow-hidden">
+          <div className="bg-amber-50 px-4 py-3 border-b">
+            <h3 className="font-semibold text-amber-800 flex items-center gap-2">
+              <XCircle className="w-4 h-4" />
+              Empty Bins ({emptyBins.length})
+            </h3>
+            <p className="text-xs text-amber-600 mt-0.5">These locations were found empty during physical count</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="py-2 px-4 text-left">#</th>
+                  <th className="py-2 px-4 text-left">Location Name</th>
+                  <th className="py-2 px-4 text-left">Remarks</th>
+                  <th className="py-2 px-4 text-left">Device</th>
+                  <th className="py-2 px-4 text-left">Synced At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {emptyBins.map((loc, idx) => (
+                  <tr key={idx} className="hover:bg-amber-50/30">
+                    <td className="py-2.5 px-4 text-sm text-gray-500">{idx + 1}</td>
+                    <td className="py-2.5 px-4 text-sm font-medium text-gray-900">{loc.location_name}</td>
+                    <td className="py-2.5 px-4 text-sm text-gray-600">{loc.empty_remarks || 'Found empty'}</td>
+                    <td className="py-2.5 px-4 text-sm text-gray-500">{loc.device_name}</td>
+                    <td className="py-2.5 px-4 text-sm text-gray-400">{loc.synced_at ? new Date(loc.synced_at).toLocaleString() : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Completed Locations */}
+      {completed.length > 0 && (
+        <div className="bg-white border border-emerald-200 rounded-xl overflow-hidden">
+          <div className="bg-emerald-50 px-4 py-3 border-b">
+            <h3 className="font-semibold text-emerald-800 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Completed Locations ({completed.length})
+            </h3>
+          </div>
+          <div className="overflow-x-auto max-h-80 overflow-y-auto">
+            <table className="w-full">
+              <thead className="sticky top-0 bg-gray-50">
+                <tr className="text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="py-2 px-4 text-left">#</th>
+                  <th className="py-2 px-4 text-left">Location Name</th>
+                  <th className="py-2 px-4 text-right">Items</th>
+                  <th className="py-2 px-4 text-right">Quantity</th>
+                  <th className="py-2 px-4 text-left">Device</th>
+                  <th className="py-2 px-4 text-left">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {completed.map((loc, idx) => (
+                  <tr key={idx} className="hover:bg-emerald-50/30">
+                    <td className="py-2.5 px-4 text-sm text-gray-500">{idx + 1}</td>
+                    <td className="py-2.5 px-4 text-sm font-medium text-gray-900">{loc.location_name}</td>
+                    <td className="py-2.5 px-4 text-sm text-right text-gray-700">{loc.total_items}</td>
+                    <td className="py-2.5 px-4 text-sm text-right font-medium text-gray-900">{loc.total_quantity}</td>
+                    <td className="py-2.5 px-4 text-sm text-gray-500">{loc.device_name}</td>
+                    <td className="py-2.5 px-4 text-sm text-gray-400">{loc.sync_date || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No Data */}
+      {pending.length === 0 && emptyBins.length === 0 && completed.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <p>No location data available. Import expected stock to see pending locations.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
