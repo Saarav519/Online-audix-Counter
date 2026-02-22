@@ -2621,6 +2621,162 @@ async def mark_all_alerts_read():
     await db.alerts.update_many({"is_read": False}, {"$set": {"is_read": True}})
     return {"message": "All alerts marked as read"}
 
+# ==================== CONFLICT RESOLUTION ROUTES ====================
+
+@portal_router.get("/conflicts")
+async def get_conflicts(client_id: str = None, session_id: str = None, status: str = None):
+    """Get all conflicts, filterable by client, session, and status"""
+    query = {}
+    if client_id:
+        query["client_id"] = client_id
+    if session_id:
+        query["session_id"] = session_id
+    if status:
+        query["status"] = status
+    
+    conflicts = await db.conflict_locations.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    
+    # Enrich with client and session names
+    for c in conflicts:
+        session = await db.audit_sessions.find_one({"id": c.get("session_id")}, {"_id": 0, "name": 1, "client_id": 1})
+        if session:
+            c["session_name"] = session.get("name", "Unknown")
+            client = await db.clients.find_one({"id": session.get("client_id", c.get("client_id"))}, {"_id": 0, "name": 1})
+            c["client_name"] = client.get("name", "Unknown") if client else "Unknown"
+        else:
+            c["session_name"] = "Unknown"
+            c["client_name"] = "Unknown"
+    
+    return conflicts
+
+@portal_router.get("/conflicts/summary")
+async def get_conflicts_summary():
+    """Get conflict counts grouped by client and session"""
+    conflicts = await db.conflict_locations.find({"status": "pending"}, {"_id": 0}).to_list(10000)
+    
+    total_pending = len(conflicts)
+    by_session = {}
+    by_client = {}
+    
+    for c in conflicts:
+        sid = c.get("session_id", "unknown")
+        cid = c.get("client_id", "unknown")
+        by_session[sid] = by_session.get(sid, 0) + 1
+        by_client[cid] = by_client.get(cid, 0) + 1
+    
+    return {
+        "total_pending": total_pending,
+        "by_session": by_session,
+        "by_client": by_client
+    }
+
+@portal_router.post("/conflicts/{conflict_id}/approve/{entry_id}")
+async def approve_conflict_entry(conflict_id: str, entry_id: str, username: str = "admin"):
+    """Approve one entry in a conflict. Moves approved entry to synced_locations, rejects all others."""
+    conflict = await db.conflict_locations.find_one({"id": conflict_id})
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    if conflict["status"] == "resolved":
+        raise HTTPException(status_code=400, detail="Conflict already resolved")
+    
+    # Find the approved entry
+    approved_entry = None
+    for entry in conflict["entries"]:
+        if entry["entry_id"] == entry_id:
+            approved_entry = entry
+            break
+    
+    if not approved_entry:
+        raise HTTPException(status_code=404, detail="Entry not found in conflict")
+    
+    # Mark all entries: approved or rejected
+    updated_entries = []
+    for entry in conflict["entries"]:
+        if entry["entry_id"] == entry_id:
+            entry["status"] = "approved"
+        else:
+            entry["status"] = "rejected"
+        updated_entries.append(entry)
+    
+    # Move approved entry back to synced_locations
+    sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    synced_loc = SyncedLocation(
+        session_id=conflict["session_id"],
+        device_id=approved_entry.get("device_id", ""),
+        device_name=approved_entry["device_name"],
+        location_id=approved_entry.get("location_id", ""),
+        location_name=conflict["location_name"],
+        items=[SyncedItem(**item) for item in approved_entry["items"]],
+        total_items=approved_entry["total_items"],
+        total_quantity=approved_entry["total_quantity"],
+        is_empty=approved_entry.get("is_empty", False),
+        empty_remarks=approved_entry.get("empty_remarks", ""),
+        sync_date=sync_date
+    )
+    
+    # Remove any existing synced data for this location (safety)
+    await db.synced_locations.delete_many({
+        "session_id": conflict["session_id"],
+        "location_name": conflict["location_name"]
+    })
+    
+    doc = synced_loc.model_dump()
+    doc['synced_at'] = doc['synced_at'].isoformat()
+    await db.synced_locations.insert_one(doc)
+    
+    # Mark conflict as resolved
+    resolve_timestamp = datetime.now(timezone.utc).isoformat()
+    await db.conflict_locations.update_one(
+        {"id": conflict_id},
+        {"$set": {
+            "status": "resolved",
+            "entries": updated_entries,
+            "resolved_at": resolve_timestamp,
+            "resolved_by": username
+        }}
+    )
+    
+    return {
+        "message": f"Entry from {approved_entry['device_name']} approved. Location '{conflict['location_name']}' is now in variance.",
+        "approved_device": approved_entry["device_name"],
+        "approved_quantity": approved_entry["total_quantity"]
+    }
+
+@portal_router.post("/conflicts/{conflict_id}/reject-all")
+async def reject_all_conflict_entries(conflict_id: str, username: str = "admin"):
+    """Reject all entries in a conflict. Location becomes pending again (needs re-scan)."""
+    conflict = await db.conflict_locations.find_one({"id": conflict_id})
+    if not conflict:
+        raise HTTPException(status_code=404, detail="Conflict not found")
+    if conflict["status"] == "resolved":
+        raise HTTPException(status_code=400, detail="Conflict already resolved")
+    
+    updated_entries = []
+    for entry in conflict["entries"]:
+        entry["status"] = "rejected"
+        updated_entries.append(entry)
+    
+    resolve_timestamp = datetime.now(timezone.utc).isoformat()
+    await db.conflict_locations.update_one(
+        {"id": conflict_id},
+        {"$set": {
+            "status": "resolved",
+            "entries": updated_entries,
+            "resolved_at": resolve_timestamp,
+            "resolved_by": username
+        }}
+    )
+    
+    # Ensure location is NOT in synced_locations (goes back to pending)
+    await db.synced_locations.delete_many({
+        "session_id": conflict["session_id"],
+        "location_name": conflict["location_name"]
+    })
+    
+    return {
+        "message": f"All entries rejected for '{conflict['location_name']}'. Location is now pending (needs re-scan)."
+    }
+
 # ==================== SETTINGS ROUTES ====================
 
 @portal_router.get("/settings")
