@@ -417,8 +417,10 @@ export default function PortalReports() {
     Object.values(columnFilters).forEach(v => {
       if (v && v.length > 0) count++;
     });
+    // Count numeric filters
+    count += Object.keys(numericFilters).length;
     return count;
-  }, [varianceCategory, columnFilters]);
+  }, [varianceCategory, columnFilters, numericFilters]);
 
   const clearAllFilters = () => {
     setVarianceCategory('all');
