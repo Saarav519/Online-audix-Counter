@@ -89,14 +89,13 @@ const NUMERIC_CONDITIONS = [
 }
 
 // ============ Column Filter Dropdown ============
-function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, onClose }) {
+function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose }) {
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
+  const isNumeric = NUMERIC_COLUMNS.has(column);
+  const currentNumeric = numericFilters?.[column] || null;
   
   // INCLUSION MODEL:
-  // activeFilters[column] = undefined/null → no filter, all shown, all boxes checked
-  // activeFilters[column] = [] → all boxes unchecked, but NO filter applied (all shown)
-  // activeFilters[column] = [some values] → inclusion filter, only those values shown
   const currentChecked = activeFilters[column];
   const isDefaultState = currentChecked === undefined || currentChecked === null;
   
@@ -115,14 +114,13 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   }, [onClose]);
 
   const isChecked = (strVal) => {
-    if (isDefaultState) return true; // no filter → all checked
+    if (isDefaultState) return true;
     return currentChecked.includes(strVal);
   };
 
   const toggleValue = (value) => {
     const strVal = String(value);
     if (isDefaultState) {
-      // Currently all selected → uncheck this one → include all EXCEPT this one
       const newChecked = allValues.map(String).filter(v => v !== strVal);
       onFilterChange(column, newChecked);
     } else {
@@ -133,7 +131,6 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
         current.add(strVal);
       }
       const arr = Array.from(current);
-      // If all selected again → remove filter entirely
       if (arr.length === allValues.length) {
         onFilterChange(column, null);
       } else {
@@ -142,14 +139,46 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
     }
   };
 
-  // Select All → check all boxes → remove filter
   const selectAll = () => onFilterChange(column, null);
-  // Clear All → uncheck all boxes → empty array (no active filter, data stays visible)
   const clearAll = () => onFilterChange(column, []);
 
+  const toggleNumericCondition = (condition) => {
+    if (currentNumeric === condition) {
+      onNumericFilterChange(column, null); // toggle off
+    } else {
+      onNumericFilterChange(column, condition);
+    }
+  };
+
   return (
-    <div ref={dropdownRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-64 max-h-80 flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div ref={dropdownRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-64 max-h-96 flex flex-col" onClick={(e) => e.stopPropagation()}>
+      {/* Numeric Quick Filter (for number columns) */}
+      {isNumeric && (
+        <div className="p-2 border-b border-gray-100">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value Filter</p>
+          <div className="flex gap-1.5">
+            {NUMERIC_CONDITIONS.map(cond => (
+              <button
+                key={cond.value}
+                onClick={() => toggleNumericCondition(cond.value)}
+                title={cond.desc}
+                className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-all border ${
+                  currentNumeric === cond.value
+                    ? cond.value === 'lt0' ? 'bg-red-500 text-white border-red-500'
+                      : cond.value === 'gt0' ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {cond.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Checkbox Value Filter */}
       <div className="p-2 border-b border-gray-100">
+        {isNumeric && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value List</p>}
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" autoFocus />
