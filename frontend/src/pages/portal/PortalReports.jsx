@@ -352,7 +352,10 @@ export default function PortalReports() {
   };
 
   const fetchDailyProgress = async () => {
-    if (!selectedSession) return;
+    if (!selectedSession || selectedSession === '__consolidated__') {
+      setDailyProgress([]);
+      return;
+    }
     try {
       const response = await fetch(`${BACKEND_URL}/api/portal/reports/${selectedSession}/daily-progress`);
       if (response.ok) {
