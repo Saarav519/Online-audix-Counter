@@ -1143,13 +1143,15 @@ async def _load_master_for_client(client_id: str):
 
 @portal_router.get("/reports/consolidated/{client_id}/bin-wise")
 async def get_consolidated_bin_wise(client_id: str):
-    """Consolidated bin-wise report across all sessions for a client"""
+    """Consolidated bin-wise report across all sessions for a client.
+    Includes empty bins and pending locations with proper status and remarks."""
     session_ids = await _get_all_session_ids_for_client(client_id)
     if not session_ids:
-        return {"report": [], "totals": {"stock_qty": 0, "physical_qty": 0, "difference_qty": 0, "accuracy_pct": 100.0}}
+        return {"report": [], "totals": {"stock_qty": 0, "physical_qty": 0, "difference_qty": 0, "accuracy_pct": 100.0}, "summary": {"total_locations": 0, "completed": 0, "empty_bins": 0, "pending": 0}}
     
     expected_by_location = {}
     physical_by_location = {}
+    empty_bin_map = {}
     
     for sid in session_ids:
         expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
@@ -1160,26 +1162,64 @@ async def get_consolidated_bin_wise(client_id: str):
         for s in synced:
             loc = s["location_name"]
             physical_by_location[loc] = physical_by_location.get(loc, 0) + s["total_quantity"]
+            if s.get("is_empty", False):
+                empty_bin_map[loc] = {
+                    "is_empty": True,
+                    "empty_remarks": s.get("empty_remarks", ""),
+                    "device_name": s.get("device_name", ""),
+                    "synced_at": s.get("synced_at", "")
+                }
     
     all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
     report = []
     total_stock = 0
     total_physical = 0
     total_diff = 0
+    count_completed = 0
+    count_empty = 0
+    count_pending = 0
     
     for loc in sorted(all_locations):
         stock_qty = expected_by_location.get(loc, 0)
         physical_qty = physical_by_location.get(loc, 0)
         diff_qty = physical_qty - stock_qty
         accuracy = calc_accuracy(stock_qty, physical_qty)
-        remark = generate_remark(stock_qty, physical_qty, accuracy, loc in expected_by_location, loc in physical_by_location)
+        in_expected = loc in expected_by_location
+        scanned = loc in physical_by_location
+        is_empty_bin = loc in empty_bin_map
+        
+        if is_empty_bin:
+            status = "empty_bin"
+            count_empty += 1
+            empty_info = empty_bin_map[loc]
+            empty_note = empty_info.get("empty_remarks", "")
+            remark = f"Empty Bin — {empty_note}" if empty_note else "Empty Bin — Location verified empty during physical count"
+        elif not scanned and in_expected:
+            status = "pending"
+            count_pending += 1
+            remark = "Pending — Location not yet counted during physical audit"
+            accuracy = 0.0
+        else:
+            status = "completed"
+            count_completed += 1
+            remark = generate_remark(stock_qty, physical_qty, accuracy, in_expected, scanned)
+        
         total_stock += stock_qty
         total_physical += physical_qty
         total_diff += diff_qty
-        report.append({"location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty, "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark})
+        report.append({
+            "location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty,
+            "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark,
+            "status": status, "is_empty": is_empty_bin,
+            "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""
+        })
     
     total_accuracy = calc_accuracy(total_stock, total_physical)
-    return {"report": report, "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "difference_qty": total_diff, "accuracy_pct": total_accuracy}}
+    return {
+        "report": report,
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
+        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending}
+    }
 
 @portal_router.get("/reports/consolidated/{client_id}/detailed")
 async def get_consolidated_detailed(client_id: str):
