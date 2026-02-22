@@ -700,11 +700,19 @@ export const AppProvider = ({ children }) => {
   };
 
   // Submit location (lock it)
-  const submitLocation = (locationId) => {
+  const submitLocation = (locationId, isEmpty = false, emptyRemarks = '') => {
     setLocations(prev =>
       prev.map(loc =>
         loc.id === locationId
-          ? { ...loc, isCompleted: true, isSubmitted: true, lastUpdated: new Date().toISOString() }
+          ? { 
+              ...loc, 
+              isCompleted: true, 
+              isSubmitted: true, 
+              isEmpty: isEmpty,
+              emptyRemarks: emptyRemarks,
+              emptyMarkedAt: isEmpty ? new Date().toISOString() : null,
+              lastUpdated: new Date().toISOString() 
+            }
           : loc
       )
     );
