@@ -13,7 +13,7 @@ import time
 import sys
 
 # Backend URL from the review request
-BASE_URL = "https://offline-sync-portal-2.preview.emergentagent.com"
+BASE_URL = "https://data-sync-tester.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 class PriorityTest:
