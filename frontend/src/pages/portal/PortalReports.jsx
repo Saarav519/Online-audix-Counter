@@ -490,15 +490,22 @@ export default function PortalReports() {
   };
 
   const getReportTypeOptions = () => {
-    // If consolidated, show all report types
+    // If consolidated, only show report types relevant to client's session modes
     if (selectedSession === '__consolidated__') {
-      return [
-        { value: 'bin-wise', label: 'Bin-wise Summary' },
-        { value: 'detailed', label: 'Detailed Item-wise' },
-        { value: 'barcode-wise', label: 'Barcode-wise Variance' },
-        { value: 'article-wise', label: 'Article-wise Variance' },
-        { value: 'category-summary', label: 'Category-wise Summary' },
-      ];
+      const activeModes = new Set(sessionInfo?.session_modes || sessions.map(s => s.variance_mode || 'bin-wise'));
+      const options = [];
+      if (activeModes.has('bin-wise')) {
+        options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
+        options.push({ value: 'detailed', label: 'Detailed Item-wise' });
+      }
+      if (activeModes.has('barcode-wise')) {
+        options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
+      }
+      if (activeModes.has('article-wise')) {
+        options.push({ value: 'article-wise', label: 'Article-wise Variance' });
+      }
+      options.push({ value: 'category-summary', label: 'Category-wise Summary' });
+      return options;
     }
     const mode = sessionInfo?.variance_mode || 'bin-wise';
     const options = [];
