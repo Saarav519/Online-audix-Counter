@@ -371,17 +371,17 @@ export default function PortalReports() {
   };
 
   const exportCSV = () => {
-    if (!reportData) return;
+    if (!filteredData) return;
 
     let csv = '';
-    const rows = reportData.report || [];
+    const rows = filteredData.report || [];
     
     if (reportType === 'bin-wise') {
       csv = 'Location,Stock Qty,Physical Qty,Difference,Accuracy %,Remarks\n';
       rows.forEach(row => {
         csv += `"${row.location}",${row.stock_qty},${row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
       });
-      const t = reportData.totals;
+      const t = filteredData.totals;
       csv += `"TOTAL",${t.stock_qty},${t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
     } else if (reportType === 'detailed') {
       csv = 'Location,Barcode,Description,Category,MRP,Cost,Stock Qty,Stock Value,Physical Qty,Physical Value,Diff Qty,Diff Value,Accuracy %,Remarks\n';
@@ -409,12 +409,13 @@ export default function PortalReports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${reportType}_report_${selectedSession}.csv`;
+    const suffix = varianceCategory !== 'all' ? `_${varianceCategory}` : '';
+    a.download = `${reportType}_report${suffix}_${selectedSession}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success('Report exported!');
+    toast.success(`Report exported! (${rows.length} rows)`);
   };
 
   const getVarianceIcon = (value) => {
