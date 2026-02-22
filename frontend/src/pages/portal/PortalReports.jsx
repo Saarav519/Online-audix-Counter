@@ -877,11 +877,16 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
             {data.report.map((row, i) => {
               const isEmptyBin = row.status === 'empty_bin' || row.is_empty;
               const isPending = row.status === 'pending';
-              const rowBg = isEmptyBin ? 'bg-amber-50/60 hover:bg-amber-50' : isPending ? 'bg-gray-50/60 hover:bg-gray-100' : 'hover:bg-gray-50';
+              const isConflict = row.status === 'conflict';
+              const rowBg = isConflict ? 'bg-red-50/60 hover:bg-red-50' : isEmptyBin ? 'bg-amber-50/60 hover:bg-amber-50' : isPending ? 'bg-gray-50/60 hover:bg-gray-100' : 'hover:bg-gray-50';
               return (
                 <tr key={i} className={`border-b border-gray-100 ${rowBg}`}>
                   <td className="py-3 px-4">
-                    {isEmptyBin ? (
+                    {isConflict ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                        <AlertTriangle className="w-3 h-3" /> Conflict
+                      </span>
+                    ) : isEmptyBin ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
                         <PackageX className="w-3 h-3" /> Empty
                       </span>
