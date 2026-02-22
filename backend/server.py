@@ -1192,8 +1192,11 @@ async def get_consolidated_bin_wise(client_id: str):
             status = "empty_bin"
             count_empty += 1
             empty_info = empty_bin_map[loc]
-            empty_note = empty_info.get("empty_remarks", "")
-            remark = f"Empty Bin — {empty_note}" if empty_note else "Empty Bin — Location verified empty during physical count"
+            empty_note = empty_info.get("empty_remarks", "").strip()
+            if empty_note:
+                remark = empty_note if empty_note.lower().startswith("empty bin") else f"Empty Bin — {empty_note}"
+            else:
+                remark = "Empty Bin — Location verified empty during physical count"
         elif not scanned and in_expected:
             status = "pending"
             count_pending += 1
