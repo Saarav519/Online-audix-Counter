@@ -544,7 +544,7 @@ export default function PortalReports() {
     if (reportType === 'bin-wise') {
       csv = 'Status,Location,Stock Qty,Physical Qty,Difference,Accuracy %,Remarks\n';
       rows.forEach(row => {
-        const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : 'Completed';
+        const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : row.status === 'conflict' ? 'Conflict' : 'Completed';
         csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
       });
       const t = filteredData.totals;
