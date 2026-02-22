@@ -524,6 +524,10 @@ export default function PortalReports() {
     // Category summary always available
     options.push({ value: 'category-summary', label: 'Category-wise Summary' });
     
+    // Empty bins & pending always available
+    options.push({ value: 'empty-bins', label: 'Empty Bins' });
+    options.push({ value: 'pending-locations', label: 'Pending Locations' });
+    
     return options;
   };
 
