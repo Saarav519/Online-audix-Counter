@@ -855,11 +855,17 @@ const Settings = () => {
 
           {/* Pending Sync Count */}
           {(() => {
-            // Only count items from locations that exist in the locations array
-            const pendingLocations = locations.filter(loc => 
+            // Filter locations by current scan mode (matching Reports page logic)
+            const isPreAssigned = settings.locationScanMode === 'preassigned';
+            const modeLocations = locations.filter(loc => {
+              if (isPreAssigned) return loc.isAssigned === true;
+              return loc.autoCreated === true || loc.isAssigned === false;
+            });
+            // Only count items from mode-relevant locations with data
+            const pendingLocations = modeLocations.filter(loc => 
               scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0
             );
-            // Derive items ONLY from valid locations (not from orphaned scannedItems keys)
+            // Derive items ONLY from valid mode-filtered locations
             const allItems = pendingLocations.flatMap(loc => scannedItems[loc.id] || []);
             const pendingItems = allItems.length;
             const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
