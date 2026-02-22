@@ -496,7 +496,6 @@ export default function PortalReports() {
       const options = [];
       if (activeModes.has('bin-wise')) {
         options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
-        options.push({ value: 'detailed', label: 'Detailed Item-wise' });
       }
       if (activeModes.has('barcode-wise')) {
         options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
@@ -504,6 +503,8 @@ export default function PortalReports() {
       if (activeModes.has('article-wise')) {
         options.push({ value: 'article-wise', label: 'Article-wise Variance' });
       }
+      // Detailed and Category summary always available
+      options.push({ value: 'detailed', label: 'Detailed Item-wise' });
       options.push({ value: 'category-summary', label: 'Category-wise Summary' });
       return options;
     }
@@ -512,14 +513,14 @@ export default function PortalReports() {
     
     if (mode === 'bin-wise') {
       options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
-      options.push({ value: 'detailed', label: 'Detailed Item-wise' });
     } else if (mode === 'barcode-wise') {
       options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
     } else if (mode === 'article-wise') {
       options.push({ value: 'article-wise', label: 'Article-wise Variance' });
     }
     
-    // Category summary is always available
+    // Detailed and Category summary always available for all modes
+    options.push({ value: 'detailed', label: 'Detailed Item-wise' });
     options.push({ value: 'category-summary', label: 'Category-wise Summary' });
     
     return options;
