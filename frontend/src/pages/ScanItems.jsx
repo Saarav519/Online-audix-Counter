@@ -668,6 +668,28 @@ const ScanItems = () => {
     } else {
       // FAST BARCODE PROCESSING
       
+      // ===== CHECK: Is this a RESCAN of the current location? =====
+      // If scanned barcode matches current location code/name → mark as EMPTY BIN
+      const currentLoc = selectedLocationRef.current;
+      const scannedLower = scannedValue.trim().toLowerCase();
+      const locationCode = (currentLoc?.code || '').trim().toLowerCase();
+      const locationName = (currentLoc?.name || '').trim().toLowerCase();
+      
+      if (scannedLower && (scannedLower === locationCode || scannedLower === locationName)) {
+        // Location barcode rescanned → Mark as Empty
+        console.log(`📭 Location barcode rescanned: "${scannedValue}" matches location "${currentLoc?.name}" → Marking EMPTY`);
+        
+        // Clear input
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.value = '';
+        }
+        setBarcodeInput('');
+        
+        // Auto-mark empty and submit
+        handleAutoMarkEmpty();
+        return;
+      }
+      
       // CRITICAL: Clear input field IMMEDIATELY (both DOM and React state)
       // to prevent next scan's chars from appending to old barcode value
       if (barcodeInputRef.current) {
