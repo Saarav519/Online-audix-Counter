@@ -606,33 +606,38 @@ export default function PortalReports() {
           <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading report...</p>
         </div>
-      ) : !reportData || (reportData.report || []).length === 0 ? (
+      ) : !filteredData || (filteredData.report || []).length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <FileBarChart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">No data available for this session</p>
-          <p className="text-sm text-gray-400 mt-1">Import master stock and sync device data to generate reports</p>
+          <p className="text-gray-500">{varianceCategory !== 'all' && reportData && reportData.report.length > 0 ? 'No items match the selected variance filter' : 'No data available for this session'}</p>
+          {varianceCategory !== 'all' && reportData && reportData.report.length > 0 && (
+            <button onClick={() => setVarianceCategory('all')} className="mt-2 text-sm text-emerald-600 hover:underline">Clear variance filter</button>
+          )}
+          {varianceCategory === 'all' && (
+            <p className="text-sm text-gray-400 mt-1">Import master stock and sync device data to generate reports</p>
+          )}
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          {reportData.totals && (
+          {filteredData.totals && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-              <SummaryCard label="Stock Qty" value={reportData.totals.stock_qty || 0} />
-              <SummaryCard label="Physical Qty" value={reportData.totals.physical_qty || 0} />
-              <SummaryCard label="Difference" value={reportData.totals.diff_qty || reportData.totals.difference_qty || 0} variant={true} />
-              <SummaryCard label="Accuracy" value={`${reportData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={reportData.totals.accuracy_pct || 0} />
-              {reportData.totals.diff_value !== undefined && (
-                <SummaryCard label="Value Diff" value={`${(reportData.totals.diff_value || 0).toFixed(2)}`} variant={true} />
+              <SummaryCard label="Stock Qty" value={filteredData.totals.stock_qty || 0} />
+              <SummaryCard label="Physical Qty" value={filteredData.totals.physical_qty || 0} />
+              <SummaryCard label="Difference" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
+              <SummaryCard label="Accuracy" value={`${filteredData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={filteredData.totals.accuracy_pct || 0} />
+              {filteredData.totals.diff_value !== undefined && (
+                <SummaryCard label="Value Diff" value={`${(filteredData.totals.diff_value || 0).toFixed(2)}`} variant={true} />
               )}
             </div>
           )}
 
           {/* Report Table */}
-          {reportType === 'bin-wise' && <BinWiseTable data={reportData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} />}
-          {reportType === 'detailed' && <DetailedTable data={reportData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={reportData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={reportData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} />}
-          {reportType === 'category-summary' && <CategorySummaryTable data={reportData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} />}
+          {reportType === 'bin-wise' && <BinWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} getColumnValues={getColumnValues} />}
+          {reportType === 'detailed' && <DetailedTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} getColumnValues={getColumnValues} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} getColumnValues={getColumnValues} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} getColumnValues={getColumnValues} />}
+          {reportType === 'category-summary' && <CategorySummaryTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} getColumnValues={getColumnValues} />}
         </>
       )}
     </div>
