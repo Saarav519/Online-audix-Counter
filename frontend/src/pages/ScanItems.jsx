@@ -2022,15 +2022,6 @@ const ScanItems = () => {
               Submit Location
             </Button>
           )}
-          {selectedLocationId && !isLocationLocked && locationItems.length === 0 && tempScannedItems.length === 0 && (
-            <Button
-              onClick={handleMarkAsEmpty}
-              className="bg-amber-500 hover:bg-amber-600"
-            >
-              <PackageX className="w-4 h-4 mr-2" />
-              Mark as Empty
-            </Button>
-          )}
         </div>
       </div>
 
