@@ -1284,7 +1284,89 @@ const ScanItems = () => {
   };
 
   const handleSubmitLocation = () => {
+    // If no items scanned, show empty bin confirmation popup
+    if (locationItems.length === 0 && tempScannedItems.length === 0) {
+      setShowEmptyBinModal(true);
+      return;
+    }
     setShowSubmitModal(true);
+  };
+
+  // Handle "Mark as Empty" button click
+  const handleMarkAsEmpty = () => {
+    setShowEmptyBinModal(true);
+  };
+
+  // Confirm empty bin submission
+  const confirmEmptyBin = () => {
+    let finalLocationId = selectedLocationId;
+    
+    const existingLocationInList = locations.find(l => l.id === selectedLocationId);
+    
+    if (tempLocation && tempLocation.isTemp) {
+      const savedLocation = saveTempLocation(tempLocation);
+      if (savedLocation) {
+        finalLocationId = savedLocation.id;
+      }
+    } else if (!existingLocationInList && selectedLocation) {
+      const savedLocation = saveTempLocation({
+        ...selectedLocation,
+        isTemp: true
+      });
+      if (savedLocation) {
+        finalLocationId = savedLocation.id;
+      }
+    }
+    
+    // Submit as empty with remarks
+    const emptyRemarks = `Location found empty — verified by ${user?.userId || 'user'} at ${new Date().toLocaleString()}`;
+    submitLocation(finalLocationId, true, emptyRemarks);
+    setShowEmptyBinModal(false);
+    
+    // Clear temp items and temp location
+    clearTempItems();
+    setTempLocation(null);
+    
+    localStorage.removeItem('audix_current_scan_location');
+    localStorage.removeItem('audix_temp_location');
+    localStorage.removeItem(`audix_temp_items_${selectedLocationId}`);
+    
+    console.log(`📭 Submitted EMPTY location: ${selectedLocation?.name} (${finalLocationId})`);
+    
+    // Handle navigation same as normal submit
+    if (settings.locationScanMode === 'preassigned') {
+      const currentCode = selectedLocation?.code;
+      if (currentCode) {
+        const nextMasterLoc = getNextSequentialLocation(currentCode);
+        if (nextMasterLoc) {
+          const nextAssigned = getOrCreateAssignedLocation(nextMasterLoc.code, nextMasterLoc.name);
+          playSound(true);
+          setTimeout(() => {
+            navigate(`/scan?location=${nextAssigned.id}`, { replace: true });
+          }, 150);
+          return;
+        }
+      }
+      playSound(true);
+      navigate('/reports');
+      return;
+    }
+    
+    // Dynamic mode - clear and reset
+    setSelectedLocationId('');
+    setLocationInput('');
+    setBarcodeInput('');
+    setLastScanResult(null);
+    setLocationSuccess('Empty bin recorded! Scan a new location to continue.');
+    playSound(true);
+    navigate('/scan', { replace: true });
+    
+    setTimeout(() => {
+      if (locationInputRef.current) {
+        locationInputRef.current.focus();
+      }
+      setTimeout(() => setLocationSuccess(null), 4000);
+    }, 100);
   };
 
   // ============================================
