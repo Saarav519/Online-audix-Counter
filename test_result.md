@@ -1645,3 +1645,78 @@ test_plan:
       
       🎉 **CONCLUSION**: The CORRECTED report priority logic is working PERFECTLY. All 5 test scenarios confirmed that product details follow the exact priority: Stock > Master > Physical scan data. The implementation correctly handles fallback scenarios and generates appropriate professional remarks for each case.
 
+  - agent: "main"
+    message: |
+      Implemented 3 new features in PortalReports as requested by user:
+      
+      1. ✅ VARIANCE CATEGORY QUICK FILTER (Frontend only)
+         - Added pill-button filter bar below dropdowns with 6 categories:
+           All, Overall Negative, Overall Positive, Overall Matched, In System Not Found, Found Not In System
+         - Filters rows client-side, recalculates totals dynamically
+         - Shows "X of Y rows" count
+         - Clear filter button in header
+         - Applies to all report types
+         - CSV export respects active filter
+      
+      2. ✅ EXCEL-LIKE COLUMN FILTERING & SORTING (Frontend only)
+         - All column headers are sortable (click for asc/desc with arrow indicators)
+         - Filter dropdown on each column (hover to see filter icon)
+         - Filter dropdown has: search, select all/clear all, checkbox per unique value
+         - Column filters compose with variance category filter
+         - All client-side for instant filtering
+      
+      3. ✅ SESSION CONSOLIDATION (Backend + Frontend)
+         - "All Sessions (Consolidated)" option in Audit Session dropdown
+         - 5 new backend endpoints: /api/portal/reports/consolidated/{client_id}/{report-type}
+           for bin-wise, detailed, barcode-wise, article-wise, category-summary
+         - Aggregates stock/physical data from ALL sessions for the selected client
+         - All report types available in consolidated mode
+         - Daily Progress hidden in consolidated mode (not applicable)
+      
+      Files modified:
+      - /app/frontend/src/pages/portal/PortalReports.jsx - Complete enhancement with all 3 features
+      - /app/backend/server.py - 5 new consolidated report endpoints
+      
+      Testing agent should verify:
+      - GET /api/portal/reports/consolidated/{client_id}/bin-wise
+      - GET /api/portal/reports/consolidated/{client_id}/detailed
+      - GET /api/portal/reports/consolidated/{client_id}/barcode-wise
+      - GET /api/portal/reports/consolidated/{client_id}/article-wise
+      - GET /api/portal/reports/consolidated/{client_id}/category-summary
+
+  - task: "Consolidated Report Endpoints"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added 5 consolidated report endpoints that aggregate data across all sessions for a client. Endpoints: bin-wise, detailed, barcode-wise, article-wise, category-summary."
+
+  - task: "Variance Category Quick Filter"
+    implemented: true
+    working: true
+    file: "PortalReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Frontend-only filter with 6 categories: All, Overall Negative, Overall Positive, Overall Matched, In System Not Found, Found Not In System. Recalculates totals dynamically."
+
+  - task: "Excel-like Column Filtering & Sorting"
+    implemented: true
+    working: true
+    file: "PortalReports.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Sortable headers with asc/desc arrows, filter dropdown on each column with unique value checkboxes and search. Composes with variance category filter."
+
