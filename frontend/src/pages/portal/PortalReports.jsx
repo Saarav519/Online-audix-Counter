@@ -323,6 +323,19 @@ export default function PortalReports() {
     });
   }, []);
 
+  // Numeric filter handler: 'lt0' | 'gt0' | 'eq0' | null
+  const handleNumericFilter = useCallback((column, condition) => {
+    setNumericFilters(prev => {
+      const next = { ...prev };
+      if (condition === null || condition === undefined) {
+        delete next[column];
+      } else {
+        next[column] = condition;
+      }
+      return next;
+    });
+  }, []);
+
   // Apply all filters: variance category → column filters → sort
   const filteredData = useMemo(() => {
     if (!reportData || !reportData.report) return null;
