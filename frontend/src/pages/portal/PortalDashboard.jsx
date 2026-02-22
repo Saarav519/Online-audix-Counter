@@ -5,7 +5,8 @@ import {
   Smartphone, 
   Users,
   RefreshCw,
-  Activity
+  Activity,
+  PackageX
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
