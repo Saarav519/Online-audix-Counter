@@ -206,11 +206,12 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
 }
 
 // ============ Sortable + Filterable Header ============
-function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, className }) {
+function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, className }) {
   const [showFilter, setShowFilter] = useState(false);
-  // Filter is "active" only when there's an inclusion list with actual items (not empty or null)
   const currentFilter = activeFilters[column];
-  const isFiltered = currentFilter !== undefined && currentFilter !== null && currentFilter.length > 0 && currentFilter.length < (allValues || []).length;
+  const hasCheckboxFilter = currentFilter !== undefined && currentFilter !== null && currentFilter.length > 0 && currentFilter.length < (allValues || []).length;
+  const hasNumericFilter = numericFilters?.[column] != null;
+  const isFiltered = hasCheckboxFilter || hasNumericFilter;
   const isSorted = sortConfig.key === column;
   
   return (
@@ -231,7 +232,7 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
         )}
       </div>
       {showFilter && (
-        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} onClose={() => setShowFilter(false)} />
+        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} onClose={() => setShowFilter(false)} />
       )}
     </th>
   );
