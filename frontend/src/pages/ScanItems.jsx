@@ -1331,11 +1331,6 @@ const ScanItems = () => {
   };
 
   const handleSubmitLocation = () => {
-    // If no items scanned, show empty bin confirmation popup
-    if (locationItems.length === 0 && tempScannedItems.length === 0) {
-      setShowEmptyBinModal(true);
-      return;
-    }
     setShowSubmitModal(true);
   };
 
