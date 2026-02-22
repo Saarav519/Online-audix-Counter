@@ -497,6 +497,7 @@ export default function PortalReports() {
       if (activeModes.has('bin-wise')) {
         options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
         options.push({ value: 'detailed', label: 'Detailed Item-wise' });
+        options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
       }
       if (activeModes.has('barcode-wise')) {
         options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
