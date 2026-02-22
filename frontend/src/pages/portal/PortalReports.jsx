@@ -357,6 +357,21 @@ export default function PortalReports() {
       // If checkedVals is null/undefined/[] → no filter → all data shown
     });
 
+    // Step 3: Numeric filters (< 0, > 0, = 0)
+    Object.entries(numericFilters).forEach(([col, condition]) => {
+      if (condition) {
+        rows = rows.filter(row => {
+          const val = Number(row[col]) || 0;
+          switch (condition) {
+            case 'lt0': return val < 0;
+            case 'gt0': return val > 0;
+            case 'eq0': return val === 0;
+            default: return true;
+          }
+        });
+      }
+    });
+
     // Step 3: Sort
     if (sortConfig.key) {
       rows.sort((a, b) => {
