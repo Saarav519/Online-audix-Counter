@@ -838,15 +838,32 @@ function SummaryCard({ label, value, variant, isAccuracy, pct }) {
 
 // ============ Bin-wise Table ============
 function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+  const summary = data.summary || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
-        <h3 className="font-semibold text-gray-900">Bin-wise Summary Report</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">Bin-wise Summary Report</h3>
+          {(summary.total_locations > 0) && (
+            <div className="flex items-center gap-3 text-xs">
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="w-3 h-3" /> {summary.completed || 0} Completed
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+                <PackageX className="w-3 h-3" /> {summary.empty_bins || 0} Empty Bins
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                <Clock className="w-3 h-3" /> {summary.pending || 0} Pending
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
+              <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -856,33 +873,54 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
             </tr>
           </thead>
           <tbody>
-            {data.report.map((row, i) => (
-              <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
-                <td className="py-3 px-4 text-right">{row.stock_qty}</td>
-                <td className="py-3 px-4 text-right">{row.physical_qty}</td>
-                <td className="py-3 px-4 text-right">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.difference_qty)}`}>
-                    {getVarianceIcon(row.difference_qty)}
-                    {row.difference_qty > 0 ? '+' : ''}{row.difference_qty}
-                  </span>
-                </td>
-                <td className="py-3 px-4 text-right">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
-                    {row.accuracy_pct}%
-                  </span>
-                </td>
-                <td className="py-2 px-4">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                    {getRemarkIcon(row.remark)}
-                    <span>{row.remark}</span>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {data.report.map((row, i) => {
+              const isEmptyBin = row.status === 'empty_bin' || row.is_empty;
+              const isPending = row.status === 'pending';
+              const rowBg = isEmptyBin ? 'bg-amber-50/60 hover:bg-amber-50' : isPending ? 'bg-gray-50/60 hover:bg-gray-100' : 'hover:bg-gray-50';
+              return (
+                <tr key={i} className={`border-b border-gray-100 ${rowBg}`}>
+                  <td className="py-3 px-4">
+                    {isEmptyBin ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                        <PackageX className="w-3 h-3" /> Empty
+                      </span>
+                    ) : isPending ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-600">
+                        <Clock className="w-3 h-3" /> Pending
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                        <CheckCircle2 className="w-3 h-3" /> Done
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
+                  <td className="py-3 px-4 text-right">{row.stock_qty}</td>
+                  <td className="py-3 px-4 text-right">{row.physical_qty}</td>
+                  <td className="py-3 px-4 text-right">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.difference_qty)}`}>
+                      {getVarianceIcon(row.difference_qty)}
+                      {row.difference_qty > 0 ? '+' : ''}{row.difference_qty}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
+                      {row.accuracy_pct}%
+                    </span>
+                  </td>
+                  <td className="py-2 px-4">
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                      {getRemarkIcon(row.remark)}
+                      <span>{row.remark}</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot className="bg-gray-50 font-semibold text-sm">
             <tr>
+              <td className="py-3 px-4"></td>
               <td className="py-3 px-4">TOTAL</td>
               <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
