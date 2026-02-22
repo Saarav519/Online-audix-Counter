@@ -798,7 +798,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, getColumnValues }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -812,17 +812,17 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Barcode</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Description</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600">Category</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">MRP</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Cost</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Stock Qty</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Physical Qty</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Diff Qty</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Diff Value</th>
-              <th className="text-right py-3 px-3 font-medium text-gray-600">Accuracy</th>
-              <th className="text-left py-3 px-3 font-medium text-gray-600 min-w-[220px]">Remarks</th>
+              <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} />
+              <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} className="min-w-[220px]" />
             </tr>
           </thead>
           <tbody>
