@@ -849,11 +849,12 @@ const Settings = () => {
 
           {/* Pending Sync Count */}
           {(() => {
-            // scannedItems is an object keyed by locationId
-            const allItems = Object.values(scannedItems || {}).flat();
+            // Only count items from locations that exist in the locations array
             const pendingLocations = locations.filter(loc => 
               scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0
             );
+            // Derive items ONLY from valid locations (not from orphaned scannedItems keys)
+            const allItems = pendingLocations.flatMap(loc => scannedItems[loc.id] || []);
             const pendingItems = allItems.length;
             const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
             
