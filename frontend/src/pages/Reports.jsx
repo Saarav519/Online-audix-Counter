@@ -1216,13 +1216,17 @@ COLD-01,Cold Storage Unit 1`;
 
                     {/* Status Icon */}
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      loc.isSubmitted
+                      loc.isEmpty
+                        ? 'bg-amber-100'
+                        : loc.isSubmitted
                         ? 'bg-emerald-100'
                         : stats.totalItems > 0
                           ? 'bg-amber-100'
                           : 'bg-slate-100'
                     }`}>
-                      {loc.isSubmitted ? (
+                      {loc.isEmpty ? (
+                        <PackageX className="w-4 h-4 text-amber-600" />
+                      ) : loc.isSubmitted ? (
                         <Lock className="w-4 h-4 text-emerald-600" />
                       ) : stats.totalItems > 0 ? (
                         <Clock className="w-4 h-4 text-amber-600" />
@@ -1237,7 +1241,12 @@ COLD-01,Cold Storage Unit 1`;
                         {loc.name || loc.code}
                       </span>
                       <div className="flex items-center gap-1">
-                        {loc.isSubmitted && (
+                        {loc.isEmpty && (
+                          <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] px-1 py-0">
+                            Empty Bin
+                          </Badge>
+                        )}
+                        {loc.isSubmitted && !loc.isEmpty && (
                           <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] px-1 py-0">
                             Submitted
                           </Badge>
