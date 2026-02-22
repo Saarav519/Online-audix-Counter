@@ -260,6 +260,7 @@ const ScanItems = () => {
   const [quantityInput, setQuantityInput] = useState('1');
   const [lastScanResult, setLastScanResult] = useState(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showEmptyBinModal, setShowEmptyBinModal] = useState(false); // Empty bin confirmation
   const [editingItemId, setEditingItemId] = useState(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [locationError, setLocationError] = useState('');
