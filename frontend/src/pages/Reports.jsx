@@ -760,7 +760,7 @@ COLD-01,Cold Storage Unit 1`;
 
         {/* Stats Row */}
         {preassignedStats && (
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-5 gap-2 mb-3">
             <Card className="border-0 shadow-sm">
               <CardContent className="p-2 text-center">
                 <p className="text-lg font-bold text-slate-800">{preassignedStats.totalLocations}</p>
@@ -771,6 +771,12 @@ COLD-01,Cold Storage Unit 1`;
               <CardContent className="p-2 text-center">
                 <p className="text-lg font-bold text-emerald-600">{preassignedStats.completedLocations}</p>
                 <p className="text-[10px] text-slate-500">Done</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-2 text-center">
+                <p className="text-lg font-bold text-amber-600">{preassignedStats.emptyBins}</p>
+                <p className="text-[10px] text-slate-500">Empty</p>
               </CardContent>
             </Card>
             <Card className="border-0 shadow-sm">
