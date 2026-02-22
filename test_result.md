@@ -1723,3 +1723,75 @@ test_plan:
         agent: "main"
         comment: "Sortable headers with asc/desc arrows, filter dropdown on each column with unique value checkboxes and search. Composes with variance category filter."
 
+agent_communication:
+  - agent: "testing"
+    message: |
+      ✅ CONSOLIDATED REPORT ENDPOINTS COMPREHENSIVE TESTING COMPLETED - ALL 9 TESTS PASSED (100% SUCCESS RATE)
+      
+      🎯 **TESTING SCOPE (Per Review Request)**:
+      Testing the NEW CONSOLIDATED REPORT endpoints for AUDIX Admin Portal following exact flow specified:
+      1. Login: POST /api/portal/login with {"username": "admin", "password": "admin123"}
+      2. Get clients: GET /api/portal/clients - pick first client ID (Reliance Retail)
+      3. Test ALL 5 consolidated report endpoints using that client_id
+      4. Test existing individual session report endpoints for backward compatibility
+      
+      📊 **FINAL TEST RESULTS (9/9 TESTS PASSED - 100% SUCCESS RATE)**:
+      
+      ✅ **AUTHENTICATION AND CLIENT SELECTION**:
+      1. Portal Login ✅ Admin login successful (User ID: 0092da74-db25-493b-a2b7-7e89242114df)
+      2. Get Clients ✅ Found 2 clients, selected Reliance Retail (ID: 1984740d-861d-4e26-a2d4-fa674bb1464b)
+      
+      ✅ **CONSOLIDATED REPORT ENDPOINTS VERIFICATION**:
+      3. GET /api/portal/reports/consolidated/{client_id}/bin-wise ✅
+         - Returns proper structure: "report" array (6 locations) + "totals" object
+         - Fields: location, stock_qty, physical_qty, difference_qty, accuracy_pct, remark
+         - Totals: Stock=1370, Physical=1188, Accuracy=86.7%
+         - Professional remarks: "Slight Shortage", "Not Scanned", "Within Tolerance"
+      
+      4. GET /api/portal/reports/consolidated/{client_id}/detailed ✅
+         - Returns proper structure: "report" array (15 items) + "totals" object  
+         - Fields: barcode, location, description, category, mrp, cost, stock_qty, physical_qty, diff_qty, accuracy_pct, remark
+         - Includes product enrichment from master data (description, category, cost)
+         
+      5. GET /api/portal/reports/consolidated/{client_id}/barcode-wise ✅
+         - Returns proper structure: "report" array (13 barcodes) + "totals" object
+         - Fields: barcode, description, category, stock_qty, physical_qty, diff_qty, accuracy_pct, remark
+         - Proper aggregation across locations by barcode
+         
+      6. GET /api/portal/reports/consolidated/{client_id}/article-wise ✅
+         - Returns proper structure: "report" array (13 articles) + "totals" object
+         - Fields: article_code, article_name, category, barcodes, stock_qty, physical_qty, diff_qty, accuracy_pct, remark
+         - Proper grouping by article_code with barcode arrays
+         
+      7. GET /api/portal/reports/consolidated/{client_id}/category-summary ✅
+         - Returns proper structure: "report" array (8 categories) + "totals" object
+         - Fields: category, item_count, stock_qty, physical_qty, diff_qty, accuracy_pct, remark
+         - Proper category-wise aggregation and item counting
+      
+      ✅ **BACKWARD COMPATIBILITY VERIFICATION**:
+      8. GET /api/portal/sessions?client_id={client_id} ✅ Found 2 sessions for client
+      9. GET /api/portal/reports/{session_id}/bin-wise ✅ Individual session report working correctly
+      
+      🔍 **STRUCTURE VALIDATION CONFIRMED**:
+      ✅ All reports return proper "report" array + "totals" object structure
+      ✅ Totals contain required fields: stock_qty, physical_qty, diff_qty/difference_qty, accuracy_pct
+      ✅ Report rows have relevant fields per report type (location/barcode/article_code/category)
+      ✅ All rows include stock_qty, physical_qty, accuracy_pct, remark fields as required
+      ✅ Professional contextual remarks present in all records
+      
+      🔧 **FIELD NAME CONSISTENCY NOTED**:
+      - bin-wise reports use "difference_qty" field
+      - detailed/barcode-wise/article-wise/category-summary reports use "diff_qty" field
+      - Both patterns working correctly in respective endpoints
+      
+      🌐 **BACKEND URL CONFIRMED**: https://audix-counter.preview.emergentagent.com
+      
+      🎯 **NEW CONSOLIDATED ENDPOINTS VERIFIED WORKING**:
+      - GET /api/portal/reports/consolidated/{client_id}/bin-wise (NEW)
+      - GET /api/portal/reports/consolidated/{client_id}/detailed (NEW)
+      - GET /api/portal/reports/consolidated/{client_id}/barcode-wise (NEW)
+      - GET /api/portal/reports/consolidated/{client_id}/article-wise (NEW)
+      - GET /api/portal/reports/consolidated/{client_id}/category-summary (NEW)
+      
+      🎉 **CONCLUSION**: ALL 5 CONSOLIDATED REPORT ENDPOINTS ARE FULLY OPERATIONAL AND PRODUCTION-READY. Data aggregation across all sessions for client working correctly, proper structure returned, all required fields present, professional remarks generated, and backward compatibility with individual session reports maintained. Ready for user deployment.
+
