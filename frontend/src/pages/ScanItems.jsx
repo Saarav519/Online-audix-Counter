@@ -470,6 +470,7 @@ const ScanItems = () => {
   // Keep refs in sync with state
   useEffect(() => {
     selectedLocationIdRef.current = selectedLocationId;
+    selectedLocationRef.current = selectedLocation;
     // If we have a selected location, we're not waiting for location scan
     if (selectedLocationId) {
       setWaitingForLocationScan(false);
