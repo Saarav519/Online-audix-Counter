@@ -1381,6 +1381,9 @@ async def get_consolidated_detailed(client_id: str):
     reco_maps = await _build_reco_maps(client_id)
     
     expected_map = {}
+    physical_map = {}
+    
+    for sid in session_ids:
         expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for e in expected:
             key = f"{e.get('location', '')}|{e['barcode']}"
