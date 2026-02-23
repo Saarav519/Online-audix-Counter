@@ -40,14 +40,14 @@ function filterByVarianceCategory(rows, category) {
   if (!rows || category === 'all') return rows;
   return rows.filter(row => {
     const stockQty = row.stock_qty || 0;
-    const physicalQty = row.physical_qty || 0;
-    const diffQty = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty !== undefined ? row.difference_qty : physicalQty - stockQty);
+    const finalQty = row.final_qty !== undefined ? row.final_qty : (row.physical_qty || 0);
+    const diffQty = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty !== undefined ? row.difference_qty : finalQty - stockQty);
     switch (category) {
       case 'negative': return diffQty < 0;
       case 'positive': return diffQty > 0;
-      case 'matched': return diffQty === 0 && (stockQty > 0 || physicalQty > 0);
-      case 'in_system_not_found': return stockQty > 0 && physicalQty === 0;
-      case 'found_not_in_system': return (stockQty === 0) && physicalQty > 0;
+      case 'matched': return diffQty === 0 && (stockQty > 0 || finalQty > 0);
+      case 'in_system_not_found': return stockQty > 0 && finalQty === 0;
+      case 'found_not_in_system': return (stockQty === 0) && finalQty > 0;
       default: return true;
     }
   });
