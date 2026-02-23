@@ -952,7 +952,35 @@ const Settings = () => {
                 Last sync: {new Date(lastSyncTime).toLocaleString()}
               </p>
             )}
+
+            {/* Progress Bar */}
+            {syncing && syncProgress.total > 0 && (
+              <div data-testid="sync-progress-container" className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-600 font-medium" data-testid="sync-progress-phase">{syncProgress.phase}</span>
+                  <span className="text-slate-500" data-testid="sync-progress-count">
+                    {syncProgress.current}/{syncProgress.total} locations
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    data-testid="sync-progress-bar"
+                    className={`h-full rounded-full transition-all duration-500 ease-out ${
+                      syncProgress.phase === 'Failed' ? 'bg-red-500' :
+                      syncProgress.phase === 'Complete!' ? 'bg-emerald-500' :
+                      'bg-blue-500'
+                    }`}
+                    style={{ width: `${Math.round((syncProgress.current / syncProgress.total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-center text-xs font-semibold text-slate-700" data-testid="sync-progress-pct">
+                  {Math.round((syncProgress.current / syncProgress.total) * 100)}%
+                </p>
+              </div>
+            )}
+
             <Button
+              data-testid="sync-now-button"
               onClick={handleManualSync}
               disabled={syncing || !syncConfig.deviceName || !syncConfig.sessionId}
               className="w-full bg-emerald-600 hover:bg-emerald-700"
@@ -960,7 +988,7 @@ const Settings = () => {
               {syncing ? (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Syncing...
+                  {syncProgress.phase || 'Syncing...'}
                 </>
               ) : (
                 <>
@@ -969,6 +997,11 @@ const Settings = () => {
                 </>
               )}
             </Button>
+            {syncing && (
+              <p className="text-xs text-blue-600 text-center font-medium">
+                Data is safe on your device until sync completes 100%
+              </p>
+            )}
             {(!syncConfig.deviceName || !syncConfig.sessionId) && (
               <p className="text-xs text-amber-600 text-center">
                 Configure device name, client, and session to enable sync
