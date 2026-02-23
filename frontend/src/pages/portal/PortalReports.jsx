@@ -933,6 +933,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
                   <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
                   <td className="py-3 px-4 text-right">{row.stock_qty}</td>
                   <td className="py-3 px-4 text-right">{row.physical_qty}</td>
+                  <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
                   <td className="py-3 px-4 text-right">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.difference_qty)}`}>
                       {getVarianceIcon(row.difference_qty)}
