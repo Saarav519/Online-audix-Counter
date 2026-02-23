@@ -859,13 +859,15 @@ export default function PortalReports() {
         <>
           {/* Summary Cards */}
           {filteredData.totals && (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+            <div className={`grid grid-cols-2 ${selectedSession === '__consolidated__' ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-3 mb-6`}>
               <SummaryCard label="Stock Qty" value={filteredData.totals.stock_qty || 0} />
               <SummaryCard label="Physical Qty" value={filteredData.totals.physical_qty || 0} />
-              {(filteredData.totals.reco_qty !== undefined && filteredData.totals.reco_qty !== 0) && (
+              {selectedSession === '__consolidated__' && (filteredData.totals.reco_qty !== undefined && filteredData.totals.reco_qty !== 0) && (
                 <SummaryCard label="Reco Adj" value={filteredData.totals.reco_qty || 0} variant={true} />
               )}
-              <SummaryCard label="Final Qty" value={filteredData.totals.final_qty || filteredData.totals.physical_qty || 0} />
+              {selectedSession === '__consolidated__' ? (
+                <SummaryCard label="Final Qty" value={filteredData.totals.final_qty || filteredData.totals.physical_qty || 0} />
+              ) : null}
               <SummaryCard label="Difference" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
               <SummaryCard label="Accuracy" value={`${filteredData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={filteredData.totals.accuracy_pct || 0} />
             </div>
