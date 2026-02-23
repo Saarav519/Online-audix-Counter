@@ -120,15 +120,15 @@ def test_conflict_resolution_flow():
         
     binwise_data = binwise_response.json()
     
-    # Find CONFLICT-TEST-LOC in the report
+    # Find test_location in the report
     conflict_location = None
     for location in binwise_data.get('locations', []):
-        if location.get('location') == 'CONFLICT-TEST-LOC':
+        if location.get('location') == test_location:
             conflict_location = location
             break
     
     if not conflict_location:
-        print("❌ CONFLICT-TEST-LOC not found in bin-wise report after first sync")
+        print(f"❌ {test_location} not found in bin-wise report after first sync")
         return False
         
     print(f"✅ First sync verified - Status: {conflict_location.get('status')}")
