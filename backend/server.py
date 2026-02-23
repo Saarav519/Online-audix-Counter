@@ -1332,19 +1332,24 @@ async def get_consolidated_bin_wise(client_id: str):
                 }
     
     all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys())
+    
+    # Build reco by location from detailed-level adjustments
+    location_reco = {}
+    for key, reco in reco_maps["detailed"].items():
+        loc = key.split("|")[0]
+        location_reco[loc] = location_reco.get(loc, 0) + reco
+    
     report = []
-    total_stock = 0
-    total_physical = 0
-    total_diff = 0
-    count_completed = 0
-    count_empty = 0
-    count_pending = 0
+    total_stock = total_physical = total_reco = total_final = total_diff = 0
+    count_completed = count_empty = count_pending = 0
     
     for loc in sorted(all_locations):
         stock_qty = expected_by_location.get(loc, 0)
         physical_qty = physical_by_location.get(loc, 0)
-        diff_qty = physical_qty - stock_qty
-        accuracy = calc_accuracy(stock_qty, physical_qty)
+        reco_qty = location_reco.get(loc, 0)
+        final_qty = physical_qty + reco_qty
+        diff_qty = final_qty - stock_qty
+        accuracy = calc_accuracy(stock_qty, final_qty)
         in_expected = loc in expected_by_location
         scanned = loc in physical_by_location
         is_empty_bin = loc in empty_bin_map
@@ -1366,22 +1371,25 @@ async def get_consolidated_bin_wise(client_id: str):
         else:
             status = "completed"
             count_completed += 1
-            remark = generate_remark(stock_qty, physical_qty, accuracy, in_expected, scanned)
+            remark = generate_remark(stock_qty, final_qty, accuracy, in_expected, scanned)
         
         total_stock += stock_qty
         total_physical += physical_qty
+        total_reco += reco_qty
+        total_final += final_qty
         total_diff += diff_qty
         report.append({
             "location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty,
+            "reco_qty": reco_qty, "final_qty": final_qty,
             "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark,
             "status": status, "is_empty": is_empty_bin,
             "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""
         })
     
-    total_accuracy = calc_accuracy(total_stock, total_physical)
+    total_accuracy = calc_accuracy(total_stock, total_final)
     return {
         "report": report,
-        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "reco_qty": total_reco, "final_qty": total_final, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
         "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending}
     }
 
