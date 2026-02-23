@@ -187,7 +187,17 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
         {isNumeric && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value List</p>}
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" autoFocus />
+          <input type="text" placeholder="Search & press Enter..." value={search} onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && search.trim()) {
+                const matchedValues = filteredValues.map(String);
+                if (matchedValues.length > 0) {
+                  onFilterChange(column, matchedValues);
+                  onClose();
+                }
+              }
+            }}
+            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" autoFocus />
         </div>
         <div className="flex gap-2 mt-1.5">
           <button className="text-xs text-emerald-600 hover:underline" onClick={selectAll}>Select All</button>
