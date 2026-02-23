@@ -1695,150 +1695,89 @@ async def get_consolidated_category_summary(client_id: str):
 
 @portal_router.get("/reports/{session_id}/bin-wise")
 async def get_bin_wise_report(session_id: str):
-    """Bin-wise summary report: Location, Stock Qty, Physical Qty, Difference Qty, Accuracy%, Remarks.
-    Includes empty bins and pending (not yet scanned) locations with proper status and remarks."""
+    """Bin-wise summary report with reco integration."""
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_by_location = {}
     for e in expected:
         loc = e.get("location", "Unknown")
-        if loc not in expected_by_location:
-            expected_by_location[loc] = 0
-        expected_by_location[loc] += e.get("qty", 0)
+        expected_by_location[loc] = expected_by_location.get(loc, 0) + e.get("qty", 0)
     
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_by_location = {}
-    # Track empty bins: location_name → {is_empty, empty_remarks}
     empty_bin_map = {}
     for s in synced:
         loc = s["location_name"]
-        if loc not in physical_by_location:
-            physical_by_location[loc] = 0
-        physical_by_location[loc] += s["total_quantity"]
-        # Track empty bin status
+        physical_by_location[loc] = physical_by_location.get(loc, 0) + s["total_quantity"]
         if s.get("is_empty", False):
-            empty_bin_map[loc] = {
-                "is_empty": True,
-                "empty_remarks": s.get("empty_remarks", ""),
-                "device_name": s.get("device_name", ""),
-                "synced_at": s.get("synced_at", "")
-            }
+            empty_bin_map[loc] = {"is_empty": True, "empty_remarks": s.get("empty_remarks", ""), "device_name": s.get("device_name", ""), "synced_at": s.get("synced_at", "")}
     
-    # Track conflict locations for this session
     conflict_locs = await db.conflict_locations.find({"session_id": session_id, "status": "pending"}, {"_id": 0}).to_list(10000)
     conflict_map = {}
     for c in conflict_locs:
-        conflict_map[c["location_name"]] = {
-            "conflict_id": c["id"],
-            "entry_count": len(c.get("entries", [])),
-            "devices": [e.get("device_name", "Unknown") for e in c.get("entries", [])]
-        }
+        conflict_map[c["location_name"]] = {"conflict_id": c["id"], "entry_count": len(c.get("entries", [])), "devices": [e.get("device_name", "Unknown") for e in c.get("entries", [])]}
+    
+    # Build reco aggregated by location from detailed-level adjustments
+    reco_maps = await _build_reco_maps(session_id)
+    location_reco = {}
+    for key, reco in reco_maps["detailed"].items():
+        loc = key.split("|")[0]
+        location_reco[loc] = location_reco.get(loc, 0) + reco
     
     all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys()) | set(conflict_map.keys())
     
     report = []
-    total_stock = 0
-    total_physical = 0
-    total_diff = 0
-    count_completed = 0
-    count_empty = 0
-    count_pending = 0
-    count_conflict = 0
+    total_stock = total_physical = total_reco = total_final = total_diff = 0
+    count_completed = count_empty = count_pending = count_conflict = 0
     
     for loc in sorted(all_locations):
         stock_qty = expected_by_location.get(loc, 0)
         physical_qty = physical_by_location.get(loc, 0)
-        diff_qty = physical_qty - stock_qty
-        accuracy = calc_accuracy(stock_qty, physical_qty)
+        reco_qty = location_reco.get(loc, 0)
+        final_qty = physical_qty + reco_qty
+        diff_qty = final_qty - stock_qty
+        accuracy = calc_accuracy(stock_qty, final_qty)
         in_expected = loc in expected_by_location
         scanned = loc in physical_by_location
         is_empty_bin = loc in empty_bin_map
         is_conflict = loc in conflict_map
         
-        # Determine status and remark
         if is_conflict:
-            # Conflict: duplicate scan from different devices — pending admin review
             status = "conflict"
             count_conflict += 1
             cinfo = conflict_map[loc]
             devices_str = ", ".join(cinfo["devices"])
             remark = f"Conflict — Duplicate scan from {cinfo['entry_count']} devices ({devices_str}). Pending admin review."
-            # Conflict locations should NOT affect variance totals
-            physical_qty = 0
-            diff_qty = 0 - stock_qty
-            accuracy = 0.0
-            report.append({
-                "location": loc,
-                "stock_qty": stock_qty,
-                "physical_qty": 0,
-                "difference_qty": diff_qty,
-                "accuracy_pct": 0.0,
-                "remark": remark,
-                "status": status,
-                "is_empty": False,
-                "empty_remarks": "",
-                "conflict_id": cinfo["conflict_id"]
-            })
-            # Don't add to totals — conflict shouldn't affect variance
+            report.append({"location": loc, "stock_qty": stock_qty, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "difference_qty": 0 - stock_qty, "accuracy_pct": 0.0, "remark": remark, "status": status, "is_empty": False, "empty_remarks": "", "conflict_id": cinfo["conflict_id"]})
             continue
         elif is_empty_bin:
-            # Empty Bin: location was physically visited and confirmed empty
             status = "empty_bin"
             count_empty += 1
             empty_info = empty_bin_map[loc]
             empty_note = empty_info.get("empty_remarks", "").strip()
-            # Avoid double "Empty Bin" prefix if remarks already contain it
-            if empty_note:
-                if empty_note.lower().startswith("empty bin"):
-                    remark = empty_note
-                else:
-                    remark = f"Empty Bin — {empty_note}"
-            else:
-                remark = "Empty Bin — Location verified empty during physical count"
+            remark = f"Empty Bin — {empty_note}" if empty_note and not empty_note.lower().startswith("empty bin") else (empty_note if empty_note else "Empty Bin — Location verified empty during physical count")
         elif not scanned and in_expected:
-            # Pending: in expected stock but not yet scanned at all
             status = "pending"
             count_pending += 1
             remark = "Pending — Location not yet counted during physical audit"
             accuracy = 0.0
         else:
-            # Normal case: completed or extra location
             status = "completed"
             count_completed += 1
-            remark = generate_remark(stock_qty, physical_qty, accuracy, in_expected, scanned)
+            remark = generate_remark(stock_qty, final_qty, accuracy, in_expected, scanned)
         
         total_stock += stock_qty
         total_physical += physical_qty
+        total_reco += reco_qty
+        total_final += final_qty
         total_diff += diff_qty
         
-        report.append({
-            "location": loc,
-            "stock_qty": stock_qty,
-            "physical_qty": physical_qty,
-            "difference_qty": diff_qty,
-            "accuracy_pct": accuracy,
-            "remark": remark,
-            "status": status,
-            "is_empty": is_empty_bin,
-            "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""
-        })
+        report.append({"location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty, "reco_qty": reco_qty, "final_qty": final_qty, "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark, "status": status, "is_empty": is_empty_bin, "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""})
     
-    total_accuracy = calc_accuracy(total_stock, total_physical)
-    
+    total_accuracy = calc_accuracy(total_stock, total_final)
     return {
         "report": report,
-        "totals": {
-            "stock_qty": total_stock,
-            "physical_qty": total_physical,
-            "difference_qty": total_diff,
-            "accuracy_pct": total_accuracy
-        },
-        "summary": {
-            "total_locations": len(report),
-            "completed": count_completed,
-            "empty_bins": count_empty,
-            "pending": count_pending,
-            "conflicts": count_conflict
-        }
+        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "reco_qty": total_reco, "final_qty": total_final, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
+        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending, "conflicts": count_conflict}
     }
 
 @portal_router.get("/reports/{session_id}/detailed")
