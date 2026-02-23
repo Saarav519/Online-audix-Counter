@@ -354,8 +354,15 @@ def test_conflict_resolution_flow():
     # Step 11: Test reject-all flow
     print("\n🚫 STEP 11: Test Reject-All Flow")
     
-    # Create another conflict by syncing a new location from two devices
+    # Create another conflict by syncing a different location from two devices
     print("   Creating new conflict for reject-all test...")
+    
+    # Use second location from expected stock if available
+    reject_location = "Rack-A02"  # Default fallback
+    if len(expected_data) > 1:
+        reject_location = expected_data[1].get('location', 'Rack-A02')
+    
+    print(f"   Using location: {reject_location}")
     
     sync_data_c = {
         "device_name": "Scanner-TestA",
@@ -364,7 +371,7 @@ def test_conflict_resolution_flow():
         "session_id": session_id,
         "locations": [{
             "id": "conflict-loc-3",
-            "name": "CONFLICT-TEST-LOC-2",
+            "name": reject_location,
             "is_empty": False,
             "items": [
                 {"barcode": "ITEM-004", "productName": "Product D", "quantity": 10, "scannedAt": "2026-02-23T12:00:00Z"}
@@ -379,7 +386,7 @@ def test_conflict_resolution_flow():
         "session_id": session_id,
         "locations": [{
             "id": "conflict-loc-4",
-            "name": "CONFLICT-TEST-LOC-2",  # Same name
+            "name": reject_location,  # Same name
             "is_empty": False,
             "items": [
                 {"barcode": "ITEM-005", "productName": "Product E", "quantity": 15, "scannedAt": "2026-02-23T12:05:00Z"}
