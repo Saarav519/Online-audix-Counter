@@ -57,7 +57,7 @@ function filterByVarianceCategory(rows, category) {
 const NUMERIC_COLUMNS = new Set([
   'stock_qty', 'physical_qty', 'difference_qty', 'diff_qty', 'accuracy_pct',
   'mrp', 'cost', 'stock_value', 'physical_value', 'diff_value',
-  'item_count', 'barcode_count'
+  'item_count', 'barcode_count', 'reco_qty', 'final_qty', 'final_value'
 ]);
 
 const NUMERIC_CONDITIONS = [
