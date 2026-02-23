@@ -512,8 +512,46 @@ export default function PortalReports() {
       const body = { session_id: sessionId, ...params };
       const response = await fetch(`${BACKEND_URL}/api/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
-        toast.success('Reco adjustment saved');
-        fetchReport();
+        // Optimistic local state update - no full page refresh
+        setReportData(prev => {
+          if (!prev || !prev.report) return prev;
+          const updated = { ...prev, report: prev.report.map(row => {
+            let match = false;
+            if (params.reco_type === 'detailed') {
+              match = row.location === params.location && row.barcode === params.barcode;
+            } else if (params.reco_type === 'barcode') {
+              match = row.barcode === params.barcode;
+            } else if (params.reco_type === 'article') {
+              match = row.article_code === params.article_code;
+            }
+            if (!match) return row;
+            const newReco = params.reco_qty;
+            const physQty = row.physical_qty || 0;
+            const finalQty = physQty + newReco;
+            const stockQty = row.stock_qty || 0;
+            const diffQty = finalQty - stockQty;
+            const cost = row.cost || 0;
+            const accuracy = stockQty > 0 ? Math.round((Math.min(finalQty, stockQty) / stockQty) * 1000) / 10 : (finalQty === 0 ? 100 : 0);
+            return { ...row, reco_qty: newReco, final_qty: finalQty, diff_qty: diffQty, final_value: finalQty * cost, diff_value: (finalQty - stockQty) * cost, accuracy_pct: accuracy };
+          })};
+          // Recalc totals
+          const t = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, stock_value: 0, physical_value: 0, final_value: 0, diff_value: 0 };
+          updated.report.forEach(r => {
+            t.stock_qty += (r.stock_qty || 0);
+            t.physical_qty += (r.physical_qty || 0);
+            t.reco_qty += (r.reco_qty || 0);
+            t.final_qty += (r.final_qty || r.physical_qty || 0);
+            t.diff_qty += (r.diff_qty || 0);
+            t.stock_value += (r.stock_value || 0);
+            t.physical_value += (r.physical_value || 0);
+            t.final_value += (r.final_value || 0);
+            t.diff_value += (r.diff_value || 0);
+          });
+          t.accuracy_pct = t.stock_qty > 0 ? Math.round((Math.min(t.final_qty, t.stock_qty) / t.stock_qty) * 1000) / 10 : (t.final_qty === 0 ? 100 : 0);
+          updated.totals = { ...prev.totals, ...t };
+          return updated;
+        });
+        toast.success('Reco saved');
       } else {
         toast.error('Failed to save Reco adjustment');
       }
