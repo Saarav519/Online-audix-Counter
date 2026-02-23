@@ -408,7 +408,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Bin-wise Report - Empty Bins and Pending Locations"
+    - "Conflict Resolution System"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
