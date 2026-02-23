@@ -911,7 +911,7 @@ function SummaryCard({ label, value, variant, isAccuracy, pct }) {
 }
 
 // ============ Bin-wise Table ============
-function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
   const summary = data.summary || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
