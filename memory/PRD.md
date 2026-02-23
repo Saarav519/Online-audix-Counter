@@ -9,7 +9,7 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
 - Offline-first data sync from scanner devices
 - Variance reports: Bin-wise, Barcode-wise, Article-wise, Category Summary
 - Conflict resolution for duplicate location scans
-- Reconciliation (Reco) column for manual quantity adjustments — **ONLY in consolidated view**
+- Reconciliation (Reco) column for manual quantity adjustments — **ONLY in consolidated view, on the primary report type**
 
 ## User Personas
 - **Scanner Operators**: Use mobile devices to scan locations and items
@@ -39,6 +39,18 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
   - Schema: {client_id, reco_type, barcode, location, article_code, reco_qty, updated_at}
 - `users, clients, devices, audit_sessions`: App entities
 
+## Reco Editability Rules (Consolidated View Only)
+
+| Session Variance Mode | Detailed Table | Barcode-wise Table | Article-wise Table |
+|---|---|---|---|
+| **Bin-wise** | Reco editable | Reco hidden | N/A |
+| **Barcode-wise** | N/A | Reco editable | N/A |
+| **Article-wise** | N/A | N/A | Reco editable |
+
+- Final Qty column is shown in ALL consolidated report views (regardless of mode)
+- Bin-wise Summary and Category Summary tables NEVER have Reco editing
+- Individual session reports have NO Reco or Final Qty columns
+
 ## What's Been Implemented
 1. Mark Empty feature (verified working)
 2. Bin-wise report with Empty Bins, Pending, Completed statuses
@@ -48,12 +60,11 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
    - Backend: `reco_adjustments` collection at client-level, CRUD APIs
    - 5 consolidated endpoints use `_build_reco_maps(client_id)` for reco data
    - 5 individual session endpoints use `EMPTY_RECO_MAPS` (no reco applied)
-   - Frontend: `isConsolidated` prop controls visibility of Reco/Final Qty columns
-   - All 5 table components (BinWise, Detailed, BarcodeWise, ArticleWise, CategorySummary) conditionally render
-   - Summary cards (Reco Adj, Final Qty) only in consolidated view
+   - Frontend: `isConsolidated` prop controls Final Qty visibility
+   - `isRecoEditable` prop controls Reco column — tied to session variance_mode
    - CSV export adapts columns based on consolidated vs individual view
    - Optimistic UI update for reco save (no page refresh)
-   - **Tested: 100% backend (14/14) and 100% frontend (17/17) tests passing**
+   - **Tested: 100% pass rate across two test iterations**
 
 ## Credentials
 - Admin: username=admin, password=admin123
