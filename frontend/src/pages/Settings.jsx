@@ -79,6 +79,7 @@ const Settings = () => {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, phase: '' });
   const [showSyncPasswordModal, setShowSyncPasswordModal] = useState(false);
   const [manualSyncPassword, setManualSyncPassword] = useState('');
   const [lastSyncTime, setLastSyncTime] = useState(localStorage.getItem('audix_last_sync') || null);
