@@ -1378,12 +1378,9 @@ async def get_consolidated_detailed(client_id: str):
     """Consolidated detailed item-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
-    reco_maps = await _build_reco_maps_for_sessions(session_ids)
+    reco_maps = await _build_reco_maps(client_id)
     
     expected_map = {}
-    physical_map = {}
-    
-    for sid in session_ids:
         expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for e in expected:
             key = f"{e.get('location', '')}|{e['barcode']}"
