@@ -134,11 +134,23 @@ user_problem_statement: |
   Focus on verifying the core sync flow works end-to-end.
   
   LATEST CHANGE: Updated bin-wise report to include empty bins and pending locations with proper status and remarks.
-  Test bin-wise endpoint: GET /api/portal/reports/{session_id}/bin-wise
-  - Should now return `status` (completed/empty_bin/pending), `is_empty`, `empty_remarks` fields per row
-  - Should return `summary` with `total_locations`, `completed`, `empty_bins`, `pending` counts
-  - Empty bins should have remark starting with "Empty Bin —"
-  - Pending locations should have remark starting with "Pending —"
+  Also implemented CONFLICT RESOLUTION system:
+  - Modified sync endpoint to detect duplicate locations from different scanners
+  - When same location synced by different device: both entries move to conflict_locations, removed from variance
+  - New APIs: GET /api/portal/conflicts, POST /api/portal/conflicts/{id}/approve/{entry_id}, POST /api/portal/conflicts/{id}/reject-all
+  - GET /api/portal/conflicts/summary for counts
+  - Dashboard now returns pending_conflicts count
+  - Bin-wise report shows conflict rows with status "conflict"
+  
+  Test the full conflict flow:
+  1. Get sessions: GET /api/portal/sessions - pick first session_id
+  2. Sync a location "CONFLICT-TEST-LOC" from device "Scanner-A" with items
+  3. Sync same location "CONFLICT-TEST-LOC" from device "Scanner-B" with different items
+  4. Verify: GET /api/portal/conflicts - should show a pending conflict for "CONFLICT-TEST-LOC"
+  5. Verify: GET /api/portal/reports/{session_id}/bin-wise - "CONFLICT-TEST-LOC" should have status "conflict"
+  6. Approve one entry: POST /api/portal/conflicts/{conflict_id}/approve/{entry_id}
+  7. Verify: conflict is resolved, approved entry now in synced_locations and appears in bin-wise with normal status
+  8. GET /api/portal/dashboard - should return pending_conflicts count
 
 backend:
   - task: "AUDIX Admin Portal Backend API Testing"
