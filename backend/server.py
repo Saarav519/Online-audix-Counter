@@ -1448,7 +1448,7 @@ async def get_consolidated_barcode_wise(client_id: str):
     """Consolidated barcode-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
-    reco_maps = await _build_reco_maps_for_sessions(session_ids)
+    reco_maps = await _build_reco_maps(client_id)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -1512,7 +1512,7 @@ async def get_consolidated_article_wise(client_id: str):
     """Consolidated article-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
-    reco_maps = await _build_reco_maps_for_sessions(session_ids)
+    reco_maps = await _build_reco_maps(client_id)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -1579,7 +1579,7 @@ async def get_consolidated_category_summary(client_id: str):
     """Consolidated category summary across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
-    reco_maps = await _build_reco_maps_for_sessions(session_ids)
+    reco_maps = await _build_reco_maps(client_id)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
