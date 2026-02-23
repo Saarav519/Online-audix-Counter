@@ -230,6 +230,8 @@ const Settings = () => {
     performSync(true);
   };
 
+  const CHUNK_SIZE = 10;
+
   const performSync = async (isManual = false) => {
     if (!syncConfig.deviceName || !syncConfig.sessionId || !syncConfig.syncPassword) {
       if (isManual) alert('Please configure device name, client, session, and sync password first');
@@ -242,16 +244,16 @@ const Settings = () => {
     }
 
     setSyncing(true);
+    setSyncProgress({ current: 0, total: 0, phase: 'Preparing...' });
 
     try {
-      // Filter locations by current scan mode (matching Reports page logic)
+      // Filter locations by current scan mode
       const isPreAssigned = settings.locationScanMode === 'preassigned';
       const modeLocations = locations.filter(loc => {
         if (isPreAssigned) return loc.isAssigned === true;
         return loc.autoCreated === true || loc.isAssigned === false;
       });
 
-      // Prepare locations data for sync — only mode-relevant locations
       const locationsToSync = modeLocations.map(loc => {
         const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
         return {
@@ -272,36 +274,83 @@ const Settings = () => {
       if (locationsToSync.length === 0) {
         if (isManual) alert('No data to sync');
         setSyncing(false);
+        setSyncProgress({ current: 0, total: 0, phase: '' });
         return;
       }
 
-      const response = await fetch(`${BACKEND_URL}/api/sync/`, {
+      // --- Chunked Upload ---
+      const batchId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const totalLocations = locationsToSync.length;
+      const chunks = [];
+      for (let i = 0; i < totalLocations; i += CHUNK_SIZE) {
+        chunks.push(locationsToSync.slice(i, i + CHUNK_SIZE));
+      }
+      const totalChunks = chunks.length;
+
+      setSyncProgress({ current: 0, total: totalLocations, phase: 'Uploading...' });
+
+      // Upload each chunk
+      for (let idx = 0; idx < totalChunks; idx++) {
+        const chunk = chunks[idx];
+        const response = await fetch(`${BACKEND_URL}/api/sync/chunk`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            batch_id: batchId,
+            device_name: syncConfig.deviceName,
+            sync_password: syncConfig.syncPassword,
+            client_id: syncConfig.clientId,
+            session_id: syncConfig.sessionId,
+            chunk_index: idx,
+            total_chunks: totalChunks,
+            locations: chunk
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          // Clean up staged data on failure
+          await fetch(`${BACKEND_URL}/api/sync/staging/${batchId}`, { method: 'DELETE' }).catch(() => {});
+          throw new Error(error.detail || `Chunk ${idx + 1} upload failed`);
+        }
+
+        // Update progress after each chunk
+        const uploadedSoFar = Math.min((idx + 1) * CHUNK_SIZE, totalLocations);
+        setSyncProgress({ current: uploadedSoFar, total: totalLocations, phase: 'Uploading...' });
+      }
+
+      // --- Finalize ---
+      setSyncProgress({ current: totalLocations, total: totalLocations, phase: 'Finalizing...' });
+
+      const finalizeResponse = await fetch(`${BACKEND_URL}/api/sync/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          batch_id: batchId,
           device_name: syncConfig.deviceName,
           sync_password: syncConfig.syncPassword,
           client_id: syncConfig.clientId,
           session_id: syncConfig.sessionId,
-          locations: locationsToSync,
-          clear_after_sync: true
+          total_locations: totalLocations
         })
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Sync failed');
+      if (!finalizeResponse.ok) {
+        const error = await finalizeResponse.json();
+        throw new Error(error.detail || 'Finalization failed');
       }
 
-      const result = await response.json();
+      const result = await finalizeResponse.json();
+
+      // --- SUCCESS: Only now create backup and clear data ---
+      setSyncProgress({ current: totalLocations, total: totalLocations, phase: 'Complete!' });
+
       const now = new Date().toISOString();
       setLastSyncTime(now);
       localStorage.setItem('audix_last_sync', now);
 
-      // Create backup file before clearing data
       createBackupFile(locationsToSync);
 
-      // Clear synced locations from Reports
       const syncedLocationIds = locationsToSync.map(loc => loc.id);
       deleteLocationData(syncedLocationIds);
 
@@ -311,9 +360,13 @@ const Settings = () => {
 
     } catch (error) {
       console.error('Sync failed:', error);
-      if (isManual) alert(`Sync failed: ${error.message}`);
+      setSyncProgress(prev => ({ ...prev, phase: 'Failed' }));
+      if (isManual) alert(`Sync failed: ${error.message}\n\nYour data is safe on the device. Please retry.`);
     } finally {
-      setSyncing(false);
+      setTimeout(() => {
+        setSyncing(false);
+        setSyncProgress({ current: 0, total: 0, phase: '' });
+      }, 2000);
     }
   };
 
