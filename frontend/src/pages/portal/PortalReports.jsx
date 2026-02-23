@@ -517,22 +517,22 @@ export default function PortalReports() {
     // If consolidated, only show report types relevant to client's session modes
     if (selectedSession === '__consolidated__') {
       const activeModes = new Set(sessionInfo?.session_modes || sessions.map(s => s.variance_mode || 'bin-wise'));
-      const options = [];
+      const optMap = new Map();
       if (activeModes.has('bin-wise')) {
-        options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
-        options.push({ value: 'detailed', label: 'Detailed Item-wise' });
-        options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
+        optMap.set('bin-wise', { value: 'bin-wise', label: 'Bin-wise Summary' });
+        optMap.set('detailed', { value: 'detailed', label: 'Detailed Item-wise' });
+        optMap.set('barcode-wise', { value: 'barcode-wise', label: 'Barcode-wise Variance' });
       }
       if (activeModes.has('barcode-wise')) {
-        options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
+        optMap.set('barcode-wise', { value: 'barcode-wise', label: 'Barcode-wise Variance' });
       }
       if (activeModes.has('article-wise')) {
-        options.push({ value: 'article-wise', label: 'Article-wise Variance' });
+        optMap.set('article-wise', { value: 'article-wise', label: 'Article-wise Variance' });
       }
-      options.push({ value: 'category-summary', label: 'Category-wise Summary' });
-      options.push({ value: 'empty-bins', label: 'Empty Bins' });
-      options.push({ value: 'pending-locations', label: 'Pending Locations' });
-      return options;
+      optMap.set('category-summary', { value: 'category-summary', label: 'Category-wise Summary' });
+      optMap.set('empty-bins', { value: 'empty-bins', label: 'Empty Bins' });
+      optMap.set('pending-locations', { value: 'pending-locations', label: 'Pending Locations' });
+      return Array.from(optMap.values());
     }
     const mode = sessionInfo?.variance_mode || 'bin-wise';
     const options = [];
