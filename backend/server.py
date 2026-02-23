@@ -986,6 +986,255 @@ async def sync_data(sync_request: SyncRequest):
         "sync_date": sync_date
     }
 
+# ==================== CHUNKED SYNC ENDPOINTS ====================
+
+async def _verify_sync_device(device_name: str, sync_password: str, client_id: str, session_id: str):
+    """Shared device/session verification for sync endpoints."""
+    device = await db.devices.find_one({"device_name": device_name})
+    if not device:
+        device_obj = Device(
+            device_name=device_name,
+            sync_password_hash=hash_password(sync_password),
+            client_id=client_id,
+            session_id=session_id
+        )
+        doc = device_obj.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        if doc['last_sync_at']:
+            doc['last_sync_at'] = doc['last_sync_at'].isoformat()
+        await db.devices.insert_one(doc)
+        device = doc
+    else:
+        if not verify_password(sync_password, device.get("sync_password_hash", "")):
+            raise HTTPException(status_code=401, detail="Invalid sync password")
+    session = await db.audit_sessions.find_one({"id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return device, session
+
+@sync_router.post("/chunk")
+async def sync_chunk(req: SyncChunkRequest):
+    """Receive a chunk of locations and store in staging. Nothing goes live until finalize."""
+    await _verify_sync_device(req.device_name, req.sync_password, req.client_id, req.session_id)
+
+    await db.sync_staging.insert_one({
+        "batch_id": req.batch_id,
+        "device_name": req.device_name,
+        "client_id": req.client_id,
+        "session_id": req.session_id,
+        "chunk_index": req.chunk_index,
+        "total_chunks": req.total_chunks,
+        "locations": req.locations,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    return {
+        "message": "Chunk received",
+        "batch_id": req.batch_id,
+        "chunk_index": req.chunk_index,
+        "total_chunks": req.total_chunks
+    }
+
+@sync_router.post("/finalize")
+async def sync_finalize(req: SyncFinalizeRequest):
+    """After all chunks uploaded, finalize: move staging → live synced_locations with conflict detection."""
+    device, session = await _verify_sync_device(req.device_name, req.sync_password, req.client_id, req.session_id)
+
+    # Gather all staged chunks for this batch
+    chunks = await db.sync_staging.find(
+        {"batch_id": req.batch_id}, {"_id": 0}
+    ).sort("chunk_index", 1).to_list(10000)
+
+    if not chunks:
+        raise HTTPException(status_code=404, detail="No staged data found for this batch")
+
+    received_indices = {c["chunk_index"] for c in chunks}
+    expected_indices = set(range(chunks[0]["total_chunks"]))
+    if received_indices != expected_indices:
+        missing = sorted(expected_indices - received_indices)
+        raise HTTPException(status_code=400, detail=f"Missing chunks: {missing}")
+
+    # Combine all locations from chunks
+    all_locations = []
+    for c in chunks:
+        all_locations.extend(c.get("locations", []))
+
+    if len(all_locations) != req.total_locations:
+        raise HTTPException(status_code=400, detail=f"Location count mismatch: expected {req.total_locations}, got {len(all_locations)}")
+
+    # Process through the same sync logic as the original endpoint
+    sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sync_timestamp = datetime.now(timezone.utc).isoformat()
+    synced_count = 0
+
+    # Store raw sync log
+    raw_log = {
+        "id": str(uuid.uuid4()),
+        "device_name": req.device_name,
+        "client_id": req.client_id or session.get("client_id", ""),
+        "session_id": req.session_id,
+        "sync_date": sync_date,
+        "synced_at": sync_timestamp,
+        "raw_payload": {
+            "locations": all_locations,
+            "device_name": req.device_name,
+            "session_id": req.session_id,
+            "client_id": req.client_id,
+            "batch_id": req.batch_id
+        },
+        "location_count": len(all_locations),
+        "total_items": sum(len(loc.get("items", [])) for loc in all_locations),
+        "total_quantity": sum(
+            sum(item.get("quantity", 0) for item in loc.get("items", []))
+            for loc in all_locations
+        ),
+        "action": "chunked_sync"
+    }
+    await db.sync_raw_logs.insert_one(raw_log)
+
+    for loc_data in all_locations:
+        location_id = loc_data.get("id", str(uuid.uuid4()))
+        location_name = loc_data.get("name", "Unknown")
+        items = loc_data.get("items", [])
+        loc_is_empty = loc_data.get("is_empty", False)
+        loc_empty_remarks = loc_data.get("empty_remarks", "")
+
+        # Conflict detection
+        existing_synced = await db.synced_locations.find_one({
+            "session_id": req.session_id,
+            "location_name": location_name
+        })
+        existing_conflict = await db.conflict_locations.find_one({
+            "session_id": req.session_id,
+            "location_name": location_name,
+            "status": "pending"
+        })
+
+        synced_items = []
+        total_qty = 0
+        for item in items:
+            synced_items.append(SyncedItem(
+                barcode=item.get("barcode", ""),
+                product_name=item.get("productName", item.get("product_name", "")),
+                price=item.get("price"),
+                quantity=item.get("quantity", 0),
+                scanned_at=item.get("scannedAt", item.get("scanned_at", ""))
+            ).model_dump())
+            total_qty += item.get("quantity", 0)
+
+        if loc_is_empty or (len(items) == 0 and loc_is_empty):
+            loc_is_empty = True
+            if not loc_empty_remarks:
+                loc_empty_remarks = "Location found empty during physical count"
+
+        new_entry = {
+            "entry_id": str(uuid.uuid4()),
+            "device_name": req.device_name,
+            "device_id": device["id"] if isinstance(device, dict) else device.id,
+            "location_id": location_id,
+            "synced_at": sync_timestamp,
+            "items": synced_items,
+            "total_items": len(synced_items),
+            "total_quantity": total_qty,
+            "is_empty": loc_is_empty,
+            "empty_remarks": loc_empty_remarks,
+            "status": "pending"
+        }
+
+        if existing_conflict:
+            await db.conflict_locations.update_one(
+                {"id": existing_conflict["id"]},
+                {"$push": {"entries": new_entry}, "$set": {"updated_at": sync_timestamp}}
+            )
+            synced_count += 1
+            continue
+
+        if existing_synced and existing_synced.get("device_name") != req.device_name:
+            first_entry = {
+                "entry_id": str(uuid.uuid4()),
+                "device_name": existing_synced.get("device_name", "Unknown"),
+                "device_id": existing_synced.get("device_id", ""),
+                "location_id": existing_synced.get("location_id", ""),
+                "synced_at": existing_synced.get("synced_at", sync_timestamp),
+                "items": existing_synced.get("items", []),
+                "total_items": existing_synced.get("total_items", 0),
+                "total_quantity": existing_synced.get("total_quantity", 0),
+                "is_empty": existing_synced.get("is_empty", False),
+                "empty_remarks": existing_synced.get("empty_remarks", ""),
+                "status": "pending"
+            }
+            conflict_doc = {
+                "id": str(uuid.uuid4()),
+                "session_id": req.session_id,
+                "client_id": req.client_id or session.get("client_id", ""),
+                "location_name": location_name,
+                "status": "pending",
+                "entries": [first_entry, new_entry],
+                "created_at": sync_timestamp,
+                "updated_at": sync_timestamp,
+                "resolved_at": None,
+                "resolved_by": None
+            }
+            await db.conflict_locations.insert_one(conflict_doc)
+            await db.synced_locations.delete_many({
+                "session_id": req.session_id,
+                "location_name": location_name
+            })
+            synced_count += 1
+            continue
+
+        # Normal sync
+        await db.synced_locations.delete_many({
+            "session_id": req.session_id,
+            "location_name": location_name
+        })
+        synced_loc = SyncedLocation(
+            session_id=req.session_id,
+            device_id=device["id"] if isinstance(device, dict) else device.id,
+            device_name=req.device_name,
+            location_id=location_id,
+            location_name=location_name,
+            items=synced_items,
+            total_items=len(synced_items),
+            total_quantity=total_qty,
+            is_empty=loc_is_empty,
+            empty_remarks=loc_empty_remarks,
+            sync_date=sync_date
+        )
+        doc = synced_loc.model_dump()
+        doc['synced_at'] = doc['synced_at'].isoformat()
+        await db.synced_locations.insert_one(doc)
+        synced_count += 1
+
+    # Update device last sync
+    await db.devices.update_one(
+        {"device_name": req.device_name},
+        {"$set": {
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "client_id": req.client_id,
+            "session_id": req.session_id
+        }}
+    )
+
+    # Clean up staging data
+    await db.sync_staging.delete_many({"batch_id": req.batch_id})
+
+    # Generate alerts
+    await check_and_generate_alerts(req.session_id, req.client_id)
+
+    return {
+        "message": "Sync finalized successfully",
+        "locations_synced": synced_count,
+        "sync_date": sync_date,
+        "batch_id": req.batch_id
+    }
+
+@sync_router.delete("/staging/{batch_id}")
+async def cancel_sync_staging(batch_id: str):
+    """Cancel a chunked sync — remove all staged data for a batch."""
+    result = await db.sync_staging.delete_many({"batch_id": batch_id})
+    return {"message": "Staging data cleared", "deleted_chunks": result.deleted_count}
+
 @sync_router.get("/config")
 async def get_sync_config():
     """Get available clients and sessions for device configuration"""
