@@ -1134,7 +1134,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 <td className="py-2 px-3">{row.category || '-'}</td>
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
-                {isConsolidated && (
+                {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
                     <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row.barcode, location: row.location, reco_qty: val })} />
                   </td>
