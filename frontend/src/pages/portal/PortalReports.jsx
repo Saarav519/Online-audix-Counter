@@ -1295,7 +1295,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                       <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row.article_code, reco_qty: val })} />
                     </td>
                   )}
-                  <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
+                  {isConsolidated && <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
                   <td className="py-2 px-3 text-right">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                       {getVarianceIcon(row.diff_qty)}
