@@ -1335,7 +1335,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
               {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
-              <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>
+              {isConsolidated && <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
               <td className="py-3 px-3 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
                   {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
