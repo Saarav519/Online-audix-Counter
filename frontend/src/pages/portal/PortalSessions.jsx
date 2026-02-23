@@ -385,9 +385,9 @@ export default function PortalSessions() {
                 </div>
               </div>
 
-              {/* Imported Stock Viewer */}
+              {/* Imported Stock Viewer - inside session card */}
               {showStockViewer === session.id && (
-                <div className="mt-4 border-t border-gray-100 pt-4">
+                <div className="border-t border-gray-100 pt-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-gray-900">
                       Imported Stock Data
