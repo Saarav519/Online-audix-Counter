@@ -435,8 +435,11 @@ def test_conflict_resolution_flow():
     binwise_response_4 = requests.get(f"{BACKEND_URL}/portal/reports/{session_id}/bin-wise")
     binwise_data_4 = binwise_response_4.json()
     
+    # Find rejected location in final report (check both 'report' and 'locations' keys)
+    locations_list_4 = binwise_data_4.get('locations', []) or binwise_data_4.get('report', [])
+    
     rejected_location = None
-    for location in binwise_data_4.get('locations', []):
+    for location in locations_list_4:
         if location.get('location') == reject_location:
             rejected_location = location
             break
