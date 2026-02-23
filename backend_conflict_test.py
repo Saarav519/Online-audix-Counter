@@ -120,9 +120,11 @@ def test_conflict_resolution_flow():
         
     binwise_data = binwise_response.json()
     
-    # Find test_location in the report
+    # Find test_location in the report (check both 'report' and 'locations' keys)
+    locations_list = binwise_data.get('locations', []) or binwise_data.get('report', [])
+    
     conflict_location = None
-    for location in binwise_data.get('locations', []):
+    for location in locations_list:
         if location.get('location') == test_location:
             conflict_location = location
             break
