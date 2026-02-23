@@ -335,6 +335,21 @@ export default function PortalSessions() {
                       Import Stock
                     </Button>
                     
+                    {session.expected_stock_imported && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewStock(session)}
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      >
+                        {showStockViewer === session.id ? (
+                          <><ChevronUp className="w-4 h-4 mr-1" /> Hide Stock</>
+                        ) : (
+                          <><Eye className="w-4 h-4 mr-1" /> View Stock</>
+                        )}
+                      </Button>
+                    )}
+                    
                     {session.status === 'active' && (
                       <Button
                         variant="outline"
