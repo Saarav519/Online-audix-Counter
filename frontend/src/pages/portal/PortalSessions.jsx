@@ -9,7 +9,11 @@ import {
   Archive,
   FileSpreadsheet,
   Calendar,
-  Trash2
+  Trash2,
+  Eye,
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -33,6 +37,9 @@ export default function PortalSessions() {
   const [showDialog, setShowDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importingSession, setImportingSession] = useState(null);
+  const [showStockViewer, setShowStockViewer] = useState(null);
+  const [stockData, setStockData] = useState([]);
+  const [stockLoading, setStockLoading] = useState(false);
   const [formData, setFormData] = useState({
     client_id: '',
     name: '',
