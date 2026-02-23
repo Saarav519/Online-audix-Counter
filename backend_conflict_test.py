@@ -65,8 +65,23 @@ def test_conflict_resolution_flow():
     print(f"✅ Using session: {session.get('name')} (ID: {session_id})")
     print(f"   Client ID: {client_id}")
     
+    # Get expected stock to find existing location
+    expected_response = requests.get(f"{BACKEND_URL}/portal/sessions/{session_id}/expected-stock")
+    if expected_response.status_code != 200:
+        print(f"❌ Failed to get expected stock: {expected_response.status_code}")
+        return False
+    
+    expected_data = expected_response.json()
+    if not expected_data:
+        print("❌ No expected stock found - cannot test conflicts")
+        return False
+    
+    # Use existing location for conflict testing
+    test_location = expected_data[0].get('location', 'Rack-A01')
+    print(f"Using existing location for conflict test: {test_location}")
+    
     # Step 3: Sync location from Scanner-TestA
-    print("\n🔄 STEP 3: Sync Location from Scanner-TestA")
+    print(f"\n🔄 STEP 3: Sync Location '{test_location}' from Scanner-TestA")
     
     sync_data_a = {
         "device_name": "Scanner-TestA",
@@ -75,7 +90,7 @@ def test_conflict_resolution_flow():
         "session_id": session_id,
         "locations": [{
             "id": "conflict-loc-1",
-            "name": "CONFLICT-TEST-LOC",
+            "name": test_location,
             "is_empty": False,
             "items": [
                 {"barcode": "ITEM-001", "productName": "Product A", "quantity": 50, "scannedAt": "2026-02-23T10:00:00Z"},
