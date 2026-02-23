@@ -1212,11 +1212,11 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
 
 # ==================== RECONCILIATION (RECO) ENDPOINTS ====================
 
-async def _build_reco_maps(session_id: str):
-    """Build lookup maps for reco adjustments for a session.
+async def _build_reco_maps(client_id: str):
+    """Build lookup maps for reco adjustments for a client (used in consolidated reports).
     Returns: { "detailed": {loc|barcode: reco_qty}, "barcode": {barcode: reco_qty}, "article": {article_code: reco_qty} }
     """
-    adjs = await db.reco_adjustments.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    adjs = await db.reco_adjustments.find({"client_id": client_id}, {"_id": 0}).to_list(100000)
     detailed_map = {}
     barcode_map = {}
     article_map = {}
@@ -1233,32 +1233,12 @@ async def _build_reco_maps(session_id: str):
             article_map[a.get("article_code", "")] = a["reco_qty"]
     return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
 
-async def _build_reco_maps_for_sessions(session_ids: list):
-    """Build combined reco maps across multiple sessions (for consolidated reports)."""
-    detailed_map = {}
-    barcode_map = {}
-    article_map = {}
-    for sid in session_ids:
-        adjs = await db.reco_adjustments.find({"session_id": sid}, {"_id": 0}).to_list(100000)
-        for a in adjs:
-            rt = a.get("reco_type", "")
-            if rt == "detailed":
-                key = f"{a.get('location', '')}|{a.get('barcode', '')}"
-                detailed_map[key] = detailed_map.get(key, 0) + a["reco_qty"]
-                bc = a.get("barcode", "")
-                barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
-            elif rt == "barcode":
-                bc = a.get("barcode", "")
-                barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
-            elif rt == "article":
-                ac = a.get("article_code", "")
-                article_map[ac] = article_map.get(ac, 0) + a["reco_qty"]
-    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+EMPTY_RECO_MAPS = {"detailed": {}, "barcode": {}, "article": {}}
 
 @portal_router.post("/reco-adjustments")
 async def save_reco_adjustment(adj: RecoAdjustmentCreate):
-    """Save or update a reconciliation adjustment."""
-    filter_key = {"session_id": adj.session_id, "reco_type": adj.reco_type}
+    """Save or update a reconciliation adjustment (client-level for consolidated reports)."""
+    filter_key = {"client_id": adj.client_id, "reco_type": adj.reco_type}
     if adj.reco_type == "detailed":
         filter_key["barcode"] = adj.barcode
         filter_key["location"] = adj.location
@@ -1273,16 +1253,16 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate):
     await db.reco_adjustments.update_one(filter_key, {"$set": doc}, upsert=True)
     return {"status": "saved", "reco_qty": adj.reco_qty}
 
-@portal_router.get("/reco-adjustments/{session_id}")
-async def get_reco_adjustments(session_id: str):
-    """Get all reco adjustments for a session."""
-    adjs = await db.reco_adjustments.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+@portal_router.get("/reco-adjustments/{client_id}")
+async def get_reco_adjustments(client_id: str):
+    """Get all reco adjustments for a client."""
+    adjs = await db.reco_adjustments.find({"client_id": client_id}, {"_id": 0}).to_list(100000)
     return adjs
 
-@portal_router.delete("/reco-adjustments/{session_id}")
-async def clear_reco_adjustments(session_id: str):
-    """Clear all reco adjustments for a session."""
-    result = await db.reco_adjustments.delete_many({"session_id": session_id})
+@portal_router.delete("/reco-adjustments/{client_id}")
+async def clear_reco_adjustments(client_id: str):
+    """Clear all reco adjustments for a client."""
+    result = await db.reco_adjustments.delete_many({"client_id": client_id})
     return {"deleted": result.deleted_count}
 
 # ==================== REPORTS ROUTES ====================
