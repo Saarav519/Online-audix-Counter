@@ -1210,6 +1210,81 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
     else:
         return f"Critical Shortage — {abs(diff):.0f} units deficit, immediate attention needed ({accuracy}% accuracy)"
 
+# ==================== RECONCILIATION (RECO) ENDPOINTS ====================
+
+async def _build_reco_maps(session_id: str):
+    """Build lookup maps for reco adjustments for a session.
+    Returns: { "detailed": {loc|barcode: reco_qty}, "barcode": {barcode: reco_qty}, "article": {article_code: reco_qty} }
+    """
+    adjs = await db.reco_adjustments.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    detailed_map = {}
+    barcode_map = {}
+    article_map = {}
+    for a in adjs:
+        rt = a.get("reco_type", "")
+        if rt == "detailed":
+            key = f"{a.get('location', '')}|{a.get('barcode', '')}"
+            detailed_map[key] = a["reco_qty"]
+            bc = a.get("barcode", "")
+            barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
+        elif rt == "barcode":
+            barcode_map[a.get("barcode", "")] = a["reco_qty"]
+        elif rt == "article":
+            article_map[a.get("article_code", "")] = a["reco_qty"]
+    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+
+async def _build_reco_maps_for_sessions(session_ids: list):
+    """Build combined reco maps across multiple sessions (for consolidated reports)."""
+    detailed_map = {}
+    barcode_map = {}
+    article_map = {}
+    for sid in session_ids:
+        adjs = await db.reco_adjustments.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for a in adjs:
+            rt = a.get("reco_type", "")
+            if rt == "detailed":
+                key = f"{a.get('location', '')}|{a.get('barcode', '')}"
+                detailed_map[key] = detailed_map.get(key, 0) + a["reco_qty"]
+                bc = a.get("barcode", "")
+                barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
+            elif rt == "barcode":
+                bc = a.get("barcode", "")
+                barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
+            elif rt == "article":
+                ac = a.get("article_code", "")
+                article_map[ac] = article_map.get(ac, 0) + a["reco_qty"]
+    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+
+@portal_router.post("/reco-adjustments")
+async def save_reco_adjustment(adj: RecoAdjustmentCreate):
+    """Save or update a reconciliation adjustment."""
+    filter_key = {"session_id": adj.session_id, "reco_type": adj.reco_type}
+    if adj.reco_type == "detailed":
+        filter_key["barcode"] = adj.barcode
+        filter_key["location"] = adj.location
+    elif adj.reco_type == "barcode":
+        filter_key["barcode"] = adj.barcode
+    elif adj.reco_type == "article":
+        filter_key["article_code"] = adj.article_code
+    if adj.reco_qty == 0:
+        await db.reco_adjustments.delete_one(filter_key)
+        return {"status": "deleted"}
+    doc = {**filter_key, "reco_qty": adj.reco_qty, "updated_at": datetime.now(timezone.utc).isoformat()}
+    await db.reco_adjustments.update_one(filter_key, {"$set": doc}, upsert=True)
+    return {"status": "saved", "reco_qty": adj.reco_qty}
+
+@portal_router.get("/reco-adjustments/{session_id}")
+async def get_reco_adjustments(session_id: str):
+    """Get all reco adjustments for a session."""
+    adjs = await db.reco_adjustments.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
+    return adjs
+
+@portal_router.delete("/reco-adjustments/{session_id}")
+async def clear_reco_adjustments(session_id: str):
+    """Clear all reco adjustments for a session."""
+    result = await db.reco_adjustments.delete_many({"session_id": session_id})
+    return {"deleted": result.deleted_count}
+
 # ==================== REPORTS ROUTES ====================
 
 # ==================== CONSOLIDATED REPORT (all sessions for a client) ====================
