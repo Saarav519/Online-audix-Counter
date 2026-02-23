@@ -1289,7 +1289,7 @@ async def get_consolidated_bin_wise(client_id: str):
     if not session_ids:
         return {"report": [], "totals": {"stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "difference_qty": 0, "accuracy_pct": 100.0}, "summary": {"total_locations": 0, "completed": 0, "empty_bins": 0, "pending": 0}}
     
-    reco_maps = await _build_reco_maps_for_sessions(session_ids)
+    reco_maps = await _build_reco_maps(client_id)
     expected_by_location = {}
     physical_by_location = {}
     empty_bin_map = {}
