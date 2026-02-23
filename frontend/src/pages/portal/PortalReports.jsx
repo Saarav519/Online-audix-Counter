@@ -1074,7 +1074,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1082,7 +1082,11 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <BarChart3 className="w-5 h-5 text-blue-500" />
           Barcode-wise Variance Report
         </h3>
-        <p className="text-xs text-gray-500 mt-1">Quantities aggregated across all locations per barcode</p>
+        {isRecoEditable ? (
+          <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-1">Variance calculated on Final Qty (Physical + Reco adjustments)</p>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1091,10 +1095,10 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isRecoEditable && <th className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1111,10 +1115,14 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">{row.category}</span>
                   ) : '-'}
                 </td>
-                <td className="py-2 px-3 text-right">{(row.mrp || 0).toFixed(2)}</td>
-                <td className="py-2 px-3 text-right">{(row.cost || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
+                {isRecoEditable && (
+                  <td className="py-1 px-2 bg-blue-50/30">
+                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row.barcode, reco_qty: val })} />
+                  </td>
+                )}
+                <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
                 <td className="py-2 px-3 text-right">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                     {getVarianceIcon(row.diff_qty)}
@@ -1142,9 +1150,11 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           </tbody>
           <tfoot className="bg-gray-50 font-semibold text-sm">
             <tr>
-              <td colSpan="5" className="py-3 px-3">TOTALS</td>
+              <td colSpan="3" className="py-3 px-3">TOTALS</td>
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
+              {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
+              <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>
               <td className="py-3 px-3 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
                   {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
