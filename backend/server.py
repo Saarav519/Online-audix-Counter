@@ -1921,53 +1921,34 @@ async def get_detailed_report(session_id: str):
 @portal_router.get("/reports/{session_id}/barcode-wise")
 async def get_barcode_wise_report(session_id: str):
     """Barcode-wise variance: Pivots by barcode across all locations, uses master for product info"""
-    # Load master products for product info enrichment
     master_by_barcode = await get_master_for_session(session_id)
+    reco_maps = await _build_reco_maps(session_id)
     
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
-    
-    # Pivot expected by barcode (sum across locations, keep product details)
     expected_by_barcode = {}
     for e in expected:
         bc = e["barcode"]
         if bc not in expected_by_barcode:
-            expected_by_barcode[bc] = {
-                "qty": 0,
-                "description": e.get("description", ""),
-                "category": e.get("category", ""),
-                "mrp": e.get("mrp", 0),
-                "cost": e.get("cost", 0),
-            }
+            expected_by_barcode[bc] = {"qty": 0, "description": e.get("description", ""), "category": e.get("category", ""), "mrp": e.get("mrp", 0), "cost": e.get("cost", 0)}
         expected_by_barcode[bc]["qty"] += e.get("qty", 0)
     
-    # Pivot physical by barcode (sum across all synced locations)
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_by_barcode = {}
     for s in synced:
         for item in s["items"]:
             bc = item["barcode"]
             if bc not in physical_by_barcode:
-                physical_by_barcode[bc] = {
-                    "barcode": bc,
-                    "product_name": item.get("product_name", ""),
-                    "quantity": 0
-                }
+                physical_by_barcode[bc] = {"barcode": bc, "product_name": item.get("product_name", ""), "quantity": 0}
             physical_by_barcode[bc]["quantity"] += item["quantity"]
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
     
     report = []
-    totals = {
-        "stock_qty": 0, "stock_value": 0,
-        "physical_qty": 0, "physical_value": 0,
-        "diff_qty": 0, "diff_value": 0
-    }
+    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
     
     for bc in sorted(all_barcodes):
         exp = expected_by_barcode.get(bc, {})
         phy = physical_by_barcode.get(bc, {})
-        
-        # Product info priority: Stock (expected) > Master (fallback) > Physical scan (last resort)
         master_info = master_by_barcode.get(bc, {})
         description = exp.get("description") or master_info.get("description") or phy.get("product_name", "")
         category = exp.get("category") or master_info.get("category", "")
@@ -1976,44 +1957,40 @@ async def get_barcode_wise_report(session_id: str):
         
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
-        diff_qty = physical_qty - stock_qty
-        
+        reco_qty = reco_maps["barcode"].get(bc, 0)
+        final_qty = physical_qty + reco_qty
+        diff_qty = final_qty - stock_qty
         stock_value = stock_qty * cost
         physical_value = physical_qty * cost
-        diff_value = diff_qty * cost
+        final_value = final_qty * cost
+        diff_value = final_value - stock_value
         
-        accuracy = calc_accuracy(stock_qty, physical_qty)
+        accuracy = calc_accuracy(stock_qty, final_qty)
         in_expected = bc in expected_by_barcode
         in_prod_master = bc in master_by_barcode
         scanned = bc in physical_by_barcode
-        remark = generate_remark(stock_qty, physical_qty, accuracy, in_master=in_expected, scanned=scanned, in_product_master=in_prod_master, in_expected_stock=in_expected)
+        remark = generate_remark(stock_qty, final_qty, accuracy, in_master=in_expected, scanned=scanned, in_product_master=in_prod_master, in_expected_stock=in_expected)
         
         totals["stock_qty"] += stock_qty
         totals["stock_value"] += stock_value
         totals["physical_qty"] += physical_qty
         totals["physical_value"] += physical_value
+        totals["reco_qty"] += reco_qty
+        totals["final_qty"] += final_qty
+        totals["final_value"] += final_value
         totals["diff_qty"] += diff_qty
         totals["diff_value"] += diff_value
         
         report.append({
-            "barcode": bc,
-            "description": description,
-            "category": category,
-            "mrp": mrp,
-            "cost": cost,
-            "stock_qty": stock_qty,
-            "stock_value": stock_value,
-            "physical_qty": physical_qty,
-            "physical_value": physical_value,
-            "diff_qty": diff_qty,
-            "diff_value": diff_value,
-            "accuracy_pct": accuracy,
-            "remark": remark,
-            "in_master": bc in master_by_barcode,
-            "in_expected_stock": bc in expected_by_barcode
+            "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
+            "stock_qty": stock_qty, "stock_value": stock_value,
+            "physical_qty": physical_qty, "physical_value": physical_value,
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
+            "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark,
+            "in_master": bc in master_by_barcode, "in_expected_stock": bc in expected_by_barcode
         })
     
-    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["physical_qty"])
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     return {"report": report, "totals": totals}
 
 
