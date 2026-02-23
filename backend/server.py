@@ -209,6 +209,15 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+# Reconciliation Adjustment Model
+class RecoAdjustmentCreate(BaseModel):
+    session_id: str
+    reco_type: str  # "detailed" (loc+barcode), "barcode", "article"
+    barcode: str = ""
+    location: str = ""
+    article_code: str = ""
+    reco_qty: float
+
 # ==================== HELPER FUNCTIONS ====================
 
 def hash_password(password: str) -> str:
