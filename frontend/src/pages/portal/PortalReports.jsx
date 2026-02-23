@@ -1180,7 +1180,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Article-wise Table ============
-function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable }) {
   const [expandedRows, setExpandedRows] = React.useState(new Set());
 
   const toggleRow = (index) => {
@@ -1199,7 +1199,11 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <BarChart3 className="w-5 h-5 text-purple-500" />
           Article-wise Variance Report
         </h3>
-        <p className="text-xs text-gray-500 mt-1">Barcodes grouped by article, variance at article level. Click on a row to view barcodes.</p>
+        {isRecoEditable ? (
+          <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-1">Variance calculated on Final Qty. Click a row to view barcodes.</p>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1211,9 +1215,10 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="barcode_count" label="Barcodes" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isRecoEditable && <th className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[220px]" />
             </tr>
@@ -1221,27 +1226,24 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <tbody>
             {data.report.map((row, i) => (
               <React.Fragment key={i}>
-                <tr 
-                  className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${row.article_code === 'UNMAPPED' ? 'bg-red-50/50' : ''}`}
-                  onClick={() => toggleRow(i)}
-                >
+                <tr className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${row.article_code === 'UNMAPPED' ? 'bg-red-50/50' : ''}`} onClick={() => toggleRow(i)}>
                   <td className="py-2 px-2 text-center">
-                    <span className={`inline-block transition-transform duration-200 text-gray-400 ${expandedRows.has(i) ? 'rotate-90' : ''}`}>
-                      &#9654;
-                    </span>
+                    <span className={`inline-block transition-transform duration-200 text-gray-400 ${expandedRows.has(i) ? 'rotate-90' : ''}`}>&#9654;</span>
                   </td>
                   <td className="py-2 px-3 font-mono text-xs font-medium">{row.article_code}</td>
                   <td className="py-2 px-3">{row.article_name || '-'}</td>
                   <td className="py-2 px-3">
-                    {row.category ? (
-                      <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span>
-                    ) : '-'}
+                    {row.category ? <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span> : '-'}
                   </td>
-                  <td className="py-2 px-3 text-right">
-                    <span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span>
-                  </td>
+                  <td className="py-2 px-3 text-right"><span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span></td>
                   <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                   <td className="py-2 px-3 text-right">{row.physical_qty}</td>
+                  {isRecoEditable && (
+                    <td className="py-1 px-2 bg-blue-50/30" onClick={e => e.stopPropagation()}>
+                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row.article_code, reco_qty: val })} />
+                    </td>
+                  )}
+                  <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
                   <td className="py-2 px-3 text-right">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                       {getVarianceIcon(row.diff_qty)}
@@ -1249,14 +1251,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     </span>
                   </td>
                   <td className="py-2 px-3 text-right">
-                    <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
-                      {row.diff_value > 0 ? '+' : ''}{(row.diff_value || 0).toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-right">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
-                      {row.accuracy_pct}%
-                    </span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>{row.accuracy_pct}%</span>
                   </td>
                   <td className="py-2 px-3">
                     <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -1267,17 +1262,13 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 </tr>
                 {expandedRows.has(i) && (
                   <tr className="bg-purple-50/50">
-                    <td colSpan="11" className="py-2 px-6">
+                    <td colSpan="12" className="py-2 px-6">
                       <div className="flex flex-wrap gap-2 items-center">
                         <span className="text-xs font-medium text-purple-700 mr-1">Barcodes:</span>
                         {(row.barcodes || []).map((bc, j) => (
-                          <span key={j} className="inline-flex items-center px-2.5 py-1 bg-white border border-purple-200 rounded-md text-xs font-mono text-purple-800 shadow-sm">
-                            {bc}
-                          </span>
+                          <span key={j} className="inline-flex items-center px-2.5 py-1 bg-white border border-purple-200 rounded-md text-xs font-mono text-purple-800 shadow-sm">{bc}</span>
                         ))}
-                        {(!row.barcodes || row.barcodes.length === 0) && (
-                          <span className="text-xs text-gray-400 italic">No barcodes</span>
-                        )}
+                        {(!row.barcodes || row.barcodes.length === 0) && <span className="text-xs text-gray-400 italic">No barcodes</span>}
                       </div>
                     </td>
                   </tr>
@@ -1291,20 +1282,15 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <td colSpan="4" className="py-3 px-3">TOTALS</td>
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
+              {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
+              <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>
               <td className="py-3 px-3 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
                   {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
                 </span>
               </td>
               <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value)}`}>
-                  {(data.totals.diff_value || 0).toFixed(2)}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>
-                  {data.totals.accuracy_pct}%
-                </span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>{data.totals.accuracy_pct}%</span>
               </td>
               <td></td>
             </tr>
@@ -1324,7 +1310,7 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
           <BarChart3 className="w-5 h-5 text-amber-500" />
           Category-wise Summary
         </h3>
-        <p className="text-xs text-gray-500 mt-1">Aggregated variance by product category</p>
+        <p className="text-xs text-gray-500 mt-1">Aggregated variance by product category (using Final Qty)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -1334,8 +1320,8 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <SortableHeader column="item_count" label="Items" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('item_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value" label="Stock Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="physical_value" label="Physical Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1346,15 +1332,13 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
             {data.report.map((row, i) => (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-3 px-4 font-medium">
-                  <span className={`px-2 py-1 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-                    {row.category}
-                  </span>
+                  <span className={`px-2 py-1 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{row.category}</span>
                 </td>
                 <td className="py-3 px-4 text-right text-gray-500">{row.item_count}</td>
                 <td className="py-3 px-4 text-right">{row.stock_qty}</td>
-                <td className="py-3 px-4 text-right">{row.stock_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td className="py-3 px-4 text-right">{(row.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td className="py-3 px-4 text-right">{row.physical_qty}</td>
-                <td className="py-3 px-4 text-right">{row.physical_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
                 <td className="py-3 px-4 text-right">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                     {getVarianceIcon(row.diff_qty)}
@@ -1363,13 +1347,11 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 </td>
                 <td className="py-3 px-4 text-right">
                   <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
-                    {row.diff_value > 0 ? '+' : ''}{row.diff_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    {row.diff_value > 0 ? '+' : ''}{(row.diff_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>
-                    {row.accuracy_pct}%
-                  </span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>{row.accuracy_pct}%</span>
                 </td>
                 <td className="py-2 px-4">
                   <div className="flex items-center gap-1 text-xs text-gray-600">
@@ -1385,9 +1367,9 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <td className="py-3 px-4">TOTAL</td>
               <td className="py-3 px-4 text-right">{data.totals.item_count}</td>
               <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-4 text-right">{data.totals.stock_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              <td className="py-3 px-4 text-right">{(data.totals.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
               <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
-              <td className="py-3 px-4 text-right">{data.totals.physical_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              <td className="py-3 px-4 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>
               <td className="py-3 px-4 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
                   {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
@@ -1395,13 +1377,11 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               </td>
               <td className="py-3 px-4 text-right">
                 <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value)}`}>
-                  {data.totals.diff_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  {(data.totals.diff_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
               </td>
               <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>
-                  {data.totals.accuracy_pct}%
-                </span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>{data.totals.accuracy_pct}%</span>
               </td>
               <td></td>
             </tr>
