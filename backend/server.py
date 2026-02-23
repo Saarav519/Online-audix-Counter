@@ -179,6 +179,24 @@ class SyncRequest(BaseModel):
     locations: List[Dict[str, Any]]
     clear_after_sync: bool = False
 
+class SyncChunkRequest(BaseModel):
+    batch_id: str
+    device_name: str
+    sync_password: str
+    client_id: str
+    session_id: str
+    chunk_index: int
+    total_chunks: int
+    locations: List[Dict[str, Any]]
+
+class SyncFinalizeRequest(BaseModel):
+    batch_id: str
+    device_name: str
+    sync_password: str
+    client_id: str
+    session_id: str
+    total_locations: int
+
 # Alert Model
 class Alert(BaseModel):
     model_config = ConfigDict(extra="ignore")
