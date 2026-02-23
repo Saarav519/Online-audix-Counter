@@ -507,9 +507,8 @@ export default function PortalReports() {
 
   const saveRecoAdjustment = async (params) => {
     try {
-      const sessionId = selectedSession === '__consolidated__' ? null : selectedSession;
-      if (!sessionId) { toast.error('Cannot edit Reco in consolidated view'); return; }
-      const body = { session_id: sessionId, ...params };
+      if (selectedSession !== '__consolidated__' || !selectedClient) { toast.error('Reco is only available in consolidated view'); return; }
+      const body = { client_id: selectedClient, ...params };
       const response = await fetch(`${BACKEND_URL}/api/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
         // Optimistic local state update - no full page refresh
