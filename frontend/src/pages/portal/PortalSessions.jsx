@@ -384,6 +384,77 @@ export default function PortalSessions() {
                   </Button>
                 </div>
               </div>
+
+              {/* Imported Stock Viewer */}
+              {showStockViewer === session.id && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-900">
+                      Imported Stock Data
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        ({stockData.length} records)
+                      </span>
+                    </h4>
+                  </div>
+                  {stockLoading ? (
+                    <div className="text-center py-6 text-gray-400 text-sm">Loading stock data...</div>
+                  ) : stockData.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400 text-sm">No stock data found</div>
+                  ) : (
+                    <div className="overflow-x-auto max-h-80 border border-gray-200 rounded-lg">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0 z-10">
+                          <tr>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Location</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Barcode</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Description</th>
+                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Category</th>
+                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">MRP</th>
+                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Cost</th>
+                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Qty</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stockData.map((item, idx) => {
+                            const hasDesc = item.description && item.description.trim() !== '';
+                            const hasCat = item.category && item.category.trim() !== '';
+                            const hasMrp = item.mrp && item.mrp > 0;
+                            const hasCost = item.cost && item.cost > 0;
+                            return (
+                              <tr key={idx} className="border-t border-gray-50 hover:bg-gray-50">
+                                <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
+                                <td className="py-1.5 px-3 font-mono text-gray-700">{item.barcode}</td>
+                                <td className={`py-1.5 px-3 ${hasDesc ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                  {hasDesc ? item.description : 'Not provided'}
+                                </td>
+                                <td className={`py-1.5 px-3 ${hasCat ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                  {hasCat ? item.category : 'Not provided'}
+                                </td>
+                                <td className={`py-1.5 px-3 text-right ${hasMrp ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                  {hasMrp ? item.mrp.toFixed(2) : '-'}
+                                </td>
+                                <td className={`py-1.5 px-3 text-right ${hasCost ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                  {hasCost ? item.cost.toFixed(2) : '-'}
+                                </td>
+                                <td className="py-1.5 px-3 text-right font-semibold text-gray-900">{item.qty}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {stockData.length > 0 && stockData.every(s => !s.description && !s.category && s.mrp === 0 && s.cost === 0) && (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                      <p className="text-xs text-amber-700">
+                        <strong>Missing fields:</strong> Description, Category, MRP, and Cost are empty. 
+                        Re-import with these columns to include them in variance reports. 
+                        These fields take priority over Master data.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             );
           })}
         </div>
