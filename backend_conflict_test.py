@@ -135,7 +135,7 @@ def test_conflict_resolution_flow():
     print(f"   Physical Qty: {conflict_location.get('physical_qty')}, Items: {len(sync_data_a['locations'][0]['items'])}")
     
     # Step 5: Sync SAME location from Scanner-TestB (different device)
-    print("\n🔄 STEP 5: Sync SAME Location from Scanner-TestB")
+    print(f"\n🔄 STEP 5: Sync SAME Location '{test_location}' from Scanner-TestB")
     
     sync_data_b = {
         "device_name": "Scanner-TestB",
@@ -144,7 +144,7 @@ def test_conflict_resolution_flow():
         "session_id": session_id,
         "locations": [{
             "id": "conflict-loc-2",
-            "name": "CONFLICT-TEST-LOC",  # Same location name
+            "name": test_location,  # Same location name
             "is_empty": False,
             "items": [
                 {"barcode": "ITEM-001", "productName": "Product A", "quantity": 45, "scannedAt": "2026-02-23T11:00:00Z"},  # Different quantity
