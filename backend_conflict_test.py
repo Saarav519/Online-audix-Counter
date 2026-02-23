@@ -11,6 +11,77 @@ BACKEND_URL = "https://data-sync-tester.preview.emergentagent.com/api"
 print("🔄 AUDIX CONFLICT RESOLUTION FLOW - COMPREHENSIVE END-TO-END TESTING")
 print("=" * 80)
 
+def test_existing_conflict_flow(test_location, session_id, client_id):
+    """Handle testing when a conflict already exists"""
+    print(f"\n⚠️  EXISTING CONFLICT DETECTED for {test_location} - Testing resolution flow")
+    
+    # Get existing conflicts
+    conflicts_response = requests.get(f"{BACKEND_URL}/portal/conflicts")
+    if conflicts_response.status_code != 200:
+        print(f"❌ Get conflicts failed: {conflicts_response.status_code}")
+        return False
+        
+    conflicts = conflicts_response.json()
+    
+    # Find our conflict
+    test_conflict = None
+    for conflict in conflicts:
+        if conflict.get('location_name') == test_location and conflict.get('status') == 'pending':
+            test_conflict = conflict
+            break
+    
+    if not test_conflict:
+        print(f"❌ No pending conflict found for {test_location}")
+        return False
+        
+    conflict_id = test_conflict.get('id')
+    entries = test_conflict.get('entries', [])
+    
+    print(f"✅ Found existing conflict:")
+    print(f"   Conflict ID: {conflict_id}")
+    print(f"   Status: {test_conflict.get('status')}")
+    print(f"   Entries count: {len(entries)}")
+    
+    # Show entry details
+    for i, entry in enumerate(entries):
+        print(f"   Entry {i+1}: Device {entry.get('device_name')}, Qty: {entry.get('total_quantity')}")
+    
+    # Approve first entry
+    if entries:
+        first_entry_id = entries[0].get('entry_id')
+        first_device = entries[0].get('device_name')
+        
+        print(f"\n✅ TESTING: Approve Entry from {first_device}")
+        
+        approve_response = requests.post(f"{BACKEND_URL}/portal/conflicts/{conflict_id}/approve/{first_entry_id}")
+        
+        if approve_response.status_code != 200:
+            print(f"❌ Approve failed: {approve_response.status_code} - {approve_response.text}")
+            return False
+            
+        approve_result = approve_response.json()
+        print(f"✅ Approval successful: {approve_result.get('message')}")
+        
+        # Verify resolution
+        conflicts_response_2 = requests.get(f"{BACKEND_URL}/portal/conflicts")
+        if conflicts_response_2.status_code == 200:
+            conflicts_2 = conflicts_response_2.json()
+            resolved_conflict = None
+            for conflict in conflicts_2:
+                if conflict.get('id') == conflict_id:
+                    resolved_conflict = conflict
+                    break
+            
+            if resolved_conflict and resolved_conflict.get('status') == 'resolved':
+                print("✅ Conflict marked as resolved")
+                print("\n🎉 EXISTING CONFLICT RESOLUTION TEST PASSED!")
+                return True
+            else:
+                print(f"❌ Conflict not resolved properly: {resolved_conflict.get('status') if resolved_conflict else 'Not found'}")
+                return False
+        
+    return False
+
 def test_conflict_resolution_flow():
     """Test the complete conflict resolution flow as specified in the review request"""
     
