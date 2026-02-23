@@ -547,11 +547,11 @@ export default function PortalSessions() {
             </p>
             
             {/* Info box explaining separation */}
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-800">
-                <strong>Note:</strong> Product details (name, category, price) come from the <strong>Master Product Catalog</strong> 
-                uploaded at client level. This file only needs <strong>barcode + quantity</strong>.
-                You can still include Description/Category/MRP/Cost columns — they'll be used as fallback if no master is uploaded.
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs text-blue-800">
+                <strong>Priority Rule:</strong> Description, Category, MRP, and Cost from this <strong>Imported Stock</strong> file 
+                take <strong>first priority</strong> in variance reports. Only for items not found here, the system falls back 
+                to the <strong>Master Product Catalog</strong>.
               </p>
             </div>
 
