@@ -1066,7 +1066,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
         <h3 className="font-semibold text-gray-900">Detailed Item-wise Report</h3>
-        {!isConsolidated && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
+        {isConsolidated && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
