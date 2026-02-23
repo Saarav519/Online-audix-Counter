@@ -2011,7 +2011,7 @@ async def get_article_wise_report(session_id: str):
 async def get_category_summary(session_id: str):
     """Category-wise summary: Groups all data by category. Uses master products for category info."""
     master_by_barcode = await get_master_for_session(session_id)
-    reco_maps = await _build_reco_maps(session_id)
+    reco_maps = EMPTY_RECO_MAPS
     
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     barcode_info = {}
