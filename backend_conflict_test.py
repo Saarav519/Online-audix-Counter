@@ -431,7 +431,7 @@ def test_conflict_resolution_flow():
     
     rejected_location = None
     for location in binwise_data_4.get('locations', []):
-        if location.get('location') == 'CONFLICT-TEST-LOC-2':
+        if location.get('location') == reject_location:
             rejected_location = location
             break
     
