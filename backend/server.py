@@ -211,7 +211,7 @@ class StatusCheckCreate(BaseModel):
 
 # Reconciliation Adjustment Model
 class RecoAdjustmentCreate(BaseModel):
-    session_id: str
+    client_id: str
     reco_type: str  # "detailed" (loc+barcode), "barcode", "article"
     barcode: str = ""
     location: str = ""
