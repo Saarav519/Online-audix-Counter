@@ -9,7 +9,7 @@ import io
 import sys
 
 # Backend URL
-BASE_URL = "https://data-sync-tester.preview.emergentagent.com"
+BASE_URL = "https://inventory-reconcile.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 def test_backward_compatibility():
