@@ -69,24 +69,28 @@ const NUMERIC_CONDITIONS = [
 // Recalculate totals from filtered rows
 function recalcTotals(rows, reportType) {
   if (!rows || rows.length === 0) return null;
-  const totals = { stock_qty: 0, physical_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0 };
-  let stockValue = 0, physicalValue = 0, diffValue = 0, itemCount = 0;
+  const totals = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0 };
+  let stockValue = 0, physicalValue = 0, finalValue = 0, diffValue = 0, itemCount = 0;
   rows.forEach(row => {
     totals.stock_qty += (row.stock_qty || 0);
     totals.physical_qty += (row.physical_qty || 0);
+    totals.reco_qty += (row.reco_qty || 0);
+    totals.final_qty += (row.final_qty || row.physical_qty || 0);
     const d = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty || 0);
     totals.diff_qty += d;
     totals.difference_qty += d;
     stockValue += (row.stock_value || 0);
     physicalValue += (row.physical_value || 0);
+    finalValue += (row.final_value || 0);
     diffValue += (row.diff_value || 0);
     itemCount += (row.item_count || 0);
   });
   totals.stock_value = stockValue;
   totals.physical_value = physicalValue;
+  totals.final_value = finalValue;
   totals.diff_value = diffValue;
   totals.item_count = itemCount;
-  totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.physical_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.physical_qty === 0 ? 100 : 0);
+  totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.final_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.final_qty === 0 ? 100 : 0);
   return totals;
 }
 
