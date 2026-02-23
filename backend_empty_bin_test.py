@@ -2,7 +2,7 @@
 """
 AUDIX Backend Testing - Empty Bin Feature APIs
 Testing Flow as specified in review request.
-Backend URL: https://inventory-reconcile.preview.emergentagent.com
+Backend URL: https://reconciliation-fix.preview.emergentagent.com
 
 Test Plan:
 1. Get session ID and client ID from existing data  
@@ -19,7 +19,7 @@ import sys
 from datetime import datetime
 
 # Backend configuration
-BACKEND_URL = "https://inventory-reconcile.preview.emergentagent.com"
+BACKEND_URL = "https://reconciliation-fix.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class EmptyBinTester:

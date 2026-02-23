@@ -22,7 +22,7 @@ import requests
 import json
 import time
 
-BASE_URL = "https://inventory-reconcile.preview.emergentagent.com"
+BASE_URL = "https://reconciliation-fix.preview.emergentagent.com"
 
 def test_backend_endpoints_for_location_data():
     """

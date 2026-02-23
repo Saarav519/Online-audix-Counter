@@ -2,7 +2,7 @@
 """
 AUDIX Backend Testing - Sync Logs Grouping, Day-wise Export, and Cascading Client Delete
 Testing Flow as specified in review request.
-Backend URL: https://inventory-reconcile.preview.emergentagent.com
+Backend URL: https://reconciliation-fix.preview.emergentagent.com
 """
 
 import requests
@@ -12,7 +12,7 @@ from datetime import datetime
 import sys
 
 # Backend configuration
-BACKEND_URL = "https://inventory-reconcile.preview.emergentagent.com"
+BACKEND_URL = "https://reconciliation-fix.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class AudixBackendTester:

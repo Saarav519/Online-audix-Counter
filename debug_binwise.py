@@ -3,7 +3,7 @@
 import requests
 import json
 
-BACKEND_URL = "https://inventory-reconcile.preview.emergentagent.com/api"
+BACKEND_URL = "https://reconciliation-fix.preview.emergentagent.com/api"
 
 # Login and get session
 login_data = {"username": "admin", "password": "admin123"}
