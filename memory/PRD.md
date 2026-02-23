@@ -9,7 +9,8 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
 - Offline-first data sync from scanner devices
 - Variance reports: Bin-wise, Barcode-wise, Article-wise, Category Summary
 - Conflict resolution for duplicate location scans
-- Reconciliation (Reco) column for manual quantity adjustments — **ONLY in consolidated view, on the primary report type**
+- Reconciliation (Reco) column — consolidated view only, primary report type per variance mode
+- Chunked sync with progress bar — data safe until 100% finalized
 
 ## User Personas
 - **Scanner Operators**: Use mobile devices to scan locations and items
@@ -20,23 +21,23 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
 /app/
 ├── backend/server.py          # FastAPI (all routes + models)
 ├── frontend/src/
-│   ├── pages/portal/
-│   │   ├── PortalDashboard.jsx
-│   │   ├── PortalReports.jsx   # All report tables + conditional Reco UI
-│   │   ├── PortalSessions.jsx
-│   │   ├── PortalConflicts.jsx
-│   │   └── ...
-│   ├── components/PortalSidebar.jsx
-│   ├── contexts/AppContext.js
+│   ├── pages/
+│   │   ├── Settings.jsx        # Scanner sync with chunked upload + progress bar
+│   │   └── portal/
+│   │       ├── PortalReports.jsx   # All report tables + conditional Reco UI
+│   │       └── ...
+│   ├── components/
+│   ├── context/AppContext.js
 │   └── App.js
 ```
 
 ## Key DB Collections
-- `synced_locations`: Scanned data from devices
+- `synced_locations`: Live synced data from devices
+- `sync_staging`: Temporary staging for chunked uploads (cleared after finalize)
+- `sync_raw_logs`: Audit trail of all sync operations
 - `expected_stock`: Master stock list per session
 - `conflict_locations`: Duplicate scan conflicts
 - `reco_adjustments`: Reconciliation adjustments (client-level)
-  - Schema: {client_id, reco_type, barcode, location, article_code, reco_qty, updated_at}
 - `users, clients, devices, audit_sessions`: App entities
 
 ## Reco Editability Rules (Consolidated View Only)
@@ -47,24 +48,26 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
 | **Barcode-wise** | N/A | Reco editable | N/A |
 | **Article-wise** | N/A | N/A | Reco editable |
 
-- Final Qty column is shown in ALL consolidated report views (regardless of mode)
-- Bin-wise Summary and Category Summary tables NEVER have Reco editing
-- Individual session reports have NO Reco or Final Qty columns
+- Final Qty column shown in ALL consolidated views
+- Individual session reports: No Reco or Final Qty
 
-## What's Been Implemented
-1. Mark Empty feature (verified working)
-2. Bin-wise report with Empty Bins, Pending, Completed statuses
-3. Duplicate Scan Conflict Resolution (full workflow)
-4. Imported Stock Viewer with all fields
-5. **Reconciliation (Reco) Column — Consolidated View Only** (Feb 2026)
-   - Backend: `reco_adjustments` collection at client-level, CRUD APIs
-   - 5 consolidated endpoints use `_build_reco_maps(client_id)` for reco data
-   - 5 individual session endpoints use `EMPTY_RECO_MAPS` (no reco applied)
-   - Frontend: `isConsolidated` prop controls Final Qty visibility
-   - `isRecoEditable` prop controls Reco column — tied to session variance_mode
-   - CSV export adapts columns based on consolidated vs individual view
-   - Optimistic UI update for reco save (no page refresh)
-   - **Tested: 100% pass rate across two test iterations**
+## Chunked Sync Flow
+1. Scanner splits locations into chunks of 10
+2. Each chunk → `POST /api/sync/chunk` → stored in `sync_staging`
+3. After all chunks uploaded → `POST /api/sync/finalize` → validates all chunks → moves to live
+4. Data cleared from scanner ONLY after finalize succeeds
+5. On failure: staging cleaned up, scanner data untouched
+6. Progress bar shows: phase, location count, percentage
+
+## Key API Endpoints
+- `POST /api/sync/` — original single-request sync (backward compatible)
+- `POST /api/sync/chunk` — upload a chunk to staging
+- `POST /api/sync/finalize` — validate & commit all chunks
+- `DELETE /api/sync/staging/{batch_id}` — cancel/cleanup
+- `GET /api/sync/config` — available clients/sessions
+- `POST /api/portal/reco` — save reco adjustments
+- `GET /api/portal/reports/{session_id}/{report_type}` — individual reports (no reco)
+- `GET /api/portal/reports/consolidated/{client_id}/{report_type}` — consolidated reports (with reco)
 
 ## Credentials
 - Admin: username=admin, password=admin123
