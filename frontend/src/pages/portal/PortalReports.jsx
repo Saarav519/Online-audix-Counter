@@ -495,6 +495,24 @@ export default function PortalReports() {
     }
   };
 
+  const saveRecoAdjustment = async (params) => {
+    try {
+      const sessionId = selectedSession === '__consolidated__' ? null : selectedSession;
+      if (!sessionId) { toast.error('Cannot edit Reco in consolidated view'); return; }
+      const body = { session_id: sessionId, ...params };
+      const response = await fetch(`${BACKEND_URL}/api/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (response.ok) {
+        toast.success('Reco adjustment saved');
+        fetchReport();
+      } else {
+        toast.error('Failed to save Reco adjustment');
+      }
+    } catch (error) {
+      console.error('Failed to save reco:', error);
+      toast.error('Failed to save Reco adjustment');
+    }
+  };
+
   const getReportTypeOptions = () => {
     // If consolidated, only show report types relevant to client's session modes
     if (selectedSession === '__consolidated__') {
