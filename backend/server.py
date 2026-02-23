@@ -1532,6 +1532,7 @@ async def get_consolidated_article_wise(client_id: str):
     """Consolidated article-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
+    reco_maps = await _build_reco_maps_for_sessions(session_ids)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -1543,7 +1544,6 @@ async def get_consolidated_article_wise(client_id: str):
             if bc not in expected_by_barcode:
                 expected_by_barcode[bc] = {"qty": 0, "category": e.get("category", ""), "article_code": e.get("article_code", ""), "article_name": e.get("article_name", "")}
             expected_by_barcode[bc]["qty"] += e.get("qty", 0)
-        
         synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for s in synced:
             for item in s.get("items", []):
@@ -1551,46 +1551,35 @@ async def get_consolidated_article_wise(client_id: str):
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
-    
-    # Group by article_code
     article_groups = {}
     for bc in all_barcodes:
         master = master_by_barcode.get(bc, {})
         exp = expected_by_barcode.get(bc, {})
-        article_code = master.get("article_code", "") or exp.get("article_code", "")
-        if not article_code:
-            article_code = "UNMAPPED"
+        article_code = master.get("article_code", "") or exp.get("article_code", "") or "UNMAPPED"
         if article_code not in article_groups:
-            article_groups[article_code] = {
-                "article_name": master.get("article_name", "") or exp.get("article_name", ""),
-                "category": master.get("category", "") or exp.get("category", "Unmapped" if article_code == "UNMAPPED" else ""),
-                "barcodes": [],
-                "stock_qty": 0, "physical_qty": 0,
-                "mrp": master.get("mrp", 0) or 0, "cost": master.get("cost", 0) or 0
-            }
+            article_groups[article_code] = {"article_name": master.get("article_name", "") or exp.get("article_name", ""), "category": master.get("category", "") or exp.get("category", "Unmapped" if article_code == "UNMAPPED" else ""), "barcodes": [], "stock_qty": 0, "physical_qty": 0, "mrp": master.get("mrp", 0) or 0, "cost": master.get("cost", 0) or 0}
         article_groups[article_code]["barcodes"].append(bc)
         article_groups[article_code]["stock_qty"] += expected_by_barcode.get(bc, {}).get("qty", 0)
         article_groups[article_code]["physical_qty"] += physical_by_barcode.get(bc, 0)
     
     report = []
-    total_stock = total_physical = total_diff = total_stock_value = total_physical_value = total_diff_value = 0
+    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
     
     for code in sorted(article_groups.keys()):
         g = article_groups[code]
-        diff_qty = g["physical_qty"] - g["stock_qty"]
         cost = g["cost"]
+        reco_qty = reco_maps["article"].get(code, 0)
+        final_qty = g["physical_qty"] + reco_qty
+        diff_qty = final_qty - g["stock_qty"]
         stock_value = g["stock_qty"] * cost
         physical_value = g["physical_qty"] * cost
-        diff_value = diff_qty * cost
-        accuracy = calc_accuracy(g["stock_qty"], g["physical_qty"])
-        remark = generate_remark(g["stock_qty"], g["physical_qty"], accuracy, code != "UNMAPPED", g["physical_qty"] > 0, code != "UNMAPPED", g["stock_qty"] > 0)
+        final_value = final_qty * cost
+        diff_value = final_value - stock_value
+        accuracy = calc_accuracy(g["stock_qty"], final_qty)
+        remark = generate_remark(g["stock_qty"], final_qty, accuracy, code != "UNMAPPED", g["physical_qty"] > 0, code != "UNMAPPED", g["stock_qty"] > 0)
         
-        total_stock += g["stock_qty"]
-        total_physical += g["physical_qty"]
-        total_diff += diff_qty
-        total_stock_value += stock_value
-        total_physical_value += physical_value
-        total_diff_value += diff_value
+        for k, v in [("stock_qty", g["stock_qty"]), ("stock_value", stock_value), ("physical_qty", g["physical_qty"]), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
+            totals[k] += v
         
         report.append({
             "article_code": code, "article_name": g["article_name"], "category": g["category"],
@@ -1598,22 +1587,19 @@ async def get_consolidated_article_wise(client_id: str):
             "mrp": g["mrp"], "cost": cost,
             "stock_qty": g["stock_qty"], "stock_value": round(stock_value, 2),
             "physical_qty": g["physical_qty"], "physical_value": round(physical_value, 2),
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
             "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
         })
     
-    total_accuracy = calc_accuracy(total_stock, total_physical)
-    return {
-        "report": report,
-        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "diff_qty": total_diff,
-                   "stock_value": round(total_stock_value, 2), "physical_value": round(total_physical_value, 2),
-                   "diff_value": round(total_diff_value, 2), "accuracy_pct": total_accuracy}
-    }
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
 
 @portal_router.get("/reports/consolidated/{client_id}/category-summary")
 async def get_consolidated_category_summary(client_id: str):
     """Consolidated category summary across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
+    reco_maps = await _build_reco_maps_for_sessions(session_ids)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -1625,7 +1611,6 @@ async def get_consolidated_category_summary(client_id: str):
             if bc not in expected_by_barcode:
                 expected_by_barcode[bc] = {"qty": 0, "category": e.get("category", ""), "cost": e.get("cost", 0)}
             expected_by_barcode[bc]["qty"] += e.get("qty", 0)
-        
         synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for s in synced:
             for item in s.get("items", []):
@@ -1633,60 +1618,52 @@ async def get_consolidated_category_summary(client_id: str):
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    barcode_reco = reco_maps["barcode"]
     
-    # Group by category
     cat_groups = {}
     for bc in all_barcodes:
         master = master_by_barcode.get(bc, {})
         exp = expected_by_barcode.get(bc, {})
-        category = master.get("category", "") or exp.get("category", "")
-        if not category:
-            category = "Unmapped"
+        category = master.get("category", "") or exp.get("category", "") or "Unmapped"
         if category not in cat_groups:
-            cat_groups[category] = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "stock_value": 0, "physical_value": 0}
+            cat_groups[category] = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "stock_value": 0, "physical_value": 0}
         cost = master.get("cost", 0) or exp.get("cost", 0) or 0
         stock_qty = expected_by_barcode.get(bc, {}).get("qty", 0)
         physical_qty = physical_by_barcode.get(bc, 0)
+        reco_qty = barcode_reco.get(bc, 0)
         cat_groups[category]["item_count"] += 1
         cat_groups[category]["stock_qty"] += stock_qty
         cat_groups[category]["physical_qty"] += physical_qty
+        cat_groups[category]["reco_qty"] += reco_qty
         cat_groups[category]["stock_value"] += stock_qty * cost
         cat_groups[category]["physical_value"] += physical_qty * cost
     
     report = []
-    total_items = total_stock = total_physical = total_diff = 0
-    total_stock_value = total_physical_value = total_diff_value = 0
+    totals = {"item_count": 0, "stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
     
     for cat in sorted(cat_groups.keys()):
         g = cat_groups[cat]
-        diff_qty = g["physical_qty"] - g["stock_qty"]
-        diff_value = g["physical_value"] - g["stock_value"]
-        accuracy = calc_accuracy(g["stock_qty"], g["physical_qty"])
-        remark = generate_remark(g["stock_qty"], g["physical_qty"], accuracy)
+        final_qty = g["physical_qty"] + g["reco_qty"]
+        avg_cost = g["physical_value"] / g["physical_qty"] if g["physical_qty"] > 0 else (g["stock_value"] / g["stock_qty"] if g["stock_qty"] > 0 else 0)
+        final_value = g["physical_value"] + g["reco_qty"] * avg_cost
+        diff_qty = final_qty - g["stock_qty"]
+        diff_value = final_value - g["stock_value"]
+        accuracy = calc_accuracy(g["stock_qty"], final_qty)
+        remark = generate_remark(g["stock_qty"], final_qty, accuracy)
         
-        total_items += g["item_count"]
-        total_stock += g["stock_qty"]
-        total_physical += g["physical_qty"]
-        total_diff += diff_qty
-        total_stock_value += g["stock_value"]
-        total_physical_value += g["physical_value"]
-        total_diff_value += diff_value
+        for k, v in [("item_count", g["item_count"]), ("stock_qty", g["stock_qty"]), ("stock_value", g["stock_value"]), ("physical_qty", g["physical_qty"]), ("physical_value", g["physical_value"]), ("reco_qty", g["reco_qty"]), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
+            totals[k] += v
         
         report.append({
             "category": cat, "item_count": g["item_count"],
             "stock_qty": g["stock_qty"], "stock_value": round(g["stock_value"], 2),
             "physical_qty": g["physical_qty"], "physical_value": round(g["physical_value"], 2),
+            "reco_qty": g["reco_qty"], "final_qty": final_qty, "final_value": round(final_value, 2),
             "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
         })
     
-    total_accuracy = calc_accuracy(total_stock, total_physical)
-    return {
-        "report": report,
-        "totals": {"item_count": total_items, "stock_qty": total_stock, "physical_qty": total_physical,
-                   "diff_qty": total_diff, "stock_value": round(total_stock_value, 2),
-                   "physical_value": round(total_physical_value, 2), "diff_value": round(total_diff_value, 2),
-                   "accuracy_pct": total_accuracy}
-    }
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
 
 # ==================== INDIVIDUAL SESSION REPORTS ====================
 
