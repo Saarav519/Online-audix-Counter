@@ -455,9 +455,7 @@ export default function PortalSessions() {
                   )}
                 </div>
               )}
-            );
-          })}
-        </div>
+              </div>
       )}
 
       {/* Create Session Dialog */}
