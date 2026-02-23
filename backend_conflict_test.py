@@ -404,12 +404,12 @@ def test_conflict_resolution_flow():
     
     reject_conflict = None
     for conflict in conflicts_3:
-        if conflict.get('location_name') == 'CONFLICT-TEST-LOC-2' and conflict.get('status') == 'pending':
+        if conflict.get('location_name') == reject_location and conflict.get('status') == 'pending':
             reject_conflict = conflict
             break
     
     if not reject_conflict:
-        print("❌ Second conflict for reject-all test not found")
+        print(f"❌ Second conflict for reject-all test not found (location: {reject_location})")
         return False
         
     reject_conflict_id = reject_conflict.get('id')
