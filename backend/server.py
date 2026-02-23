@@ -1671,7 +1671,7 @@ async def get_bin_wise_report(session_id: str):
         conflict_map[c["location_name"]] = {"conflict_id": c["id"], "entry_count": len(c.get("entries", [])), "devices": [e.get("device_name", "Unknown") for e in c.get("entries", [])]}
     
     # Build reco aggregated by location from detailed-level adjustments
-    reco_maps = await _build_reco_maps(session_id)
+    reco_maps = EMPTY_RECO_MAPS
     location_reco = {}
     for key, reco in reco_maps["detailed"].items():
         loc = key.split("|")[0]
