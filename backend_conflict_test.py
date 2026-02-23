@@ -320,15 +320,15 @@ def test_conflict_resolution_flow():
         
     binwise_data_3 = binwise_response_3.json()
     
-    # Find CONFLICT-TEST-LOC in the final report
+    # Find test_location in the final report
     final_location = None
     for location in binwise_data_3.get('locations', []):
-        if location.get('location') == 'CONFLICT-TEST-LOC':
+        if location.get('location') == test_location:
             final_location = location
             break
     
     if not final_location:
-        print("❌ CONFLICT-TEST-LOC not found in final bin-wise report")
+        print(f"❌ {test_location} not found in final bin-wise report")
         return False
         
     final_status = final_location.get('status')
