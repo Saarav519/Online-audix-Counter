@@ -383,11 +383,10 @@ export default function PortalSessions() {
                     Delete
                   </Button>
                 </div>
-              </div>
 
               {/* Imported Stock Viewer - inside session card */}
               {showStockViewer === session.id && (
-                <div className="border-t border-gray-100 pt-4">
+                <div className="border-t border-gray-100 pt-4 mt-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-gray-900">
                       Imported Stock Data
@@ -415,41 +414,34 @@ export default function PortalSessions() {
                           </tr>
                         </thead>
                         <tbody>
-                          {stockData.map((item, idx) => {
-                            const hasDesc = item.description && item.description.trim() !== '';
-                            const hasCat = item.category && item.category.trim() !== '';
-                            const hasMrp = item.mrp && item.mrp > 0;
-                            const hasCost = item.cost && item.cost > 0;
-                            return (
-                              <tr key={idx} className="border-t border-gray-50 hover:bg-gray-50">
-                                <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
-                                <td className="py-1.5 px-3 font-mono text-gray-700">{item.barcode}</td>
-                                <td className={`py-1.5 px-3 ${hasDesc ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                  {hasDesc ? item.description : 'Not provided'}
-                                </td>
-                                <td className={`py-1.5 px-3 ${hasCat ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                  {hasCat ? item.category : 'Not provided'}
-                                </td>
-                                <td className={`py-1.5 px-3 text-right ${hasMrp ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                  {hasMrp ? item.mrp.toFixed(2) : '-'}
-                                </td>
-                                <td className={`py-1.5 px-3 text-right ${hasCost ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                  {hasCost ? item.cost.toFixed(2) : '-'}
-                                </td>
-                                <td className="py-1.5 px-3 text-right font-semibold text-gray-900">{item.qty}</td>
-                              </tr>
-                            );
-                          })}
+                          {stockData.map((item, idx) => (
+                            <tr key={idx} className="border-t border-gray-50 hover:bg-gray-50">
+                              <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
+                              <td className="py-1.5 px-3 font-mono text-gray-700">{item.barcode}</td>
+                              <td className={`py-1.5 px-3 ${item.description ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                {item.description || 'Not provided'}
+                              </td>
+                              <td className={`py-1.5 px-3 ${item.category ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                {item.category || 'Not provided'}
+                              </td>
+                              <td className={`py-1.5 px-3 text-right ${item.mrp > 0 ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                {item.mrp > 0 ? item.mrp.toFixed(2) : '-'}
+                              </td>
+                              <td className={`py-1.5 px-3 text-right ${item.cost > 0 ? 'text-gray-700' : 'text-gray-300 italic'}`}>
+                                {item.cost > 0 ? item.cost.toFixed(2) : '-'}
+                              </td>
+                              <td className="py-1.5 px-3 text-right font-semibold text-gray-900">{item.qty}</td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
                   )}
-                  {stockData.length > 0 && stockData.every(s => !s.description && !s.category && s.mrp === 0 && s.cost === 0) && (
+                  {stockData.length > 0 && stockData.every(s => !s.description && !s.category && !s.mrp && !s.cost) && (
                     <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
                       <p className="text-xs text-amber-700">
                         <strong>Missing fields:</strong> Description, Category, MRP, and Cost are empty. 
-                        Re-import with these columns to include them in variance reports. 
-                        These fields take priority over Master data.
+                        Re-import with these columns to include them in variance reports.
                       </p>
                     </div>
                   )}
