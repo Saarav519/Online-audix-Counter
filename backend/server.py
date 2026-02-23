@@ -1468,6 +1468,7 @@ async def get_consolidated_barcode_wise(client_id: str):
     """Consolidated barcode-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
+    reco_maps = await _build_reco_maps_for_sessions(session_ids)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -1479,7 +1480,6 @@ async def get_consolidated_barcode_wise(client_id: str):
             if bc not in expected_by_barcode:
                 expected_by_barcode[bc] = {"qty": 0, "description": e.get("description", ""), "category": e.get("category", ""), "mrp": e.get("mrp", 0), "cost": e.get("cost", 0)}
             expected_by_barcode[bc]["qty"] += e.get("qty", 0)
-        
         synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for s in synced:
             for item in s.get("items", []):
@@ -1488,7 +1488,7 @@ async def get_consolidated_barcode_wise(client_id: str):
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
     report = []
-    total_stock = total_physical = total_diff = total_stock_value = total_physical_value = total_diff_value = 0
+    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
     
     for bc in sorted(all_barcodes):
         exp = expected_by_barcode.get(bc, {})
@@ -1500,37 +1500,32 @@ async def get_consolidated_barcode_wise(client_id: str):
         
         stock_qty = exp.get("qty", 0) if exp else 0
         physical_qty = physical_by_barcode.get(bc, 0)
-        diff_qty = physical_qty - stock_qty
+        reco_qty = reco_maps["barcode"].get(bc, 0)
+        final_qty = physical_qty + reco_qty
+        diff_qty = final_qty - stock_qty
         stock_value = stock_qty * cost
         physical_value = physical_qty * cost
-        diff_value = diff_qty * cost
-        accuracy = calc_accuracy(stock_qty, physical_qty)
+        final_value = final_qty * cost
+        diff_value = final_value - stock_value
+        accuracy = calc_accuracy(stock_qty, final_qty)
         in_master = bc in master_by_barcode
         in_expected = bc in expected_by_barcode
         scanned = bc in physical_by_barcode
-        remark = generate_remark(stock_qty, physical_qty, accuracy, True, scanned, in_master, in_expected)
+        remark = generate_remark(stock_qty, final_qty, accuracy, True, scanned, in_master, in_expected)
         
-        total_stock += stock_qty
-        total_physical += physical_qty
-        total_diff += diff_qty
-        total_stock_value += stock_value
-        total_physical_value += physical_value
-        total_diff_value += diff_value
+        for k, v in [("stock_qty", stock_qty), ("stock_value", stock_value), ("physical_qty", physical_qty), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
+            totals[k] += v
         
         report.append({
             "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value": round(stock_value, 2),
             "physical_qty": physical_qty, "physical_value": round(physical_value, 2),
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
             "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
         })
     
-    total_accuracy = calc_accuracy(total_stock, total_physical)
-    return {
-        "report": report,
-        "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "diff_qty": total_diff,
-                   "stock_value": round(total_stock_value, 2), "physical_value": round(total_physical_value, 2),
-                   "diff_value": round(total_diff_value, 2), "accuracy_pct": total_accuracy}
-    }
+    totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
 
 @portal_router.get("/reports/consolidated/{client_id}/article-wise")
 async def get_consolidated_article_wise(client_id: str):
