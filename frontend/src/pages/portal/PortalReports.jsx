@@ -604,6 +604,8 @@ export default function PortalReports() {
     return options;
   };
 
+  const isConsolidatedView = selectedSession === '__consolidated__';
+
   const exportCSV = () => {
     if (!filteredData) return;
 
@@ -611,33 +613,71 @@ export default function PortalReports() {
     const rows = filteredData.report || [];
     
     if (reportType === 'bin-wise') {
-      csv = 'Status,Location,Stock Qty,Physical Qty,Final Qty,Difference,Accuracy %,Remarks\n';
-      rows.forEach(row => {
-        const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : row.status === 'conflict' ? 'Conflict' : 'Completed';
-        csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.final_qty ?? row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
-      });
-      const t = filteredData.totals;
-      csv += `"","TOTAL",${t.stock_qty},${t.physical_qty},${t.final_qty ?? t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
+      if (isConsolidatedView) {
+        csv = 'Status,Location,Stock Qty,Physical Qty,Final Qty,Difference,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : row.status === 'conflict' ? 'Conflict' : 'Completed';
+          csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.final_qty ?? row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+        const t = filteredData.totals;
+        csv += `"","TOTAL",${t.stock_qty},${t.physical_qty},${t.final_qty ?? t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
+      } else {
+        csv = 'Status,Location,Stock Qty,Physical Qty,Difference,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : row.status === 'conflict' ? 'Conflict' : 'Completed';
+          csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+        const t = filteredData.totals;
+        csv += `"","TOTAL",${t.stock_qty},${t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
+      }
     } else if (reportType === 'detailed') {
-      csv = 'Location,Barcode,Description,Category,Stock Qty,Physical Qty,Reco,Final Qty,Diff Qty,Accuracy %,Remarks\n';
-      rows.forEach(row => {
-        csv += `"${row.location}","${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
-      });
+      if (isConsolidatedView) {
+        csv = 'Location,Barcode,Description,Category,Stock Qty,Physical Qty,Reco,Final Qty,Diff Qty,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.location}","${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      } else {
+        csv = 'Location,Barcode,Description,Category,Stock Qty,Physical Qty,Diff Qty,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.location}","${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.physical_qty},${row.diff_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      }
     } else if (reportType === 'barcode-wise') {
-      csv = 'Barcode,Description,Category,Stock Qty,Stock Value,Physical Qty,Reco,Final Qty,Final Value,Diff Qty,Diff Value,Accuracy %,Remarks\n';
-      rows.forEach(row => {
-        csv += `"${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.final_value || 0},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
-      });
+      if (isConsolidatedView) {
+        csv = 'Barcode,Description,Category,Stock Qty,Stock Value,Physical Qty,Reco,Final Qty,Final Value,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.final_value || 0},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      } else {
+        csv = 'Barcode,Description,Category,Stock Qty,Stock Value,Physical Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.barcode}","${row.description}","${row.category}",${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      }
     } else if (reportType === 'article-wise') {
-      csv = 'Article Code,Article Name,Category,Barcodes,Stock Qty,Physical Qty,Reco,Final Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
-      rows.forEach(row => {
-        csv += `"${row.article_code}","${row.article_name}","${row.category}","${(row.barcodes || []).join('; ')}",${row.stock_qty},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
-      });
+      if (isConsolidatedView) {
+        csv = 'Article Code,Article Name,Category,Barcodes,Stock Qty,Physical Qty,Reco,Final Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.article_code}","${row.article_name}","${row.category}","${(row.barcodes || []).join('; ')}",${row.stock_qty},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      } else {
+        csv = 'Article Code,Article Name,Category,Barcodes,Stock Qty,Physical Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.article_code}","${row.article_name}","${row.category}","${(row.barcodes || []).join('; ')}",${row.stock_qty},${row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      }
     } else if (reportType === 'category-summary') {
-      csv = 'Category,Items,Stock Qty,Stock Value,Physical Qty,Final Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
-      rows.forEach(row => {
-        csv += `"${row.category}",${row.item_count},${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
-      });
+      if (isConsolidatedView) {
+        csv = 'Category,Items,Stock Qty,Stock Value,Physical Qty,Final Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.category}",${row.item_count},${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      } else {
+        csv = 'Category,Items,Stock Qty,Stock Value,Physical Qty,Diff Qty,Diff Value,Accuracy %,Remarks\n';
+        rows.forEach(row => {
+          csv += `"${row.category}",${row.item_count},${row.stock_qty},${row.stock_value || 0},${row.physical_qty},${row.diff_qty},${row.diff_value || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+        });
+      }
     }
 
     const blob = new Blob([csv], { type: 'text/csv' });
