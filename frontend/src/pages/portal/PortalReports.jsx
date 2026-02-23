@@ -979,12 +979,42 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
   );
 }
 
+// ============ Reco Input Component ============
+function RecoInput({ value, onSave, dataTestId }) {
+  const [editing, setEditing] = React.useState(false);
+  const [inputVal, setInputVal] = React.useState(value || 0);
+  const inputRef = React.useRef(null);
+
+  React.useEffect(() => { setInputVal(value || 0); }, [value]);
+
+  const handleSave = () => {
+    const num = parseFloat(inputVal) || 0;
+    if (num !== (value || 0)) onSave(num);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button data-testid={dataTestId} onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+        className={`w-full text-right px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-50 transition-colors ${value ? 'text-blue-700 font-semibold bg-blue-50' : 'text-gray-400'}`}>
+        {value ? (value > 0 ? `+${value}` : value) : '—'}
+      </button>
+    );
+  }
+  return (
+    <input ref={inputRef} type="number" value={inputVal} onChange={e => setInputVal(e.target.value)}
+      onBlur={handleSave} onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
+      className="w-16 text-right px-1 py-0.5 border border-blue-400 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+  );
+}
+
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
         <h3 className="font-semibold text-gray-900">Detailed Item-wise Report</h3>
+        {!isConsolidated && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -994,10 +1024,10 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {!isConsolidated && <th className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_qty" label="Diff" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[200px]" />
@@ -1010,10 +1040,14 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 <td className="py-2 px-3 font-mono">{row.barcode || '-'}</td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">{row.category || '-'}</td>
-                <td className="py-2 px-3 text-right">{(row.mrp || 0).toFixed(2)}</td>
-                <td className="py-2 px-3 text-right">{(row.cost || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
+                {!isConsolidated && (
+                  <td className="py-1 px-2 bg-blue-50/30">
+                    <RecoInput data-testid={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row.barcode, location: row.location, reco_qty: val })} />
+                  </td>
+                )}
+                <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>
                 <td className="py-2 px-3 text-right">
                   <span className={`px-1.5 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                     {row.diff_qty > 0 ? '+' : ''}{row.diff_qty}
