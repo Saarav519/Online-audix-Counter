@@ -177,12 +177,12 @@ def test_conflict_resolution_flow():
     # Find our conflict
     test_conflict = None
     for conflict in conflicts:
-        if conflict.get('location_name') == 'CONFLICT-TEST-LOC' and conflict.get('status') == 'pending':
+        if conflict.get('location_name') == test_location and conflict.get('status') == 'pending':
             test_conflict = conflict
             break
     
     if not test_conflict:
-        print("❌ Conflict for CONFLICT-TEST-LOC not found")
+        print(f"❌ Conflict for {test_location} not found")
         print(f"   Available conflicts: {[c.get('location_name') for c in conflicts]}")
         return False
         
