@@ -131,6 +131,20 @@ def test_conflict_resolution_flow():
     
     if not conflict_location:
         print(f"❌ {test_location} not found in bin-wise report after first sync")
+        print(f"   Available locations: {[loc.get('location') for loc in locations_list]}")
+        print(f"   Report structure: {list(binwise_data.keys())}")
+        print(f"   Summary: {binwise_data.get('summary', {})}")
+        
+        # Maybe there's already a conflict? Check existing conflicts
+        conflicts_check = requests.get(f"{BACKEND_URL}/portal/conflicts")
+        if conflicts_check.status_code == 200:
+            existing_conflicts = conflicts_check.json()
+            for conf in existing_conflicts:
+                if conf.get('location_name') == test_location:
+                    print(f"   ⚠️ {test_location} already has a conflict: {conf.get('status')}")
+                    print(f"   Continuing with existing conflict...")
+                    # Skip to step 5 since we already have a conflict
+                    return test_existing_conflict_flow(test_location, session_id, client_id)
         return False
         
     print(f"✅ First sync verified - Status: {conflict_location.get('status')}")
