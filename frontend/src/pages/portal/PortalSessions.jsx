@@ -165,6 +165,32 @@ export default function PortalSessions() {
     }
   };
 
+  const fetchStockData = async (sessionId) => {
+    setStockLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}/expected-stock`);
+      if (response.ok) {
+        const data = await response.json();
+        setStockData(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stock data:', error);
+      toast.error('Failed to load imported stock');
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  const handleViewStock = (session) => {
+    if (showStockViewer === session.id) {
+      setShowStockViewer(null);
+      setStockData([]);
+    } else {
+      setShowStockViewer(session.id);
+      fetchStockData(session.id);
+    }
+  };
+
   const getClientName = (clientId) => {
     const client = clients.find(c => c.id === clientId);
     return client ? client.name : 'Unknown';
