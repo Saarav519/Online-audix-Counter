@@ -610,10 +610,14 @@ Cold-Storage,8901234567895,Butter 500g,Dairy,280,240,80`;
                 </Button>
               </div>
               <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
-                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'Location, Barcode, Qty'}
-                {importingSession?.variance_mode === 'barcode-wise' && 'Barcode, Qty'}
-                {importingSession?.variance_mode === 'article-wise' && 'Barcode, Qty (article mapping comes from Master)'}
+                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'Location, Barcode, Description, Category, MRP, Cost, Qty'}
+                {importingSession?.variance_mode === 'barcode-wise' && 'Barcode, Description, Category, MRP, Cost, Qty'}
+                {importingSession?.variance_mode === 'article-wise' && 'Barcode, Description, Category, MRP, Cost, Qty'}
               </code>
+              <p className="text-xs text-gray-500 mt-1">
+                <strong>Required:</strong> {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') ? 'Location, Barcode, Qty' : 'Barcode, Qty'} &nbsp;|&nbsp; 
+                <strong>Optional (recommended):</strong> Description, Category, MRP, Cost
+              </p>
               <p className="text-xs text-gray-500 mt-2">
                 {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'One row per location + barcode with expected quantity.'}
                 {importingSession?.variance_mode === 'barcode-wise' && 'One row per barcode with expected quantity (aggregated across locations).'}
