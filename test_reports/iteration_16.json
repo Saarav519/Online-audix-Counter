@@ -1,0 +1,63 @@
+{
+  "summary": "Testing Report Value Columns (MRP/Cost Split) for Audix Counter. All 10 backend API tests PASSED. Frontend verification complete - all tables display correct value columns (Stock Val MRP/Cost, Phys Val MRP/Cost, Diff Val MRP/Cost). CSV export includes value columns.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_report_value_columns.py",
+    "/app/test_reports/pytest/pytest_report_value_columns.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All consolidated report endpoints return MRP/Cost value columns: detailed, barcode-wise, article-wise, category-summary",
+    "All session report endpoints return MRP/Cost value columns: detailed, barcode-wise, article-wise, category-summary",
+    "Consolidated bin-wise report shows pending locations with status field and summary.pending count",
+    "Frontend DetailedTable shows Stock Val(MRP), Stock Val(Cost), Phys Val(MRP), Phys Val(Cost), Diff Val(MRP), Diff Val(Cost)",
+    "Frontend BarcodeWiseTable shows all MRP/Cost value columns",
+    "Frontend ArticleWiseTable shows all MRP/Cost value columns",
+    "Frontend CategorySummaryTable shows all MRP/Cost value columns",
+    "CSV export includes all value columns for all report types",
+    "calc_values helper function correctly computes MRP and Cost values",
+    "All totals in API responses include value columns with proper aggregation"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_report_value_columns.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "100% - All tables verified with MRP/Cost columns"
+  },
+  "test_credentials": {
+    "username": "admin",
+    "password": "admin123",
+    "client_id": "77eff157-ed53-43b5-86ad-df67fd8ccc91",
+    "session_id": "451c28d8-5e2a-4f16-83b9-7eabdc35ea54"
+  },
+  "seed_data_creation": "Used existing client 'Nimans' with session 'Day 1' containing physical_qty data (125 qty in 5 locations synced by Rohit, Yogesh)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Report value columns (MRP/Cost split) testing complete. All backend endpoints verified: consolidated (detailed, barcode-wise, article-wise, category-summary, bin-wise) and session (detailed, barcode-wise, article-wise, category-summary). Frontend tables display columns correctly. CSV export includes value columns.",
+  "features_verified": {
+    "backend_consolidated_detailed_value_cols": "PASS - Returns stock_value_mrp, stock_value_cost, physical_value_mrp, physical_value_cost, diff_value_mrp, diff_value_cost",
+    "backend_consolidated_barcode_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_consolidated_article_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_consolidated_category_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_session_detailed_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_session_barcode_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_session_article_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_session_category_value_cols": "PASS - Returns all MRP/Cost value columns",
+    "backend_bin_wise_pending_locations": "PASS - Shows pending locations with status and summary.pending",
+    "backend_final_value_cols": "PASS - Consolidated reports include final_value_mrp and final_value_cost",
+    "frontend_detailed_table_cols": "PASS - Shows Stock Val(MRP), Stock Val(Cost), Phys Val(MRP), Phys Val(Cost), Diff Val(MRP), Diff Val(Cost)",
+    "frontend_barcode_table_cols": "PASS - Shows all MRP/Cost value columns",
+    "frontend_article_table_cols": "PASS - Shows all MRP/Cost value columns",
+    "frontend_category_table_cols": "PASS - Shows all MRP/Cost value columns",
+    "frontend_csv_export_cols": "PASS - CSV includes all value columns"
+  }
+}
