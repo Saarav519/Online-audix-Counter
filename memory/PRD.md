@@ -65,6 +65,17 @@ STORE clients:
     - Category summary correctly filters by selected session
     - Consolidated bin-wise shows pending locations
     - Barcode normalization prevents scientific notation mismatches
+15. **Schema Template Fix** (Feb 28, 2026)
+    - Template download now only shows fields enabled in the client's schema
+    - Default (no schema configured) shows only barcode field, forcing schema setup first
+16. **Session Stock Refresh** (Feb 28, 2026)
+    - "Refresh Stock" button on session cards for warehouse-type clients
+    - Re-snapshots latest client_stock into session's expected_stock
+    - Replaces old snapshot with fresh data
+17. **Report Table Scroll Fix** (Feb 28, 2026)
+    - All report tables now have max-h-[70vh] with sticky headers
+    - Horizontal scrollbar visible within the table container without scrolling down
+    - Headers stay visible while scrolling vertically through data
 
 ## Key Endpoints
 - `POST /api/sync/` + chunked flow → sync to inbox
