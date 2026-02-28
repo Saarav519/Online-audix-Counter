@@ -801,10 +801,31 @@ export default function PortalClients() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Download the template to see the exact columns configured for this client's schema.
-                Use the Schema button on the client card to configure fields.
-              </p>
+
+              {/* Dynamic Schema Columns Display */}
+              {masterSchemaLoading ? (
+                <p className="text-xs text-gray-400 mt-2">Loading schema...</p>
+              ) : masterSchemaFields.length > 0 ? (
+                <div className="mt-2">
+                  <p className="text-xs font-medium text-gray-600 mb-1.5">Expected Columns (from Schema):</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {masterSchemaFields.map(f => (
+                      <span key={f.name} className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.required ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-700'}`}>
+                        {f.label || f.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        {f.required && ' *'}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    * = required. Use the Schema button on the client card to configure fields.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  Download the template to see the exact columns configured for this client's schema.
+                  Use the Schema button on the client card to configure fields.
+                </p>
+              )}
             </div>
 
             {/* Upload Area */}
