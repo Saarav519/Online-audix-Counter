@@ -512,8 +512,9 @@ async def download_schema_template(client_id: str, template_type: str = "master"
     """Download a CSV template based on the client's schema."""
     schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
     if not schema:
-        # Use default
-        enabled_fields = [f["name"] for f in STANDARD_MASTER_FIELDS]
+        # Use default schema - only barcode (required) enabled, rest disabled
+        # This forces users to configure schema before importing
+        enabled_fields = ["barcode"]
     else:
         enabled_fields = [f["name"] for f in schema["fields"] if f.get("enabled", True)]
 
