@@ -940,13 +940,13 @@ export default function PortalReports() {
     
     if (reportType === 'bin-wise') {
       if (isConsolidatedView) {
-        csv = 'Status,Location,Stock Qty,Physical Qty,Final Qty,Difference,Accuracy %,Remarks\n';
+        csv = 'Status,Location,Stock Qty,Physical Qty,Reco Qty,Final Qty,Difference,Accuracy %,Remarks\n';
         rows.forEach(row => {
           const status = row.status === 'empty_bin' ? 'Empty Bin' : row.status === 'pending' ? 'Pending' : row.status === 'conflict' ? 'Conflict' : 'Completed';
-          csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.final_qty ?? row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
+          csv += `"${status}","${row.location}",${row.stock_qty},${row.physical_qty},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.difference_qty},${row.accuracy_pct}%,"${row.remark}"\n`;
         });
         const t = filteredData.totals;
-        csv += `"","TOTAL",${t.stock_qty},${t.physical_qty},${t.final_qty ?? t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
+        csv += `"","TOTAL",${t.stock_qty},${t.physical_qty},${t.reco_qty || 0},${t.final_qty ?? t.physical_qty},${t.difference_qty},${t.accuracy_pct}%,""\n`;
       } else {
         csv = 'Status,Location,Stock Qty,Physical Qty,Difference,Accuracy %,Remarks\n';
         rows.forEach(row => {
