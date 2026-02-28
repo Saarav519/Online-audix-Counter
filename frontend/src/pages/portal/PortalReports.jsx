@@ -878,40 +878,6 @@ export default function PortalReports() {
         )}
       </div>
 
-      {/* Daily Progress */}
-      {selectedSession && dailyProgress.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-emerald-500" />
-            Daily Progress
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 px-3 font-medium text-gray-600">Date</th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600">Locations</th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600">Items</th>
-                  <th className="text-right py-2 px-3 font-medium text-gray-600">Quantity</th>
-                  <th className="text-left py-2 px-3 font-medium text-gray-600">Devices</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailyProgress.map((day, index) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2 px-3 font-medium">{day.date}</td>
-                    <td className="py-2 px-3 text-right">{day.locations}</td>
-                    <td className="py-2 px-3 text-right">{day.items}</td>
-                    <td className="py-2 px-3 text-right">{day.quantity}</td>
-                    <td className="py-2 px-3">{day.devices.join(', ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
       {/* Report Content */}
       {!selectedSession ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
@@ -938,16 +904,13 @@ export default function PortalReports() {
         <>
           {/* Summary Cards */}
           {filteredData.totals && (
-            <div className={`grid grid-cols-2 ${selectedSession === '__consolidated__' ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-3 mb-6`}>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
               <SummaryCard label="Stock Qty" value={filteredData.totals.stock_qty || 0} />
+              <SummaryCard label="Stock Value" value={(filteredData.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
               <SummaryCard label="Physical Qty" value={filteredData.totals.physical_qty || 0} />
-              {selectedSession === '__consolidated__' && (filteredData.totals.reco_qty !== undefined && filteredData.totals.reco_qty !== 0) && (
-                <SummaryCard label="Reco Adj" value={filteredData.totals.reco_qty || 0} variant={true} />
-              )}
-              {selectedSession === '__consolidated__' ? (
-                <SummaryCard label="Final Qty" value={filteredData.totals.final_qty || filteredData.totals.physical_qty || 0} />
-              ) : null}
-              <SummaryCard label="Difference" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
+              <SummaryCard label="Physical Value" value={(filteredData.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              <SummaryCard label="Difference Qty" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
+              <SummaryCard label="Difference Value" value={(filteredData.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
               <SummaryCard label="Accuracy" value={`${filteredData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={filteredData.totals.accuracy_pct || 0} />
             </div>
           )}
