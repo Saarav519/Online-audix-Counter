@@ -6,7 +6,7 @@ AUDIX Admin Portal - Variance Mode Feature Testing
 This script tests the new variance mode functionality in the AUDIX Admin Portal backend
 following the exact test flow specified in the review request.
 
-Backend URL: https://reco-reports-fix.preview.emergentagent.com
+Backend URL: https://code-review-hub-19.preview.emergentagent.com
 
 Test Flow:
 1. Portal Login (register + login)
@@ -29,7 +29,7 @@ import sys
 
 class VarianceModeBackendTester:
     def __init__(self):
-        self.base_url = "https://reco-reports-fix.preview.emergentagent.com"
+        self.base_url = "https://code-review-hub-19.preview.emergentagent.com"
         self.api_url = f"{self.base_url}/api"
         self.portal_url = f"{self.base_url}/api/portal"
         self.sync_url = f"{self.base_url}/api/sync"

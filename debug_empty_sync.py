@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Backend configuration
-BACKEND_URL = "https://reco-reports-fix.preview.emergentagent.com"
+BACKEND_URL = "https://code-review-hub-19.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 def debug_sync_and_report():

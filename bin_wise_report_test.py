@@ -2,7 +2,7 @@
 """
 AUDIX Backend Testing - Bin-wise Report with Empty Bins and Pending Locations
 Testing Flow as specified in review request.
-Backend URL: https://reco-reports-fix.preview.emergentagent.com
+Backend URL: https://code-review-hub-19.preview.emergentagent.com
 """
 
 import requests
@@ -12,7 +12,7 @@ from datetime import datetime
 import sys
 
 # Backend configuration
-BACKEND_URL = "https://reco-reports-fix.preview.emergentagent.com"
+BACKEND_URL = "https://code-review-hub-19.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class BinWiseReportTester:

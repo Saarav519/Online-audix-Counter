@@ -9,7 +9,7 @@ import io
 import sys
 
 # Backend URL
-BASE_URL = "https://reco-reports-fix.preview.emergentagent.com"
+BASE_URL = "https://code-review-hub-19.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 def test_backward_compatibility():
