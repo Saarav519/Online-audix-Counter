@@ -318,7 +318,7 @@ export default function PortalSessions() {
                       </span>
                       {session.expected_stock_imported && (
                         <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                          Stock Imported
+                          {session.stock_snapshot ? 'Stock: Snapshot' : 'Stock Imported'}
                         </span>
                       )}
                     </div>
