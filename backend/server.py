@@ -1286,6 +1286,53 @@ async def get_forward_batches(session_id: str = None, client_id: str = None):
     batches = await db.forward_batches.find(query, {"_id": 0}).sort("forwarded_at", -1).to_list(100)
     return batches
 
+@portal_router.delete("/forward-batches/{batch_id}")
+async def delete_forward_batch(batch_id: str):
+    """Rollback a forward batch: remove data from variance, reset inbox to pending, delete batch record."""
+    batch = await db.forward_batches.find_one({"id": batch_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    session_id = batch["session_id"]
+
+    # Find all inbox entries that were part of this batch
+    inbox_entries = await db.sync_inbox.find(
+        {"forward_batch_id": batch_id}, {"_id": 0}
+    ).to_list(100000)
+
+    # Remove forwarded locations from synced_locations
+    location_names = list(set(e["location_name"] for e in inbox_entries))
+    if location_names:
+        await db.synced_locations.delete_many({
+            "session_id": session_id,
+            "location_name": {"$in": location_names}
+        })
+
+    # Also remove any conflicts created by this batch's forward
+    # (conflicts where location_name matches and created_at >= batch forwarded_at)
+    batch_time = batch.get("forwarded_at", "")
+    if batch_time and location_names:
+        await db.conflict_locations.delete_many({
+            "session_id": session_id,
+            "location_name": {"$in": location_names},
+            "created_at": {"$gte": batch_time}
+        })
+
+    # Reset inbox entries back to "pending"
+    await db.sync_inbox.update_many(
+        {"forward_batch_id": batch_id},
+        {"$set": {"status": "pending", "forward_batch_id": None}}
+    )
+
+    # Delete the batch record
+    await db.forward_batches.delete_one({"id": batch_id})
+
+    return {
+        "message": f"Batch rolled back. {len(location_names)} locations removed from variance. Data is back in the inbox for re-forwarding.",
+        "locations_rolled_back": len(location_names),
+        "inbox_entries_reset": len(inbox_entries)
+    }
+
 @sync_router.get("/config")
 async def get_sync_config():
     """Get available clients and sessions for device configuration"""
