@@ -187,6 +187,25 @@ export default function PortalSyncLogs() {
     }
   };
 
+  const handleDeleteBatch = async (batchId) => {
+    if (!window.confirm('Are you sure? This will remove all data from this batch from variance and push it back to the inbox for re-forwarding.')) return;
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/forward-batches/${batchId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Delete failed');
+      }
+      const result = await response.json();
+      toast.success(`Batch rolled back! ${result.locations_rolled_back} locations removed from variance. Data is back in inbox.`);
+      fetchForwardBatches();
+      fetchInboxSummary();
+    } catch (error) {
+      toast.error(`Delete failed: ${error.message}`);
+    }
+  };
+
   const handleExportDayLogs = async (clientId, date, clientName) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/portal/sync-logs/export?client_id=${clientId}&date=${date}`);
