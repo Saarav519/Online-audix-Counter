@@ -2102,6 +2102,7 @@ async def get_consolidated_detailed(client_id: str):
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
     reco_maps = await _build_reco_maps(client_id)
+    extra_columns = await _get_extra_columns_for_client(client_id)
     
     expected_map = {}
     physical_map = {}
