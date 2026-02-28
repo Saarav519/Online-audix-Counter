@@ -379,6 +379,7 @@ export default function PortalSessions() {
                         onClick={() => {
                           setImportingSession(session);
                           setShowImportDialog(true);
+                          fetchSchemaForSession(session);
                         }}
                       >
                         <Upload className="w-4 h-4 mr-1" />
