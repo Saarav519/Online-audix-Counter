@@ -2069,3 +2069,25 @@ agent_communication:
       
       🎉 **CONCLUSION**: CONFLICT RESOLUTION SYSTEM IS FULLY OPERATIONAL AND PRODUCTION-READY. All requested verification points confirmed working correctly. The system properly handles duplicate location scans from different devices, provides admin review workflows, maintains data integrity during resolution, and integrates seamlessly with reporting and dashboard systems.
 
+  - agent: "main"
+    message: |
+      Fixed schema not showing in Stock Upload dialog:
+      
+      ISSUE: Schema-configured fields (e.g. Barcode, Description, Category, MRP) were visible in
+      Master Upload dialog but NOT in the Session Import Stock dialog. The stock dialog showed 
+      hardcoded "Required: Barcode, Qty" instead of the actual schema columns.
+      
+      FIX APPLIED (Frontend only, no backend changes):
+      
+      1. PortalSessions.jsx:
+         - Added schema fetch when Import Stock dialog opens (fetchSchemaForSession)
+         - Dynamic "Expected Columns (from Schema)" display with color-coded tags
+         - Location shown for bin-wise mode, Qty always appended
+         - Required fields marked with green indicator
+      
+      2. PortalClients.jsx:
+         - Master Upload dialog now also shows schema column tags (consistency)
+         - Warehouse Stock Upload dialog also shows schema column tags
+         - Schema fetched in parallel with stats when dialog opens
+      
+      Testing agent should verify backend APIs remain healthy.
