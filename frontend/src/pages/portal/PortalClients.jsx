@@ -331,15 +331,27 @@ export default function PortalClients() {
     setMasterClient(client);
     setMasterStats(null);
     setShowMasterDialog(true);
+    setMasterSchemaFields([]);
+    setMasterSchemaLoading(true);
 
-    // Fetch stats
+    // Fetch stats and schema in parallel
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products/stats`);
-      if (res.ok) {
-        setMasterStats(await res.json());
+      const [statsRes, schemaRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products/stats`),
+        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`)
+      ]);
+      if (statsRes.ok) {
+        setMasterStats(await statsRes.json());
+      }
+      if (schemaRes.ok) {
+        const schemaData = await schemaRes.json();
+        const enabledFields = (schemaData.fields || []).filter(f => f.enabled);
+        setMasterSchemaFields(enabledFields);
       }
     } catch (err) {
-      console.error('Failed to fetch master stats:', err);
+      console.error('Failed to fetch master stats/schema:', err);
+    } finally {
+      setMasterSchemaLoading(false);
     }
   };
 
