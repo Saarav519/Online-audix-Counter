@@ -2036,13 +2036,14 @@ async def get_master_for_session(session_id: str) -> dict:
     return master_by_barcode
 
 def calc_accuracy(expected_qty: float, physical_qty: float) -> float:
-    """Calculate percentage accuracy"""
+    """Calculate percentage accuracy based on absolute difference"""
     if expected_qty == 0 and physical_qty == 0:
         return 100.0
     if expected_qty == 0:
         return 0.0
-    accuracy = (min(physical_qty, expected_qty) / expected_qty) * 100
-    return round(min(accuracy, 100.0), 1)
+    diff = abs(expected_qty - physical_qty)
+    accuracy = ((expected_qty - diff) / expected_qty) * 100
+    return round(max(accuracy, 0.0), 1)
 
 def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, in_master: bool = True, scanned: bool = True, in_product_master: bool = True, in_expected_stock: bool = True) -> str:
     """Generate professional remark based on variance.
