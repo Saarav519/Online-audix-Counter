@@ -712,6 +712,9 @@ export default function PortalClients() {
                     <th className="text-right p-2 font-medium text-gray-600">Cost</th>
                     <th className="text-left p-2 font-medium text-gray-600">Article Code</th>
                     <th className="text-left p-2 font-medium text-gray-600">Article Name</th>
+                    {masterExtraColumns.map(col => (
+                      <th key={col.name} className="text-left p-2 font-medium text-purple-600">{col.label}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -729,6 +732,9 @@ export default function PortalClients() {
                       <td className="p-2 text-right">{product.cost > 0 ? product.cost.toFixed(2) : '-'}</td>
                       <td className="p-2 text-xs">{product.article_code || '-'}</td>
                       <td className="p-2 text-xs">{product.article_name || '-'}</td>
+                      {masterExtraColumns.map(col => (
+                        <td key={col.name} className="p-2 text-xs text-purple-700">{product.custom_fields?.[col.name] || '-'}</td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
