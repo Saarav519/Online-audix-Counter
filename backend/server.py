@@ -449,6 +449,19 @@ COMMON_OPTIONAL_FIELDS = [
 
 STANDARD_MASTER_FIELD_NAMES = {"barcode", "description", "category", "mrp", "cost", "article_code", "article_name"}
 
+def normalize_barcode(value):
+    """Convert scientific notation barcodes (8.9044E+12) to proper string"""
+    if not value:
+        return ''
+    value = str(value).strip()
+    try:
+        float_val = float(value)
+        if 'e' in value.lower() or float_val > 1e9:
+            return str(int(float_val))
+    except (ValueError, OverflowError):
+        pass
+    return value
+
 class SchemaField(BaseModel):
     name: str
     label: str
