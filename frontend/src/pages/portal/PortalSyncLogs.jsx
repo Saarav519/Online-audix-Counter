@@ -52,7 +52,13 @@ export default function PortalSyncLogs() {
       fetchInboxSummary();
       fetchForwardBatches();
     } else if (activeTab === 'logs') {
-      fetchGroupedLogs();
+      if (selectedClient) {
+        fetchScannerLogs();
+      } else {
+        fetchGroupedLogs();
+      }
+    } else if (activeTab === 'batches' && selectedSession) {
+      fetchForwardBatches();
     }
   }, [activeTab, selectedSession, selectedClient]);
 
