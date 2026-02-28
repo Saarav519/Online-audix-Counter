@@ -705,6 +705,231 @@ export default function PortalReports() {
 
   const isConsolidatedView = selectedSession === '__consolidated__';
 
+  // ============ Column Settings Logic ============
+  const isRecoEditable = useMemo(() => {
+    if (!isConsolidatedView || !sessionInfo) return false;
+    if (reportType === 'detailed') return sessionInfo.variance_mode === 'bin-wise';
+    if (reportType === 'barcode-wise') return sessionInfo.variance_mode === 'barcode-wise';
+    if (reportType === 'article-wise') return sessionInfo.variance_mode === 'article-wise';
+    return false;
+  }, [isConsolidatedView, sessionInfo, reportType]);
+
+  const extraColumns = useMemo(() => reportData?.extra_columns || [], [reportData]);
+
+  const columnConfig = useMemo(() => {
+    const ec = extraColumns.map(c => ({ key: c.name, label: c.label }));
+    switch (reportType) {
+      case 'bin-wise':
+        return [
+          { key: 'status', label: 'Status' },
+          { key: 'location', label: 'Location' },
+          { key: 'stock_qty', label: 'Stock Qty' },
+          { key: 'physical_qty', label: 'Physical' },
+          ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          { key: 'difference_qty', label: 'Difference' },
+          { key: 'accuracy_pct', label: 'Accuracy %' },
+          { key: 'remark', label: 'Remarks' },
+        ];
+      case 'detailed':
+        return [
+          { key: 'location', label: 'Location' },
+          { key: 'barcode', label: 'Barcode' },
+          { key: 'description', label: 'Description' },
+          { key: 'category', label: 'Category' },
+          ...ec,
+          { key: 'stock_qty', label: 'Stock Qty' },
+          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
+          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          { key: 'physical_qty', label: 'Physical Qty' },
+          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
+          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...(isRecoEditable ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          { key: 'diff_qty', label: 'Diff Qty' },
+          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
+          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          { key: 'accuracy_pct', label: 'Accuracy' },
+          { key: 'remark', label: 'Remarks' },
+        ];
+      case 'barcode-wise':
+        return [
+          { key: 'barcode', label: 'Barcode' },
+          { key: 'description', label: 'Description' },
+          { key: 'category', label: 'Category' },
+          ...ec,
+          { key: 'stock_qty', label: 'Stock Qty' },
+          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
+          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          { key: 'physical_qty', label: 'Physical' },
+          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
+          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...(isRecoEditable ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          { key: 'diff_qty', label: 'Diff Qty' },
+          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
+          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          { key: 'accuracy_pct', label: 'Accuracy' },
+          { key: 'remark', label: 'Remarks' },
+        ];
+      case 'article-wise':
+        return [
+          { key: '_expand', label: 'Expand' },
+          { key: 'article_code', label: 'Article Code' },
+          { key: 'article_name', label: 'Article Name' },
+          { key: 'category', label: 'Category' },
+          ...ec,
+          { key: 'barcode_count', label: 'Barcodes' },
+          { key: 'stock_qty', label: 'Stock Qty' },
+          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
+          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          { key: 'physical_qty', label: 'Physical' },
+          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
+          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...(isRecoEditable ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          { key: 'diff_qty', label: 'Diff Qty' },
+          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
+          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          { key: 'accuracy_pct', label: 'Accuracy' },
+          { key: 'remark', label: 'Remarks' },
+        ];
+      case 'category-summary':
+        return [
+          { key: 'category', label: 'Category' },
+          { key: 'item_count', label: 'Items' },
+          { key: 'stock_qty', label: 'Stock Qty' },
+          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
+          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          { key: 'physical_qty', label: 'Physical' },
+          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
+          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          { key: 'diff_qty', label: 'Diff Qty' },
+          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
+          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          { key: 'accuracy_pct', label: 'Accuracy' },
+          { key: 'remark', label: 'Remarks' },
+        ];
+      default:
+        return [];
+    }
+  }, [reportType, isConsolidatedView, isRecoEditable, extraColumns]);
+
+  // Reset column settings when report type changes
+  useEffect(() => {
+    setHiddenColumns(new Set());
+    setFrozenColumns(new Set());
+  }, [reportType, selectedSession]);
+
+  // Apply frozen/hidden column styles via DOM
+  useEffect(() => {
+    if (!tableContainerRef.current) return;
+    const table = tableContainerRef.current.querySelector('table');
+    if (!table) return;
+
+    const headerCells = Array.from(table.querySelectorAll('thead > tr > th'));
+    const bodyRows = Array.from(table.querySelectorAll('tbody > tr'));
+    const footRows = Array.from(table.querySelectorAll('tfoot > tr'));
+
+    // Reset all inline styles
+    headerCells.forEach(th => {
+      th.classList.remove('frozen-col-header');
+      th.style.removeProperty('left');
+      th.style.removeProperty('display');
+    });
+    [...bodyRows, ...footRows].forEach(row => {
+      Array.from(row.children).forEach(td => {
+        td.classList.remove('frozen-col', 'frozen-col-footer');
+        td.style.removeProperty('left');
+        td.style.removeProperty('display');
+      });
+    });
+
+    // Build column index map
+    const colMap = {};
+    headerCells.forEach((th, idx) => {
+      const col = th.getAttribute('data-col');
+      if (col) colMap[col] = idx;
+    });
+
+    // Apply hidden columns
+    hiddenColumns.forEach(colKey => {
+      const idx = colMap[colKey];
+      if (idx === undefined) return;
+      headerCells[idx].style.display = 'none';
+      bodyRows.forEach(row => {
+        if (row.children[idx]) row.children[idx].style.display = 'none';
+      });
+      // For tfoot, check if columns match (skip if colSpan used)
+      footRows.forEach(row => {
+        if (row.children.length === headerCells.length && row.children[idx]) {
+          row.children[idx].style.display = 'none';
+        }
+      });
+    });
+
+    // Apply frozen columns (in DOM order for correct left offset)
+    let offset = 0;
+    headerCells.forEach((th, idx) => {
+      const col = th.getAttribute('data-col');
+      if (!col || !frozenColumns.has(col) || hiddenColumns.has(col)) return;
+
+      const width = th.getBoundingClientRect().width;
+      th.classList.add('frozen-col-header');
+      th.style.left = offset + 'px';
+
+      bodyRows.forEach(row => {
+        const cell = row.children[idx];
+        if (cell) {
+          cell.classList.add('frozen-col');
+          cell.style.left = offset + 'px';
+        }
+      });
+
+      footRows.forEach(row => {
+        if (row.children.length === headerCells.length && row.children[idx]) {
+          row.children[idx].classList.add('frozen-col-footer');
+          row.children[idx].style.left = offset + 'px';
+        }
+      });
+
+      offset += width;
+    });
+  }, [hiddenColumns, frozenColumns, reportType, filteredData, selectedSession]);
+
+  const toggleColumnVisibility = useCallback((colKey) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(colKey)) next.delete(colKey);
+      else next.add(colKey);
+      return next;
+    });
+    // Unfreeze if hidden
+    setFrozenColumns(prev => {
+      const next = new Set(prev);
+      next.delete(colKey);
+      return next;
+    });
+  }, []);
+
+  const toggleColumnFreeze = useCallback((colKey) => {
+    setFrozenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(colKey)) next.delete(colKey);
+      else next.add(colKey);
+      return next;
+    });
+  }, []);
+
+  const showAllColumns = useCallback(() => {
+    setHiddenColumns(new Set());
+  }, []);
+
+  const resetColumnSettings = useCallback(() => {
+    setHiddenColumns(new Set());
+    setFrozenColumns(new Set());
+  }, []);
+
   const exportCSV = () => {
     if (!filteredData) return;
 
