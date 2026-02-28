@@ -1372,7 +1372,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 </tr>
                 {expandedRows.has(i) && (
                   <tr className="bg-purple-50/50">
-                    <td colSpan="12" className="py-2 px-6">
+                    <td colSpan={12 + extraColumns.length} className="py-2 px-6">
                       <div className="flex flex-wrap gap-2 items-center">
                         <span className="text-xs font-medium text-purple-700 mr-1">Barcodes:</span>
                         {(row.barcodes || []).map((bc, j) => (
