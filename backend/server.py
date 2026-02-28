@@ -2999,11 +2999,13 @@ async def get_category_summary(session_id: str):
         master_info = master_by_barcode.get(bc, {})
         cat = e.get("category", "") or master_info.get("category", "") or "Uncategorized"
         cost = e.get("cost", 0) or master_info.get("cost", 0)
-        barcode_info[bc] = {"category": cat, "cost": cost}
+        mrp = e.get("mrp", 0) or master_info.get("mrp", 0)
+        barcode_info[bc] = {"category": cat, "cost": cost, "mrp": mrp}
         if cat not in expected_by_category:
-            expected_by_category[cat] = {"qty": 0, "value": 0, "item_count": 0}
+            expected_by_category[cat] = {"qty": 0, "value_mrp": 0, "value_cost": 0, "item_count": 0}
         expected_by_category[cat]["qty"] += e.get("qty", 0)
-        expected_by_category[cat]["value"] += e.get("qty", 0) * cost
+        expected_by_category[cat]["value_mrp"] += e.get("qty", 0) * mrp
+        expected_by_category[cat]["value_cost"] += e.get("qty", 0) * cost
         expected_by_category[cat]["item_count"] += 1
     
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
@@ -3013,34 +3015,33 @@ async def get_category_summary(session_id: str):
             bc = item["barcode"]
             if bc not in barcode_info:
                 master_info = master_by_barcode.get(bc, {})
-                barcode_info[bc] = {"category": master_info.get("category", "") or "Unmapped", "cost": master_info.get("cost", 0)}
+                barcode_info[bc] = {"category": master_info.get("category", "") or "Unmapped", "cost": master_info.get("cost", 0), "mrp": master_info.get("mrp", 0)}
             physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item["quantity"]
     
-    # Apply reco at barcode level, then aggregate by category
     barcode_reco = reco_maps["barcode"]
     article_reco = reco_maps["article"]
     
-    # Build final_qty per barcode
     all_barcodes = set(barcode_info.keys()) | set(physical_by_barcode.keys()) | set(barcode_reco.keys())
     
     physical_by_category = {}
     reco_by_category = {}
     
     for bc in all_barcodes:
-        info = barcode_info.get(bc, {"category": "Unmapped", "cost": 0})
+        info = barcode_info.get(bc, {"category": "Unmapped", "cost": 0, "mrp": 0})
         cat = info["category"]
         cost = info["cost"]
+        mrp = info["mrp"]
         phy = physical_by_barcode.get(bc, 0)
         reco = barcode_reco.get(bc, 0)
         if cat not in physical_by_category:
-            physical_by_category[cat] = {"qty": 0, "value": 0}
+            physical_by_category[cat] = {"qty": 0, "value_mrp": 0, "value_cost": 0}
         if cat not in reco_by_category:
             reco_by_category[cat] = 0
         physical_by_category[cat]["qty"] += phy
-        physical_by_category[cat]["value"] += phy * cost
+        physical_by_category[cat]["value_mrp"] += phy * mrp
+        physical_by_category[cat]["value_cost"] += phy * cost
         reco_by_category[cat] += reco
     
-    # Handle article-level reco for article-wise sessions
     if article_reco:
         session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
         if session and session.get("variance_mode") == "article-wise":
@@ -3058,48 +3059,49 @@ async def get_category_summary(session_id: str):
     all_categories = set(expected_by_category.keys()) | set(physical_by_category.keys())
     
     report = []
-    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0, "item_count": 0}
+    totals = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "diff_qty": 0,
+              "stock_value_mrp": 0, "physical_value_mrp": 0, "final_value_mrp": 0, "diff_value_mrp": 0,
+              "stock_value_cost": 0, "physical_value_cost": 0, "final_value_cost": 0, "diff_value_cost": 0}
     
     for cat in sorted(all_categories):
-        exp = expected_by_category.get(cat, {"qty": 0, "value": 0, "item_count": 0})
-        phy = physical_by_category.get(cat, {"qty": 0, "value": 0})
+        exp = expected_by_category.get(cat, {"qty": 0, "value_mrp": 0, "value_cost": 0, "item_count": 0})
+        phy = physical_by_category.get(cat, {"qty": 0, "value_mrp": 0, "value_cost": 0})
         reco = reco_by_category.get(cat, 0)
         
         stock_qty = exp["qty"]
-        stock_value = exp["value"]
         physical_qty = phy["qty"]
-        physical_value = phy["value"]
         reco_qty = reco
         final_qty = physical_qty + reco_qty
-        # Approximate final_value: scale physical_value proportionally
-        final_value = physical_value + (reco_qty * (physical_value / physical_qty if physical_qty > 0 else (stock_value / stock_qty if stock_qty > 0 else 0)))
         diff_qty = final_qty - stock_qty
-        diff_value = final_value - stock_value
         item_count = exp["item_count"]
+        
+        avg_mrp = phy["value_mrp"] / physical_qty if physical_qty > 0 else (exp["value_mrp"] / stock_qty if stock_qty > 0 else 0)
+        avg_cost = phy["value_cost"] / physical_qty if physical_qty > 0 else (exp["value_cost"] / stock_qty if stock_qty > 0 else 0)
+        fv_mrp = phy["value_mrp"] + reco_qty * avg_mrp
+        fv_cost = phy["value_cost"] + reco_qty * avg_cost
+        dv_mrp = fv_mrp - exp["value_mrp"]
+        dv_cost = fv_cost - exp["value_cost"]
         
         accuracy = calc_accuracy(stock_qty, final_qty)
         in_master = cat in expected_by_category
         scanned = cat in physical_by_category
         remark = generate_remark(stock_qty, final_qty, accuracy, in_master, scanned)
         
-        for k, v in [("stock_qty", stock_qty), ("stock_value", stock_value), ("physical_qty", physical_qty), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value), ("item_count", item_count)]:
-            totals[k] += v
+        totals["item_count"] += item_count; totals["stock_qty"] += stock_qty; totals["physical_qty"] += physical_qty
+        totals["reco_qty"] += reco_qty; totals["final_qty"] += final_qty; totals["diff_qty"] += diff_qty
+        totals["stock_value_mrp"] += exp["value_mrp"]; totals["physical_value_mrp"] += phy["value_mrp"]; totals["final_value_mrp"] += fv_mrp; totals["diff_value_mrp"] += dv_mrp
+        totals["stock_value_cost"] += exp["value_cost"]; totals["physical_value_cost"] += phy["value_cost"]; totals["final_value_cost"] += fv_cost; totals["diff_value_cost"] += dv_cost
         
         report.append({
             "category": cat, "item_count": item_count,
-            "stock_qty": stock_qty, "stock_value": round(stock_value, 2),
-            "physical_qty": physical_qty, "physical_value": round(physical_value, 2),
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
-            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+            "stock_qty": stock_qty, "stock_value_mrp": round(exp["value_mrp"], 2), "stock_value_cost": round(exp["value_cost"], 2),
+            "physical_qty": physical_qty, "physical_value_mrp": round(phy["value_mrp"], 2), "physical_value_cost": round(phy["value_cost"], 2),
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": round(fv_mrp, 2), "final_value_cost": round(fv_cost, 2),
+            "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2), "accuracy_pct": accuracy, "remark": remark
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    totals["stock_value"] = round(totals["stock_value"], 2)
-    totals["physical_value"] = round(totals["physical_value"], 2)
-    totals["final_value"] = round(totals["final_value"], 2)
-    totals["diff_value"] = round(totals["diff_value"], 2)
-    
-    return {"report": report, "totals": totals}
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
 
 @portal_router.get("/reports/{session_id}/daily-progress")
 async def get_daily_progress(session_id: str):
