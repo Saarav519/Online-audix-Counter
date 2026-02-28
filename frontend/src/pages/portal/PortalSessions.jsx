@@ -71,6 +71,25 @@ export default function PortalSessions() {
     fetchData();
   }, []);
 
+  // Fetch schema when Import Stock dialog opens
+  const fetchSchemaForSession = async (session) => {
+    if (!session?.client_id) return;
+    setSchemaLoading(true);
+    setSchemaFields([]);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${session.client_id}/schema`);
+      if (res.ok) {
+        const data = await res.json();
+        const enabledFields = (data.fields || []).filter(f => f.enabled);
+        setSchemaFields(enabledFields);
+      }
+    } catch (err) {
+      console.error('Failed to fetch schema:', err);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
