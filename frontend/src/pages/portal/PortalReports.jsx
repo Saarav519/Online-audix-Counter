@@ -872,7 +872,7 @@ export default function PortalReports() {
                 </button>
               ))}
             </div>
-            {filteredData && reportData && (
+            {filteredData && reportData && filteredData.report && reportData.report && (
               <span className="text-xs text-gray-400 ml-auto">
                 Showing {filteredData.report.length} of {reportData.report.length} rows
               </span>
