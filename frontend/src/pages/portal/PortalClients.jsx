@@ -124,7 +124,7 @@ export default function PortalClients() {
       toast.success(editingClient ? 'Client updated!' : 'Client created!');
       setShowDialog(false);
       setEditingClient(null);
-      setFormData({ name: '', code: '', address: '', contact_person: '', contact_phone: '' });
+      setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
       fetchClients();
     } catch (error) {
       toast.error(error.message);
@@ -136,6 +136,7 @@ export default function PortalClients() {
     setFormData({
       name: client.name,
       code: client.code,
+      client_type: client.client_type || 'store',
       address: client.address || '',
       contact_person: client.contact_person || '',
       contact_phone: client.contact_phone || ''
