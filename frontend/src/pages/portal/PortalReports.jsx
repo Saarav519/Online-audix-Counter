@@ -1017,11 +1017,11 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
           )}
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} /> sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1147,9 +1147,9 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
         <h3 className="font-semibold text-gray-900">Detailed Item-wise Report</h3>
         {isRecoEditable && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-xs">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
