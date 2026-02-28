@@ -1434,13 +1434,17 @@ async def get_sync_logs_by_scanner(client_id: str = None, session_id: str = None
     return result
 
 @portal_router.get("/sync-logs/export")
-async def export_sync_logs(client_id: str, date: str):
-    """Export sync logs for a specific client and date as CSV"""
-    query = {"client_id": client_id, "sync_date": date}
+async def export_sync_logs(client_id: str, date: str = None, session_id: str = None):
+    """Export sync logs as CSV. Filter by client + optional date or session."""
+    query = {"client_id": client_id}
+    if date:
+        query["sync_date"] = date
+    if session_id:
+        query["session_id"] = session_id
     logs = await db.sync_raw_logs.find(query, {"_id": 0}).sort("synced_at", 1).to_list(100000)
     
     if not logs:
-        raise HTTPException(status_code=404, detail="No logs found for this client and date")
+        raise HTTPException(status_code=404, detail="No logs found")
     
     # Get client name
     client = await db.clients.find_one({"id": client_id}, {"_id": 0, "name": 1, "code": 1})
@@ -1449,7 +1453,7 @@ async def export_sync_logs(client_id: str, date: str):
     # Build CSV
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Log ID", "Device", "Session ID", "Sync Time", "Location", "Barcode", "Product Name", "Quantity", "Scanned At"])
+    writer.writerow(["Log ID", "Device", "Session ID", "Sync Date", "Sync Time", "Location", "Barcode", "Product Name", "Quantity", "Scanned At"])
     
     for log in logs:
         for loc in (log.get("raw_payload", {}).get("locations", [])):
@@ -1459,6 +1463,7 @@ async def export_sync_logs(client_id: str, date: str):
                     log.get("id", ""),
                     log.get("device_name", ""),
                     log.get("session_id", ""),
+                    log.get("sync_date", ""),
                     log.get("synced_at", ""),
                     loc_name,
                     item.get("barcode", ""),
@@ -1468,6 +1473,8 @@ async def export_sync_logs(client_id: str, date: str):
                 ])
     
     csv_content = output.getvalue()
+    
+    suffix = f"_{date}" if date else f"_session" if session_id else "_all"
     
     return StreamingResponse(
         iter([csv_content]),
