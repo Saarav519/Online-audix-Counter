@@ -653,7 +653,7 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
     for row in reader:
         norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
         
-        barcode = norm_row.get('barcode', '')
+        barcode = normalize_barcode(norm_row.get('barcode', ''))
         if not barcode:
             continue
         
