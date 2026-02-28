@@ -2733,10 +2733,10 @@ async def get_detailed_report(session_id: str):
         reco_qty = reco_maps["detailed"].get(key, 0)
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
-        stock_value = stock_qty * cost
-        physical_value = physical_qty * cost
-        final_value = final_qty * cost
-        diff_value = final_value - stock_value
+        sv = calc_values(stock_qty, mrp, cost)
+        pv = calc_values(physical_qty, mrp, cost)
+        fv = calc_values(final_qty, mrp, cost)
+        dv_mrp = fv["mrp"] - sv["mrp"]; dv_cost = fv["cost"] - sv["cost"]
         
         accuracy = calc_accuracy(stock_qty, final_qty)
         in_expected = key in expected_map
@@ -2744,22 +2744,18 @@ async def get_detailed_report(session_id: str):
         scanned = key in physical_map
         remark = generate_remark(stock_qty, final_qty, accuracy, in_master=in_expected, scanned=scanned, in_product_master=in_prod_master, in_expected_stock=in_expected)
         
-        totals["stock_qty"] += stock_qty
-        totals["stock_value"] += stock_value
-        totals["physical_qty"] += physical_qty
-        totals["physical_value"] += physical_value
-        totals["reco_qty"] += reco_qty
-        totals["final_qty"] += final_qty
-        totals["final_value"] += final_value
-        totals["diff_qty"] += diff_qty
-        totals["diff_value"] += diff_value
+        totals["stock_qty"] += stock_qty; totals["physical_qty"] += physical_qty; totals["reco_qty"] += reco_qty; totals["final_qty"] += final_qty; totals["diff_qty"] += diff_qty
+        totals["stock_value_mrp"] += sv["mrp"]; totals["physical_value_mrp"] += pv["mrp"]; totals["final_value_mrp"] += fv["mrp"]; totals["diff_value_mrp"] += dv_mrp
+        totals["stock_value_cost"] += sv["cost"]; totals["physical_value_cost"] += pv["cost"]; totals["final_value_cost"] += fv["cost"]; totals["diff_value_cost"] += dv_cost
         
         row = {
             "location": location, "barcode": barcode, "description": description, "category": category,
-            "mrp": mrp, "cost": cost, "stock_qty": stock_qty, "stock_value": stock_value,
-            "physical_qty": physical_qty, "physical_value": physical_value,
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
-            "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark,
+            "mrp": mrp, "cost": cost, "stock_qty": stock_qty,
+            "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
+            "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
+            "accuracy_pct": accuracy, "remark": remark,
             "in_master": barcode in master_by_barcode, "in_expected_stock": key in expected_map
         }
         if extra_columns:
