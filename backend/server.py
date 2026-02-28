@@ -2293,7 +2293,7 @@ async def get_consolidated_article_wise(client_id: str):
         for k, v in [("stock_qty", g["stock_qty"]), ("stock_value", stock_value), ("physical_qty", g["physical_qty"]), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
             totals[k] += v
         
-        report.append({
+        row = {
             "article_code": code, "article_name": g["article_name"], "category": g["category"],
             "barcodes": sorted(g["barcodes"]), "barcode_count": len(g["barcodes"]),
             "mrp": g["mrp"], "cost": cost,
@@ -2301,10 +2301,15 @@ async def get_consolidated_article_wise(client_id: str):
             "physical_qty": g["physical_qty"], "physical_value": round(physical_value, 2),
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
             "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
-        })
+        }
+        # For article-wise, pull custom fields from the first barcode's master data
+        if extra_columns and g["barcodes"]:
+            first_bc = sorted(g["barcodes"])[0]
+            _merge_custom_fields(row, master_by_barcode.get(first_bc, {}), extra_columns)
+        report.append(row)
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}, "extra_columns": extra_columns}
 
 @portal_router.get("/reports/consolidated/{client_id}/category-summary")
 async def get_consolidated_category_summary(client_id: str):
