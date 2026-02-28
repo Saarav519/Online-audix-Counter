@@ -895,8 +895,8 @@ export default function PortalReports() {
       ) : !filteredData || ((reportType !== 'pending-locations' && reportType !== 'empty-bins') && (filteredData.report || []).length === 0) ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <FileBarChart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">{varianceCategory !== 'all' && reportData && reportData.report.length > 0 ? 'No items match the selected variance filter' : 'No data available for this session'}</p>
-          {varianceCategory !== 'all' && reportData && reportData.report.length > 0 && (
+          <p className="text-gray-500">{varianceCategory !== 'all' && reportData && (reportData.report || []).length > 0 ? 'No items match the selected variance filter' : 'No data available for this session'}</p>
+          {varianceCategory !== 'all' && reportData && (reportData.report || []).length > 0 && (
             <button onClick={() => setVarianceCategory('all')} className="mt-2 text-sm text-emerald-600 hover:underline">Clear variance filter</button>
           )}
           {varianceCategory === 'all' && (
