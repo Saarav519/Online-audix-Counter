@@ -2122,3 +2122,19 @@ agent_communication:
       - Both master and stock templates correctly reflecting the current schema configuration
       
       🎉 **CONCLUSION**: ALL AUDIX ADMIN PORTAL BACKEND APIs ARE HEALTHY AND OPERATIONAL after frontend changes. The schema endpoint works correctly and provides the foundation for frontend schema display functionality. Backend infrastructure is solid and ready to support frontend schema features.
+  - agent: "main"
+    message: |
+      Fixed Reports: Added missing Final Val(MRP), Final Val(Cost), and Reco Qty columns.
+      
+      ISSUE 1: In consolidated view, Final Qty appeared but Final MRP Value and Final Cost Value were missing.
+      ISSUE 2: Reco Qty only appeared when editable (matching variance mode). Should be visible read-only in ALL report types.
+      
+      FIX APPLIED (Frontend only - PortalReports.jsx):
+      
+      1. Column configs updated for ALL 5 report types (bin-wise, detailed, barcode-wise, article-wise, category-summary)
+      2. Summary cards now show Final Qty, Final Val(MRP), Final Val(Cost) in consolidated view
+      3. Reco column: editable in matching variance mode, READ-ONLY (blue text) in all other consolidated views
+      4. CSV export updated to include Reco Qty, Final Val(MRP), Final Val(Cost) columns
+      5. Tables updated: headers, body rows, footers all include the new columns
+      
+      Testing agent should verify backend APIs still healthy.
