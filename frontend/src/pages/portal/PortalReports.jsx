@@ -100,6 +100,7 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   const dropdownRef = useRef(null);
   const isNumeric = NUMERIC_COLUMNS.has(column);
   const currentNumeric = numericFilters?.[column] || null;
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   
   // INCLUSION MODEL:
   const currentChecked = activeFilters[column];
@@ -110,6 +111,22 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
     const lower = search.toLowerCase();
     return allValues.filter(v => String(v).toLowerCase().includes(lower));
   }, [allValues, search]);
+
+  useEffect(() => {
+    // Calculate position relative to the trigger button
+    if (dropdownRef.current) {
+      const parent = dropdownRef.current.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        const dropH = 384; // max-h-96 = 24rem = 384px
+        const spaceBelow = window.innerHeight - rect.bottom;
+        setPosition({
+          top: spaceBelow < dropH ? Math.max(8, rect.top - dropH) : rect.bottom + 4,
+          left: Math.min(rect.left, window.innerWidth - 272)
+        });
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
