@@ -1444,6 +1444,16 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     </span>
                   </td>
                   <td className="py-2 px-3 text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value_mrp)}`}>
+                      {(row.diff_value_mrp || 0).toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value_cost)}`}>
+                      {(row.diff_value_cost || 0).toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right">
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(row.accuracy_pct)}`}>{row.accuracy_pct}%</span>
                   </td>
                   <td className="py-2 px-3">
