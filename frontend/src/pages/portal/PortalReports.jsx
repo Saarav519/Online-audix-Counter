@@ -1195,7 +1195,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
         )}
       </div>
       <div className="overflow-auto max-h-[70vh]">
-        <table className="w-full text-sm">
+        <table className="min-w-full text-sm report-table">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
