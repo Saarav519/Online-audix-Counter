@@ -549,20 +549,29 @@ export default function PortalReports() {
             const diffQty = finalQty - stockQty;
             const cost = row.cost || 0;
             const accuracy = stockQty > 0 ? Math.round((Math.min(finalQty, stockQty) / stockQty) * 1000) / 10 : (finalQty === 0 ? 100 : 0);
-            return { ...row, reco_qty: newReco, final_qty: finalQty, diff_qty: diffQty, final_value: finalQty * cost, diff_value: (finalQty - stockQty) * cost, accuracy_pct: accuracy };
+            return { ...row, reco_qty: newReco, final_qty: finalQty, diff_qty: diffQty,
+              final_value_mrp: finalQty * (row.mrp || 0), final_value_cost: finalQty * cost,
+              diff_value_mrp: (finalQty - stockQty) * (row.mrp || 0), diff_value_cost: (finalQty - stockQty) * cost,
+              accuracy_pct: accuracy };
           })};
           // Recalc totals
-          const t = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, stock_value: 0, physical_value: 0, final_value: 0, diff_value: 0 };
+          const t = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0,
+            stock_value_mrp: 0, stock_value_cost: 0, physical_value_mrp: 0, physical_value_cost: 0,
+            final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0 };
           updated.report.forEach(r => {
             t.stock_qty += (r.stock_qty || 0);
             t.physical_qty += (r.physical_qty || 0);
             t.reco_qty += (r.reco_qty || 0);
             t.final_qty += (r.final_qty || r.physical_qty || 0);
             t.diff_qty += (r.diff_qty || 0);
-            t.stock_value += (r.stock_value || 0);
-            t.physical_value += (r.physical_value || 0);
-            t.final_value += (r.final_value || 0);
-            t.diff_value += (r.diff_value || 0);
+            t.stock_value_mrp += (r.stock_value_mrp || 0);
+            t.stock_value_cost += (r.stock_value_cost || 0);
+            t.physical_value_mrp += (r.physical_value_mrp || 0);
+            t.physical_value_cost += (r.physical_value_cost || 0);
+            t.final_value_mrp += (r.final_value_mrp || 0);
+            t.final_value_cost += (r.final_value_cost || 0);
+            t.diff_value_mrp += (r.diff_value_mrp || 0);
+            t.diff_value_cost += (r.diff_value_cost || 0);
           });
           t.accuracy_pct = t.stock_qty > 0 ? Math.round((Math.min(t.final_qty, t.stock_qty) / t.stock_qty) * 1000) / 10 : (t.final_qty === 0 ? 100 : 0);
           updated.totals = { ...prev.totals, ...t };
