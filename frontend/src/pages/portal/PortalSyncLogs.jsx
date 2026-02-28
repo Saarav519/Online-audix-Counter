@@ -79,6 +79,59 @@ export default function PortalSyncLogs() {
     }
   }, [activeTab, selectedSession, selectedClient]);
 
+  const handleBackupUpload = async () => {
+    if (!backupForm.clientName.trim()) {
+      toast.error('Please enter a client name');
+      return;
+    }
+    if (!backupForm.sessionName.trim()) {
+      toast.error('Please enter a session name');
+      return;
+    }
+    if (!backupForm.file) {
+      toast.error('Please select a CSV backup file');
+      return;
+    }
+
+    setBackupUploading(true);
+    setBackupResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', backupForm.file);
+      formData.append('client_name', backupForm.clientName.trim());
+      formData.append('session_name', backupForm.sessionName.trim());
+      formData.append('variance_mode', backupForm.varianceMode);
+      formData.append('device_name', backupForm.deviceName.trim() || 'backup-restore');
+
+      const res = await fetch(`${BACKEND_URL}/api/portal/sync-inbox/upload-backup`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Upload failed');
+      }
+
+      const result = await res.json();
+      setBackupResult(result);
+      toast.success(`Backup restored! ${result.locations_restored} locations, ${result.total_items} items`);
+
+      // Refresh clients list and auto-select the restored client/session
+      await fetchClients();
+      setSelectedClient(result.client_id);
+      // We need to wait for sessions to load after client change
+      setTimeout(async () => {
+        await fetchSessions(result.client_id);
+        setSelectedSession(result.session_id);
+      }, 500);
+    } catch (err) {
+      toast.error(err.message || 'Failed to restore backup');
+    } finally {
+      setBackupUploading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
