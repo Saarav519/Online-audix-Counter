@@ -192,6 +192,28 @@ export default function PortalSessions() {
     }
   };
 
+  const [refreshingStock, setRefreshingStock] = useState(null);
+  const handleRefreshStock = async (session) => {
+    if (!window.confirm(`Refresh stock for "${session.name}"?\n\nThis will re-import the latest warehouse stock into this session, replacing the current snapshot.`)) return;
+    setRefreshingStock(session.id);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/sessions/${session.id}/refresh-stock`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message);
+        fetchData();
+        if (showStockViewer === session.id) fetchStockData(session.id);
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Failed to refresh stock');
+      }
+    } catch (err) {
+      toast.error('Failed to refresh stock');
+    } finally {
+      setRefreshingStock(null);
+    }
+  };
+
   const getClientName = (clientId) => {
     const client = clients.find(c => c.id === clientId);
     return client ? client.name : 'Unknown';
