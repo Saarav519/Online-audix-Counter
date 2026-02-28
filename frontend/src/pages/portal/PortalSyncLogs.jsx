@@ -48,8 +48,11 @@ export default function PortalSyncLogs() {
   }, [selectedClient]);
 
   const fetchData = useCallback(() => {
-    if (activeTab === 'inbox' && selectedSession) {
+    // Always fetch inbox summary when session is selected (for the banner/badge)
+    if (selectedSession) {
       fetchInboxSummary();
+    }
+    if (activeTab === 'inbox' && selectedSession) {
       fetchForwardBatches();
     } else if (activeTab === 'logs') {
       if (selectedClient) {
