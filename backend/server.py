@@ -1987,6 +1987,24 @@ async def _load_master_for_client(client_id: str):
         master_by_barcode[m["barcode"]] = m
     return master_by_barcode
 
+async def _get_extra_columns_for_client(client_id: str):
+    """Get the list of extra (non-standard) enabled columns for a client's schema."""
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    if not schema:
+        return []
+    extra = []
+    for f in schema.get("fields", []):
+        if f.get("enabled", True) and f["name"] not in STANDARD_MASTER_FIELD_NAMES:
+            extra.append({"name": f["name"], "label": f.get("label", f["name"]), "type": f.get("type", "text")})
+    return extra
+
+def _merge_custom_fields(row: dict, master: dict, extra_columns: list) -> dict:
+    """Merge custom_fields from master into a report row based on extra_columns."""
+    cf = master.get("custom_fields", {})
+    for col in extra_columns:
+        row[col["name"]] = cf.get(col["name"], "")
+    return row
+
 @portal_router.get("/reports/consolidated/{client_id}/bin-wise")
 async def get_consolidated_bin_wise(client_id: str):
     """Consolidated bin-wise report across all sessions for a client."""
