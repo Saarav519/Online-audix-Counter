@@ -1879,7 +1879,10 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 <td className="py-3 px-4 text-right">{row.physical_qty}</td>
                 <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{row.reco_qty || 0}</td>}
                 {isConsolidated && <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
+                {isConsolidated && <td className="py-3 px-4 text-right text-gray-500">{(row.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}
+                {isConsolidated && <td className="py-3 px-4 text-right text-gray-500">{(row.final_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}
                 <td className="py-3 px-4 text-right">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                     {getVarianceIcon(row.diff_qty)}
