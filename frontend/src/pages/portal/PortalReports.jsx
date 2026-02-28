@@ -1524,6 +1524,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
         </h3>
         {isRecoEditable ? (
           <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>
+        ) : isConsolidated ? (
+          <p className="text-xs text-gray-500 mt-1">Reco Qty and Final Qty shown from consolidated adjustments (read-only).</p>
         ) : (
           <p className="text-xs text-gray-500 mt-1">Variance report by barcode across all locations</p>
         )}
