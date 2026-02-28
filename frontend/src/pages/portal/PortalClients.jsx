@@ -673,6 +673,25 @@ export default function PortalClients() {
               />
             </div>
             <div>
+              <Label htmlFor="client_type">Client Type *</Label>
+              <select
+                id="client_type"
+                value={formData.client_type}
+                onChange={(e) => setFormData({ ...formData, client_type: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                disabled={!!editingClient}
+                data-testid="client-type-select"
+              >
+                <option value="store">Store — Stock uploaded per session</option>
+                <option value="warehouse">Warehouse — Stock uploaded once, shared across sessions</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.client_type === 'warehouse' 
+                  ? 'Stock is uploaded at client level. Sessions auto-import a snapshot on creation.'
+                  : 'Stock is uploaded individually inside each session.'}
+              </p>
+            </div>
+            <div>
               <Label htmlFor="address">Address</Label>
               <Input
                 id="address"
