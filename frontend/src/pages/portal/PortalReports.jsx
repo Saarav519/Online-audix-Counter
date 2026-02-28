@@ -1536,11 +1536,15 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="item_count" label="Items" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('item_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="stock_value" label="Stock Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="stock_value_mrp" label="Stock Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="stock_value_cost" label="Stock Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              <SortableHeader column="diff_value" label="Diff Value" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="diff_value_mrp" label="Diff Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              <SortableHeader column="diff_value_cost" label="Diff Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[220px]" />
             </tr>
@@ -1553,8 +1557,11 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 </td>
                 <td className="py-3 px-4 text-right text-gray-500">{row.item_count}</td>
                 <td className="py-3 px-4 text-right">{row.stock_qty}</td>
-                <td className="py-3 px-4 text-right">{(row.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td className="py-3 px-4 text-right text-gray-500">{(row.stock_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td className="py-3 px-4 text-right text-gray-500">{(row.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td className="py-3 px-4 text-right">{row.physical_qty}</td>
+                <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 {isConsolidated && <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
                 <td className="py-3 px-4 text-right">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
@@ -1563,8 +1570,13 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">
-                  <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value)}`}>
-                    {row.diff_value > 0 ? '+' : ''}{(row.diff_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value_mrp)}`}>
+                    {(row.diff_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                  </span>
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(row.diff_value_cost)}`}>
+                    {(row.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </span>
                 </td>
                 <td className="py-3 px-4 text-right">
@@ -1584,8 +1596,11 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <td className="py-3 px-4">TOTAL</td>
               <td className="py-3 px-4 text-right">{data.totals.item_count}</td>
               <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-4 text-right">{(data.totals.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.stock_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
               <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
+              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
               {isConsolidated && <td className="py-3 px-4 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
               <td className="py-3 px-4 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
@@ -1593,8 +1608,13 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 </span>
               </td>
               <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value)}`}>
-                  {(data.totals.diff_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_mrp)}`}>
+                  {(data.totals.diff_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+              </td>
+              <td className="py-3 px-4 text-right">
+                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_cost)}`}>
+                  {(data.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                 </span>
               </td>
               <td className="py-3 px-4 text-right">
