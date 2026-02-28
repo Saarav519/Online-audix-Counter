@@ -648,11 +648,36 @@ export default function PortalSessions() {
                   Download Template
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Download the template to see the exact columns configured for this client's schema.
-                <br/>
-                <strong>Required:</strong> {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') ? 'Location, Barcode, Qty' : 'Barcode, Qty'}
-              </p>
+
+              {/* Dynamic Schema Columns Display */}
+              {schemaLoading ? (
+                <p className="text-xs text-gray-400 mt-2">Loading schema...</p>
+              ) : schemaFields.length > 0 ? (
+                <div className="mt-2">
+                  <p className="text-xs font-medium text-gray-600 mb-1.5">Expected Columns (from Schema):</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Location</span>
+                    )}
+                    {schemaFields.map(f => (
+                      <span key={f.name} className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.required ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-700'}`}>
+                        {f.label || f.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        {f.required && ' *'}
+                      </span>
+                    ))}
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Qty</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    * = required. These columns match the schema configured for this client.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  Download the template to see the exact columns configured for this client's schema.
+                  <br/>
+                  <strong>Required:</strong> {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') ? 'Location, Barcode, Qty' : 'Barcode, Qty'}
+                </p>
+              )}
             </div>
 
             <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
