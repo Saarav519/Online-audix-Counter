@@ -1076,6 +1076,17 @@ export default function PortalReports() {
               Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
             </Button>
           )}
+          {filteredData && columnConfig.length > 0 && (
+            <ColumnSettingsPanel
+              columns={columnConfig}
+              hiddenColumns={hiddenColumns}
+              frozenColumns={frozenColumns}
+              onToggleVisibility={toggleColumnVisibility}
+              onToggleFreeze={toggleColumnFreeze}
+              onShowAll={showAllColumns}
+              onReset={resetColumnSettings}
+            />
+          )}
           {filteredData && (
             <Button onClick={exportCSV} variant="outline">
               <Download className="w-4 h-4 mr-2" />
