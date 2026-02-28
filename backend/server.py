@@ -3682,8 +3682,46 @@ async def reject_all_conflict_entries(conflict_id: str, username: str = "admin")
         "location_name": conflict["location_name"]
     })
     
+    # Remove ALL rejected entries from sync_inbox and sync_raw_logs
+    for rej in conflict["entries"]:
+        rej_device = rej.get("device_name", "")
+        rej_session = conflict["session_id"]
+        rej_location = conflict["location_name"]
+
+        await db.sync_inbox.delete_many({
+            "session_id": rej_session,
+            "location_name": rej_location,
+            "device_name": rej_device
+        })
+
+        raw_logs = await db.sync_raw_logs.find({
+            "session_id": rej_session,
+            "device_name": rej_device
+        }).to_list(1000)
+        for rl in raw_logs:
+            payload = rl.get("raw_payload", {})
+            locations = payload.get("locations", [])
+            filtered = [loc for loc in locations if loc.get("name") != rej_location]
+            if len(filtered) == 0:
+                await db.sync_raw_logs.delete_one({"id": rl["id"]})
+            elif len(filtered) < len(locations):
+                new_loc_count = len(filtered)
+                new_items = sum(len(loc.get("items", [])) for loc in filtered)
+                new_qty = sum(sum(i.get("quantity", 0) for i in loc.get("items", [])) for loc in filtered)
+                payload["locations"] = filtered
+                await db.sync_raw_logs.update_one(
+                    {"id": rl["id"]},
+                    {"$set": {
+                        "raw_payload": payload,
+                        "location_count": new_loc_count,
+                        "total_items": new_items,
+                        "total_quantity": new_qty
+                    }}
+                )
+    
     return {
-        "message": f"All entries rejected for '{conflict['location_name']}'. Location is now pending (needs re-scan)."
+        "message": f"All entries rejected for '{conflict['location_name']}'. Data removed from raw logs. Location needs re-scan.",
+        "rejected_devices_cleaned": [e.get("device_name", "") for e in conflict["entries"]]
     }
 
 # ==================== SETTINGS ROUTES ====================
