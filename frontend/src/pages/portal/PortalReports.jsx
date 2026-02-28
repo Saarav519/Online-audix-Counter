@@ -280,7 +280,6 @@ export default function PortalReports() {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [reportType, setReportType] = useState('');
   const [reportData, setReportData] = useState(null);
-  const [dailyProgress, setDailyProgress] = useState([]);
   const [loading, setLoading] = useState(false);
   const [varianceCategory, setVarianceCategory] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
