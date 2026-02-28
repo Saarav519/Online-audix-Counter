@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 BACKEND_URL = "https://counter-preview-2.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
-def make_request(method: str, endpoint: str, data: Optional[Dict] = None, headers: Optional[Dict] = None) -> Dict[str, Any]:
+def make_request(method: str, endpoint: str, data: Optional[Dict] = None, headers: Optional[Dict] = None, expect_csv: bool = False) -> Dict[str, Any]:
     """Make HTTP request with error handling"""
     url = f"{API_BASE}{endpoint}"
     
@@ -27,6 +27,15 @@ def make_request(method: str, endpoint: str, data: Optional[Dict] = None, header
             response = requests.delete(url, headers=headers, timeout=30)
         else:
             return {"success": False, "error": f"Unsupported method: {method}"}
+        
+        # Handle CSV responses
+        if expect_csv:
+            return {
+                "success": response.status_code < 400,
+                "status_code": response.status_code,
+                "data": response.text if response.content else None,
+                "url": url
+            }
         
         return {
             "success": response.status_code < 400,
