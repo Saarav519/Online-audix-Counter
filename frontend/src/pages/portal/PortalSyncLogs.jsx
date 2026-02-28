@@ -913,6 +913,168 @@ export default function PortalSyncLogs() {
           )}
         </>
       )}
+
+      {/* Backup Upload Dialog */}
+      <Dialog open={showBackupDialog} onOpenChange={setShowBackupDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-amber-600" />
+              Restore Sync Backup
+            </DialogTitle>
+            <DialogDescription>
+              Upload a scanner backup CSV to restore sync data. A new client & session will be created if needed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {backupResult ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <p className="font-semibold text-green-800">Backup Restored Successfully!</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="text-gray-600">Client:</div>
+                  <div className="font-medium">{backupResult.client_name}</div>
+                  <div className="text-gray-600">Session:</div>
+                  <div className="font-medium">{backupResult.session_name}</div>
+                  <div className="text-gray-600">Locations:</div>
+                  <div className="font-medium">{backupResult.locations_restored}</div>
+                  <div className="text-gray-600">Total Items:</div>
+                  <div className="font-medium">{backupResult.total_items}</div>
+                  <div className="text-gray-600">Total Quantity:</div>
+                  <div className="font-medium">{backupResult.total_quantity}</div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">
+                Data is now in the <strong>Sync Inbox</strong>. Go to the Inbox tab to review and forward to variance.
+              </p>
+              <Button onClick={() => { setShowBackupDialog(false); fetchData(); }} className="w-full">
+                Go to Sync Inbox
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Client Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
+                <input
+                  type="text"
+                  value={backupForm.clientName}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, clientName: e.target.value }))}
+                  placeholder="e.g., Reliance Retail"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  list="existing-clients"
+                  data-testid="backup-client-name"
+                />
+                <datalist id="existing-clients">
+                  {clients.map(c => <option key={c.id} value={c.name} />)}
+                </datalist>
+                <p className="text-xs text-gray-400 mt-1">Type an existing client name or enter a new one</p>
+              </div>
+
+              {/* Session Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Session Name *</label>
+                <input
+                  type="text"
+                  value={backupForm.sessionName}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, sessionName: e.target.value }))}
+                  placeholder="e.g., Q1 2026 Audit Restore"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  data-testid="backup-session-name"
+                />
+              </div>
+
+              {/* Variance Mode + Device Name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Variance Mode</label>
+                  <select
+                    value={backupForm.varianceMode}
+                    onChange={(e) => setBackupForm(prev => ({ ...prev, varianceMode: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    data-testid="backup-variance-mode"
+                  >
+                    <option value="bin-wise">Bin-wise</option>
+                    <option value="barcode-wise">Barcode-wise</option>
+                    <option value="article-wise">Article-wise</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
+                  <input
+                    type="text"
+                    value={backupForm.deviceName}
+                    onChange={(e) => setBackupForm(prev => ({ ...prev, deviceName: e.target.value }))}
+                    placeholder="backup-restore"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    data-testid="backup-device-name"
+                  />
+                </div>
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Backup CSV File *</label>
+                <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${backupForm.file ? 'border-amber-400 bg-amber-50' : 'border-gray-300 hover:border-amber-400'}`}>
+                  {backupForm.file ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileUp className="w-5 h-5 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-700">{backupForm.file.name}</span>
+                      <button onClick={() => setBackupForm(prev => ({ ...prev, file: null }))} className="text-gray-400 hover:text-red-500 ml-2">✕</button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer">
+                      <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Click to select CSV file</p>
+                      <p className="text-xs text-gray-400 mt-1">Format: Location, Barcode, Product Name, Price, Quantity, Scanned At</p>
+                      <input
+                        type="file"
+                        accept=".csv,.txt"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files[0]) {
+                            setBackupForm(prev => ({ ...prev, file: e.target.files[0] }));
+                          }
+                        }}
+                        data-testid="backup-file-input"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-700">
+                  <strong>How it works:</strong> The CSV data will be parsed and placed in the <strong>Sync Inbox</strong> as pending items. 
+                  You can then review and <strong>Forward</strong> them to variance, just like normal scanner syncs.
+                  If the client already exists, it will be reused (matched by name).
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowBackupDialog(false)} className="flex-1">Cancel</Button>
+                <Button 
+                  onClick={handleBackupUpload} 
+                  disabled={backupUploading || !backupForm.clientName || !backupForm.sessionName || !backupForm.file}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
+                  data-testid="backup-upload-submit"
+                >
+                  {backupUploading ? (
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Restoring...</>
+                  ) : (
+                    <><Upload className="w-4 h-4 mr-2" />Restore Backup</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
