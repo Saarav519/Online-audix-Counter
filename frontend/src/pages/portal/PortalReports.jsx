@@ -1342,6 +1342,9 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-3">
                     {row.category ? <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span> : '-'}
                   </td>
+                  {extraColumns.map(col => (
+                    <td key={col.name} className="py-2 px-3 text-xs text-purple-700">{row[col.name] || '-'}</td>
+                  ))}
                   <td className="py-2 px-3 text-right"><span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span></td>
                   <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                   <td className="py-2 px-3 text-right">{row.physical_qty}</td>
