@@ -637,7 +637,6 @@ export default function PortalClients() {
                     )}
                   </div>
                 )}
-                </div>
               </div>
             </div>
           ))}
