@@ -51,6 +51,8 @@ export default function PortalClients() {
   // Master upload state
   const [showMasterDialog, setShowMasterDialog] = useState(false);
   const [masterClient, setMasterClient] = useState(null);
+  const [masterSchemaFields, setMasterSchemaFields] = useState([]);
+  const [masterSchemaLoading, setMasterSchemaLoading] = useState(false);
   const [masterStats, setMasterStats] = useState(null);
   const [masterUploading, setMasterUploading] = useState(false);
   const [showMasterViewDialog, setShowMasterViewDialog] = useState(false);
