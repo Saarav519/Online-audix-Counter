@@ -714,16 +714,47 @@ export default function PortalSyncLogs() {
                     </div>
                   </div>
                   {batch.scanners && batch.scanners.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap gap-2">
-                      {batch.scanners.map(s => (
-                        <span key={s} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                          <Smartphone className="w-3 h-3 inline mr-1" />{s}
-                        </span>
-                      ))}
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {batch.scanners.map(s => (
+                          <span key={s} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                            <Smartphone className="w-3 h-3 inline mr-1" />{s}
+                          </span>
+                        ))}
+                      </div>
+                      <Button
+                        data-testid={`delete-batch-${batch.id}`}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        onClick={() => handleDeleteBatch(batch.id)}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        Rollback Batch
+                      </Button>
+                    </div>
+                  )}
+                  {(!batch.scanners || batch.scanners.length === 0) && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                      <Button
+                        data-testid={`delete-batch-${batch.id}`}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        onClick={() => handleDeleteBatch(batch.id)}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        Rollback Batch
+                      </Button>
                     </div>
                   )}
                 </div>
               ))}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+                <RotateCcw className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-800">How to re-push data to variance</p>
+                  <p className="text-xs text-blue-600 mt-1">Click "Rollback Batch" to remove data from variance and send it back to the Sync Inbox. Then go to Sync Inbox tab to review and forward the data again.</p>
+                </div>
+              </div>
             </div>
           )}
         </>
