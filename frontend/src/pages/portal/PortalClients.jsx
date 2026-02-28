@@ -612,24 +612,24 @@ export default function PortalClients() {
             {/* Info */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-700">CSV Format (Product Catalog):</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadSampleMasterCSV}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Sample CSV
-                </Button>
+                <p className="text-sm font-medium text-gray-700">CSV Template:</p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadSampleMasterCSV}
+                    className="text-blue-600 hover:text-blue-700"
+                    data-testid="download-master-template-btn"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download Template
+                  </Button>
+                </div>
               </div>
-              <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
-                Barcode, Description, Category, MRP, Cost, Article_Code, Article_Name
-              </code>
-              <p className="text-xs text-gray-500 mt-2">
-                Upload ALL products in your catalog. Article_Code and Article_Name are optional (used for article-wise variance).
-                Re-upload replaces the existing master.
+              <p className="text-xs text-gray-500 mt-1">
+                Download the template to see the exact columns configured for this client's schema.
+                Use the Schema button on the client card to configure fields.
               </p>
             </div>
 
