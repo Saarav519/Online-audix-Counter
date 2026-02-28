@@ -889,7 +889,7 @@ export default function PortalReports() {
           <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading report...</p>
         </div>
-      ) : !filteredData || (filteredData.report || []).length === 0 ? (
+      ) : !filteredData || ((reportType !== 'pending-locations' && reportType !== 'empty-bins') && (filteredData.report || []).length === 0) ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <FileBarChart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
           <p className="text-gray-500">{varianceCategory !== 'all' && reportData && reportData.report.length > 0 ? 'No items match the selected variance filter' : 'No data available for this session'}</p>
