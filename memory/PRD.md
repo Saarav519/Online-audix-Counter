@@ -1,22 +1,9 @@
 # Audix Counter Software - PRD
 
 ## Original Problem Statement
-Full-stack audit/inventory reconciliation platform with offline data collection on scanner devices, central web portal for admins, variance reporting (bin-wise, barcode-wise, article-wise), conflict resolution for duplicate scans, and reconciliation adjustments.
+Full-stack audit/inventory reconciliation platform with offline data collection on scanner devices, central web portal for admins, variance reporting, conflict resolution, and reconciliation adjustments.
 
-## Core Requirements
-- Mobile-first scanner interface + desktop admin portal
-- FastAPI backend + React frontend + MongoDB
-- Offline-first data sync from scanner devices
-- Variance reports: Bin-wise, Barcode-wise, Article-wise, Category Summary
-- Conflict resolution for duplicate location scans
-- Reconciliation (Reco) column — consolidated view only, primary report type per variance mode
-- Chunked sync with progress bar — data safe until 100% finalized
-
-## User Personas
-- **Scanner Operators**: Use mobile devices to scan locations and items
-- **Admin Users**: Use web portal for session management, reports, conflict resolution, reco adjustments
-
-## Architecture
+## Core Architecture
 ```
 /app/
 ├── backend/server.py          # FastAPI (all routes + models)
@@ -24,53 +11,72 @@ Full-stack audit/inventory reconciliation platform with offline data collection 
 │   ├── pages/
 │   │   ├── Settings.jsx        # Scanner sync with chunked upload + progress bar
 │   │   └── portal/
-│   │       ├── PortalReports.jsx   # All report tables + conditional Reco UI
+│   │       ├── PortalReports.jsx   # Variance reports + conditional Reco UI
+│   │       ├── PortalSyncLogs.jsx  # Sync Inbox + Forward to Variance + Batch history
+│   │       ├── PortalConflicts.jsx # Conflict resolution
 │   │       └── ...
-│   ├── components/
 │   ├── context/AppContext.js
 │   └── App.js
 ```
 
 ## Key DB Collections
-- `synced_locations`: Live synced data from devices
-- `sync_staging`: Temporary staging for chunked uploads (cleared after finalize)
+- `sync_inbox`: Staging area for synced data (pending forward)
+- `synced_locations`: Live variance data (only after admin forwards)
+- `forward_batches`: Batch records of each forward operation
+- `sync_staging`: Temporary staging for chunked uploads
 - `sync_raw_logs`: Audit trail of all sync operations
 - `expected_stock`: Master stock list per session
 - `conflict_locations`: Duplicate scan conflicts
 - `reco_adjustments`: Reconciliation adjustments (client-level)
-- `users, clients, devices, audit_sessions`: App entities
+
+## Data Flow
+```
+Scanner syncs → sync_inbox (staging)
+                    ↓
+Admin reviews: "28/30 scanners synced"
+                    ↓
+Admin clicks "Forward All to Variance"
+                    ↓
+Conflict detection runs → synced_locations (variance) + conflict_locations
+                    ↓
+Second sync from scanners → new entries in sync_inbox (previous variance untouched)
+```
 
 ## Reco Editability Rules (Consolidated View Only)
-
-| Session Variance Mode | Detailed Table | Barcode-wise Table | Article-wise Table |
+| Session Variance Mode | Detailed | Barcode-wise | Article-wise |
 |---|---|---|---|
 | **Bin-wise** | Reco editable | Reco hidden | N/A |
 | **Barcode-wise** | N/A | Reco editable | N/A |
 | **Article-wise** | N/A | N/A | Reco editable |
 
-- Final Qty column shown in ALL consolidated views
-- Individual session reports: No Reco or Final Qty
-
-## Chunked Sync Flow
-1. Scanner splits locations into chunks of 10
-2. Each chunk → `POST /api/sync/chunk` → stored in `sync_staging`
-3. After all chunks uploaded → `POST /api/sync/finalize` → validates all chunks → moves to live
-4. Data cleared from scanner ONLY after finalize succeeds
-5. On failure: staging cleaned up, scanner data untouched
-6. Progress bar shows: phase, location count, percentage
-
-## Key API Endpoints
-- `POST /api/sync/` — original single-request sync (backward compatible)
-- `POST /api/sync/chunk` — upload a chunk to staging
-- `POST /api/sync/finalize` — validate & commit all chunks
-- `DELETE /api/sync/staging/{batch_id}` — cancel/cleanup
-- `GET /api/sync/config` — available clients/sessions
-- `POST /api/portal/reco` — save reco adjustments
-- `GET /api/portal/reports/{session_id}/{report_type}` — individual reports (no reco)
-- `GET /api/portal/reports/consolidated/{client_id}/{report_type}` — consolidated reports (with reco)
+## What's Been Implemented
+1. Mark Empty feature
+2. Bin-wise report with Empty Bins, Pending, Completed statuses
+3. Duplicate Scan Conflict Resolution
+4. Imported Stock Viewer
+5. **Reco Column — Consolidated View Only, mode-aware** (Feb 2026)
+6. **Chunked Sync with Progress Bar** (Feb 2026)
+7. **Sync Inbox + Forward to Variance** (Feb 2026)
+   - Sync data lands in inbox (not variance) — no race conditions
+   - Admin reviews scanner count, forwards when ready
+   - Conflict detection at forward time (not sync time)
+   - Forward batch tracking with full metadata
+   - Previously forwarded data pulled into conflicts when duplicates found
 
 ## Credentials
 - Admin: username=admin, password=admin123
 
+## Upcoming Tasks (User Requested)
+### Phase 2: Sync Logs Redesign
+- Scanner grouping in raw logs (individual sync entries per scanner)
+- Per-sync export option
+
+### Phase 3: Dynamic Master Schema
+- Field selection screen before upload (standard + custom fields)
+- Template generation based on selected fields
+- Extra columns reflected in variance reports
+- Schema per-client, shared between master and stock uploads
+- Custom fields per-client only
+
 ## Backlog
-- No pending tasks identified
+- No other pending items
