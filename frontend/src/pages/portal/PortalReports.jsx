@@ -1097,7 +1097,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
         {isRecoEditable && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
       </div>
       <div className="overflow-auto max-h-[70vh]">
-        <table className="w-full text-xs">
+        <table className="min-w-full text-xs report-table">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
