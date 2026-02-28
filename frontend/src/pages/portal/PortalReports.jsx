@@ -725,6 +725,7 @@ export default function PortalReports() {
           { key: 'location', label: 'Location' },
           { key: 'stock_qty', label: 'Stock Qty' },
           { key: 'physical_qty', label: 'Physical' },
+          ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
           { key: 'difference_qty', label: 'Difference' },
           { key: 'accuracy_pct', label: 'Accuracy %' },
