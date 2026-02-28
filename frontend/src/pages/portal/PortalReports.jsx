@@ -1101,7 +1101,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 }
 
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [] }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1116,6 +1116,9 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {extraColumns.map(col => (
+                <SortableHeader key={col.name} column={col.name} label={col.label} sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues(col.name)} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              ))}
               <SortableHeader column="stock_qty" label="Stock" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               {isRecoEditable && <th className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
@@ -1132,6 +1135,9 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 <td className="py-2 px-3 font-mono">{row.barcode || '-'}</td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">{row.category || '-'}</td>
+                {extraColumns.map(col => (
+                  <td key={col.name} className="py-2 px-3 text-purple-700">{row[col.name] || '-'}</td>
+                ))}
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
                 {isRecoEditable && (
