@@ -1488,7 +1488,7 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
         <p className="text-xs text-gray-500 mt-1">{isConsolidated ? 'Aggregated variance by product category (using Final Qty)' : 'Aggregated variance by product category'}</p>
       </div>
       <div className="overflow-auto max-h-[70vh]">
-        <table className="w-full text-sm">
+        <table className="min-w-full text-sm report-table">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
