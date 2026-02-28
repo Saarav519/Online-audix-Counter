@@ -113,6 +113,24 @@ export default function PortalSyncLogs() {
     }
   };
 
+  const fetchScannerLogs = async () => {
+    setLoading(true);
+    try {
+      let url = `${BACKEND_URL}/api/portal/sync-logs/by-scanner?client_id=${selectedClient}`;
+      if (selectedSession) url += `&session_id=${selectedSession}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setScannerLogs(data);
+        if (data.length === 1) setExpandedScanner(data[0].device_name);
+      }
+    } catch (error) {
+      console.error('Failed to fetch scanner logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchGroupedLogs = async () => {
     setLoading(true);
     try {
