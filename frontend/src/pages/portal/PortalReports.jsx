@@ -1391,9 +1391,9 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <p className="text-xs text-gray-500 mt-1">Variance report by article. Click a row to view barcodes.</p>
         )}
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[70vh]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <th className="w-8 py-3 px-2"></th>
               <SortableHeader column="article_code" label="Article Code" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_code')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
