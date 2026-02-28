@@ -18,7 +18,12 @@ import {
   X,
   ChevronDown,
   PackageX,
-  Clock
+  Clock,
+  Eye,
+  EyeOff,
+  Pin,
+  PinOff,
+  Columns
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
