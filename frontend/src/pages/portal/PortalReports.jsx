@@ -244,6 +244,82 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   );
 }
 
+// ============ Column Settings Panel ============
+function ColumnSettingsPanel({ columns, hiddenColumns, frozenColumns, onToggleVisibility, onToggleFreeze, onShowAll, onReset }) {
+  const [open, setOpen] = useState(false);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const hiddenCount = hiddenColumns.size;
+  const frozenCount = frozenColumns.size;
+
+  return (
+    <div className="relative" ref={panelRef}>
+      <Button
+        onClick={() => setOpen(!open)}
+        variant="outline"
+        size="sm"
+        className={`gap-1.5 ${hiddenCount > 0 || frozenCount > 0 ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : ''}`}
+      >
+        <Columns className="w-4 h-4" />
+        Columns
+        {hiddenCount > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-600 rounded-full">{hiddenCount} hidden</span>}
+        {frozenCount > 0 && <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">{frozenCount} pinned</span>}
+      </Button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+          <div className="px-3 py-2 bg-gray-50 border-b flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Column Settings</span>
+            <div className="flex gap-1">
+              <button onClick={onShowAll} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-0.5 rounded hover:bg-emerald-50">Show All</button>
+              <button onClick={onReset} className="text-xs text-gray-500 hover:text-gray-700 font-medium px-2 py-0.5 rounded hover:bg-gray-100">Reset</button>
+            </div>
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {columns.map(col => {
+              const isHidden = hiddenColumns.has(col.key);
+              const isFrozen = frozenColumns.has(col.key);
+              return (
+                <div key={col.key} className={`flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 ${isHidden ? 'opacity-50' : ''}`}>
+                  <button
+                    onClick={() => onToggleVisibility(col.key)}
+                    className={`p-1 rounded transition-colors ${isHidden ? 'text-gray-300 hover:text-gray-500' : 'text-emerald-500 hover:text-emerald-600'}`}
+                    title={isHidden ? 'Show column' : 'Hide column'}
+                  >
+                    {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                  <span className={`flex-1 text-sm ${isHidden ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{col.label}</span>
+                  <button
+                    onClick={() => onToggleFreeze(col.key)}
+                    className={`p-1 rounded transition-colors ${isFrozen ? 'text-blue-500 hover:text-blue-600 bg-blue-50' : 'text-gray-300 hover:text-gray-500'}`}
+                    title={isFrozen ? 'Unfreeze column' : 'Freeze column'}
+                    disabled={isHidden}
+                  >
+                    {isFrozen ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="px-3 py-2 bg-gray-50 border-t">
+            <p className="text-xs text-gray-400">
+              <Eye className="w-3 h-3 inline mr-1" />Show/Hide &nbsp;
+              <Pin className="w-3 h-3 inline mr-1" />Freeze column
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============ Sortable + Filterable Header ============
 function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, className }) {
   const [showFilter, setShowFilter] = useState(false);
