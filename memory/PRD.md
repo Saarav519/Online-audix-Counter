@@ -57,6 +57,14 @@ STORE clients:
     - Session page: "Stock: Snapshot" badge for warehouse sessions
     - Session-level stock template now uses dynamic schema endpoint
     - Cascading delete includes `client_stock` and `client_schemas`
+14. **Report Value Columns Fix** (Feb 28, 2026)
+    - All report endpoints now return dual MRP and Cost based value columns
+    - Fields: stock_value_mrp, stock_value_cost, physical_value_mrp, physical_value_cost, diff_value_mrp, diff_value_cost, final_value_mrp, final_value_cost
+    - Updated all 4 frontend tables (Detailed, Barcode-wise, Article-wise, Category-wise)
+    - CSV export includes all value columns for all report types
+    - Category summary correctly filters by selected session
+    - Consolidated bin-wise shows pending locations
+    - Barcode normalization prevents scientific notation mismatches
 
 ## Key Endpoints
 - `POST /api/sync/` + chunked flow → sync to inbox
@@ -81,5 +89,6 @@ STORE clients:
 - Admin: username=admin, password=admin123
 
 ## Upcoming/Backlog Tasks
-- **Refactoring**: Break `server.py` (4100+ lines) into smaller routers (reports.py, sync.py, admin.py)
-- User-requested enhancements TBD
+- **P0 Refactoring**: Break `server.py` (4200+ lines) into smaller routers (routes/reports.py, routes/sync.py, routes/clients.py, routes/sessions.py, models.py, helpers.py)
+- **P1 Reporting Enhancements**: Dashboard Summary Card, Variance Highlights (Top 10), Row Color-Coding (Red/Amber/Green), Advanced Filters (accuracy range, variance type)
+- **P2 Charts & Graphs**: Category-wise accuracy pie chart, visual charts on reports page
