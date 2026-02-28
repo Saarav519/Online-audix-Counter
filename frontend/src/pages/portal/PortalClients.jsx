@@ -67,6 +67,17 @@ export default function PortalClients() {
   const [newFieldType, setNewFieldType] = useState('text');
   const [masterExtraColumns, setMasterExtraColumns] = useState([]);
 
+  // Stock upload state (warehouse clients)
+  const [showStockDialog, setShowStockDialog] = useState(false);
+  const [stockClient, setStockClient] = useState(null);
+  const [stockUploading, setStockUploading] = useState(false);
+  const [showStockViewDialog, setShowStockViewDialog] = useState(false);
+  const [stockRecords, setStockRecords] = useState([]);
+  const [stockTotal, setStockTotal] = useState(0);
+  const [stockViewLoading, setStockViewLoading] = useState(false);
+  const [stockExtraColumns, setStockExtraColumns] = useState([]);
+  const stockFileRef = useRef(null);
+
   const fetchClients = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
