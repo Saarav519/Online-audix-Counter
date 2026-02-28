@@ -1,0 +1,64 @@
+{
+  "summary": "Testing Dynamic Master/Stock Schema (Phase 3) for Audix Counter Software. All 15 backend tests PASSED. Frontend UI verification for Schema Builder, Master Products View, and Reports completed successfully.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Reports page - Extra column headers",
+        "issues": ["Extra column headers in report tables (DetailedTable, BarcodeWiseTable, ArticleWiseTable) use standard gray styling instead of purple styling. The cell values ARE purple (text-purple-700) but headers are not. Master Products View correctly has purple headers (text-purple-600). This is a minor inconsistency but doesn't affect functionality."],
+        "priority": "LOW"
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dynamic_schema.py",
+    "/app/test_reports/pytest/pytest_dynamic_schema.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Add className='text-purple-600' to SortableHeader for extra columns in PortalReports.jsx (lines 1132, 1222, 1309) to match purple header styling used in Master Products View"
+  ],
+  "critical_code_review_comments": [
+    "Backend schema endpoints (GET/POST /api/portal/clients/{client_id}/schema) working correctly",
+    "Template download (GET /api/portal/clients/{client_id}/schema/template?template_type=master|stock) generates correct CSV headers",
+    "Master import (POST /api/portal/clients/{client_id}/import-master) correctly stores custom fields in custom_fields dict",
+    "Master products endpoint returns extra_columns metadata alongside products",
+    "All consolidated report endpoints (detailed, barcode-wise, article-wise) return extra_columns in response",
+    "All individual session report endpoints return extra_columns in response",
+    "Frontend Schema Builder dialog fully functional with toggle fields, add custom field, download templates",
+    "Master Products View shows purple headers and values for extra columns - WORKING CORRECTLY"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dynamic_schema.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% - All UI elements verified"
+  },
+  "seed_data_creation": "Created test master products (TEST_001, TEST_002) with custom fields (colour, size, brand) via pytest",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 3 (Dynamic Schema) testing complete. Schema Builder, template downloads, master import with custom fields, and report extra columns all working. Test client 'Reliance Retail' has schema with colour/size/brand enabled and test products imported.",
+  "features_verified": {
+    "backend_schema_get": "PASS - GET /api/portal/clients/{client_id}/schema returns default and saved schemas",
+    "backend_schema_post": "PASS - POST /api/portal/clients/{client_id}/schema saves custom schema",
+    "backend_template_master": "PASS - GET /api/portal/clients/{client_id}/schema/template?template_type=master returns CSV",
+    "backend_template_stock": "PASS - GET /api/portal/clients/{client_id}/schema/template?template_type=stock returns CSV with Location+Qty",
+    "backend_import_master": "PASS - Import stores custom fields in custom_fields dict",
+    "backend_master_products": "PASS - Returns extra_columns metadata with products",
+    "backend_consolidated_detailed": "PASS - Returns extra_columns in response",
+    "backend_consolidated_barcode": "PASS - Returns extra_columns in response",
+    "backend_consolidated_article": "PASS - Returns extra_columns in response",
+    "backend_individual_detailed": "PASS - Returns extra_columns in response",
+    "backend_individual_barcode": "PASS - Returns extra_columns in response",
+    "backend_individual_article": "PASS - Returns extra_columns in response",
+    "frontend_schema_builder": "PASS - Dialog opens, shows toggleable fields, add custom field section",
+    "frontend_download_template": "PASS - Master and Stock template buttons present",
+    "frontend_master_products_view": "PASS - Table shows purple headers and values for extra columns",
+    "frontend_reports_extra_columns": "PASS - Reports show extra columns (values purple, headers standard)"
+  }
+}
