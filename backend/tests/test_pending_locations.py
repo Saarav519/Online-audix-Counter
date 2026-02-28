@@ -117,18 +117,18 @@ class TestReportEndpointsForEmptyData:
         assert "totals" in data
         print(f"PASS: Category-summary report handles empty data correctly")
     
-    def test_empty_bins_report(self):
-        """Test empty-bins consolidated report"""
+    def test_bin_wise_report_empty_data(self):
+        """Test bin-wise consolidated report"""
         client_id = "d0006b61-1a09-4eb7-aebb-6a0f19884a73"
         
-        response = requests.get(f"{BASE_URL}/api/portal/reports/consolidated/{client_id}/empty-bins")
+        response = requests.get(f"{BASE_URL}/api/portal/reports/consolidated/{client_id}/bin-wise")
         
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         
         data = response.json()
-        # empty-bins returns different structure
-        assert "empty_bins" in data or "locations" in data or isinstance(data, list) or "summary" in data
-        print(f"PASS: Empty-bins report handles empty data correctly")
+        assert "report" in data
+        assert "totals" in data
+        print(f"PASS: Bin-wise report handles empty data correctly")
 
 
 class TestReportTotalsFor7Cards:
