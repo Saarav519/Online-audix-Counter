@@ -1389,7 +1389,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <tfoot className="bg-gray-50 font-semibold text-sm">
             <tr>
               <td className="py-3 px-2"></td>
-              <td colSpan="4" className="py-3 px-3">TOTALS</td>
+              <td colSpan={4 + extraColumns.length} className="py-3 px-3">TOTALS</td>
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
               {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
