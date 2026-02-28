@@ -2197,3 +2197,22 @@ agent_communication:
       8. GET /api/portal/dashboard - ✅ Returns stats
       
       🎉 **CONCLUSION**: ALL AUDIX ADMIN PORTAL BACKEND REPORT APIS ARE HEALTHY AND OPERATIONAL after frontend changes. All requested field verification points confirmed working correctly. The report endpoints successfully return reco_qty, final_qty, final_value_mrp, and final_value_cost fields as required. Frontend changes had ZERO impact on backend API functionality. Ready for production use.
+  - agent: "main"
+    message: |
+      NEW FEATURE: Restore Sync Backup — Upload scanner backup CSV to restore deleted sync data.
+      
+      Backend: POST /api/portal/sync-inbox/upload-backup
+      - Accepts multipart form: file, client_name, session_name, variance_mode, device_name
+      - Finds or creates client (matched by name, case-insensitive)
+      - Creates new session automatically
+      - Parses CSV (Location, Barcode, Product Name, Price, Quantity, Scanned At)
+      - Groups items by location and creates sync_inbox entries (status: pending)
+      - Creates sync_raw_log with action: "backup_restore"
+      
+      Frontend: PortalSyncLogs.jsx
+      - "Restore Backup" button in Sync & Forward header
+      - Dialog with: Client Name (autocomplete), Session Name, Variance Mode, Device Name, CSV upload
+      - Success result shows summary with counts
+      - Auto-selects restored client/session after upload
+      
+      Testing: POST /api/portal/sync-inbox/upload-backup with test CSV
