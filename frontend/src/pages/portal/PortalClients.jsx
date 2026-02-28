@@ -371,7 +371,7 @@ export default function PortalClients() {
         <Button 
           onClick={() => {
             setEditingClient(null);
-            setFormData({ name: '', code: '', address: '', contact_person: '', contact_phone: '' });
+            setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
             setShowDialog(true);
           }}
           className="bg-emerald-500 hover:bg-emerald-600"
