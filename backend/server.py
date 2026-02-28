@@ -728,6 +728,116 @@ async def clear_master_products(client_id: str):
         "deleted_count": result.deleted_count
     }
 
+# ==================== CLIENT-LEVEL STOCK (WAREHOUSE) ROUTES ====================
+
+@portal_router.post("/clients/{client_id}/import-stock")
+async def import_client_stock(client_id: str, file: UploadFile = File(...)):
+    """Import stock at client level (for warehouse clients). Replaces existing stock on re-upload."""
+    client = await db.clients.find_one({"id": client_id})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    # Get client schema for dynamic fields
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    extra_field_names = []
+    if schema:
+        for f in schema.get("fields", []):
+            if f.get("enabled", True) and f["name"] not in STANDARD_MASTER_FIELD_NAMES and f["name"] not in ("location", "qty"):
+                extra_field_names.append(f["name"])
+    
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    reader = csv.DictReader(io.StringIO(decoded))
+    
+    await db.client_stock.delete_many({"client_id": client_id})
+    
+    records = []
+    for row in reader:
+        norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
+        
+        barcode = norm_row.get('barcode', '')
+        if not barcode:
+            continue
+        
+        record = {
+            "client_id": client_id,
+            "location": norm_row.get('location', ''),
+            "barcode": barcode,
+            "description": norm_row.get('description', ''),
+            "category": norm_row.get('category', ''),
+            "article_code": norm_row.get('article_code', ''),
+            "article_name": norm_row.get('article_name', ''),
+            "mrp": float(norm_row.get('mrp', 0) or 0),
+            "cost": float(norm_row.get('cost', 0) or 0),
+            "qty": float(norm_row.get('qty', 0) or 0),
+            "imported_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        custom_fields = {}
+        for fn in extra_field_names:
+            val = norm_row.get(fn, '')
+            if val:
+                custom_fields[fn] = val
+        if custom_fields:
+            record['custom_fields'] = custom_fields
+        
+        records.append(record)
+    
+    if records:
+        await db.client_stock.insert_many(records)
+    
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"stock_imported": True, "stock_record_count": len(records)}}
+    )
+    
+    return {
+        "message": f"Imported {len(records)} stock records",
+        "record_count": len(records),
+        "extra_fields": len(extra_field_names)
+    }
+
+@portal_router.get("/clients/{client_id}/stock")
+async def get_client_stock(client_id: str, limit: int = 1000, skip: int = 0):
+    """Get client-level stock with pagination"""
+    total = await db.client_stock.count_documents({"client_id": client_id})
+    records = await db.client_stock.find(
+        {"client_id": client_id}, {"_id": 0}
+    ).skip(skip).limit(limit).to_list(limit)
+    extra_columns = await _get_extra_columns_for_client(client_id)
+    
+    return {
+        "records": records,
+        "total": total,
+        "limit": limit,
+        "skip": skip,
+        "extra_columns": extra_columns
+    }
+
+@portal_router.get("/clients/{client_id}/stock/stats")
+async def get_client_stock_stats(client_id: str):
+    """Get client-level stock statistics"""
+    total = await db.client_stock.count_documents({"client_id": client_id})
+    locations = await db.client_stock.distinct("location", {"client_id": client_id})
+    return {
+        "total_records": total,
+        "unique_locations": len([l for l in locations if l]),
+        "locations": [l for l in sorted(locations) if l][:20]
+    }
+
+@portal_router.delete("/clients/{client_id}/stock")
+async def clear_client_stock(client_id: str):
+    """Clear all client-level stock"""
+    result = await db.client_stock.delete_many({"client_id": client_id})
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"stock_imported": False, "stock_record_count": 0}}
+    )
+    return {
+        "message": f"Cleared {result.deleted_count} stock records",
+        "deleted_count": result.deleted_count
+    }
+
 # ==================== AUDIT SESSION ROUTES ====================
 
 @portal_router.get("/sessions")
