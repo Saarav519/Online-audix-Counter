@@ -821,80 +821,61 @@ export default function PortalReports() {
     setFrozenColumns(new Set());
   }, [reportType, selectedSession]);
 
-  // Apply frozen/hidden column styles via DOM
+  // Generate dynamic CSS for hidden/frozen columns (fast CSS injection instead of slow DOM manipulation)
+  const [columnStyleCSS, setColumnStyleCSS] = useState('');
+
   useEffect(() => {
-    if (!tableContainerRef.current) return;
+    if (!tableContainerRef.current) { setColumnStyleCSS(''); return; }
     const table = tableContainerRef.current.querySelector('table');
-    if (!table) return;
+    if (!table) { setColumnStyleCSS(''); return; }
 
     const headerCells = Array.from(table.querySelectorAll('thead > tr > th'));
-    const bodyRows = Array.from(table.querySelectorAll('tbody > tr'));
-    const footRows = Array.from(table.querySelectorAll('tfoot > tr'));
 
-    // Reset all inline styles
-    headerCells.forEach(th => {
-      th.classList.remove('frozen-col-header');
-      th.style.removeProperty('left');
-      th.style.removeProperty('display');
-    });
-    [...bodyRows, ...footRows].forEach(row => {
-      Array.from(row.children).forEach(td => {
-        td.classList.remove('frozen-col', 'frozen-col-footer');
-        td.style.removeProperty('left');
-        td.style.removeProperty('display');
-      });
-    });
-
-    // Build column index map
-    const colMap = {};
+    // Build column key → nth-child index map (1-based)
+    const colIndexMap = {};
     headerCells.forEach((th, idx) => {
       const col = th.getAttribute('data-col');
-      if (col) colMap[col] = idx;
+      if (col) colIndexMap[col] = idx + 1;
     });
 
-    // Apply hidden columns
+    let css = '';
+
+    // Hidden columns — CSS nth-child rules (instant, no row iteration)
     hiddenColumns.forEach(colKey => {
-      const idx = colMap[colKey];
-      if (idx === undefined) return;
-      headerCells[idx].style.display = 'none';
-      bodyRows.forEach(row => {
-        if (row.children[idx]) row.children[idx].style.display = 'none';
-      });
-      // For tfoot, check if columns match (skip if colSpan used)
-      footRows.forEach(row => {
-        if (row.children.length === headerCells.length && row.children[idx]) {
-          row.children[idx].style.display = 'none';
-        }
-      });
+      const nth = colIndexMap[colKey];
+      if (!nth) return;
+      css += `#report-table-area thead tr th:nth-child(${nth}),
+              #report-table-area tbody tr td:nth-child(${nth}),
+              #report-table-area tbody tr th:nth-child(${nth}) { display: none !important; }\n`;
     });
 
-    // Apply frozen columns (in DOM order for correct left offset)
+    // Frozen columns — measure widths and generate sticky CSS
     let offset = 0;
     headerCells.forEach((th, idx) => {
       const col = th.getAttribute('data-col');
       if (!col || !frozenColumns.has(col) || hiddenColumns.has(col)) return;
 
       const width = th.getBoundingClientRect().width;
-      th.classList.add('frozen-col-header');
-      th.style.left = offset + 'px';
+      const nth = idx + 1;
 
-      bodyRows.forEach(row => {
-        const cell = row.children[idx];
-        if (cell) {
-          cell.classList.add('frozen-col');
-          cell.style.left = offset + 'px';
-        }
-      });
+      // Header: sticky both top AND left
+      css += `#report-table-area thead tr th:nth-child(${nth}) {
+        position: sticky !important; left: ${offset}px; top: 0;
+        z-index: 30 !important; background-color: #f9fafb !important;
+        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+      }\n`;
 
-      footRows.forEach(row => {
-        if (row.children.length === headerCells.length && row.children[idx]) {
-          row.children[idx].classList.add('frozen-col-footer');
-          row.children[idx].style.left = offset + 'px';
-        }
-      });
+      // Body cells: sticky left only
+      css += `#report-table-area tbody tr td:nth-child(${nth}) {
+        position: sticky !important; left: ${offset}px;
+        z-index: 20 !important; background-color: white !important;
+        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+      }\n`;
 
       offset += width;
     });
+
+    setColumnStyleCSS(css);
   }, [hiddenColumns, frozenColumns, reportType, filteredData, selectedSession]);
 
   const toggleColumnVisibility = useCallback((colKey) => {
