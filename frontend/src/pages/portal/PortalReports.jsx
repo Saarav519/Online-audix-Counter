@@ -1484,12 +1484,26 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <td className="py-3 px-2"></td>
               <td colSpan={4 + extraColumns.length} className="py-3 px-3">TOTALS</td>
               <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
+              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_mrp || 0).toFixed(2)}</td>
+              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_cost || 0).toFixed(2)}</td>
               <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
+              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_mrp || 0).toFixed(2)}</td>
+              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_cost || 0).toFixed(2)}</td>
               {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
               {isConsolidated && <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
               <td className="py-3 px-3 text-right">
                 <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
                   {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
+                </span>
+              </td>
+              <td className="py-3 px-3 text-right">
+                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_mrp)}`}>
+                  {(data.totals.diff_value_mrp || 0).toFixed(2)}
+                </span>
+              </td>
+              <td className="py-3 px-3 text-right">
+                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_cost)}`}>
+                  {(data.totals.diff_value_cost || 0).toFixed(2)}
                 </span>
               </td>
               <td className="py-3 px-3 text-right">
