@@ -57,6 +57,16 @@ export default function PortalClients() {
   const [masterViewLoading, setMasterViewLoading] = useState(false);
   const masterFileRef = useRef(null);
 
+  // Schema Builder state
+  const [showSchemaDialog, setShowSchemaDialog] = useState(false);
+  const [schemaClient, setSchemaClient] = useState(null);
+  const [schemaFields, setSchemaFields] = useState([]);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaSaving, setSchemaSaving] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [newFieldType, setNewFieldType] = useState('text');
+  const [masterExtraColumns, setMasterExtraColumns] = useState([]);
+
   const fetchClients = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
