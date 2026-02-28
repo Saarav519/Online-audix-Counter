@@ -1,0 +1,88 @@
+{
+  "summary": "Testing Phase 5: Delete Batch (permanent) + Rebuild Variance (clean slate). All 9 backend tests PASSED, all 8 frontend UI verifications PASSED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_delete_rebuild.py",
+    "/app/test_reports/pytest/pytest_delete_rebuild.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DELETE /api/portal/forward-batches/{batch_id} permanently removes batch and data from variance (NO inbox reset) - WORKING",
+    "POST /api/portal/rebuild-variance clears ALL synced_locations + conflict_locations, then rebuilds from sync_raw_logs - WORKING",
+    "Rebuild deduplicates per device per location (keeps latest synced_at) - WORKING",
+    "Rebuild detects conflicts when different devices scan same location - WORKING",
+    "Rebuild returns: cleared_locations, cleared_conflicts, rebuilt_locations, conflicts_created, raw_logs_processed - WORKING",
+    "Frontend Batches tab shows 'Delete Batch' button (not 'Rollback Batch') with data-testid='delete-batch-{id}' - WORKING",
+    "Frontend shows 'Rebuild Variance' button with data-testid='rebuild-variance-btn' - WORKING",
+    "Frontend shows info text: 'Re-push Raw Data to Variance', 'raw sync logs', 'source of truth' - WORKING",
+    "Delete batch uses window.confirm for confirmation dialog - WORKING"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_delete_rebuild.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (8/8 UI verifications passed)"
+  },
+  "seed_data_creation": "Created test sync data via POST /api/sync/ with TEST_DeletePerm_, TEST_Rebuild_, TEST_Dedup_, TEST_Dev1_, TEST_Dev2_, TEST_NoPending_, TEST_FullFlow_ prefixed devices and locations",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Phase 5 (Delete Batch + Rebuild Variance) testing complete. Key changes from previous iteration (11): 1) 'Rollback Batch' renamed to 'Delete Batch' - permanent deletion with no inbox reset, 2) New 'Rebuild Variance' endpoint clears all variance data then rebuilds from raw sync logs, 3) Rebuild includes deduplication per device per location and conflict detection. Test data uses Client=0a2045d2-dc5f-4f6b-b622-8c2a67788b8d, Session=8bb1ee6a-a3b3-48ee-b6a2-023fede4382d, Sync password=test123",
+  "testing_results": {
+    "backend_tests": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "test_file": "/app/backend/tests/test_delete_rebuild.py",
+      "test_classes": [
+        "TestDeleteBatchPermanent (2 tests) - permanent deletion removes from variance, 404 for nonexistent",
+        "TestRebuildVariance (3 tests) - endpoint exists, clears and rebuilds, returns proper counts",
+        "TestRebuildDeduplication (1 test) - keeps latest per device per location",
+        "TestRebuildConflictDetection (1 test) - creates conflicts for different devices same location",
+        "TestDeleteBatchVsRollback (1 test) - delete does NOT reset inbox to pending",
+        "TestFullDeleteRebuildFlow (1 test) - sync→forward→delete→rebuild full flow"
+      ]
+    },
+    "frontend_tests": {
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "test_scenarios": [
+        "1_navigation: PASS - Navigate to Sync & Forward page via localStorage auth",
+        "2_client_session: PASS - Client and session filters work correctly",
+        "3_batches_tab: PASS - Batches tab accessible and clickable",
+        "4_delete_buttons: PASS - Found 15 'Delete Batch' buttons with data-testid",
+        "5_no_rollback: PASS - No 'Rollback Batch' text found (correct)",
+        "6_rebuild_button: PASS - 'Rebuild Variance' button found and visible",
+        "7_rebuild_text: PASS - 'Re-push Raw Data to Variance' info text present",
+        "8_source_truth: PASS - 'source of truth' text present in rebuild section"
+      ]
+    }
+  },
+  "features_verified": {
+    "backend_delete_batch_permanent": "PASS - DELETE removes from variance without inbox reset",
+    "backend_delete_nonexistent": "PASS - Returns 404 for nonexistent batch",
+    "backend_rebuild_endpoint": "PASS - POST /api/portal/rebuild-variance works",
+    "backend_rebuild_clears": "PASS - Clears synced_locations and conflict_locations",
+    "backend_rebuild_counts": "PASS - Returns all required counts in response",
+    "backend_rebuild_dedup": "PASS - Deduplicates per device per location",
+    "backend_rebuild_conflicts": "PASS - Detects conflicts between devices",
+    "backend_full_flow": "PASS - Delete→Rebuild restores data from raw logs",
+    "frontend_delete_button": "PASS - 'Delete Batch' buttons with correct data-testid",
+    "frontend_no_rollback": "PASS - 'Rollback Batch' text removed",
+    "frontend_rebuild_button": "PASS - 'Rebuild Variance' button with data-testid='rebuild-variance-btn'",
+    "frontend_info_text": "PASS - Explanatory text about re-push from raw data"
+  },
+  "screenshots": [
+    ".screenshots/batches_tab_view.png - Shows Batches tab with Delete Batch buttons",
+    ".screenshots/final_batches_tab.png - Shows full batches list with Rebuild Variance section"
+  ]
+}
