@@ -498,6 +498,10 @@ a, button, input, select, textarea {
 .report-table td {
     white-space: nowrap;
     border-left: 1px solid #e5e7eb;
+    text-align: left !important;
+}
+.report-table th > div {
+    justify-content: flex-start !important;
 }
 .report-table th:first-child,
 .report-table td:first-child {
