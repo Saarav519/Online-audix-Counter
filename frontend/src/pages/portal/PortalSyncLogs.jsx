@@ -762,7 +762,7 @@ export default function PortalSyncLogs() {
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                         onClick={() => handleDeleteBatch(batch.id)}>
                         <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Rollback Batch
+                        Delete Batch
                       </Button>
                     </div>
                   )}
@@ -775,17 +775,37 @@ export default function PortalSyncLogs() {
                         className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                         onClick={() => handleDeleteBatch(batch.id)}>
                         <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Rollback Batch
+                        Delete Batch
                       </Button>
                     </div>
                   )}
                 </div>
               ))}
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-                <RotateCcw className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">How to re-push data to variance</p>
-                  <p className="text-xs text-blue-600 mt-1">Click "Rollback Batch" to remove data from variance and send it back to the Sync Inbox. Then go to Sync Inbox tab to review and forward the data again.</p>
+
+              {/* Re-push Raw Data Section */}
+              <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-3">
+                    <RotateCcw className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Re-push Raw Data to Variance</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Clears all existing variance data and conflicts for this session, then rebuilds from raw sync logs.
+                        Use this after resolving conflicts or deleting bad batches — raw data is always the source of truth.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    data-testid="rebuild-variance-btn"
+                    onClick={handleRebuildVariance}
+                    disabled={rebuilding}
+                    className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 ml-4">
+                    {rebuilding ? (
+                      <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Rebuilding...</>
+                    ) : (
+                      <><RotateCcw className="w-4 h-4 mr-2" />Rebuild Variance</>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
