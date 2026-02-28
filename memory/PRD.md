@@ -76,6 +76,12 @@ STORE clients:
     - All report tables now have max-h-[70vh] with sticky headers
     - Horizontal scrollbar visible within the table container without scrolling down
     - Headers stay visible while scrolling vertically through data
+18. **Report UI Improvements** (Feb 28, 2026)
+    - Removed Daily Progress section from reports
+    - 7 Summary Cards: Stock Qty, Stock Value, Physical Qty, Physical Value, Diff Qty, Diff Value, Accuracy
+    - Header alignment: whitespace-nowrap on all table headers
+    - Consolidated Pending Locations endpoint: `/api/portal/reports/consolidated/{client_id}/pending-locations`
+    - Consolidated Empty Bins endpoint: `/api/portal/reports/consolidated/{client_id}/empty-bins`
 
 ## Key Endpoints
 - `POST /api/sync/` + chunked flow → sync to inbox
