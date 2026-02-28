@@ -307,17 +307,44 @@ export default function PortalSyncLogs() {
             {['inbox', 'logs', 'batches'].map(tab => (
               <button key={tab} data-testid={`tab-${tab}`}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
                   activeTab === tab
                     ? 'bg-emerald-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}>
                 {tab === 'inbox' ? 'Sync Inbox' : tab === 'logs' ? 'Raw Logs' : 'Batches'}
+                {tab === 'inbox' && inboxSummary && inboxSummary.total_pending > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    {inboxSummary.total_pending > 99 ? '99+' : inboxSummary.total_pending}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
       </div>
+
+      {/* Pending Forward Banner — visible on all tabs */}
+      {inboxSummary && inboxSummary.total_pending > 0 && activeTab !== 'inbox' && selectedSession && (
+        <div data-testid="pending-forward-banner" className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <div>
+              <p className="font-medium text-amber-800 text-sm">
+                {inboxSummary.total_pending} location{inboxSummary.total_pending !== 1 ? 's' : ''} from {inboxSummary.scanner_count} scanner{inboxSummary.scanner_count !== 1 ? 's' : ''} waiting to be forwarded
+              </p>
+              <p className="text-xs text-amber-600">Go to Sync Inbox to review and forward data to variance</p>
+            </div>
+          </div>
+          <Button
+            data-testid="banner-go-to-inbox"
+            onClick={() => setActiveTab('inbox')}
+            className="bg-amber-500 hover:bg-amber-600 text-white"
+            size="sm">
+            <ArrowRight className="w-4 h-4 mr-1" /> Go to Inbox
+          </Button>
+        </div>
+      )}
 
       {/* TAB: Sync Inbox */}
       {activeTab === 'inbox' && (
