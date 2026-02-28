@@ -2477,6 +2477,10 @@ async def get_detailed_report(session_id: str):
     master_by_barcode = await get_master_for_session(session_id)
     reco_maps = EMPTY_RECO_MAPS
     
+    # Get extra columns for this session's client
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    extra_columns = await _get_extra_columns_for_client(session.get("client_id", "")) if session else []
+    
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     expected_map = {}
     for e in expected:
