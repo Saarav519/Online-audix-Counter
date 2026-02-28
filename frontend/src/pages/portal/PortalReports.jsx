@@ -1424,9 +1424,12 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   {extraColumns.map(col => (
                     <td key={col.name} className="py-2 px-3 text-xs text-purple-700">{row[col.name] || '-'}</td>
                   ))}
-                  <td className="py-2 px-3 text-right"><span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span></td>
                   <td className="py-2 px-3 text-right">{row.stock_qty}</td>
+                  <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_mrp || 0).toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_cost || 0).toFixed(2)}</td>
                   <td className="py-2 px-3 text-right">{row.physical_qty}</td>
+                  <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_mrp || 0).toFixed(2)}</td>
+                  <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
                   {isRecoEditable && (
                     <td className="py-1 px-2 bg-blue-50/30" onClick={e => e.stopPropagation()}>
                       <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row.article_code, reco_qty: val })} />
