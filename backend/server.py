@@ -3410,6 +3410,43 @@ async def get_consolidated_pending_locations(client_id: str):
     }
 
 
+@portal_router.get("/reports/consolidated/{client_id}/empty-bins")
+async def get_consolidated_empty_bins(client_id: str):
+    """Get all empty bins across all sessions for a client."""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    if not session_ids:
+        return {"summary": {"total_locations_audited": 0, "total_empty_bins": 0, "percentage_empty": 0}, "empty_bins": []}
+    
+    empty_bins = []
+    seen = set()
+    for sid in session_ids:
+        synced = await db.synced_locations.find({"session_id": sid, "is_empty": True}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            name = s.get("location_name", "")
+            if name not in seen:
+                seen.add(name)
+                empty_bins.append({
+                    "location_name": name,
+                    "device_name": s.get("device_name", ""),
+                    "empty_remarks": s.get("empty_remarks", ""),
+                    "synced_at": s.get("synced_at", ""),
+                    "sync_date": s.get("sync_date", "")
+                })
+    
+    total_audited = 0
+    for sid in session_ids:
+        total_audited += await db.synced_locations.count_documents({"session_id": sid})
+    
+    return {
+        "summary": {
+            "total_locations_audited": total_audited,
+            "total_empty_bins": len(empty_bins),
+            "percentage_empty": round((len(empty_bins) / total_audited * 100), 1) if total_audited > 0 else 0
+        },
+        "empty_bins": empty_bins
+    }
+
+
 @portal_router.get("/empty-bins/summary")
 async def get_empty_bins_summary(client_id: Optional[str] = None, date: Optional[str] = None):
     """Consolidated empty bins summary across sessions - filterable by client and date"""
