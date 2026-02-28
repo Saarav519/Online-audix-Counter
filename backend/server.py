@@ -841,6 +841,56 @@ async def sync_data(sync_request: SyncRequest):
 
 # ==================== CHUNKED SYNC ENDPOINTS ====================
 
+async def _store_locations_to_inbox(locations, device, session_id, client_id, device_name, sync_log_id, sync_date, sync_timestamp):
+    """Store locations in sync_inbox (staging area). Data does NOT go to variance until admin forwards it."""
+    count = 0
+    for loc_data in locations:
+        location_id = loc_data.get("id", str(uuid.uuid4()))
+        location_name = loc_data.get("name", "Unknown")
+        items = loc_data.get("items", [])
+        loc_is_empty = loc_data.get("is_empty", False)
+        loc_empty_remarks = loc_data.get("empty_remarks", "")
+
+        synced_items = []
+        total_qty = 0
+        for item in items:
+            synced_items.append(SyncedItem(
+                barcode=item.get("barcode", ""),
+                product_name=item.get("productName", item.get("product_name", "")),
+                price=item.get("price"),
+                quantity=item.get("quantity", 0),
+                scanned_at=item.get("scannedAt", item.get("scanned_at", ""))
+            ).model_dump())
+            total_qty += item.get("quantity", 0)
+
+        if loc_is_empty or (len(items) == 0 and loc_is_empty):
+            loc_is_empty = True
+            if not loc_empty_remarks:
+                loc_empty_remarks = "Location found empty during physical count"
+
+        inbox_doc = {
+            "id": str(uuid.uuid4()),
+            "sync_log_id": sync_log_id,
+            "session_id": session_id,
+            "client_id": client_id,
+            "device_name": device_name,
+            "device_id": device["id"] if isinstance(device, dict) else device.id,
+            "location_id": location_id,
+            "location_name": location_name,
+            "items": synced_items,
+            "total_items": len(synced_items),
+            "total_quantity": total_qty,
+            "is_empty": loc_is_empty,
+            "empty_remarks": loc_empty_remarks,
+            "synced_at": sync_timestamp,
+            "sync_date": sync_date,
+            "status": "pending",
+            "forward_batch_id": None
+        }
+        await db.sync_inbox.insert_one(inbox_doc)
+        count += 1
+    return count
+
 async def _verify_sync_device(device_name: str, sync_password: str, client_id: str, session_id: str):
     """Shared device/session verification for sync endpoints."""
     device = await db.devices.find_one({"device_name": device_name})
