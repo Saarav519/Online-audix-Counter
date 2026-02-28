@@ -2224,16 +2224,19 @@ async def get_consolidated_barcode_wise(client_id: str):
         for k, v in [("stock_qty", stock_qty), ("stock_value", stock_value), ("physical_qty", physical_qty), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
             totals[k] += v
         
-        report.append({
+        row = {
             "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value": round(stock_value, 2),
             "physical_qty": physical_qty, "physical_value": round(physical_value, 2),
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
             "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
-        })
+        }
+        if extra_columns:
+            _merge_custom_fields(row, master_by_barcode.get(bc, {}), extra_columns)
+        report.append(row)
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}, "extra_columns": extra_columns}
 
 @portal_router.get("/reports/consolidated/{client_id}/article-wise")
 async def get_consolidated_article_wise(client_id: str):
@@ -2241,6 +2244,7 @@ async def get_consolidated_article_wise(client_id: str):
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
     reco_maps = await _build_reco_maps(client_id)
+    extra_columns = await _get_extra_columns_for_client(client_id)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
