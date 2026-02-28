@@ -3340,6 +3340,76 @@ async def get_pending_locations(session_id: str):
         "pending": pending
     }
 
+@portal_router.get("/reports/consolidated/{client_id}/pending-locations")
+async def get_consolidated_pending_locations(client_id: str):
+    """Get pending locations across all sessions for a client. 
+    Compares expected stock locations with synced locations across all sessions."""
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    if not session_ids:
+        return {"summary": {"total_expected": 0, "total_completed": 0, "total_empty": 0, "total_pending": 0, "total_synced": 0, "completion_pct": 0}, "completed": [], "empty_bins": [], "pending": []}
+    
+    expected_locations = set()
+    synced_location_names = set()
+    synced_map = {}
+    
+    for sid in session_ids:
+        expected = await db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for rec in expected:
+            loc = rec.get("location", "").strip()
+            if loc:
+                expected_locations.add(loc)
+        
+        synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
+        for s in synced:
+            name = s.get("location_name", "")
+            synced_location_names.add(name)
+            if name not in synced_map or not synced_map[name].get("is_empty", False):
+                synced_map[name] = {
+                    "location_name": name,
+                    "total_items": synced_map.get(name, {}).get("total_items", 0) + s.get("total_items", 0),
+                    "total_quantity": synced_map.get(name, {}).get("total_quantity", 0) + s.get("total_quantity", 0),
+                    "is_empty": s.get("is_empty", False),
+                    "empty_remarks": s.get("empty_remarks", ""),
+                    "device_name": s.get("device_name", ""),
+                    "synced_at": s.get("synced_at", ""),
+                    "sync_date": s.get("sync_date", ""),
+                    "status": "empty" if s.get("is_empty", False) else "completed"
+                }
+    
+    all_locations = sorted(expected_locations | synced_location_names)
+    completed = []
+    empty_bins = []
+    pending = []
+    
+    for loc_name in all_locations:
+        if loc_name in synced_map:
+            info = synced_map[loc_name]
+            if info["is_empty"]:
+                empty_bins.append({"location_name": loc_name, "status": "empty", "in_expected": loc_name in expected_locations, **info})
+            else:
+                completed.append({"location_name": loc_name, "status": "completed", "in_expected": loc_name in expected_locations, **info})
+        else:
+            pending.append({"location_name": loc_name, "status": "pending", "in_expected": True, "total_items": 0, "total_quantity": 0, "is_empty": False, "empty_remarks": "", "device_name": "", "synced_at": "", "sync_date": ""})
+    
+    total_expected = len(expected_locations)
+    total_synced = len(synced_location_names & expected_locations)
+    completion_pct = round((total_synced / total_expected * 100), 1) if total_expected > 0 else 0
+    
+    return {
+        "summary": {
+            "total_expected": total_expected,
+            "total_completed": len(completed),
+            "total_empty": len(empty_bins),
+            "total_pending": len(pending),
+            "total_synced": total_synced + len(empty_bins),
+            "completion_pct": completion_pct
+        },
+        "completed": completed,
+        "empty_bins": empty_bins,
+        "pending": pending
+    }
+
+
 @portal_router.get("/empty-bins/summary")
 async def get_empty_bins_summary(client_id: Optional[str] = None, date: Optional[str] = None):
     """Consolidated empty bins summary across sessions - filterable by client and date"""
