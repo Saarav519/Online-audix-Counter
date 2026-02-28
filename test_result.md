@@ -400,15 +400,30 @@ frontend:
         agent: "main"
         comment: "Sync payload now includes is_empty and empty_remarks from location state. Filter updated to include empty bins in sync count (loc.items.length > 0 || loc.is_empty)."
 
+  - task: "Restore Sync Backup Feature"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE: Restore Sync Backup — Upload scanner backup CSV to restore deleted sync data. Backend: POST /api/portal/sync-inbox/upload-backup - Accepts multipart form: file, client_name, session_name, variance_mode, device_name - Finds or creates client (matched by name, case-insensitive) - Creates new session automatically - Parses CSV (Location, Barcode, Product Name, Price, Quantity, Scanned At) - Groups items by location and creates sync_inbox entries (status: pending) - Creates sync_raw_log with action: backup_restore. Frontend: PortalSyncLogs.jsx - Restore Backup button in Sync & Forward header - Dialog with: Client Name (autocomplete), Session Name, Variance Mode, Device Name, CSV upload - Success result shows summary with counts - Auto-selects restored client/session after upload. Testing: POST /api/portal/sync-inbox/upload-backup with test CSV"
+      - working: true
+        agent: "testing"
+        comment: "✅ RESTORE SYNC BACKUP COMPREHENSIVE TESTING COMPLETED - ALL 5 TESTS PASSED (100% SUCCESS RATE). Verified complete backup restoration workflow: 1) Upload backup CSV (new client) - Successfully created client ID: 1be5199a-a9ba-4069-b3c5-9cf665a82c38, session ID: 2a15925c-ca53-4d7a-bbeb-a210df4c6cbb, locations_restored=2, total_items=3, total_quantity=483 as expected, 2) Sync inbox verification - Found total_pending=2, scanner_count=1, device_name='test-device' correctly, 3) Client creation verification - 'Test Backup Client' found in clients list with correct ID, 4) Existing client reuse - Same client_name reused same client_id (1be5199a-a9ba-4069-b3c5-9cf665a82c38), created new session ID: 992cb9c8-ce93-478f-a015-94d92bc2d13b, 5) Cleanup - Successfully deleted both sessions. CRITICAL FEATURES VERIFIED: Multipart form upload working, CSV parsing with Location/Barcode/Product Name/Price/Quantity/Scanned At columns, client name case-insensitive matching, automatic client creation, session creation, sync_inbox data population with pending status, sync_raw_log creation with backup_restore action, client reuse for duplicate names, session cleanup via DELETE endpoint. Backend URLs tested: POST /api/portal/sync-inbox/upload-backup, GET /api/portal/sync-inbox/summary, GET /api/portal/clients, DELETE /api/portal/sessions/{session_id}. ALL RESTORE SYNC BACKUP ENDPOINTS OPERATIONAL AND PRODUCTION-READY."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 3
+  test_sequence: 4
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Conflict Resolution System"
+    - "Restore Sync Backup Feature"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
