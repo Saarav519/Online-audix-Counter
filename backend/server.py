@@ -2760,7 +2760,7 @@ async def get_article_wise_report(session_id: str):
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": totals}
+    return {"report": report, "totals": totals, "extra_columns": extra_columns}
 
 
 @portal_router.get("/reports/{session_id}/category-summary")
