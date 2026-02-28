@@ -56,8 +56,9 @@ function filterByVarianceCategory(rows, category) {
 // Numeric columns that support < 0 / > 0 / = 0 filtering
 const NUMERIC_COLUMNS = new Set([
   'stock_qty', 'physical_qty', 'difference_qty', 'diff_qty', 'accuracy_pct',
-  'mrp', 'cost', 'stock_value', 'physical_value', 'diff_value',
-  'item_count', 'barcode_count', 'reco_qty', 'final_qty', 'final_value'
+  'mrp', 'cost', 'stock_value_mrp', 'stock_value_cost', 'physical_value_mrp', 'physical_value_cost',
+  'diff_value_mrp', 'diff_value_cost', 'final_value_mrp', 'final_value_cost',
+  'item_count', 'barcode_count', 'reco_qty', 'final_qty'
 ]);
 
 const NUMERIC_CONDITIONS = [
@@ -69,8 +70,9 @@ const NUMERIC_CONDITIONS = [
 // Recalculate totals from filtered rows
 function recalcTotals(rows, reportType) {
   if (!rows || rows.length === 0) return null;
-  const totals = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0 };
-  let stockValue = 0, physicalValue = 0, finalValue = 0, diffValue = 0, itemCount = 0;
+  const totals = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0,
+    stock_value_mrp: 0, stock_value_cost: 0, physical_value_mrp: 0, physical_value_cost: 0,
+    final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0, item_count: 0 };
   rows.forEach(row => {
     totals.stock_qty += (row.stock_qty || 0);
     totals.physical_qty += (row.physical_qty || 0);
@@ -79,17 +81,16 @@ function recalcTotals(rows, reportType) {
     const d = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty || 0);
     totals.diff_qty += d;
     totals.difference_qty += d;
-    stockValue += (row.stock_value || 0);
-    physicalValue += (row.physical_value || 0);
-    finalValue += (row.final_value || 0);
-    diffValue += (row.diff_value || 0);
-    itemCount += (row.item_count || 0);
+    totals.stock_value_mrp += (row.stock_value_mrp || 0);
+    totals.stock_value_cost += (row.stock_value_cost || 0);
+    totals.physical_value_mrp += (row.physical_value_mrp || 0);
+    totals.physical_value_cost += (row.physical_value_cost || 0);
+    totals.final_value_mrp += (row.final_value_mrp || 0);
+    totals.final_value_cost += (row.final_value_cost || 0);
+    totals.diff_value_mrp += (row.diff_value_mrp || 0);
+    totals.diff_value_cost += (row.diff_value_cost || 0);
+    totals.item_count += (row.item_count || 0);
   });
-  totals.stock_value = stockValue;
-  totals.physical_value = physicalValue;
-  totals.final_value = finalValue;
-  totals.diff_value = diffValue;
-  totals.item_count = itemCount;
   totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.final_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.final_qty === 0 ? 100 : 0);
   return totals;
 }
