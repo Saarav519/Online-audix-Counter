@@ -599,6 +599,14 @@ async def delete_client(client_id: str):
     r = await db.alerts.delete_many({"client_id": client_id})
     deleted_summary["alerts"] = r.deleted_count
     
+    # 7. Client-level stock
+    r = await db.client_stock.delete_many({"client_id": client_id})
+    deleted_summary["client_stock"] = r.deleted_count
+    
+    # 8. Client schema
+    r = await db.client_schemas.delete_many({"client_id": client_id})
+    deleted_summary["client_schemas"] = r.deleted_count
+    
     return {
         "message": "Client and all related data deleted",
         "deleted": deleted_summary
