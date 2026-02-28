@@ -2672,7 +2672,9 @@ async def get_detailed_report(session_id: str):
                 physical_map[key] = {"location": loc, "barcode": item["barcode"], "product_name": item.get("product_name", ""), "quantity": 0}
             physical_map[key]["quantity"] += item["quantity"]
     
-    all_keys = set(expected_map.keys()) | set(physical_map.keys())
+    # Session-wise: only show items that have scan data
+    # Stock-only (unscanned) items hidden — appear in consolidated view
+    all_keys = set(physical_map.keys())
     
     report = []
     totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
