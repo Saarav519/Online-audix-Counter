@@ -1172,7 +1172,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [] }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1193,6 +1193,9 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="description" label="Description" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('description')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {extraColumns.map(col => (
+                <SortableHeader key={col.name} column={col.name} label={col.label} sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues(col.name)} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              ))}
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               {isRecoEditable && <th className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
@@ -1213,6 +1216,9 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">{row.category}</span>
                   ) : '-'}
                 </td>
+                {extraColumns.map(col => (
+                  <td key={col.name} className="py-2 px-3 text-xs text-purple-700">{row[col.name] || '-'}</td>
+                ))}
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
                 {isRecoEditable && (
