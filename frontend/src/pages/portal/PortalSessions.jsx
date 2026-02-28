@@ -365,6 +365,20 @@ export default function PortalSessions() {
                       </Button>
                     )}
                     
+                    {session.client_type === 'warehouse' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRefreshStock(session)}
+                        disabled={refreshingStock === session.id}
+                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                        data-testid={`refresh-stock-${session.id}`}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${refreshingStock === session.id ? 'animate-spin' : ''}`} />
+                        {refreshingStock === session.id ? 'Refreshing...' : 'Refresh Stock'}
+                      </Button>
+                    )}
+                    
                     {session.expected_stock_imported && (
                       <Button
                         variant="outline"
