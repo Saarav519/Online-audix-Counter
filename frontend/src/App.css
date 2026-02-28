@@ -488,3 +488,19 @@ a, button, input, select, textarea {
     -webkit-tap-highlight-color: rgba(16, 185, 129, 0.3);
 }
 
+
+
+/* ===== REPORT TABLE ALIGNMENT ===== */
+.report-table {
+    border-collapse: collapse;
+}
+.report-table th,
+.report-table td {
+    white-space: nowrap;
+}
+.report-table .remark-cell {
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
