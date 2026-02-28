@@ -4,7 +4,7 @@ import requests
 import json
 
 # Backend URL from environment
-BACKEND_URL = "https://code-review-hub-19.preview.emergentagent.com/api"
+BACKEND_URL = "https://counter-preview-2.preview.emergentagent.com/api"
 
 print("🔍 DEBUGGING CONFLICT FLOW - STEP BY STEP")
 
