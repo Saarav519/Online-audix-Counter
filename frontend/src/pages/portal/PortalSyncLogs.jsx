@@ -396,10 +396,16 @@ export default function PortalSyncLogs() {
           <h1 className="text-2xl font-bold text-gray-900">Sync & Forward</h1>
           <p className="text-gray-500">Manage scanner data — review, forward to variance, track batches</p>
         </div>
-        <Button onClick={fetchData} variant="outline" size="sm" data-testid="refresh-sync-logs">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', file: null }); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
+            <Upload className="w-4 h-4 mr-2" />
+            Restore Backup
+          </Button>
+          <Button onClick={fetchData} variant="outline" size="sm" data-testid="refresh-sync-logs">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
