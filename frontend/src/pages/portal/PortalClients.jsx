@@ -609,6 +609,34 @@ export default function PortalClients() {
                     </Button>
                   )}
                 </div>
+                {/* Warehouse: Stock Upload/View */}
+                {client.client_type === 'warehouse' && (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 flex-1"
+                      onClick={() => openStockUpload(client)}
+                      data-testid={`upload-stock-btn-${client.code}`}
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-1" />
+                      Upload Stock
+                    </Button>
+                    {client.stock_imported && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-gray-600 hover:text-gray-700 flex-1"
+                        onClick={() => openStockView(client)}
+                        data-testid={`view-stock-btn-${client.code}`}
+                      >
+                        <Eye className="w-3.5 h-3.5 mr-1" />
+                        View Stock
+                      </Button>
+                    )}
+                  </div>
+                )}
+                </div>
               </div>
             </div>
           ))}
