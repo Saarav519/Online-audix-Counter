@@ -610,9 +610,11 @@ export default function PortalReports() {
     // Category summary always available
     options.push({ value: 'category-summary', label: 'Category-wise Summary' });
     
-    // Empty bins & pending always available
+    // Empty bins available in session view
     options.push({ value: 'empty-bins', label: 'Empty Bins' });
-    options.push({ value: 'pending-locations', label: 'Pending Locations' });
+    
+    // Pending Locations only in consolidated view (not session-wise)
+    // Session-wise only shows scanned data, pending makes sense only in consolidated
     
     return options;
   };
