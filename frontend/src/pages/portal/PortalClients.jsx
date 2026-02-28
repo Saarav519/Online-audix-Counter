@@ -320,24 +320,24 @@ export default function PortalClients() {
     }
   };
 
-  const downloadSampleMasterCSV = () => {
-    const sampleCSV = `Barcode,Description,Category,MRP,Cost,Article_Code,Article_Name
-8901234567890,Rice 5kg,Grocery,280,250,ART001,Rice Products
-8901234567891,Oil 1L,Grocery,180,150,ART002,Cooking Oil
-8901234567892,Sugar 1kg,Grocery,55,45,ART003,Sugar
-8901234567893,Flour 10kg,Grocery,520,480,ART004,Flour Products
-8901234567895,Butter 500g,Dairy,280,240,ART005,Dairy Items
-8901234567896,Milk 1L,Dairy,65,55,ART006,Dairy Items`;
-    const blob = new Blob([sampleCSV], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample_master_products.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('Sample file downloaded!');
+  const downloadSampleMasterCSV = async () => {
+    if (!masterClient) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${masterClient.id}/schema/template?template_type=master`);
+      if (!res.ok) throw new Error('Failed to download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `master_template_${masterClient.code}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Template downloaded!');
+    } catch (err) {
+      toast.error('Failed to download template');
+    }
   };
 
   const filteredClients = clients.filter(client =>
