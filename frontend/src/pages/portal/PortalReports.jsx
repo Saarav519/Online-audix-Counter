@@ -1422,6 +1422,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
       <div className="p-4 border-b border-gray-200">
         <h3 className="font-semibold text-gray-900">Detailed Item-wise Report</h3>
         {isRecoEditable && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
+        {isConsolidated && !isRecoEditable && <p className="text-xs text-gray-500 mt-1">Reco Qty and Final Qty shown from consolidated adjustments (read-only).</p>}
       </div>
       <div className="overflow-auto max-h-[70vh]">
         <table className="min-w-full text-xs report-table">
