@@ -246,6 +246,84 @@ export default function PortalClients() {
 
   // ========== MASTER PRODUCT FUNCTIONS ==========
 
+  // ========== STOCK FUNCTIONS (WAREHOUSE) ==========
+  
+  const openStockUpload = (client) => {
+    setStockClient(client);
+    setShowStockDialog(true);
+  };
+
+  const handleStockUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !stockClient) return;
+
+    const fd = new FormData();
+    fd.append('file', file);
+    setStockUploading(true);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${stockClient.id}/import-stock`, {
+        method: 'POST',
+        body: fd
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Import failed');
+      }
+      const result = await res.json();
+      toast.success(result.message);
+      setShowStockDialog(false);
+      setStockClient(null);
+      fetchClients();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setStockUploading(false);
+      if (stockFileRef.current) stockFileRef.current.value = '';
+    }
+  };
+
+  const openStockView = async (client) => {
+    setStockClient(client);
+    setStockViewLoading(true);
+    setShowStockViewDialog(true);
+    setStockRecords([]);
+    setStockExtraColumns([]);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/stock?limit=200`);
+      if (res.ok) {
+        const data = await res.json();
+        setStockRecords(data.records);
+        setStockTotal(data.total);
+        setStockExtraColumns(data.extra_columns || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stock:', err);
+    } finally {
+      setStockViewLoading(false);
+    }
+  };
+
+  const downloadStockTemplate = async (client) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema/template?template_type=stock`);
+      if (!res.ok) throw new Error('Failed to download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `stock_template_${client.code}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Stock template downloaded!');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const openMasterUpload = async (client) => {
     setMasterClient(client);
     setMasterStats(null);
