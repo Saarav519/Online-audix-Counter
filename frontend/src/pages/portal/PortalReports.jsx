@@ -249,7 +249,7 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
   const isSorted = sortConfig.key === column;
   
   return (
-    <th className={`py-3 px-3 font-medium text-gray-600 relative group ${align === 'right' ? 'text-right' : 'text-left'} ${className || ''}`}>
+    <th className={`py-3 px-3 font-medium text-gray-600 relative group whitespace-nowrap text-xs ${align === 'right' ? 'text-right' : 'text-left'} ${className || ''}`}>
       <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
         <button className="flex items-center gap-0.5 hover:text-emerald-600 transition-colors" onClick={() => onSort(column)}>
           <span className="select-none">{label}</span>
