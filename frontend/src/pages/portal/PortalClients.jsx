@@ -492,7 +492,16 @@ export default function PortalClients() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">{client.name}</h3>
-                    <p className="text-sm text-gray-500">Code: {client.code}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-500">Code: {client.code}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        client.client_type === 'warehouse' 
+                          ? 'bg-orange-100 text-orange-700' 
+                          : 'bg-teal-100 text-teal-700'
+                      }`} data-testid={`client-type-badge-${client.code}`}>
+                        {client.client_type === 'warehouse' ? 'Warehouse' : 'Store'}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-1">
