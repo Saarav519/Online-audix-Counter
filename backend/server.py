@@ -1474,7 +1474,7 @@ async def export_sync_logs(client_id: str, date: str = None, session_id: str = N
     
     csv_content = output.getvalue()
     
-    suffix = f"_{date}" if date else f"_session" if session_id else "_all"
+    suffix = "_" + date if date else "_session" if session_id else "_all"
     
     return StreamingResponse(
         iter([csv_content]),
