@@ -935,6 +935,62 @@ async def create_session(session: AuditSessionCreate):
         result["snapshot"] = f"Auto-imported {snapshot_count} stock records from warehouse"
     return result
 
+@portal_router.post("/sessions/{session_id}/refresh-stock")
+async def refresh_session_stock(session_id: str):
+    """Re-snapshot client_stock into session's expected_stock for warehouse clients."""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    client = await db.clients.find_one({"id": session["client_id"]}, {"_id": 0})
+    if not client or client.get("client_type") != "warehouse":
+        raise HTTPException(status_code=400, detail="Refresh stock is only available for warehouse clients")
+    
+    # Delete existing expected_stock for this session
+    del_result = await db.expected_stock.delete_many({"session_id": session_id})
+    
+    # Re-snapshot from client_stock
+    client_stock_records = await db.client_stock.find(
+        {"client_id": session["client_id"]}, {"_id": 0}
+    ).to_list(500000)
+    
+    snapshot_count = 0
+    if client_stock_records:
+        expected_records = []
+        for rec in client_stock_records:
+            expected_doc = {
+                "session_id": session_id,
+                "location": rec.get("location", ""),
+                "barcode": rec.get("barcode", ""),
+                "description": rec.get("description", ""),
+                "category": rec.get("category", ""),
+                "article_code": rec.get("article_code", ""),
+                "article_name": rec.get("article_name", ""),
+                "mrp": rec.get("mrp", 0),
+                "cost": rec.get("cost", 0),
+                "qty": rec.get("qty", 0),
+                "imported_at": datetime.now(timezone.utc).isoformat()
+            }
+            if rec.get("custom_fields"):
+                expected_doc["custom_fields"] = rec["custom_fields"]
+            expected_records.append(expected_doc)
+        
+        await db.expected_stock.insert_many(expected_records)
+        snapshot_count = len(expected_records)
+    
+    # Update session metadata
+    await db.audit_sessions.update_one(
+        {"id": session_id},
+        {"$set": {"expected_stock_imported": snapshot_count > 0, "stock_snapshot": True, "stock_refreshed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {
+        "message": f"Stock refreshed — {snapshot_count} records re-imported from warehouse",
+        "previous_count": del_result.deleted_count,
+        "new_count": snapshot_count
+    }
+
+
 @portal_router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
     session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
