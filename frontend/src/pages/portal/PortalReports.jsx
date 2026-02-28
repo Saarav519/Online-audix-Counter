@@ -831,7 +831,7 @@ export default function PortalReports() {
       default:
         return [];
     }
-  }, [reportType, isConsolidatedView, isRecoEditable, extraColumns]);
+  }, [reportType, isConsolidatedView, extraColumns]);
 
   // Reset column settings when report type changes
   useEffect(() => {
