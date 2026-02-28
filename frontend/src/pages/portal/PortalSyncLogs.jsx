@@ -36,6 +36,18 @@ export default function PortalSyncLogs() {
   const [expandedClient, setExpandedClient] = useState(null);
   const [expandedDate, setExpandedDate] = useState(null);
 
+  // Backup upload state
+  const [showBackupDialog, setShowBackupDialog] = useState(false);
+  const [backupUploading, setBackupUploading] = useState(false);
+  const [backupForm, setBackupForm] = useState({
+    clientName: '',
+    sessionName: '',
+    varianceMode: 'bin-wise',
+    deviceName: 'backup-restore',
+    file: null
+  });
+  const [backupResult, setBackupResult] = useState(null);
+
   useEffect(() => {
     fetchClients();
   }, []);
