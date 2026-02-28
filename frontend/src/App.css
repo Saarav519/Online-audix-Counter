@@ -497,6 +497,11 @@ a, button, input, select, textarea {
 .report-table th,
 .report-table td {
     white-space: nowrap;
+    border-left: 1px solid #e5e7eb;
+}
+.report-table th:first-child,
+.report-table td:first-child {
+    border-left: none;
 }
 .report-table .remark-cell {
     white-space: nowrap;
