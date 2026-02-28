@@ -1164,10 +1164,10 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                     {row.accuracy_pct}%
                   </span>
                 </td>
-                <td className="py-2 px-3">
+                <td className="py-2 px-3 remark-cell">
                   <div className="flex items-center gap-1 text-gray-600">
                     {getRemarkIcon(row.remark)}
-                    <span className="truncate max-w-[200px]" title={row.remark}>{row.remark}</span>
+                    <span className="truncate" title={row.remark}>{row.remark}</span>
                   </div>
                 </td>
               </tr>
