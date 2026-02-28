@@ -2732,14 +2732,17 @@ async def get_article_wise_report(session_id: str):
         totals["diff_qty"] += diff_qty
         totals["diff_value"] += diff_value
         
-        report.append({
+        row = {
             "article_code": article_code, "article_name": article_name, "category": category,
             "barcodes": barcodes, "barcode_count": len(barcodes), "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value": stock_value,
             "physical_qty": physical_qty, "physical_value": physical_value,
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
             "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark
-        })
+        }
+        if extra_columns and barcodes:
+            _merge_custom_fields(row, master_by_barcode.get(barcodes[0], {}), extra_columns)
+        report.append(row)
     
     for bc, data in sorted(unmapped_barcodes.items()):
         physical_qty = data["quantity"]
