@@ -630,6 +630,34 @@ export default function PortalSyncLogs() {
                   )}
                 </div>
               ))}
+
+              {/* Re-push Raw Data to Variance */}
+              {selectedSession && (
+                <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <RotateCcw className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Re-push Raw Data to Variance</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Clears all existing variance data and conflicts, then rebuilds from the raw sync logs above. Raw data is the source of truth.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      data-testid="rebuild-variance-btn-logs"
+                      onClick={handleRebuildVariance}
+                      disabled={rebuilding}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 ml-4">
+                      {rebuilding ? (
+                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Rebuilding...</>
+                      ) : (
+                        <><RotateCcw className="w-4 h-4 mr-2" />Rebuild Variance</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : selectedClient && scannerLogs.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
