@@ -1668,7 +1668,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
         <table className="min-w-full text-sm report-table">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <th className="w-8 py-3 px-2"></th>
+              <th data-col="_expand" className="w-8 py-3 px-2"></th>
               <SortableHeader column="article_code" label="Article Code" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_code')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="article_name" label="Article Name" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('article_name')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="category" label="Category" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('category')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
