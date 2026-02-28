@@ -974,10 +974,10 @@ export default function PortalReports() {
     } else if (reportType === 'barcode-wise') {
       const extraH = ec.length ? ',' + ecHeaders : '';
       if (isConsolidatedView) {
-        csv = `Barcode,Description,Category${extraH},Stock Qty,Stock Val(MRP),Stock Val(Cost),Physical Qty,Phys Val(MRP),Phys Val(Cost),Reco,Final Qty,Diff Qty,Diff Val(MRP),Diff Val(Cost),Accuracy %,Remarks\n`;
+        csv = `Barcode,Description,Category${extraH},Stock Qty,Stock Val(MRP),Stock Val(Cost),Physical Qty,Phys Val(MRP),Phys Val(Cost),Reco,Final Qty,Final Val(MRP),Final Val(Cost),Diff Qty,Diff Val(MRP),Diff Val(Cost),Accuracy %,Remarks\n`;
         rows.forEach(row => {
           const ev = ec.length ? ',' + ecVals(row) : '';
-          csv += `"${row.barcode}","${row.description}","${row.category}"${ev},${row.stock_qty},${row.stock_value_mrp || 0},${row.stock_value_cost || 0},${row.physical_qty},${row.physical_value_mrp || 0},${row.physical_value_cost || 0},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.diff_qty},${row.diff_value_mrp || 0},${row.diff_value_cost || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
+          csv += `"${row.barcode}","${row.description}","${row.category}"${ev},${row.stock_qty},${row.stock_value_mrp || 0},${row.stock_value_cost || 0},${row.physical_qty},${row.physical_value_mrp || 0},${row.physical_value_cost || 0},${row.reco_qty || 0},${row.final_qty ?? row.physical_qty},${row.final_value_mrp || 0},${row.final_value_cost || 0},${row.diff_qty},${row.diff_value_mrp || 0},${row.diff_value_cost || 0},${row.accuracy_pct}%,"${row.remark}"\n`;
         });
       } else {
         csv = `Barcode,Description,Category${extraH},Stock Qty,Stock Val(MRP),Stock Val(Cost),Physical Qty,Phys Val(MRP),Phys Val(Cost),Diff Qty,Diff Val(MRP),Diff Val(Cost),Accuracy %,Remarks\n`;
