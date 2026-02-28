@@ -251,9 +251,23 @@ export default function PortalClients() {
 
   // ========== STOCK FUNCTIONS (WAREHOUSE) ==========
   
-  const openStockUpload = (client) => {
+  const openStockUpload = async (client) => {
     setStockClient(client);
     setShowStockDialog(true);
+    setStockSchemaFields([]);
+    setStockSchemaLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`);
+      if (res.ok) {
+        const data = await res.json();
+        const enabledFields = (data.fields || []).filter(f => f.enabled);
+        setStockSchemaFields(enabledFields);
+      }
+    } catch (err) {
+      console.error('Failed to fetch schema for stock:', err);
+    } finally {
+      setStockSchemaLoading(false);
+    }
   };
 
   const handleStockUpload = async (e) => {
