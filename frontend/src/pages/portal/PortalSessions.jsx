@@ -196,6 +196,11 @@ export default function PortalSessions() {
     return client ? client.name : 'Unknown';
   };
 
+  const getClientType = (clientId) => {
+    const client = clients.find(c => c.id === clientId);
+    return client?.client_type || 'store';
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'active': return 'bg-emerald-100 text-emerald-700';
