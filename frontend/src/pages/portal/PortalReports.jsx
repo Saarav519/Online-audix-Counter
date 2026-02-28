@@ -174,7 +174,7 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   };
 
   return (
-    <div ref={dropdownRef} className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 w-64 max-h-96 flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div ref={dropdownRef} className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-64 max-h-96 flex flex-col" style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}>
       {/* Numeric Quick Filter (for number columns) */}
       {isNumeric && (
         <div className="p-2 border-b border-gray-100">
