@@ -2621,17 +2621,20 @@ async def get_barcode_wise_report(session_id: str):
         totals["diff_qty"] += diff_qty
         totals["diff_value"] += diff_value
         
-        report.append({
+        row = {
             "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value": stock_value,
             "physical_qty": physical_qty, "physical_value": physical_value,
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
             "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark,
             "in_master": bc in master_by_barcode, "in_expected_stock": bc in expected_by_barcode
-        })
+        }
+        if extra_columns:
+            _merge_custom_fields(row, master_by_barcode.get(bc, {}), extra_columns)
+        report.append(row)
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": totals}
+    return {"report": report, "totals": totals, "extra_columns": extra_columns}
 
 
 @portal_router.get("/reports/{session_id}/article-wise")
@@ -2639,6 +2642,9 @@ async def get_article_wise_report(session_id: str):
     """Article-wise variance: Groups barcodes by article_code from master, calculates variance at article level"""
     master_by_barcode = await get_master_for_session(session_id)
     reco_maps = EMPTY_RECO_MAPS
+    
+    session_info = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    extra_columns = await _get_extra_columns_for_client(session_info.get("client_id", "")) if session_info else []
     
     expected = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     barcode_to_article = {}
