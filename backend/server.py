@@ -2481,32 +2481,37 @@ async def get_consolidated_article_wise(client_id: str):
         article_groups[article_code]["physical_qty"] += physical_by_barcode.get(bc, 0)
     
     report = []
-    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
+    totals = {"stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "diff_qty": 0,
+              "stock_value_mrp": 0, "physical_value_mrp": 0, "final_value_mrp": 0, "diff_value_mrp": 0,
+              "stock_value_cost": 0, "physical_value_cost": 0, "final_value_cost": 0, "diff_value_cost": 0}
     
     for code in sorted(article_groups.keys()):
         g = article_groups[code]
         cost = g["cost"]
+        mrp = g["mrp"]
         reco_qty = reco_maps["article"].get(code, 0)
         final_qty = g["physical_qty"] + reco_qty
         diff_qty = final_qty - g["stock_qty"]
-        stock_value = g["stock_qty"] * cost
-        physical_value = g["physical_qty"] * cost
-        final_value = final_qty * cost
-        diff_value = final_value - stock_value
+        sv = calc_values(g["stock_qty"], mrp, cost)
+        pv = calc_values(g["physical_qty"], mrp, cost)
+        fv = calc_values(final_qty, mrp, cost)
+        dv_mrp = fv["mrp"] - sv["mrp"]; dv_cost = fv["cost"] - sv["cost"]
         accuracy = calc_accuracy(g["stock_qty"], final_qty)
         remark = generate_remark(g["stock_qty"], final_qty, accuracy, code != "UNMAPPED", g["physical_qty"] > 0, code != "UNMAPPED", g["stock_qty"] > 0)
         
-        for k, v in [("stock_qty", g["stock_qty"]), ("stock_value", stock_value), ("physical_qty", g["physical_qty"]), ("physical_value", physical_value), ("reco_qty", reco_qty), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
-            totals[k] += v
+        totals["stock_qty"] += g["stock_qty"]; totals["physical_qty"] += g["physical_qty"]; totals["reco_qty"] += reco_qty; totals["final_qty"] += final_qty; totals["diff_qty"] += diff_qty
+        totals["stock_value_mrp"] += sv["mrp"]; totals["physical_value_mrp"] += pv["mrp"]; totals["final_value_mrp"] += fv["mrp"]; totals["diff_value_mrp"] += dv_mrp
+        totals["stock_value_cost"] += sv["cost"]; totals["physical_value_cost"] += pv["cost"]; totals["final_value_cost"] += fv["cost"]; totals["diff_value_cost"] += dv_cost
         
         row = {
             "article_code": code, "article_name": g["article_name"], "category": g["category"],
             "barcodes": sorted(g["barcodes"]), "barcode_count": len(g["barcodes"]),
-            "mrp": g["mrp"], "cost": cost,
-            "stock_qty": g["stock_qty"], "stock_value": round(stock_value, 2),
-            "physical_qty": g["physical_qty"], "physical_value": round(physical_value, 2),
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": round(final_value, 2),
-            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+            "mrp": mrp, "cost": cost,
+            "stock_qty": g["stock_qty"], "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
+            "physical_qty": g["physical_qty"], "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
+            "accuracy_pct": accuracy, "remark": remark
         }
         # For article-wise, pull custom fields from the first barcode's master data
         if extra_columns and g["barcodes"]:
