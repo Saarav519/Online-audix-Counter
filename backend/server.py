@@ -2874,7 +2874,8 @@ async def get_article_wise_report(session_id: str):
     report = []
     totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
     
-    all_article_codes = set(expected_by_article.keys()) | set(physical_by_article.keys())
+    # Session-wise: only show articles that have scan data
+    all_article_codes = set(physical_by_article.keys())
     
     for ac in sorted(all_article_codes):
         exp = expected_by_article.get(ac, {})
