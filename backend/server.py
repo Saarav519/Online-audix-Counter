@@ -1374,6 +1374,65 @@ async def get_sync_logs_grouped(client_id: str = None, limit: int = 500):
     
     return result
 
+@portal_router.get("/sync-logs/by-scanner")
+async def get_sync_logs_by_scanner(client_id: str = None, session_id: str = None, limit: int = 2000):
+    """Get sync logs grouped by scanner (device_name). Each scanner shows individual sync entries."""
+    query = {}
+    if client_id:
+        query["client_id"] = client_id
+    if session_id:
+        query["session_id"] = session_id
+
+    logs = await db.sync_raw_logs.find(query, {"_id": 0, "raw_payload": 0}).sort("synced_at", -1).to_list(limit)
+
+    # Fetch session names for display
+    all_session_ids = list(set(log.get("session_id", "") for log in logs if log.get("session_id")))
+    sessions_list = await db.audit_sessions.find({"id": {"$in": all_session_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    session_map = {s["id"]: s.get("name", "") for s in sessions_list}
+
+    # Group by device_name
+    by_scanner = {}
+    for log in logs:
+        dn = log.get("device_name", "Unknown")
+        if dn not in by_scanner:
+            by_scanner[dn] = {
+                "device_name": dn,
+                "sync_count": 0,
+                "total_locations": 0,
+                "total_items": 0,
+                "total_quantity": 0,
+                "last_synced_at": None,
+                "sync_dates": set(),
+                "syncs": []
+            }
+        group = by_scanner[dn]
+        group["sync_count"] += 1
+        group["total_locations"] += log.get("location_count", 0)
+        group["total_items"] += log.get("total_items", 0)
+        group["total_quantity"] += log.get("total_quantity", 0)
+        if not group["last_synced_at"] or log.get("synced_at", "") > group["last_synced_at"]:
+            group["last_synced_at"] = log.get("synced_at")
+        group["sync_dates"].add(log.get("sync_date", ""))
+        group["syncs"].append({
+            "id": log.get("id", ""),
+            "sync_date": log.get("sync_date", ""),
+            "synced_at": log.get("synced_at", ""),
+            "location_count": log.get("location_count", 0),
+            "total_items": log.get("total_items", 0),
+            "total_quantity": log.get("total_quantity", 0),
+            "session_id": log.get("session_id", ""),
+            "session_name": session_map.get(log.get("session_id", ""), ""),
+            "action": log.get("action", "sync")
+        })
+
+    result = []
+    for dn in sorted(by_scanner.keys()):
+        group = by_scanner[dn]
+        group["sync_dates"] = sorted(group["sync_dates"], reverse=True)
+        result.append(group)
+
+    return result
+
 @portal_router.get("/sync-logs/export")
 async def export_sync_logs(client_id: str, date: str):
     """Export sync logs for a specific client and date as CSV"""
