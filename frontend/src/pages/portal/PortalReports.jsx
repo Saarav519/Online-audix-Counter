@@ -1706,7 +1706,10 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               {isRecoEditable && <th data-col="reco" className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
+              {isConsolidated && <SortableHeader column="final_value_mrp" label="Final Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
+              {isConsolidated && <SortableHeader column="final_value_cost" label="Final Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="diff_qty" label="Diff Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_value_mrp" label="Diff Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="diff_value_cost" label="Diff Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1741,7 +1744,10 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                       <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row.article_code, reco_qty: val })} />
                     </td>
                   )}
+                  {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
                   {isConsolidated && <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
+                  {isConsolidated && <td className="py-2 px-3 text-right text-gray-500">{(row.final_value_mrp || 0).toFixed(2)}</td>}
+                  {isConsolidated && <td className="py-2 px-3 text-right text-gray-500">{(row.final_value_cost || 0).toFixed(2)}</td>}
                   <td className="py-2 px-3 text-right">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                       {getVarianceIcon(row.diff_qty)}
