@@ -22,7 +22,7 @@ def test_portal_login():
         
         if response.status_code == 200:
             result = response.json()
-            if 'id' in result and result.get('username') == 'admin':
+            if 'user' in result and result['user'].get('username') == 'admin':
                 print("✅ Portal Login PASSED")
                 return True
         
