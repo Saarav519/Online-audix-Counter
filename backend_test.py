@@ -136,12 +136,37 @@ def test_schema_template(client_id: str, template_type: str, client_name: str = 
     """Test getting schema template"""
     print(f"\nTesting Schema Template ({template_type}) for {client_name} ({client_id})...")
     
-    result = make_request("GET", f"/portal/clients/{client_id}/schema/template?template_type={template_type}")
+    result = make_request("GET", f"/portal/clients/{client_id}/schema/template?template_type={template_type}", expect_csv=True)
     
     if result["success"]:
+        template_data = result["data"]
         print(f"✅ Schema Template ({template_type}): SUCCESS")
-        print(f"   Response received (likely CSV data)")
-        return {"success": True, "template_data": result["data"]}
+        print(f"   CSV Header: {template_data.strip() if template_data else 'No data'}")
+        
+        # Parse the CSV header to check expected fields
+        if template_data and template_type == "master":
+            expected_fields = ["Barcode", "Description", "Category", "Mrp"]
+            header_fields = [field.strip() for field in template_data.strip().split(',')]
+            
+            # Check if expected fields are present
+            missing_fields = [field for field in expected_fields if field not in header_fields]
+            if not missing_fields:
+                print(f"   ✅ Master template verification: All expected fields present ({', '.join(expected_fields)})")
+            else:
+                print(f"   ⚠️ Master template verification: Missing fields: {', '.join(missing_fields)}")
+        
+        elif template_data and template_type == "stock":
+            expected_fields = ["Location", "Barcode", "Description", "Category", "Mrp", "Qty"]
+            header_fields = [field.strip() for field in template_data.strip().split(',')]
+            
+            # Check if expected fields are present
+            missing_fields = [field for field in expected_fields if field not in header_fields]
+            if not missing_fields:
+                print(f"   ✅ Stock template verification: All expected fields present ({', '.join(expected_fields)})")
+            else:
+                print(f"   ⚠️ Stock template verification: Missing fields: {', '.join(missing_fields)}")
+        
+        return {"success": True, "template_data": template_data}
     else:
         print(f"❌ Schema Template ({template_type}): FAILED")
         print(f"   Error: {result.get('error', 'Unknown error')}")
