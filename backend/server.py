@@ -1389,6 +1389,186 @@ async def cancel_sync_staging(batch_id: str):
     result = await db.sync_staging.delete_many({"batch_id": batch_id})
     return {"message": "Staging data cleared", "deleted_chunks": result.deleted_count}
 
+# ==================== BACKUP RESTORE (Upload Sync Backup CSV) ====================
+
+@portal_router.post("/sync-inbox/upload-backup")
+async def upload_sync_backup(
+    file: UploadFile = File(...),
+    client_name: str = Form(...),
+    session_name: str = Form(...),
+    variance_mode: str = Form("bin-wise"),
+    device_name: str = Form("backup-restore")
+):
+    """Upload a scanner backup CSV to restore sync data.
+    Creates client/session if needed, then populates sync_inbox."""
+    import csv as csv_module
+    import io
+
+    # 1. Read and parse the CSV
+    content = await file.read()
+    try:
+        text = content.decode('utf-8-sig')  # Handle BOM
+    except UnicodeDecodeError:
+        text = content.decode('latin-1')
+
+    reader = csv_module.DictReader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows")
+
+    # Normalize headers (lowercase, strip)
+    norm_rows = []
+    for row in rows:
+        norm = {k.strip().lower().replace(' ', '_'): v.strip() if v else '' for k, v in row.items() if k}
+        norm_rows.append(norm)
+
+    # 2. Find or create client
+    client = await db.clients.find_one({"name": {"$regex": f"^{client_name.strip()}$", "$options": "i"}}, {"_id": 0})
+    if client:
+        client_id = client["id"]
+    else:
+        client_id = str(uuid.uuid4())
+        new_client = {
+            "id": client_id,
+            "name": client_name.strip(),
+            "code": client_name.strip().lower().replace(' ', '-'),
+            "client_type": "store",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.clients.insert_one(new_client)
+        # Create default schema
+        default_fields = [
+            {"name": "barcode", "label": "Barcode", "type": "text", "enabled": True, "required": True},
+            {"name": "description", "label": "Description", "type": "text", "enabled": True, "required": False},
+            {"name": "category", "label": "Category", "type": "text", "enabled": True, "required": False},
+            {"name": "mrp", "label": "MRP", "type": "number", "enabled": True, "required": False},
+            {"name": "cost", "label": "Cost", "type": "number", "enabled": True, "required": False},
+            {"name": "article_code", "label": "Article Code", "type": "text", "enabled": False, "required": False},
+            {"name": "article_name", "label": "Article Name", "type": "text", "enabled": False, "required": False},
+        ]
+        await db.client_schemas.insert_one({
+            "client_id": client_id, "fields": default_fields, "extra_columns": [],
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        })
+
+    # 3. Create session
+    session_id = str(uuid.uuid4())
+    new_session = {
+        "id": session_id,
+        "name": session_name.strip(),
+        "client_id": client_id,
+        "variance_mode": variance_mode,
+        "status": "active",
+        "start_date": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.audit_sessions.insert_one(new_session)
+
+    # 4. Ensure device exists
+    device = await db.devices.find_one({"device_name": device_name}, {"_id": 0})
+    if not device:
+        device = {
+            "id": str(uuid.uuid4()),
+            "device_name": device_name,
+            "device_type": "backup",
+            "status": "active",
+            "client_id": client_id,
+            "session_id": session_id,
+            "registered_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.devices.insert_one(device)
+
+    # 5. Group items by location
+    location_map = {}
+    for row in norm_rows:
+        loc_name = row.get('location', 'Unknown')
+        if not loc_name:
+            loc_name = 'Unknown'
+        if loc_name not in location_map:
+            location_map[loc_name] = []
+
+        barcode = row.get('barcode', '').strip().strip('="').strip('"')
+        quantity = 0
+        try:
+            quantity = float(row.get('quantity', 0) or 0)
+        except (ValueError, TypeError):
+            pass
+
+        price = None
+        try:
+            price_val = row.get('price', '') or ''
+            if price_val:
+                price = float(price_val)
+        except (ValueError, TypeError):
+            pass
+
+        location_map[loc_name].append({
+            "barcode": barcode,
+            "productName": row.get('product_name', row.get('description', '')),
+            "price": price,
+            "quantity": quantity,
+            "scannedAt": row.get('scanned_at', datetime.now(timezone.utc).isoformat())
+        })
+
+    # 6. Build locations list (same format as sync)
+    all_locations = []
+    for loc_name, items in location_map.items():
+        all_locations.append({
+            "id": str(uuid.uuid4()),
+            "name": loc_name,
+            "is_empty": len(items) == 0,
+            "empty_remarks": "",
+            "items": items
+        })
+
+    # 7. Create sync_raw_log
+    sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    sync_timestamp = datetime.now(timezone.utc).isoformat()
+    sync_log_id = str(uuid.uuid4())
+
+    raw_log = {
+        "id": sync_log_id,
+        "device_name": device_name,
+        "client_id": client_id,
+        "session_id": session_id,
+        "sync_date": sync_date,
+        "synced_at": sync_timestamp,
+        "raw_payload": {
+            "locations": all_locations,
+            "device_name": device_name,
+            "session_id": session_id,
+            "client_id": client_id,
+            "source": "backup_restore",
+            "original_filename": file.filename
+        },
+        "location_count": len(all_locations),
+        "total_items": sum(len(loc["items"]) for loc in all_locations),
+        "total_quantity": sum(
+            sum(item.get("quantity", 0) for item in loc["items"])
+            for loc in all_locations
+        ),
+        "action": "backup_restore"
+    }
+    await db.sync_raw_logs.insert_one(raw_log)
+
+    # 8. Store locations in sync_inbox
+    synced_count = await _store_locations_to_inbox(
+        all_locations, device, session_id, client_id,
+        device_name, sync_log_id, sync_date, sync_timestamp
+    )
+
+    return {
+        "message": "Backup restored successfully",
+        "client_id": client_id,
+        "client_name": client_name.strip(),
+        "session_id": session_id,
+        "session_name": session_name.strip(),
+        "locations_restored": synced_count,
+        "total_items": raw_log["total_items"],
+        "total_quantity": raw_log["total_quantity"],
+        "sync_log_id": sync_log_id
+    }
+
 # ==================== SYNC INBOX & FORWARD TO VARIANCE ====================
 
 @portal_router.get("/sync-inbox/summary")
