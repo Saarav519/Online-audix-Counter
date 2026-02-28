@@ -443,6 +443,8 @@ COMMON_OPTIONAL_FIELDS = [
     {"name": "hsn_code", "label": "HSN Code", "type": "text", "required": False, "is_standard": True},
 ]
 
+STANDARD_MASTER_FIELD_NAMES = {"barcode", "description", "category", "mrp", "cost", "article_code", "article_name"}
+
 class SchemaField(BaseModel):
     name: str
     label: str
