@@ -41,6 +41,7 @@ export default function PortalClients() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
+    client_type: 'store',
     address: '',
     contact_person: '',
     contact_phone: ''
