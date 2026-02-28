@@ -148,6 +148,89 @@ export default function PortalClients() {
     }
   };
 
+  // ========== SCHEMA BUILDER FUNCTIONS ==========
+  
+  const openSchemaBuilder = async (client) => {
+    setSchemaClient(client);
+    setSchemaLoading(true);
+    setShowSchemaDialog(true);
+    setNewFieldName('');
+    setNewFieldType('text');
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`);
+      if (res.ok) {
+        const data = await res.json();
+        setSchemaFields(data.fields || []);
+      }
+    } catch (err) {
+      toast.error('Failed to load schema');
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+  
+  const toggleField = (index) => {
+    setSchemaFields(prev => prev.map((f, i) => i === index ? { ...f, enabled: !f.enabled } : f));
+  };
+  
+  const addCustomField = () => {
+    const name = newFieldName.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!name) return;
+    if (schemaFields.some(f => f.name === name)) {
+      toast.error('Field already exists');
+      return;
+    }
+    setSchemaFields(prev => [...prev, {
+      name, label: newFieldName.trim(), type: newFieldType, required: false, is_standard: false, enabled: true
+    }]);
+    setNewFieldName('');
+    setNewFieldType('text');
+  };
+  
+  const removeCustomField = (index) => {
+    const field = schemaFields[index];
+    if (field.is_standard) return;
+    setSchemaFields(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const saveSchema = async () => {
+    setSchemaSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${schemaClient.id}/schema`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: schemaFields })
+      });
+      if (!res.ok) throw new Error('Failed to save');
+      toast.success('Schema saved successfully');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSchemaSaving(false);
+    }
+  };
+  
+  const downloadSchemaTemplate = async (templateType = 'master') => {
+    if (!schemaClient) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${schemaClient.id}/schema/template?template_type=${templateType}`);
+      if (!res.ok) throw new Error('Failed to download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateType}_template_${schemaClient.code}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`${templateType} template downloaded!`);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   // ========== MASTER PRODUCT FUNCTIONS ==========
 
   const openMasterUpload = async (client) => {
