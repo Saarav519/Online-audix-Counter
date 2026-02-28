@@ -328,7 +328,7 @@ export default function PortalSessions() {
                 {/* Action Buttons Row */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                   <div className="flex gap-2 flex-wrap">
-                    {getClientType(session.client_id) !== 'warehouse' && (
+                    {session.client_type !== 'warehouse' && (
                       <Button
                         variant="outline"
                         size="sm"
