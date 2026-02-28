@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Database, RefreshCw, ChevronDown, ChevronRight, Smartphone, Clock,
   MapPin, Package, Download, Building2, Calendar, Filter, ArrowRight,
-  CheckCircle2, AlertTriangle, Inbox, History, Layers, Trash2, RotateCcw
+  CheckCircle2, AlertTriangle, Inbox, History, Layers, Trash2, RotateCcw,
+  Upload, FileUp
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
