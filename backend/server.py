@@ -783,38 +783,18 @@ async def update_device(device_id: str, update: DeviceUpdate):
 @sync_router.post("/")
 async def sync_data(sync_request: SyncRequest):
     # Verify device and password
-    device = await db.devices.find_one({"device_name": sync_request.device_name})
-    if not device:
-        # Auto-register device
-        device = Device(
-            device_name=sync_request.device_name,
-            sync_password_hash=hash_password(sync_request.sync_password),
-            client_id=sync_request.client_id,
-            session_id=sync_request.session_id
-        )
-        doc = device.model_dump()
-        doc['created_at'] = doc['created_at'].isoformat()
-        if doc['last_sync_at']:
-            doc['last_sync_at'] = doc['last_sync_at'].isoformat()
-        await db.devices.insert_one(doc)
-        device = doc
-    else:
-        # Verify password
-        if not verify_password(sync_request.sync_password, device.get("sync_password_hash", "")):
-            raise HTTPException(status_code=401, detail="Invalid sync password")
-    
-    # Verify session exists
-    session = await db.audit_sessions.find_one({"id": sync_request.session_id})
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    device, session = await _verify_sync_device(
+        sync_request.device_name, sync_request.sync_password,
+        sync_request.client_id, sync_request.session_id
+    )
     
     sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     sync_timestamp = datetime.now(timezone.utc).isoformat()
-    synced_count = 0
     
     # Store raw sync log (append-only audit trail)
+    sync_log_id = str(uuid.uuid4())
     raw_log = {
-        "id": str(uuid.uuid4()),
+        "id": sync_log_id,
         "device_name": sync_request.device_name,
         "client_id": sync_request.client_id or session.get("client_id", ""),
         "session_id": sync_request.session_id,
@@ -836,149 +816,22 @@ async def sync_data(sync_request: SyncRequest):
     }
     await db.sync_raw_logs.insert_one(raw_log)
     
-    for loc_data in sync_request.locations:
-        location_id = loc_data.get("id", str(uuid.uuid4()))
-        location_name = loc_data.get("name", "Unknown")
-        items = loc_data.get("items", [])
-        loc_is_empty = loc_data.get("is_empty", False)
-        loc_empty_remarks = loc_data.get("empty_remarks", "")
-        
-        # ============================================
-        # CONFLICT DETECTION: Check if location already synced by a DIFFERENT device
-        # ============================================
-        existing_synced = await db.synced_locations.find_one({
-            "session_id": sync_request.session_id,
-            "location_name": location_name
-        })
-        
-        # Also check if this location is already in an active conflict
-        existing_conflict = await db.conflict_locations.find_one({
-            "session_id": sync_request.session_id,
-            "location_name": location_name,
-            "status": "pending"
-        })
-        
-        # Build new entry data
-        synced_items = []
-        total_qty = 0
-        for item in items:
-            synced_items.append(SyncedItem(
-                barcode=item.get("barcode", ""),
-                product_name=item.get("productName", item.get("product_name", "")),
-                price=item.get("price"),
-                quantity=item.get("quantity", 0),
-                scanned_at=item.get("scannedAt", item.get("scanned_at", ""))
-            ).model_dump())
-            total_qty += item.get("quantity", 0)
-        
-        if loc_is_empty or (len(items) == 0 and loc_is_empty):
-            loc_is_empty = True
-            if not loc_empty_remarks:
-                loc_empty_remarks = "Location found empty during physical count"
-        
-        new_entry = {
-            "entry_id": str(uuid.uuid4()),
-            "device_name": sync_request.device_name,
-            "device_id": device["id"] if isinstance(device, dict) else device.id,
-            "location_id": location_id,
-            "synced_at": sync_timestamp,
-            "items": synced_items,
-            "total_items": len(synced_items),
-            "total_quantity": total_qty,
-            "is_empty": loc_is_empty,
-            "empty_remarks": loc_empty_remarks,
-            "status": "pending"
-        }
-        
-        if existing_conflict:
-            # Already a conflict for this location — add this as another entry
-            await db.conflict_locations.update_one(
-                {"id": existing_conflict["id"]},
-                {"$push": {"entries": new_entry}, "$set": {"updated_at": sync_timestamp}}
-            )
-            synced_count += 1
-            continue
-        
-        if existing_synced and existing_synced.get("device_name") != sync_request.device_name:
-            # CONFLICT: Same location from DIFFERENT device
-            # Move existing entry from synced_locations to conflict
-            first_entry = {
-                "entry_id": str(uuid.uuid4()),
-                "device_name": existing_synced.get("device_name", "Unknown"),
-                "device_id": existing_synced.get("device_id", ""),
-                "location_id": existing_synced.get("location_id", ""),
-                "synced_at": existing_synced.get("synced_at", sync_timestamp),
-                "items": existing_synced.get("items", []),
-                "total_items": existing_synced.get("total_items", 0),
-                "total_quantity": existing_synced.get("total_quantity", 0),
-                "is_empty": existing_synced.get("is_empty", False),
-                "empty_remarks": existing_synced.get("empty_remarks", ""),
-                "status": "pending"
-            }
-            
-            conflict_doc = {
-                "id": str(uuid.uuid4()),
-                "session_id": sync_request.session_id,
-                "client_id": sync_request.client_id or session.get("client_id", ""),
-                "location_name": location_name,
-                "status": "pending",
-                "entries": [first_entry, new_entry],
-                "created_at": sync_timestamp,
-                "updated_at": sync_timestamp,
-                "resolved_at": None,
-                "resolved_by": None
-            }
-            
-            await db.conflict_locations.insert_one(conflict_doc)
-            
-            # Remove from synced_locations (no longer in variance)
-            await db.synced_locations.delete_many({
-                "session_id": sync_request.session_id,
-                "location_name": location_name
-            })
-            
-            synced_count += 1
-            continue
-        
-        # Normal sync: same device re-sync OR first time
-        await db.synced_locations.delete_many({
-            "session_id": sync_request.session_id,
-            "location_name": location_name
-        })
-        
-        synced_loc = SyncedLocation(
-            session_id=sync_request.session_id,
-            device_id=device["id"] if isinstance(device, dict) else device.id,
-            device_name=sync_request.device_name,
-            location_id=location_id,
-            location_name=location_name,
-            items=synced_items,
-            total_items=len(synced_items),
-            total_quantity=total_qty,
-            is_empty=loc_is_empty,
-            empty_remarks=loc_empty_remarks,
-            sync_date=sync_date
-        )
-        
-        doc = synced_loc.model_dump()
-        doc['synced_at'] = doc['synced_at'].isoformat()
-        await db.synced_locations.insert_one(doc)
-        synced_count += 1
+    # Store locations in sync_inbox (NOT in variance yet)
+    synced_count = await _store_locations_to_inbox(
+        sync_request.locations, device, sync_request.session_id,
+        sync_request.client_id or session.get("client_id", ""),
+        sync_request.device_name, sync_log_id, sync_date, sync_timestamp
+    )
     
     # Update device last sync
     await db.devices.update_one(
         {"device_name": sync_request.device_name},
-        {
-            "$set": {
-                "last_sync_at": datetime.now(timezone.utc).isoformat(),
-                "client_id": sync_request.client_id,
-                "session_id": sync_request.session_id
-            }
-        }
+        {"$set": {
+            "last_sync_at": datetime.now(timezone.utc).isoformat(),
+            "client_id": sync_request.client_id,
+            "session_id": sync_request.session_id
+        }}
     )
-    
-    # Generate alerts for high variance
-    await check_and_generate_alerts(sync_request.session_id, sync_request.client_id)
     
     return {
         "message": "Sync successful",
