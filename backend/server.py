@@ -2758,7 +2758,8 @@ async def get_barcode_wise_report(session_id: str):
                 physical_by_barcode[bc] = {"barcode": bc, "product_name": item.get("product_name", ""), "quantity": 0}
             physical_by_barcode[bc]["quantity"] += item["quantity"]
     
-    all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
+    # Session-wise: only show barcodes that have scan data
+    all_barcodes = set(physical_by_barcode.keys())
     
     report = []
     totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
