@@ -13,7 +13,7 @@ import time
 import sys
 
 # Backend URL from the review request
-BASE_URL = "https://master-stock-config.preview.emergentagent.com"
+BASE_URL = "https://reco-reports-fix.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 class PriorityTest:

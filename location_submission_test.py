@@ -22,7 +22,7 @@ import requests
 import json
 import time
 
-BASE_URL = "https://master-stock-config.preview.emergentagent.com"
+BASE_URL = "https://reco-reports-fix.preview.emergentagent.com"
 
 def test_backend_endpoints_for_location_data():
     """
