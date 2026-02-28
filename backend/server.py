@@ -2554,8 +2554,10 @@ async def get_consolidated_category_summary(client_id: str):
         exp = expected_by_barcode.get(bc, {})
         category = master.get("category", "") or exp.get("category", "") or "Unmapped"
         if category not in cat_groups:
-            cat_groups[category] = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "stock_value": 0, "physical_value": 0}
+            cat_groups[category] = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
+                                    "stock_value_mrp": 0, "stock_value_cost": 0, "physical_value_mrp": 0, "physical_value_cost": 0}
         cost = master.get("cost", 0) or exp.get("cost", 0) or 0
+        mrp = master.get("mrp", 0) or exp.get("mrp", 0) or 0
         stock_qty = expected_by_barcode.get(bc, {}).get("qty", 0)
         physical_qty = physical_by_barcode.get(bc, 0)
         reco_qty = barcode_reco.get(bc, 0)
@@ -2563,31 +2565,41 @@ async def get_consolidated_category_summary(client_id: str):
         cat_groups[category]["stock_qty"] += stock_qty
         cat_groups[category]["physical_qty"] += physical_qty
         cat_groups[category]["reco_qty"] += reco_qty
-        cat_groups[category]["stock_value"] += stock_qty * cost
-        cat_groups[category]["physical_value"] += physical_qty * cost
+        cat_groups[category]["stock_value_mrp"] += stock_qty * mrp
+        cat_groups[category]["stock_value_cost"] += stock_qty * cost
+        cat_groups[category]["physical_value_mrp"] += physical_qty * mrp
+        cat_groups[category]["physical_value_cost"] += physical_qty * cost
     
     report = []
-    totals = {"item_count": 0, "stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
+    totals = {"item_count": 0, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "diff_qty": 0,
+              "stock_value_mrp": 0, "physical_value_mrp": 0, "final_value_mrp": 0, "diff_value_mrp": 0,
+              "stock_value_cost": 0, "physical_value_cost": 0, "final_value_cost": 0, "diff_value_cost": 0}
     
     for cat in sorted(cat_groups.keys()):
         g = cat_groups[cat]
         final_qty = g["physical_qty"] + g["reco_qty"]
-        avg_cost = g["physical_value"] / g["physical_qty"] if g["physical_qty"] > 0 else (g["stock_value"] / g["stock_qty"] if g["stock_qty"] > 0 else 0)
-        final_value = g["physical_value"] + g["reco_qty"] * avg_cost
         diff_qty = final_qty - g["stock_qty"]
-        diff_value = final_value - g["stock_value"]
+        # Calculate final values: physical_value + reco_qty * avg_price
+        avg_mrp = g["physical_value_mrp"] / g["physical_qty"] if g["physical_qty"] > 0 else (g["stock_value_mrp"] / g["stock_qty"] if g["stock_qty"] > 0 else 0)
+        avg_cost = g["physical_value_cost"] / g["physical_qty"] if g["physical_qty"] > 0 else (g["stock_value_cost"] / g["stock_qty"] if g["stock_qty"] > 0 else 0)
+        fv_mrp = g["physical_value_mrp"] + g["reco_qty"] * avg_mrp
+        fv_cost = g["physical_value_cost"] + g["reco_qty"] * avg_cost
+        dv_mrp = fv_mrp - g["stock_value_mrp"]
+        dv_cost = fv_cost - g["stock_value_cost"]
         accuracy = calc_accuracy(g["stock_qty"], final_qty)
         remark = generate_remark(g["stock_qty"], final_qty, accuracy)
         
-        for k, v in [("item_count", g["item_count"]), ("stock_qty", g["stock_qty"]), ("stock_value", g["stock_value"]), ("physical_qty", g["physical_qty"]), ("physical_value", g["physical_value"]), ("reco_qty", g["reco_qty"]), ("final_qty", final_qty), ("final_value", final_value), ("diff_qty", diff_qty), ("diff_value", diff_value)]:
-            totals[k] += v
+        totals["item_count"] += g["item_count"]; totals["stock_qty"] += g["stock_qty"]; totals["physical_qty"] += g["physical_qty"]
+        totals["reco_qty"] += g["reco_qty"]; totals["final_qty"] += final_qty; totals["diff_qty"] += diff_qty
+        totals["stock_value_mrp"] += g["stock_value_mrp"]; totals["physical_value_mrp"] += g["physical_value_mrp"]; totals["final_value_mrp"] += fv_mrp; totals["diff_value_mrp"] += dv_mrp
+        totals["stock_value_cost"] += g["stock_value_cost"]; totals["physical_value_cost"] += g["physical_value_cost"]; totals["final_value_cost"] += fv_cost; totals["diff_value_cost"] += dv_cost
         
         report.append({
             "category": cat, "item_count": g["item_count"],
-            "stock_qty": g["stock_qty"], "stock_value": round(g["stock_value"], 2),
-            "physical_qty": g["physical_qty"], "physical_value": round(g["physical_value"], 2),
-            "reco_qty": g["reco_qty"], "final_qty": final_qty, "final_value": round(final_value, 2),
-            "diff_qty": diff_qty, "diff_value": round(diff_value, 2), "accuracy_pct": accuracy, "remark": remark
+            "stock_qty": g["stock_qty"], "stock_value_mrp": round(g["stock_value_mrp"], 2), "stock_value_cost": round(g["stock_value_cost"], 2),
+            "physical_qty": g["physical_qty"], "physical_value_mrp": round(g["physical_value_mrp"], 2), "physical_value_cost": round(g["physical_value_cost"], 2),
+            "reco_qty": g["reco_qty"], "final_qty": final_qty, "final_value_mrp": round(fv_mrp, 2), "final_value_cost": round(fv_cost, 2),
+            "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2), "accuracy_pct": accuracy, "remark": remark
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
@@ -2905,7 +2917,9 @@ async def get_article_wise_report(session_id: str):
                 physical_by_article[article_code] = physical_by_article.get(article_code, 0) + item["quantity"]
     
     report = []
-    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
+    totals = {"stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "diff_qty": 0,
+              "stock_value_mrp": 0, "physical_value_mrp": 0, "final_value_mrp": 0, "diff_value_mrp": 0,
+              "stock_value_cost": 0, "physical_value_cost": 0, "final_value_cost": 0, "diff_value_cost": 0}
     
     # Session-wise: only show articles that have scan data
     all_article_codes = set(physical_by_article.keys())
@@ -2924,33 +2938,28 @@ async def get_article_wise_report(session_id: str):
         reco_qty = reco_maps["article"].get(ac, 0)
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
-        stock_value = stock_qty * cost
-        physical_value = physical_qty * cost
-        final_value = final_qty * cost
-        diff_value = final_value - stock_value
+        sv = calc_values(stock_qty, mrp, cost)
+        pv = calc_values(physical_qty, mrp, cost)
+        fv = calc_values(final_qty, mrp, cost)
+        dv_mrp = fv["mrp"] - sv["mrp"]; dv_cost = fv["cost"] - sv["cost"]
         
         accuracy = calc_accuracy(stock_qty, final_qty)
         in_master = ac in expected_by_article
         scanned = ac in physical_by_article
         remark = generate_remark(stock_qty, final_qty, accuracy, in_master, scanned)
         
-        totals["stock_qty"] += stock_qty
-        totals["stock_value"] += stock_value
-        totals["physical_qty"] += physical_qty
-        totals["physical_value"] += physical_value
-        totals["reco_qty"] += reco_qty
-        totals["final_qty"] += final_qty
-        totals["final_value"] += final_value
-        totals["diff_qty"] += diff_qty
-        totals["diff_value"] += diff_value
+        totals["stock_qty"] += stock_qty; totals["physical_qty"] += physical_qty; totals["reco_qty"] += reco_qty; totals["final_qty"] += final_qty; totals["diff_qty"] += diff_qty
+        totals["stock_value_mrp"] += sv["mrp"]; totals["physical_value_mrp"] += pv["mrp"]; totals["final_value_mrp"] += fv["mrp"]; totals["diff_value_mrp"] += dv_mrp
+        totals["stock_value_cost"] += sv["cost"]; totals["physical_value_cost"] += pv["cost"]; totals["final_value_cost"] += fv["cost"]; totals["diff_value_cost"] += dv_cost
         
         row = {
             "article_code": article_code, "article_name": article_name, "category": category,
             "barcodes": barcodes, "barcode_count": len(barcodes), "mrp": mrp, "cost": cost,
-            "stock_qty": stock_qty, "stock_value": stock_value,
-            "physical_qty": physical_qty, "physical_value": physical_value,
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
-            "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark
+            "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
+            "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
+            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
+            "accuracy_pct": accuracy, "remark": remark
         }
         if extra_columns and barcodes:
             _merge_custom_fields(row, master_by_barcode.get(barcodes[0], {}), extra_columns)
@@ -2966,13 +2975,14 @@ async def get_article_wise_report(session_id: str):
         report.append({
             "article_code": "UNMAPPED", "article_name": f"Not in Master ({bc})", "category": "Unmapped",
             "barcodes": [bc], "barcode_count": 1, "mrp": 0, "cost": 0,
-            "stock_qty": 0, "stock_value": 0, "physical_qty": physical_qty, "physical_value": 0,
-            "reco_qty": 0, "final_qty": physical_qty, "final_value": 0,
-            "diff_qty": physical_qty, "diff_value": 0, "accuracy_pct": accuracy, "remark": remark
+            "stock_qty": 0, "stock_value_mrp": 0, "stock_value_cost": 0,
+            "physical_qty": physical_qty, "physical_value_mrp": 0, "physical_value_cost": 0,
+            "reco_qty": 0, "final_qty": physical_qty, "final_value_mrp": 0, "final_value_cost": 0,
+            "diff_qty": physical_qty, "diff_value_mrp": 0, "diff_value_cost": 0, "accuracy_pct": accuracy, "remark": remark
         })
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": totals, "extra_columns": extra_columns}
+    return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}, "extra_columns": extra_columns}
 
 
 @portal_router.get("/reports/{session_id}/category-summary")
