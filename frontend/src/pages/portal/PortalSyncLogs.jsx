@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Database, RefreshCw, ChevronDown, ChevronRight, Smartphone, Clock,
   MapPin, Package, Download, Building2, Calendar, Filter, ArrowRight,
-  CheckCircle2, AlertTriangle, Inbox, History, Layers
+  CheckCircle2, AlertTriangle, Inbox, History, Layers, Trash2, RotateCcw
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
