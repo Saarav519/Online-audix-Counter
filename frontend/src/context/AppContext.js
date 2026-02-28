@@ -615,12 +615,32 @@ export const AppProvider = ({ children }) => {
 
   // Delete all scanned items for specific locations
   const deleteLocationData = (locationIds) => {
+    // Remove scanned items for these locations
     setScannedItems(prev => {
       const updated = { ...prev };
       locationIds.forEach(locId => {
-        updated[locId] = [];
+        delete updated[locId];
       });
+      try {
+        localStorage.setItem('audix_scanned_items', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to sync localStorage after sync clear:', e);
+      }
       return updated;
+    });
+    // Also remove the locations themselves (they've been synced)
+    setLocations(prev => {
+      const updated = prev.filter(loc => !locationIds.includes(loc.id));
+      try {
+        localStorage.setItem('audix_locations', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to sync localStorage after sync clear:', e);
+      }
+      return updated;
+    });
+    // Clear temp items
+    locationIds.forEach(locId => {
+      localStorage.removeItem(`audix_temp_items_${locId}`);
     });
   };
 
