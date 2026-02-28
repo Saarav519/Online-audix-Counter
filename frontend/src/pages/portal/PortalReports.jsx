@@ -250,7 +250,7 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
   
   return (
     <th className={`py-3 px-3 font-medium text-gray-600 relative group whitespace-nowrap text-xs ${align === 'right' ? 'text-right' : 'text-left'} ${className || ''}`}>
-      <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+      <div className={`flex items-center gap-1 w-full ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
         <button className="flex items-center gap-0.5 hover:text-emerald-600 transition-colors" onClick={() => onSort(column)}>
           <span className="select-none">{label}</span>
           {isSorted ? (
