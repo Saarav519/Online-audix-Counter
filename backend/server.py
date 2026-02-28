@@ -422,6 +422,98 @@ async def delete_portal_user(user_id: str):
     await db.portal_users.delete_one({"id": user_id})
     return {"message": "User deleted successfully"}
 
+# ==================== CLIENT SCHEMA ROUTES ====================
+
+STANDARD_MASTER_FIELDS = [
+    {"name": "barcode", "label": "Barcode", "type": "text", "required": True, "is_standard": True},
+    {"name": "description", "label": "Description", "type": "text", "required": False, "is_standard": True},
+    {"name": "category", "label": "Category", "type": "text", "required": False, "is_standard": True},
+    {"name": "mrp", "label": "MRP", "type": "number", "required": False, "is_standard": True},
+    {"name": "cost", "label": "Cost", "type": "number", "required": False, "is_standard": True},
+    {"name": "article_code", "label": "Article Code", "type": "text", "required": False, "is_standard": True},
+    {"name": "article_name", "label": "Article Name", "type": "text", "required": False, "is_standard": True},
+]
+
+COMMON_OPTIONAL_FIELDS = [
+    {"name": "colour", "label": "Colour", "type": "text", "required": False, "is_standard": True},
+    {"name": "size", "label": "Size", "type": "text", "required": False, "is_standard": True},
+    {"name": "department", "label": "Department", "type": "text", "required": False, "is_standard": True},
+    {"name": "brand", "label": "Brand", "type": "text", "required": False, "is_standard": True},
+    {"name": "season", "label": "Season", "type": "text", "required": False, "is_standard": True},
+    {"name": "hsn_code", "label": "HSN Code", "type": "text", "required": False, "is_standard": True},
+]
+
+class SchemaField(BaseModel):
+    name: str
+    label: str
+    type: str = "text"
+    required: bool = False
+    is_standard: bool = True
+    enabled: bool = True
+
+class ClientSchemaRequest(BaseModel):
+    fields: List[Dict[str, Any]]
+
+@portal_router.get("/clients/{client_id}/schema")
+async def get_client_schema(client_id: str):
+    """Get the master/stock schema for a client. Returns default if none set."""
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    if schema:
+        return schema
+    # Return default schema
+    default_fields = [{"enabled": True, **f} for f in STANDARD_MASTER_FIELDS]
+    for f in COMMON_OPTIONAL_FIELDS:
+        default_fields.append({"enabled": False, **f})
+    return {
+        "client_id": client_id,
+        "fields": default_fields,
+        "is_default": True
+    }
+
+@portal_router.post("/clients/{client_id}/schema")
+async def save_client_schema(client_id: str, req: ClientSchemaRequest):
+    """Save the master/stock schema for a client."""
+    client = await db.clients.find_one({"id": client_id})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    doc = {
+        "client_id": client_id,
+        "fields": req.fields,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "is_default": False
+    }
+    await db.client_schemas.update_one(
+        {"client_id": client_id}, {"$set": doc}, upsert=True
+    )
+    return {"message": "Schema saved", "field_count": len(req.fields)}
+
+@portal_router.get("/clients/{client_id}/schema/template")
+async def download_schema_template(client_id: str, template_type: str = "master"):
+    """Download a CSV template based on the client's schema."""
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    if not schema:
+        # Use default
+        enabled_fields = [f["name"] for f in STANDARD_MASTER_FIELDS]
+    else:
+        enabled_fields = [f["name"] for f in schema["fields"] if f.get("enabled", True)]
+
+    headers = [f.replace("_", " ").title() for f in enabled_fields]
+    if template_type == "stock":
+        # Stock template adds Location (for bin-wise) and Qty
+        if "location" not in enabled_fields:
+            headers = ["Location"] + headers
+        headers.append("Qty")
+
+    csv_content = ",".join(headers) + "\n"
+    filename = f"template_{template_type}_{client_id[:8]}.csv"
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ==================== CLIENT ROUTES ====================
 
 @portal_router.get("/clients")
