@@ -589,19 +589,10 @@ export default function PortalSessions() {
                   Download Template
                 </Button>
               </div>
-              <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
-                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'Location, Barcode, Description, Category, MRP, Cost, Qty'}
-                {importingSession?.variance_mode === 'barcode-wise' && 'Barcode, Description, Category, MRP, Cost, Qty'}
-                {importingSession?.variance_mode === 'article-wise' && 'Barcode, Description, Category, MRP, Cost, Qty'}
-              </code>
               <p className="text-xs text-gray-500 mt-1">
-                <strong>Required:</strong> {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') ? 'Location, Barcode, Qty' : 'Barcode, Qty'} &nbsp;|&nbsp; 
-                <strong>Optional (recommended):</strong> Description, Category, MRP, Cost
-              </p>
-              <p className="text-xs text-gray-500 mt-2">
-                {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') && 'One row per location + barcode with expected quantity.'}
-                {importingSession?.variance_mode === 'barcode-wise' && 'One row per barcode with expected quantity (aggregated across locations).'}
-                {importingSession?.variance_mode === 'article-wise' && 'One row per barcode with expected quantity. Article grouping comes from the Master Catalog.'}
+                Download the template to see the exact columns configured for this client's schema.
+                <br/>
+                <strong>Required:</strong> {(!importingSession?.variance_mode || importingSession?.variance_mode === 'bin-wise') ? 'Location, Barcode, Qty' : 'Barcode, Qty'}
               </p>
             </div>
 
