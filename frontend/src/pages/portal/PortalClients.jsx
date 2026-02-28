@@ -74,6 +74,8 @@ export default function PortalClients() {
   // Stock upload state (warehouse clients)
   const [showStockDialog, setShowStockDialog] = useState(false);
   const [stockClient, setStockClient] = useState(null);
+  const [stockSchemaFields, setStockSchemaFields] = useState([]);
+  const [stockSchemaLoading, setStockSchemaLoading] = useState(false);
   const [stockUploading, setStockUploading] = useState(false);
   const [showStockViewDialog, setShowStockViewDialog] = useState(false);
   const [stockRecords, setStockRecords] = useState([]);
