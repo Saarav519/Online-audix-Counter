@@ -27,7 +27,7 @@
   "seed_data_creation": "None - used existing test data from previous iterations",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "Phase 6 (Rebuild Variance button in Raw Logs tab) testing complete. Key changes: 1) Added 'Re-push Raw Data to Variance' section to Raw Logs tab (PortalSyncLogs.jsx lines 633-660), 2) New button data-testid='rebuild-variance-btn-logs' vs existing 'rebuild-variance-btn' in Batches tab, 3) Both buttons call the same handleRebuildVariance() function. Test data uses Client=0a2045d2-dc5f-4f6b-b622-8c2a67788b8d, Session=Q1 2026 - Warehouse Audit",
+  "context_for_next_testing_agent": "Phase 6 (Rebuild Variance button in Raw Logs tab) testing complete. Key changes: 1) Added 'Re-push Raw Data to Variance' section to Raw Logs tab (PortalSyncLogs.jsx lines 633-660), 2) New button data-testid='rebuild-variance-btn-logs' vs existing 'rebuild-variance-btn' in Batches tab, 3) Both buttons call the same handleRebuildVariance() function. Test data uses Client=master-stock-config, Session=Q1 2026 - Warehouse Audit",
   "testing_results": {
     "frontend_tests": {
       "total": 5,

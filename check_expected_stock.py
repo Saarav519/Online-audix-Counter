@@ -4,7 +4,7 @@ import requests
 import json
 
 # Backend URL from environment
-BACKEND_URL = "https://reconciliation-fix.preview.emergentagent.com/api"
+BACKEND_URL = "https://master-stock-config.preview.emergentagent.com/api"
 
 print("🔍 CHECKING SESSION EXPECTED STOCK")
 

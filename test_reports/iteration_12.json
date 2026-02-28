@@ -35,7 +35,7 @@
   "seed_data_creation": "Created test sync data via POST /api/sync/ with TEST_DeletePerm_, TEST_Rebuild_, TEST_Dedup_, TEST_Dev1_, TEST_Dev2_, TEST_NoPending_, TEST_FullFlow_ prefixed devices and locations",
   "retest_needed": false,
   "should_main_agent_self_test": false,
-  "context_for_next_testing_agent": "Phase 5 (Delete Batch + Rebuild Variance) testing complete. Key changes from previous iteration (11): 1) 'Rollback Batch' renamed to 'Delete Batch' - permanent deletion with no inbox reset, 2) New 'Rebuild Variance' endpoint clears all variance data then rebuilds from raw sync logs, 3) Rebuild includes deduplication per device per location and conflict detection. Test data uses Client=0a2045d2-dc5f-4f6b-b622-8c2a67788b8d, Session=8bb1ee6a-a3b3-48ee-b6a2-023fede4382d, Sync password=test123",
+  "context_for_next_testing_agent": "Phase 5 (Delete Batch + Rebuild Variance) testing complete. Key changes from previous iteration (11): 1) 'Rollback Batch' renamed to 'Delete Batch' - permanent deletion with no inbox reset, 2) New 'Rebuild Variance' endpoint clears all variance data then rebuilds from raw sync logs, 3) Rebuild includes deduplication per device per location and conflict detection. Test data uses Client=master-stock-config, Session=master-stock-config, Sync password=test123",
   "testing_results": {
     "backend_tests": {
       "total": 9,
