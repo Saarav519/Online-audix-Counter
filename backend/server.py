@@ -2191,6 +2191,13 @@ def _merge_custom_fields(row: dict, master: dict, extra_columns: list) -> dict:
         row[col["name"]] = cf.get(col["name"], "")
     return row
 
+def calc_values(qty, mrp, cost):
+    """Calculate value columns based on available price data."""
+    return {
+        "mrp": round(qty * mrp, 2) if mrp else 0,
+        "cost": round(qty * cost, 2) if cost else 0
+    }
+
 @portal_router.get("/reports/consolidated/{client_id}/bin-wise")
 async def get_consolidated_bin_wise(client_id: str):
     """Consolidated bin-wise report across all sessions for a client."""
