@@ -677,12 +677,14 @@ async def get_master_products(client_id: str, limit: int = 1000, skip: int = 0):
     records = await db.master_products.find(
         {"client_id": client_id}, {"_id": 0}
     ).skip(skip).limit(limit).to_list(limit)
+    extra_columns = await _get_extra_columns_for_client(client_id)
     
     return {
         "products": records,
         "total": total,
         "limit": limit,
-        "skip": skip
+        "skip": skip,
+        "extra_columns": extra_columns
     }
 
 @portal_router.get("/clients/{client_id}/master-products/stats")
