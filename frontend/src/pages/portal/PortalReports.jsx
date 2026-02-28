@@ -1364,6 +1364,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <td className="py-3 px-4">TOTAL</td>
               <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
               <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
+              {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{data.totals.reco_qty || 0}</td>}
               {isConsolidated && <td className="py-3 px-4 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
               <td className="py-3 px-4 text-right">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(data.totals.difference_qty)}`}>
