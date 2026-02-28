@@ -863,7 +863,46 @@ async def create_session(session: AuditSessionCreate):
     doc['created_at'] = doc['created_at'].isoformat()
     await db.audit_sessions.insert_one(doc)
     
-    return {"message": "Session created", "session": new_session.model_dump()}
+    # For warehouse clients, auto-snapshot client_stock into expected_stock
+    snapshot_count = 0
+    if client.get("client_type") == "warehouse" and client.get("stock_imported"):
+        client_stock_records = await db.client_stock.find(
+            {"client_id": session.client_id}, {"_id": 0}
+        ).to_list(500000)
+        
+        if client_stock_records:
+            expected_records = []
+            for rec in client_stock_records:
+                expected_doc = {
+                    "session_id": new_session.id,
+                    "location": rec.get("location", ""),
+                    "barcode": rec.get("barcode", ""),
+                    "description": rec.get("description", ""),
+                    "category": rec.get("category", ""),
+                    "article_code": rec.get("article_code", ""),
+                    "article_name": rec.get("article_name", ""),
+                    "mrp": rec.get("mrp", 0),
+                    "cost": rec.get("cost", 0),
+                    "qty": rec.get("qty", 0),
+                    "imported_at": datetime.now(timezone.utc).isoformat()
+                }
+                if rec.get("custom_fields"):
+                    expected_doc["custom_fields"] = rec["custom_fields"]
+                expected_records.append(expected_doc)
+            
+            await db.expected_stock.insert_many(expected_records)
+            snapshot_count = len(expected_records)
+            
+            # Mark session as having stock imported
+            await db.audit_sessions.update_one(
+                {"id": new_session.id},
+                {"$set": {"expected_stock_imported": True, "stock_snapshot": True}}
+            )
+    
+    result = {"message": "Session created", "session": new_session.model_dump()}
+    if snapshot_count > 0:
+        result["snapshot"] = f"Auto-imported {snapshot_count} stock records from warehouse"
+    return result
 
 @portal_router.get("/sessions/{session_id}")
 async def get_session(session_id: str):
