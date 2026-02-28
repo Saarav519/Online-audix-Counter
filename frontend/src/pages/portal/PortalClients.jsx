@@ -1046,6 +1046,138 @@ export default function PortalClients() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Upload Stock Dialog (Warehouse) */}
+      <Dialog open={showStockDialog} onOpenChange={setShowStockDialog}>
+        <DialogContent className="max-w-lg" data-testid="stock-upload-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                Upload Stock — {stockClient?.name}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <p className="text-xs text-emerald-800">
+                <strong>Warehouse Mode:</strong> Stock uploaded here is shared across all sessions. 
+                When a new session is created, this stock data is <strong>automatically snapshot</strong> into it.
+                Re-uploading stock only affects <strong>future</strong> sessions.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">CSV Template:</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => stockClient && downloadStockTemplate(stockClient)}
+                  className="text-emerald-600 hover:text-emerald-700"
+                  data-testid="download-stock-template-btn"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Download Template
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Download the template to see the exact columns configured for this client's schema.
+              </p>
+            </div>
+
+            <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+              <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p className="text-sm text-gray-600 mb-4">
+                {stockUploading ? 'Uploading...' : 'Select your stock CSV file'}
+              </p>
+              <input
+                ref={stockFileRef}
+                type="file"
+                accept=".csv"
+                onChange={handleStockUpload}
+                className="hidden"
+                disabled={stockUploading}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => stockFileRef.current?.click()}
+                disabled={stockUploading}
+                data-testid="select-stock-file-btn"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {stockUploading ? 'Uploading...' : 'Select CSV File'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Stock Dialog (Warehouse) */}
+      <Dialog open={showStockViewDialog} onOpenChange={setShowStockViewDialog}>
+        <DialogContent className="max-w-5xl max-h-[85vh]" data-testid="stock-view-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  Warehouse Stock — {stockClient?.name}
+                </div>
+                <span className="text-sm font-normal text-gray-500">
+                  {stockTotal} total records
+                  {stockTotal > 200 && ' (showing first 200)'}
+                </span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          {stockViewLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading stock data...</div>
+          ) : stockRecords.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">No stock data found</div>
+          ) : (
+            <div className="overflow-auto max-h-[60vh] border border-gray-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-gray-50 border-b">
+                  <tr>
+                    <th className="text-left p-2 font-medium text-gray-600">#</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Location</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Description</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Category</th>
+                    <th className="text-right p-2 font-medium text-gray-600">MRP</th>
+                    <th className="text-right p-2 font-medium text-gray-600">Cost</th>
+                    <th className="text-right p-2 font-medium text-gray-600">Qty</th>
+                    {stockExtraColumns.map(col => (
+                      <th key={col.name} className="text-left p-2 font-medium text-purple-600">{col.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {stockRecords.map((rec, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="p-2 text-gray-400">{idx + 1}</td>
+                      <td className="p-2">{rec.location || '-'}</td>
+                      <td className="p-2 font-mono text-xs">{rec.barcode}</td>
+                      <td className="p-2">{rec.description || '-'}</td>
+                      <td className="p-2">
+                        {rec.category ? <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{rec.category}</span> : '-'}
+                      </td>
+                      <td className="p-2 text-right">{rec.mrp > 0 ? rec.mrp.toFixed(2) : '-'}</td>
+                      <td className="p-2 text-right">{rec.cost > 0 ? rec.cost.toFixed(2) : '-'}</td>
+                      <td className="p-2 text-right font-semibold">{rec.qty}</td>
+                      {stockExtraColumns.map(col => (
+                        <td key={col.name} className="p-2 text-xs text-purple-700">{rec.custom_fields?.[col.name] || '-'}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
