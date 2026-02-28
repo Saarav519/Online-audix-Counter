@@ -509,21 +509,6 @@ export default function PortalReports() {
     }
   };
 
-  const fetchDailyProgress = async () => {
-    if (!selectedSession || selectedSession === '__consolidated__') {
-      setDailyProgress([]);
-      return;
-    }
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/reports/${selectedSession}/daily-progress`);
-      if (response.ok) {
-        setDailyProgress(await response.json());
-      }
-    } catch (error) {
-      console.error('Failed to fetch daily progress:', error);
-    }
-  };
-
   const saveRecoAdjustment = async (params) => {
     try {
       if (selectedSession !== '__consolidated__' || !selectedClient) { toast.error('Reco is only available in consolidated view'); return; }
