@@ -468,6 +468,16 @@ export default function PortalClients() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200"
+                    onClick={() => openSchemaBuilder(client)}
+                    data-testid={`schema-btn-${client.code}`}
+                  >
+                    <Settings className="w-3.5 h-3.5 mr-1" />
+                    Schema
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 flex-1"
                     onClick={() => openMasterUpload(client)}
                   >
