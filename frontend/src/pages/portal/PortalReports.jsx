@@ -1341,7 +1341,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
         )}
       </div>
       <div className="overflow-auto max-h-[70vh]">
-        <table className="w-full text-sm">
+        <table className="min-w-full text-sm report-table">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <th className="w-8 py-3 px-2"></th>
