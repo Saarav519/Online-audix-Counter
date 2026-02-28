@@ -62,6 +62,7 @@ class Client(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     code: str  # Short code for client
+    client_type: str = "store"  # "warehouse" or "store"
     address: Optional[str] = None
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -69,10 +70,13 @@ class Client(BaseModel):
     is_active: bool = True
     master_imported: bool = False
     master_product_count: int = 0
+    stock_imported: bool = False
+    stock_record_count: int = 0
 
 class ClientCreate(BaseModel):
     name: str
     code: str
+    client_type: str = "store"
     address: Optional[str] = None
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
