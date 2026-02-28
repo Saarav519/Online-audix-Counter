@@ -1288,28 +1288,29 @@ async def get_forward_batches(session_id: str = None, client_id: str = None):
 
 @portal_router.delete("/forward-batches/{batch_id}")
 async def delete_forward_batch(batch_id: str):
-    """Rollback a forward batch: remove data from variance, reset inbox to pending, delete batch record."""
+    """Permanently delete a batch and remove its data from variance. No rollback — batch is gone."""
     batch = await db.forward_batches.find_one({"id": batch_id})
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
 
     session_id = batch["session_id"]
 
-    # Find all inbox entries that were part of this batch
+    # Find all inbox entries that were part of this batch to know which locations to remove
     inbox_entries = await db.sync_inbox.find(
         {"forward_batch_id": batch_id}, {"_id": 0}
     ).to_list(100000)
 
-    # Remove forwarded locations from synced_locations
+    # Remove forwarded locations from synced_locations (variance)
     location_names = list(set(e["location_name"] for e in inbox_entries))
+    removed_count = 0
     if location_names:
-        await db.synced_locations.delete_many({
+        result = await db.synced_locations.delete_many({
             "session_id": session_id,
             "location_name": {"$in": location_names}
         })
+        removed_count = result.deleted_count
 
     # Also remove any conflicts created by this batch's forward
-    # (conflicts where location_name matches and created_at >= batch forwarded_at)
     batch_time = batch.get("forwarded_at", "")
     if batch_time and location_names:
         await db.conflict_locations.delete_many({
@@ -1318,19 +1319,171 @@ async def delete_forward_batch(batch_id: str):
             "created_at": {"$gte": batch_time}
         })
 
-    # Reset inbox entries back to "pending"
-    await db.sync_inbox.update_many(
-        {"forward_batch_id": batch_id},
-        {"$set": {"status": "pending", "forward_batch_id": None}}
-    )
-
     # Delete the batch record
     await db.forward_batches.delete_one({"id": batch_id})
 
     return {
-        "message": f"Batch rolled back. {len(location_names)} locations removed from variance. Data is back in the inbox for re-forwarding.",
-        "locations_rolled_back": len(location_names),
-        "inbox_entries_reset": len(inbox_entries)
+        "message": f"Batch deleted. {removed_count} locations removed from variance.",
+        "locations_removed": removed_count
+    }
+
+class RebuildVarianceRequest(BaseModel):
+    session_id: str
+    client_id: str
+    rebuilt_by: str = "admin"
+
+@portal_router.post("/rebuild-variance")
+async def rebuild_variance_from_raw(req: RebuildVarianceRequest):
+    """Clean slate rebuild: clear all variance data for this session, then re-process from raw sync logs."""
+    # Step 1: Clear all existing variance data for this session
+    del_synced = await db.synced_locations.delete_many({"session_id": req.session_id})
+    del_conflicts = await db.conflict_locations.delete_many({"session_id": req.session_id})
+
+    # Step 2: Read all raw sync logs for this session
+    raw_logs = await db.sync_raw_logs.find(
+        {"session_id": req.session_id}, {"_id": 0}
+    ).sort("synced_at", 1).to_list(100000)
+
+    if not raw_logs:
+        return {
+            "message": "No raw data found for this session. Variance cleared.",
+            "cleared_locations": del_synced.deleted_count,
+            "cleared_conflicts": del_conflicts.deleted_count,
+            "rebuilt_locations": 0,
+            "conflicts_created": 0
+        }
+
+    # Step 3: Extract all locations from raw logs, grouped by location_name
+    # Each location keeps track of which device synced it and when
+    location_entries = {}  # location_name -> list of {device_name, data, synced_at}
+    for log in raw_logs:
+        device_name = log.get("device_name", "Unknown")
+        synced_at = log.get("synced_at", "")
+        sync_date = log.get("sync_date", "")
+        device_id = ""
+        # Try to get device_id
+        device = await db.devices.find_one({"device_name": device_name})
+        if device:
+            device_id = device.get("id", "")
+
+        payload = log.get("raw_payload", {})
+        for loc_data in payload.get("locations", []):
+            location_name = loc_data.get("name", "Unknown")
+            items = loc_data.get("items", [])
+            loc_is_empty = loc_data.get("is_empty", False)
+            loc_empty_remarks = loc_data.get("empty_remarks", "")
+
+            synced_items = []
+            total_qty = 0
+            for item in items:
+                synced_items.append(SyncedItem(
+                    barcode=item.get("barcode", ""),
+                    product_name=item.get("productName", item.get("product_name", "")),
+                    price=item.get("price"),
+                    quantity=item.get("quantity", 0),
+                    scanned_at=item.get("scannedAt", item.get("scanned_at", ""))
+                ).model_dump())
+                total_qty += item.get("quantity", 0)
+
+            if loc_is_empty or (len(items) == 0 and loc_is_empty):
+                loc_is_empty = True
+                if not loc_empty_remarks:
+                    loc_empty_remarks = "Location found empty during physical count"
+
+            entry = {
+                "device_name": device_name,
+                "device_id": device_id,
+                "location_id": loc_data.get("id", str(uuid.uuid4())),
+                "location_name": location_name,
+                "items": synced_items,
+                "total_items": len(synced_items),
+                "total_quantity": total_qty,
+                "is_empty": loc_is_empty,
+                "empty_remarks": loc_empty_remarks,
+                "synced_at": synced_at,
+                "sync_date": sync_date
+            }
+
+            if location_name not in location_entries:
+                location_entries[location_name] = []
+            location_entries[location_name].append(entry)
+
+    # Step 4: Process each location — same logic as forward
+    timestamp = datetime.now(timezone.utc).isoformat()
+    locations_rebuilt = 0
+    conflicts_created = 0
+
+    for location_name, entries in location_entries.items():
+        # Deduplicate per device: keep latest entry per device
+        by_device = {}
+        for e in entries:
+            dn = e["device_name"]
+            if dn not in by_device or e["synced_at"] > by_device[dn]["synced_at"]:
+                by_device[dn] = e
+        unique_entries = list(by_device.values())
+
+        if len(unique_entries) > 1:
+            # Multiple devices → conflict
+            conflict_entries = []
+            for e in unique_entries:
+                conflict_entries.append({
+                    "entry_id": str(uuid.uuid4()),
+                    "device_name": e["device_name"],
+                    "device_id": e["device_id"],
+                    "location_id": e["location_id"],
+                    "synced_at": e["synced_at"],
+                    "items": e["items"],
+                    "total_items": e["total_items"],
+                    "total_quantity": e["total_quantity"],
+                    "is_empty": e["is_empty"],
+                    "empty_remarks": e["empty_remarks"],
+                    "status": "pending"
+                })
+            conflict_doc = {
+                "id": str(uuid.uuid4()),
+                "session_id": req.session_id,
+                "client_id": req.client_id,
+                "location_name": location_name,
+                "status": "pending",
+                "entries": conflict_entries,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "resolved_at": None,
+                "resolved_by": None
+            }
+            await db.conflict_locations.insert_one(conflict_doc)
+            conflicts_created += 1
+        else:
+            # Single device → straight to variance
+            entry = unique_entries[0]
+            synced_loc = SyncedLocation(
+                session_id=req.session_id,
+                device_id=entry["device_id"],
+                device_name=entry["device_name"],
+                location_id=entry["location_id"],
+                location_name=location_name,
+                items=entry["items"],
+                total_items=entry["total_items"],
+                total_quantity=entry["total_quantity"],
+                is_empty=entry["is_empty"],
+                empty_remarks=entry["empty_remarks"],
+                sync_date=entry.get("sync_date", timestamp[:10])
+            )
+            doc = synced_loc.model_dump()
+            doc['synced_at'] = doc['synced_at'].isoformat()
+            await db.synced_locations.insert_one(doc)
+            locations_rebuilt += 1
+
+    # Generate alerts
+    await check_and_generate_alerts(req.session_id, req.client_id)
+
+    return {
+        "message": f"Variance rebuilt from raw data. {locations_rebuilt} locations in variance, {conflicts_created} conflicts detected.",
+        "cleared_locations": del_synced.deleted_count,
+        "cleared_conflicts": del_conflicts.deleted_count,
+        "rebuilt_locations": locations_rebuilt,
+        "conflicts_created": conflicts_created,
+        "raw_logs_processed": len(raw_logs)
     }
 
 @sync_router.get("/config")
