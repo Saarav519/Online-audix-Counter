@@ -460,13 +460,24 @@ export default function PortalSyncLogs() {
             </div>
           ) : selectedClient && scannerLogs.length > 0 ? (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                  {scannerLogs.length} scanner{scannerLogs.length !== 1 ? 's' : ''}
-                </span>
-                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                  {scannerLogs.reduce((sum, s) => sum + s.sync_count, 0)} total syncs
-                </span>
+              {/* Top bar: summary + Export All */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                    {scannerLogs.length} scanner{scannerLogs.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                    {scannerLogs.reduce((sum, s) => sum + s.sync_count, 0)} total syncs
+                  </span>
+                </div>
+                <Button
+                  data-testid="export-all-session-logs"
+                  variant="outline"
+                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                  onClick={handleExportAllSessionLogs}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export All Logs
+                </Button>
               </div>
               {scannerLogs.map((scanner) => (
                 <div key={scanner.device_name} data-testid={`scanner-group-${scanner.device_name}`}
