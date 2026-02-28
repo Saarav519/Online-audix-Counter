@@ -604,29 +604,33 @@ async def delete_client(client_id: str):
 
 @portal_router.post("/clients/{client_id}/import-master")
 async def import_master_products(client_id: str, file: UploadFile = File(...)):
-    """Import product master catalog CSV at client level. Replaces existing master on re-upload."""
-    # Verify client exists
+    """Import product master catalog CSV at client level. Replaces existing master on re-upload.
+    Supports dynamic schema: extra fields defined in client schema are stored in custom_fields."""
     client = await db.clients.find_one({"id": client_id})
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
     
-    # Read CSV file
+    # Get client schema for dynamic fields
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    extra_field_names = []
+    if schema:
+        for f in schema.get("fields", []):
+            if f.get("enabled", True) and f["name"] not in STANDARD_MASTER_FIELD_NAMES:
+                extra_field_names.append(f["name"])
+    
     content = await file.read()
     decoded = content.decode('utf-8')
     reader = csv.DictReader(io.StringIO(decoded))
     
-    # Clear existing master products for this client
     await db.master_products.delete_many({"client_id": client_id})
     
-    # Import new master products
     records = []
     for row in reader:
-        # Normalize column names (case-insensitive, strip whitespace)
         norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
         
         barcode = norm_row.get('barcode', '')
         if not barcode:
-            continue  # Skip rows without barcode
+            continue
         
         master = MasterProduct(
             client_id=client_id,
@@ -640,12 +644,21 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
         )
         doc = master.model_dump()
         doc['imported_at'] = doc['imported_at'].isoformat()
+        
+        # Extract extra/custom fields from schema
+        custom_fields = {}
+        for fn in extra_field_names:
+            val = norm_row.get(fn, '')
+            if val:
+                custom_fields[fn] = val
+        if custom_fields:
+            doc['custom_fields'] = custom_fields
+        
         records.append(doc)
     
     if records:
         await db.master_products.insert_many(records)
     
-    # Update client flag
     await db.clients.update_one(
         {"id": client_id},
         {"$set": {"master_imported": True, "master_product_count": len(records)}}
@@ -653,7 +666,8 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
     
     return {
         "message": f"Imported {len(records)} master products",
-        "product_count": len(records)
+        "product_count": len(records),
+        "extra_fields": len(extra_field_names)
     }
 
 @portal_router.get("/clients/{client_id}/master-products")
