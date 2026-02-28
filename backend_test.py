@@ -1,474 +1,325 @@
 #!/usr/bin/env python3
 """
-AUDIX Backend Testing - Sync Logs Grouping, Day-wise Export, and Cascading Client Delete
-Testing Flow as specified in review request.
-Backend URL: https://counter-preview-2.preview.emergentagent.com
+Backend API Testing Script for AUDIX Admin Portal
+Tests the specific endpoints mentioned in the review request after frontend changes.
 """
 
 import requests
 import json
-import io
-from datetime import datetime
 import sys
+from typing import Dict, Any, List, Optional
 
-# Backend configuration
 BACKEND_URL = "https://counter-preview-2.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
-class AudixBackendTester:
-    def __init__(self):
-        self.session = requests.Session()
-        self.admin_token = None
-        self.client_id = None
-        self.session_id = None
-        self.test_results = {}
-        
-    def log_test(self, test_name, success, details):
-        """Log test results"""
-        status = "✅ PASS" if success else "❌ FAIL"
-        print(f"{status} - {test_name}: {details}")
-        self.test_results[test_name] = {"success": success, "details": details}
-        return success
-
-    def test_1_portal_register_login(self):
-        """Test 1: Register/Login admin user"""
-        try:
-            # Try to register admin user (may already exist)
-            register_data = {"username": "admin", "password": "admin123"}
-            register_response = self.session.post(f"{API_BASE}/portal/register", json=register_data)
-            
-            # Login admin user
-            login_response = self.session.post(f"{API_BASE}/portal/login", json=register_data)
-            
-            if login_response.status_code == 200:
-                login_data = login_response.json()
-                # Handle nested user object
-                user_data = login_data.get("user", login_data)
-                if "id" in user_data and "username" in user_data:
-                    self.admin_token = user_data.get("id")
-                    return self.log_test("Portal Login", True, 
-                        f"Admin login successful - User ID: {user_data['id']}, Username: {user_data['username']}")
-                else:
-                    return self.log_test("Portal Login", False, f"Invalid login response format: {login_data}")
-            else:
-                return self.log_test("Portal Login", False, 
-                    f"Login failed - Status: {login_response.status_code}, Response: {login_response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Portal Login", False, f"Exception: {str(e)}")
-
-    def test_2_create_client(self):
-        """Test 2: Create CascadeTest Client"""
-        try:
-            # Generate unique client code with timestamp
-            import time
-            unique_code = f"CASC{int(time.time() % 100000)}"
-            
-            client_data = {
-                "name": "CascadeTest Client",
-                "code": unique_code
-            }
-            
-            response = self.session.post(f"{API_BASE}/portal/clients", json=client_data)
-            
-            if response.status_code == 200:
-                client_response = response.json()
-                # Handle nested client object
-                client = client_response.get("client", client_response)
-                if "id" in client and client["name"] == "CascadeTest Client":
-                    self.client_id = client["id"]
-                    return self.log_test("Create Client", True, 
-                        f"Client created - ID: {client['id']}, Name: {client['name']}, Code: {client['code']}")
-                else:
-                    return self.log_test("Create Client", False, f"Invalid client response: {client_response}")
-            elif response.status_code == 400 and "already exists" in response.text:
-                # Client already exists, try to find it
-                clients_response = self.session.get(f"{API_BASE}/portal/clients")
-                if clients_response.status_code == 200:
-                    clients_data = clients_response.json()
-                    for client in clients_data:
-                        if "CascadeTest Client" in client.get("name", ""):
-                            self.client_id = client["id"]
-                            return self.log_test("Create Client", True, 
-                                f"Found existing client - ID: {client['id']}, Name: {client['name']}, Code: {client['code']}")
-                
-                return self.log_test("Create Client", False, f"Client exists but couldn't find it: {response.text}")
-            else:
-                return self.log_test("Create Client", False, 
-                    f"Client creation failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Create Client", False, f"Exception: {str(e)}")
-
-    def test_3_upload_master_products(self):
-        """Test 3: Upload Master Products CSV"""
-        try:
-            if not self.client_id:
-                return self.log_test("Upload Master Products", False, "No client_id available")
-            
-            # Create CSV content
-            csv_content = """Barcode,Description,Category,MRP,Cost
-1111111111111,Product A,Cat1,100,80
-2222222222222,Product B,Cat2,200,160"""
-            
-            files = {
-                'file': ('master_products.csv', io.StringIO(csv_content), 'text/csv')
-            }
-            
-            response = self.session.post(
-                f"{API_BASE}/portal/clients/{self.client_id}/import-master",
-                files=files
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Handle different response formats
-                imported_count = result.get("imported_count") or result.get("product_count", 0)
-                if imported_count >= 2:
-                    return self.log_test("Upload Master Products", True, 
-                        f"Master products uploaded - Count: {imported_count}")
-                else:
-                    return self.log_test("Upload Master Products", False, f"Invalid import result: {result}")
-            else:
-                return self.log_test("Upload Master Products", False, 
-                    f"Upload failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Upload Master Products", False, f"Exception: {str(e)}")
-
-    def test_4_create_session(self):
-        """Test 4: Create Session with bin-wise variance mode"""
-        try:
-            if not self.client_id:
-                return self.log_test("Create Session", False, "No client_id available")
-            
-            session_data = {
-                "client_id": self.client_id,
-                "name": "CascadeTest Session",
-                "variance_mode": "bin-wise",
-                "start_date": datetime.now().strftime("%Y-%m-%d")
-            }
-            
-            response = self.session.post(f"{API_BASE}/portal/sessions", json=session_data)
-            
-            if response.status_code == 200:
-                session_response = response.json()
-                # Handle nested session object
-                session = session_response.get("session", session_response)
-                if "id" in session and session["name"] == "CascadeTest Session":
-                    self.session_id = session["id"]
-                    return self.log_test("Create Session", True, 
-                        f"Session created - ID: {session['id']}, Name: {session['name']}, Mode: {session.get('variance_mode')}")
-                else:
-                    return self.log_test("Create Session", False, f"Invalid session response: {session_response}")
-            else:
-                return self.log_test("Create Session", False, 
-                    f"Session creation failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Create Session", False, f"Exception: {str(e)}")
-
-    def test_5_import_expected_stock(self):
-        """Test 5: Import Expected Stock CSV"""
-        try:
-            if not self.session_id:
-                return self.log_test("Import Expected Stock", False, "No session_id available")
-            
-            # Create CSV content for expected stock
-            csv_content = """Location,Barcode,Qty
-Bin-A,1111111111111,50"""
-            
-            files = {
-                'file': ('expected_stock.csv', io.StringIO(csv_content), 'text/csv')
-            }
-            
-            response = self.session.post(
-                f"{API_BASE}/portal/sessions/{self.session_id}/import-expected",
-                files=files
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Handle different response formats
-                imported_count = result.get("imported_count") or result.get("record_count", 0)
-                if imported_count >= 1:
-                    return self.log_test("Import Expected Stock", True, 
-                        f"Expected stock imported - Count: {imported_count}")
-                else:
-                    return self.log_test("Import Expected Stock", False, f"Invalid import result: {result}")
-            else:
-                return self.log_test("Import Expected Stock", False, 
-                    f"Import failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Import Expected Stock", False, f"Exception: {str(e)}")
-
-    def test_6_sync_physical_data(self):
-        """Test 6: Sync Physical Data"""
-        try:
-            if not self.client_id or not self.session_id:
-                return self.log_test("Sync Physical Data", False, "Missing client_id or session_id")
-            
-            sync_data = {
-                "device_name": "test-cascade",
-                "sync_password": "audix2024",
-                "client_id": self.client_id,
-                "session_id": self.session_id,
-                "locations": [
-                    {
-                        "location": "Bin-A",
-                        "items": [
-                            {
-                                "barcode": "1111111111111",
-                                "qty": 45,
-                                "scanned_at": datetime.now().isoformat()
-                            }
-                        ]
-                    }
-                ]
-            }
-            
-            response = self.session.post(f"{API_BASE}/sync/", json=sync_data)
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Check for success indicators
-                if ("success" in result and result["success"]) or ("message" in result and "successful" in result["message"].lower()):
-                    return self.log_test("Sync Physical Data", True, 
-                        f"Physical data synced - Message: {result.get('message', 'Success')}")
-                else:
-                    return self.log_test("Sync Physical Data", False, f"Sync failed: {result}")
-            else:
-                return self.log_test("Sync Physical Data", False, 
-                    f"Sync failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Sync Physical Data", False, f"Exception: {str(e)}")
-
-    def test_7_grouped_sync_logs(self):
-        """Test 7: Grouped Sync Logs"""
-        try:
-            response = self.session.get(f"{API_BASE}/portal/sync-logs/grouped")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    # Check if our CascadeTest Client appears
-                    cascade_client_found = False
-                    for client_group in data:
-                        if "client_name" in client_group and "CascadeTest Client" in client_group["client_name"]:
-                            cascade_client_found = True
-                            if "dates" in client_group and len(client_group["dates"]) > 0:
-                                date_group = client_group["dates"][0]
-                                required_fields = ["date", "logs", "total_locations", "total_items", "total_quantity", "sync_count"]
-                                if all(field in date_group for field in required_fields):
-                                    return self.log_test("Grouped Sync Logs", True, 
-                                        f"Grouped logs working - Found CascadeTest Client with {date_group['sync_count']} syncs")
-                    
-                    if not cascade_client_found:
-                        return self.log_test("Grouped Sync Logs", True, 
-                            f"Grouped logs endpoint working - {len(data)} client groups found (CascadeTest not yet synced)")
-                    else:
-                        return self.log_test("Grouped Sync Logs", False, "CascadeTest Client found but missing required date fields")
-                else:
-                    return self.log_test("Grouped Sync Logs", True, "Grouped logs endpoint working - No data yet")
-            else:
-                return self.log_test("Grouped Sync Logs", False, 
-                    f"Request failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Grouped Sync Logs", False, f"Exception: {str(e)}")
-
-    def test_8_grouped_sync_logs_with_filter(self):
-        """Test 8: Grouped Sync Logs with client filter"""
-        try:
-            if not self.client_id:
-                return self.log_test("Grouped Sync Logs (Filtered)", False, "No client_id available")
-            
-            response = self.session.get(f"{API_BASE}/portal/sync-logs/grouped?client_id={self.client_id}")
-            
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list):
-                    if len(data) == 0:
-                        return self.log_test("Grouped Sync Logs (Filtered)", True, 
-                            "Client filter working - No sync logs yet for CascadeTest Client")
-                    elif len(data) == 1 and data[0].get("client_id") == self.client_id:
-                        return self.log_test("Grouped Sync Logs (Filtered)", True, 
-                            f"Client filter working - Found 1 client group for CascadeTest Client")
-                    else:
-                        return self.log_test("Grouped Sync Logs (Filtered)", False, 
-                            f"Client filter not working - Expected 0-1 results, got {len(data)}")
-                else:
-                    return self.log_test("Grouped Sync Logs (Filtered)", False, f"Invalid response format: {data}")
-            else:
-                return self.log_test("Grouped Sync Logs (Filtered)", False, 
-                    f"Request failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Grouped Sync Logs (Filtered)", False, f"Exception: {str(e)}")
-
-    def test_9_day_wise_export(self):
-        """Test 9: Day-wise Export"""
-        try:
-            if not self.client_id:
-                return self.log_test("Day-wise Export", False, "No client_id available")
-            
-            today = datetime.now().strftime("%Y-%m-%d")
-            response = self.session.get(f"{API_BASE}/portal/sync-logs/export?client_id={self.client_id}&date={today}")
-            
-            if response.status_code == 200:
-                # Check content type
-                content_type = response.headers.get('content-type', '')
-                if 'text/csv' in content_type:
-                    # Check content disposition
-                    content_disposition = response.headers.get('content-disposition', '')
-                    if 'attachment' in content_disposition and 'filename' in content_disposition:
-                        # Check CSV content has headers
-                        csv_content = response.text
-                        if 'Log ID' in csv_content and 'Device' in csv_content:
-                            return self.log_test("Day-wise Export", True, 
-                                f"CSV export working - Content-Type: {content_type}, Size: {len(csv_content)} chars")
-                        else:
-                            return self.log_test("Day-wise Export", False, 
-                                f"CSV content missing expected headers - Content: {csv_content[:200]}...")
-                    else:
-                        return self.log_test("Day-wise Export", False, 
-                            f"Missing Content-Disposition header - Headers: {response.headers}")
-                else:
-                    return self.log_test("Day-wise Export", False, 
-                        f"Wrong Content-Type - Expected text/csv, got: {content_type}")
-            else:
-                return self.log_test("Day-wise Export", False, 
-                    f"Export failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Day-wise Export", False, f"Exception: {str(e)}")
-
-    def test_10_cascading_delete(self):
-        """Test 10: Cascading Delete"""
-        try:
-            if not self.client_id:
-                return self.log_test("Cascading Delete", False, "No client_id available")
-            
-            response = self.session.delete(f"{API_BASE}/portal/clients/{self.client_id}")
-            
-            if response.status_code == 200:
-                result = response.json()
-                # Handle nested deleted object
-                deleted = result.get("deleted", result)
-                required_fields = ["master_products", "sync_raw_logs", "audit_sessions", "alerts"]
-                
-                if all(field in deleted for field in required_fields):
-                    # Verify some counts are > 0 (since we created data)
-                    counts_summary = []
-                    for field in required_fields:
-                        count = deleted[field]
-                        counts_summary.append(f"{field}: {count}")
-                    
-                    return self.log_test("Cascading Delete", True, 
-                        f"Cascading delete working - Deleted counts: {', '.join(counts_summary)}")
-                else:
-                    return self.log_test("Cascading Delete", False, 
-                        f"Missing required fields in delete response: {result}")
-            else:
-                return self.log_test("Cascading Delete", False, 
-                    f"Delete failed - Status: {response.status_code}, Response: {response.text}")
-                    
-        except Exception as e:
-            return self.log_test("Cascading Delete", False, f"Exception: {str(e)}")
-
-    def test_11_verify_delete_cleanup(self):
-        """Test 11: Verify Delete Cleanup"""
-        try:
-            if not self.client_id:
-                return self.log_test("Verify Delete Cleanup", False, "No client_id available")
-            
-            # Check grouped sync logs for client
-            sync_logs_response = self.session.get(f"{API_BASE}/portal/sync-logs/grouped?client_id={self.client_id}")
-            
-            # Check clients list
-            clients_response = self.session.get(f"{API_BASE}/portal/clients")
-            
-            # Check sessions list
-            sessions_response = self.session.get(f"{API_BASE}/portal/sessions")
-            
-            cleanup_results = []
-            
-            # Verify sync logs cleanup
-            if sync_logs_response.status_code == 200:
-                sync_data = sync_logs_response.json()
-                if isinstance(sync_data, list) and len(sync_data) == 0:
-                    cleanup_results.append("sync logs cleared")
-                else:
-                    cleanup_results.append(f"sync logs NOT cleared ({len(sync_data)} remaining)")
-            
-            # Verify client removal
-            if clients_response.status_code == 200:
-                clients_data = clients_response.json()
-                if isinstance(clients_data, list):
-                    cascade_client_exists = any(c.get("id") == self.client_id for c in clients_data)
-                    if not cascade_client_exists:
-                        cleanup_results.append("client removed")
-                    else:
-                        cleanup_results.append("client NOT removed")
-            
-            # Verify sessions removal
-            if sessions_response.status_code == 200:
-                sessions_data = sessions_response.json()
-                if isinstance(sessions_data, list):
-                    cascade_session_exists = any(s.get("id") == self.session_id for s in sessions_data)
-                    if not cascade_session_exists:
-                        cleanup_results.append("sessions removed")
-                    else:
-                        cleanup_results.append("sessions NOT removed")
-            
-            success = all("NOT" not in result for result in cleanup_results)
-            return self.log_test("Verify Delete Cleanup", success, 
-                f"Cleanup verification - {', '.join(cleanup_results)}")
-                
-        except Exception as e:
-            return self.log_test("Verify Delete Cleanup", False, f"Exception: {str(e)}")
-
-    def run_all_tests(self):
-        """Run all tests in sequence"""
-        print(f"🚀 AUDIX Backend Testing - Sync Logs, Export & Cascading Delete")
-        print(f"Backend URL: {BACKEND_URL}")
-        print("=" * 80)
-        
-        tests = [
-            self.test_1_portal_register_login,
-            self.test_2_create_client,
-            self.test_3_upload_master_products,
-            self.test_4_create_session,
-            self.test_5_import_expected_stock,
-            self.test_6_sync_physical_data,
-            self.test_7_grouped_sync_logs,
-            self.test_8_grouped_sync_logs_with_filter,
-            self.test_9_day_wise_export,
-            self.test_10_cascading_delete,
-            self.test_11_verify_delete_cleanup
-        ]
-        
-        passed = 0
-        total = len(tests)
-        
-        for test in tests:
-            if test():
-                passed += 1
-            print()  # Add space between tests
-        
-        print("=" * 80)
-        print(f"🎯 TEST SUMMARY: {passed}/{total} tests passed ({passed/total*100:.1f}%)")
-        
-        if passed == total:
-            print("🎉 ALL TESTS PASSED - SYNC LOGS, EXPORT & CASCADING DELETE WORKING CORRECTLY")
+def make_request(method: str, endpoint: str, data: Optional[Dict] = None, headers: Optional[Dict] = None) -> Dict[str, Any]:
+    """Make HTTP request with error handling"""
+    url = f"{API_BASE}{endpoint}"
+    
+    try:
+        if method.upper() == "GET":
+            response = requests.get(url, headers=headers, timeout=30)
+        elif method.upper() == "POST":
+            response = requests.post(url, json=data, headers=headers, timeout=30)
+        elif method.upper() == "PUT":
+            response = requests.put(url, json=data, headers=headers, timeout=30)
+        elif method.upper() == "DELETE":
+            response = requests.delete(url, headers=headers, timeout=30)
         else:
-            print("⚠️  SOME TESTS FAILED - CHECK DETAILS ABOVE")
+            return {"success": False, "error": f"Unsupported method: {method}"}
+        
+        return {
+            "success": response.status_code < 400,
+            "status_code": response.status_code,
+            "data": response.json() if response.content else None,
+            "url": url
+        }
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Request timeout", "url": url}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": "Connection error", "url": url}
+    except Exception as e:
+        return {"success": False, "error": str(e), "url": url}
+
+def test_portal_login() -> Dict[str, Any]:
+    """Test portal login with admin/admin123 credentials"""
+    print("Testing Portal Login...")
+    
+    login_data = {
+        "username": "admin",
+        "password": "admin123"
+    }
+    
+    result = make_request("POST", "/portal/login", login_data)
+    
+    if result["success"]:
+        print(f"✅ Portal Login: SUCCESS")
+        print(f"   User ID: {result['data'].get('user', {}).get('id', 'N/A')}")
+        print(f"   Username: {result['data'].get('user', {}).get('username', 'N/A')}")
+        print(f"   Role: {result['data'].get('user', {}).get('role', 'N/A')}")
+        return {"success": True, "user": result["data"].get("user", {})}
+    else:
+        print(f"❌ Portal Login: FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", "Login failed")}
+
+def test_get_clients() -> Dict[str, Any]:
+    """Test getting list of clients to find client IDs"""
+    print("\nTesting Get Clients...")
+    
+    result = make_request("GET", "/portal/clients")
+    
+    if result["success"]:
+        clients = result["data"]
+        print(f"✅ Get Clients: SUCCESS")
+        print(f"   Found {len(clients)} clients")
+        
+        # Look for the "xZasdas" client (store type)
+        xzasdas_client = None
+        for client in clients:
+            print(f"   - Client: {client.get('name', 'N/A')}, Type: {client.get('client_type', 'N/A')}, ID: {client.get('id', 'N/A')}")
+            if client.get('name') == 'xZasdas' and client.get('client_type') == 'store':
+                xzasdas_client = client
+        
+        return {"success": True, "clients": clients, "xzasdas_client": xzasdas_client}
+    else:
+        print(f"❌ Get Clients: FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", "Failed to get clients")}
+
+def test_client_schema(client_id: str, client_name: str = "") -> Dict[str, Any]:
+    """Test getting client schema"""
+    print(f"\nTesting Client Schema for {client_name} ({client_id})...")
+    
+    result = make_request("GET", f"/portal/clients/{client_id}/schema")
+    
+    if result["success"]:
+        schema = result["data"]
+        print(f"✅ Client Schema: SUCCESS")
+        print(f"   Fields in schema: {len(schema.get('fields', []))}")
+        
+        # Check for enabled/disabled fields
+        enabled_fields = []
+        disabled_fields = []
+        for field in schema.get('fields', []):
+            field_name = field.get('name', 'Unknown')
+            is_enabled = field.get('enabled', True)
+            if is_enabled:
+                enabled_fields.append(field_name)
+            else:
+                disabled_fields.append(field_name)
+        
+        print(f"   Enabled fields ({len(enabled_fields)}): {', '.join(enabled_fields)}")
+        print(f"   Disabled fields ({len(disabled_fields)}): {', '.join(disabled_fields)}")
+        
+        return {
+            "success": True, 
+            "schema": schema, 
+            "enabled_fields": enabled_fields, 
+            "disabled_fields": disabled_fields
+        }
+    else:
+        print(f"❌ Client Schema: FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", "Failed to get schema")}
+
+def test_schema_template(client_id: str, template_type: str, client_name: str = "") -> Dict[str, Any]:
+    """Test getting schema template"""
+    print(f"\nTesting Schema Template ({template_type}) for {client_name} ({client_id})...")
+    
+    result = make_request("GET", f"/portal/clients/{client_id}/schema/template?template_type={template_type}")
+    
+    if result["success"]:
+        print(f"✅ Schema Template ({template_type}): SUCCESS")
+        print(f"   Response received (likely CSV data)")
+        return {"success": True, "template_data": result["data"]}
+    else:
+        print(f"❌ Schema Template ({template_type}): FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", f"Failed to get {template_type} template")}
+
+def test_dashboard() -> Dict[str, Any]:
+    """Test dashboard endpoint"""
+    print("\nTesting Dashboard...")
+    
+    result = make_request("GET", "/portal/dashboard")
+    
+    if result["success"]:
+        dashboard_data = result["data"]
+        print(f"✅ Dashboard: SUCCESS")
+        print(f"   Stats available: {list(dashboard_data.keys())}")
+        return {"success": True, "dashboard": dashboard_data}
+    else:
+        print(f"❌ Dashboard: FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", "Failed to get dashboard")}
+
+def test_sessions() -> Dict[str, Any]:
+    """Test sessions endpoint"""
+    print("\nTesting Sessions...")
+    
+    result = make_request("GET", "/portal/sessions")
+    
+    if result["success"]:
+        sessions = result["data"]
+        print(f"✅ Sessions: SUCCESS")
+        print(f"   Found {len(sessions)} sessions")
+        
+        # Check if sessions have client_id field
+        sessions_with_client_id = []
+        for session in sessions:
+            if 'client_id' in session:
+                sessions_with_client_id.append(session)
+                print(f"   - Session: {session.get('name', 'N/A')}, Client ID: {session.get('client_id', 'N/A')}")
+        
+        print(f"   Sessions with client_id field: {len(sessions_with_client_id)}")
+        
+        return {"success": True, "sessions": sessions, "sessions_with_client_id": sessions_with_client_id}
+    else:
+        print(f"❌ Sessions: FAILED")
+        print(f"   Error: {result.get('error', 'Unknown error')}")
+        return {"success": False, "error": result.get("error", "Failed to get sessions")}
+
+def main():
+    """Main testing function"""
+    print("=" * 60)
+    print("AUDIX Admin Portal Backend API Testing")
+    print("=" * 60)
+    print(f"Backend URL: {BACKEND_URL}")
+    print(f"API Base: {API_BASE}")
+    
+    tests_passed = 0
+    tests_failed = 0
+    failed_tests = []
+    
+    # Test 1: Portal Login
+    login_result = test_portal_login()
+    if login_result["success"]:
+        tests_passed += 1
+    else:
+        tests_failed += 1
+        failed_tests.append("Portal Login")
+    
+    # Test 2: Get Clients (to find client IDs)
+    clients_result = test_get_clients()
+    if clients_result["success"]:
+        tests_passed += 1
+    else:
+        tests_failed += 1
+        failed_tests.append("Get Clients")
+        print("\n❌ CRITICAL: Cannot proceed without client data")
+        print("=" * 60)
+        print(f"FINAL RESULTS: {tests_passed} PASSED, {tests_failed} FAILED")
+        return
+    
+    # Test 3: Schema Endpoint for xZasdas client
+    xzasdas_client = clients_result.get("xzasdas_client")
+    if xzasdas_client:
+        client_id = xzasdas_client["id"]
+        client_name = xzasdas_client["name"]
+        
+        schema_result = test_client_schema(client_id, client_name)
+        if schema_result["success"]:
+            tests_passed += 1
             
-        return passed == total
+            # Verify that some fields are enabled=true and some are enabled=false
+            enabled_fields = schema_result.get("enabled_fields", [])
+            disabled_fields = schema_result.get("disabled_fields", [])
+            
+            if len(enabled_fields) > 0 and len(disabled_fields) > 0:
+                print(f"   ✅ Schema verification: Found both enabled ({len(enabled_fields)}) and disabled ({len(disabled_fields)}) fields as expected")
+            else:
+                print(f"   ⚠️ Schema verification: Expected both enabled and disabled fields, but found enabled={len(enabled_fields)}, disabled={len(disabled_fields)}")
+        else:
+            tests_failed += 1
+            failed_tests.append("Client Schema")
+        
+        # Test 4: Schema Template - Master
+        master_template_result = test_schema_template(client_id, "master", client_name)
+        if master_template_result["success"]:
+            tests_passed += 1
+        else:
+            tests_failed += 1
+            failed_tests.append("Schema Template (Master)")
+        
+        # Test 5: Schema Template - Stock
+        stock_template_result = test_schema_template(client_id, "stock", client_name)
+        if stock_template_result["success"]:
+            tests_passed += 1
+        else:
+            tests_failed += 1
+            failed_tests.append("Schema Template (Stock)")
+    else:
+        print("\n⚠️ WARNING: Could not find 'xZasdas' client (store type)")
+        print("   Testing schema endpoints with first available client...")
+        
+        if clients_result["clients"]:
+            first_client = clients_result["clients"][0]
+            client_id = first_client["id"]
+            client_name = first_client["name"]
+            
+            schema_result = test_client_schema(client_id, client_name)
+            if schema_result["success"]:
+                tests_passed += 1
+            else:
+                tests_failed += 1
+                failed_tests.append("Client Schema")
+            
+            master_template_result = test_schema_template(client_id, "master", client_name)
+            if master_template_result["success"]:
+                tests_passed += 1
+            else:
+                tests_failed += 1
+                failed_tests.append("Schema Template (Master)")
+            
+            stock_template_result = test_schema_template(client_id, "stock", client_name)
+            if stock_template_result["success"]:
+                tests_passed += 1
+            else:
+                tests_failed += 1
+                failed_tests.append("Schema Template (Stock)")
+    
+    # Test 6: Dashboard
+    dashboard_result = test_dashboard()
+    if dashboard_result["success"]:
+        tests_passed += 1
+    else:
+        tests_failed += 1
+        failed_tests.append("Dashboard")
+    
+    # Test 7: Sessions
+    sessions_result = test_sessions()
+    if sessions_result["success"]:
+        tests_passed += 1
+        
+        # Verify that sessions have client_id field
+        sessions_with_client_id = sessions_result.get("sessions_with_client_id", [])
+        if len(sessions_with_client_id) > 0:
+            print(f"   ✅ Sessions verification: Found {len(sessions_with_client_id)} sessions with client_id field as expected")
+        else:
+            print(f"   ⚠️ Sessions verification: Expected sessions to have client_id field, but none found")
+    else:
+        tests_failed += 1
+        failed_tests.append("Sessions")
+    
+    # Final Results
+    print("\n" + "=" * 60)
+    print("FINAL RESULTS")
+    print("=" * 60)
+    print(f"✅ TESTS PASSED: {tests_passed}")
+    print(f"❌ TESTS FAILED: {tests_failed}")
+    
+    if tests_failed > 0:
+        print(f"\nFailed Tests:")
+        for test in failed_tests:
+            print(f"  - {test}")
+    
+    print(f"\nSUCCESS RATE: {(tests_passed / (tests_passed + tests_failed)) * 100:.1f}%")
+    
+    if tests_failed == 0:
+        print("\n🎉 ALL TESTS PASSED! Backend APIs are healthy after frontend changes.")
+    else:
+        print(f"\n⚠️ {tests_failed} tests failed. Backend may need attention.")
 
 if __name__ == "__main__":
-    tester = AudixBackendTester()
-    success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    main()
