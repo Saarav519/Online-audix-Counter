@@ -854,6 +854,15 @@ async def get_sessions(client_id: Optional[str] = None):
     if client_id:
         query["client_id"] = client_id
     sessions = await db.audit_sessions.find(query, {"_id": 0}).to_list(1000)
+    
+    # Enrich sessions with client_type for frontend conditional rendering
+    client_ids = list(set(s.get("client_id") for s in sessions if s.get("client_id")))
+    if client_ids:
+        clients = await db.clients.find({"id": {"$in": client_ids}}, {"_id": 0, "id": 1, "client_type": 1}).to_list(1000)
+        ct_map = {c["id"]: c.get("client_type", "store") for c in clients}
+        for s in sessions:
+            s["client_type"] = ct_map.get(s.get("client_id"), "store")
+    
     return sessions
 
 @portal_router.post("/sessions")
