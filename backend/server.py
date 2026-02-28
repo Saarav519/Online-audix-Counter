@@ -2715,7 +2715,9 @@ async def get_detailed_report(session_id: str):
     all_keys = set(physical_map.keys())
     
     report = []
-    totals = {"stock_qty": 0, "stock_value": 0, "physical_qty": 0, "physical_value": 0, "reco_qty": 0, "final_qty": 0, "final_value": 0, "diff_qty": 0, "diff_value": 0}
+    totals = {"stock_qty": 0, "physical_qty": 0, "reco_qty": 0, "final_qty": 0, "diff_qty": 0,
+              "stock_value_mrp": 0, "physical_value_mrp": 0, "final_value_mrp": 0, "diff_value_mrp": 0,
+              "stock_value_cost": 0, "physical_value_cost": 0, "final_value_cost": 0, "diff_value_cost": 0}
     
     for key in sorted(all_keys):
         exp = expected_map.get(key, {})
