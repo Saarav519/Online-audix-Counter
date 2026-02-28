@@ -366,6 +366,9 @@ export default function PortalReports() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [columnFilters, setColumnFilters] = useState({});
   const [numericFilters, setNumericFilters] = useState({});
+  const [hiddenColumns, setHiddenColumns] = useState(new Set());
+  const [frozenColumns, setFrozenColumns] = useState(new Set());
+  const tableContainerRef = useRef(null);
 
   useEffect(() => {
     fetchClients();
