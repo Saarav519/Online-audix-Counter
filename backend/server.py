@@ -2986,7 +2986,7 @@ async def get_conflicts_summary():
 
 @portal_router.post("/conflicts/{conflict_id}/approve/{entry_id}")
 async def approve_conflict_entry(conflict_id: str, entry_id: str, username: str = "admin"):
-    """Approve one entry in a conflict. Moves approved entry to synced_locations, rejects all others."""
+    """Approve one entry in a conflict. Moves approved entry to synced_locations, removes rejected data from raw."""
     conflict = await db.conflict_locations.find_one({"id": conflict_id})
     if not conflict:
         raise HTTPException(status_code=404, detail="Conflict not found")
@@ -2995,10 +2995,12 @@ async def approve_conflict_entry(conflict_id: str, entry_id: str, username: str 
     
     # Find the approved entry
     approved_entry = None
+    rejected_entries = []
     for entry in conflict["entries"]:
         if entry["entry_id"] == entry_id:
             approved_entry = entry
-            break
+        else:
+            rejected_entries.append(entry)
     
     if not approved_entry:
         raise HTTPException(status_code=404, detail="Entry not found in conflict")
@@ -3038,6 +3040,47 @@ async def approve_conflict_entry(conflict_id: str, entry_id: str, username: str 
     doc['synced_at'] = doc['synced_at'].isoformat()
     await db.synced_locations.insert_one(doc)
     
+    # Remove rejected entries from sync_inbox and sync_raw_logs
+    for rej in rejected_entries:
+        rej_device = rej.get("device_name", "")
+        rej_session = conflict["session_id"]
+        rej_location = conflict["location_name"]
+
+        # Remove from sync_inbox
+        await db.sync_inbox.delete_many({
+            "session_id": rej_session,
+            "location_name": rej_location,
+            "device_name": rej_device
+        })
+
+        # Remove location from sync_raw_logs raw_payload
+        raw_logs = await db.sync_raw_logs.find({
+            "session_id": rej_session,
+            "device_name": rej_device
+        }).to_list(1000)
+        for rl in raw_logs:
+            payload = rl.get("raw_payload", {})
+            locations = payload.get("locations", [])
+            filtered = [loc for loc in locations if loc.get("name") != rej_location]
+            if len(filtered) == 0:
+                # No locations left — remove entire raw log
+                await db.sync_raw_logs.delete_one({"id": rl["id"]})
+            elif len(filtered) < len(locations):
+                # Update raw_payload with filtered locations
+                new_loc_count = len(filtered)
+                new_items = sum(len(loc.get("items", [])) for loc in filtered)
+                new_qty = sum(sum(i.get("quantity", 0) for i in loc.get("items", [])) for loc in filtered)
+                payload["locations"] = filtered
+                await db.sync_raw_logs.update_one(
+                    {"id": rl["id"]},
+                    {"$set": {
+                        "raw_payload": payload,
+                        "location_count": new_loc_count,
+                        "total_items": new_items,
+                        "total_quantity": new_qty
+                    }}
+                )
+
     # Mark conflict as resolved
     resolve_timestamp = datetime.now(timezone.utc).isoformat()
     await db.conflict_locations.update_one(
@@ -3051,9 +3094,10 @@ async def approve_conflict_entry(conflict_id: str, entry_id: str, username: str 
     )
     
     return {
-        "message": f"Entry from {approved_entry['device_name']} approved. Location '{conflict['location_name']}' is now in variance.",
+        "message": f"Entry from {approved_entry['device_name']} approved. Location '{conflict['location_name']}' is now in variance. Rejected data removed from raw logs.",
         "approved_device": approved_entry["device_name"],
-        "approved_quantity": approved_entry["total_quantity"]
+        "approved_quantity": approved_entry["total_quantity"],
+        "rejected_devices_cleaned": [e.get("device_name", "") for e in rejected_entries]
     }
 
 @portal_router.post("/conflicts/{conflict_id}/reject-all")
