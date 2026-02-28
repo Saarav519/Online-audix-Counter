@@ -188,7 +188,7 @@ export default function PortalSyncLogs() {
   };
 
   const handleDeleteBatch = async (batchId) => {
-    if (!window.confirm('Are you sure? This will remove all data from this batch from variance and push it back to the inbox for re-forwarding.')) return;
+    if (!window.confirm('Are you sure? This will permanently remove this batch and its data from variance.')) return;
     try {
       const response = await fetch(`${BACKEND_URL}/api/portal/forward-batches/${batchId}`, {
         method: 'DELETE'
@@ -198,11 +198,44 @@ export default function PortalSyncLogs() {
         throw new Error(error.detail || 'Delete failed');
       }
       const result = await response.json();
-      toast.success(`Batch rolled back! ${result.locations_rolled_back} locations removed from variance. Data is back in inbox.`);
+      toast.success(`Batch deleted! ${result.locations_removed} locations removed from variance.`);
+      fetchForwardBatches();
+    } catch (error) {
+      toast.error(`Delete failed: ${error.message}`);
+    }
+  };
+
+  const [rebuilding, setRebuilding] = useState(false);
+
+  const handleRebuildVariance = async () => {
+    if (!selectedSession || !selectedClient) {
+      toast.error('Select a client and session first');
+      return;
+    }
+    if (!window.confirm('This will CLEAR all existing variance data and conflicts for this session, then rebuild from raw sync logs. Are you sure?')) return;
+    setRebuilding(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/rebuild-variance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: selectedSession,
+          client_id: selectedClient,
+          rebuilt_by: 'admin'
+        })
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Rebuild failed');
+      }
+      const result = await response.json();
+      toast.success(`Variance rebuilt! ${result.rebuilt_locations} locations from ${result.raw_logs_processed} raw logs. ${result.conflicts_created} conflicts detected.`);
       fetchForwardBatches();
       fetchInboxSummary();
     } catch (error) {
-      toast.error(`Delete failed: ${error.message}`);
+      toast.error(`Rebuild failed: ${error.message}`);
+    } finally {
+      setRebuilding(false);
     }
   };
 
