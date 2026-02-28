@@ -20,7 +20,10 @@ export default function PortalSyncLogs() {
   const [inboxSummary, setInboxSummary] = useState(null);
   const [forwarding, setForwarding] = useState(false);
 
-  // Sync logs state (grouped)
+  // Sync logs state (scanner-grouped)
+  const [scannerLogs, setScannerLogs] = useState([]);
+
+  // Sync logs state (client-date grouped - fallback when no client selected)
   const [groupedData, setGroupedData] = useState([]);
 
   // Forward batches state
