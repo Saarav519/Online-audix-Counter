@@ -562,6 +562,19 @@ export default function PortalClients() {
                         No Master
                       </span>
                     )}
+                    {client.client_type === 'warehouse' && (
+                      client.stock_imported ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Stock: {client.stock_record_count || 0} records
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          No Stock
+                        </span>
+                      )
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
