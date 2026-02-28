@@ -2169,11 +2169,14 @@ async def get_consolidated_detailed(client_id: str):
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}, "extra_columns": extra_columns}
+
+@portal_router.get("/reports/consolidated/{client_id}/barcode-wise")
 async def get_consolidated_barcode_wise(client_id: str):
     """Consolidated barcode-wise report across all sessions for a client"""
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
     reco_maps = await _build_reco_maps(client_id)
+    extra_columns = await _get_extra_columns_for_client(client_id)
     
     expected_by_barcode = {}
     physical_by_barcode = {}
