@@ -1,0 +1,60 @@
+{
+  "summary": "Testing 3 new features: 1) Schema template fix (only enabled fields), 2) Refresh Stock for warehouse sessions, 3) Report table scroll fix with sticky headers. All 7 backend tests PASSED. Frontend verified: Refresh Stock button appears only for warehouse sessions, tables have max-h-[70vh] overflow-auto with sticky headers, BinWise Status column correct.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_schema_refresh_stock.py",
+    "/app/test_reports/pytest/pytest_schema_refresh_stock.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Schema template endpoint correctly returns only enabled fields (not all standard fields)",
+    "Default schema (no saved config) returns only 'barcode' field in template",
+    "Refresh stock endpoint correctly re-snapshots client_stock into expected_stock",
+    "Refresh stock returns 400 error for non-warehouse clients with proper message",
+    "Sessions endpoint returns client_type for frontend conditional rendering",
+    "Frontend PortalSessions shows 'Refresh Stock' button ONLY for warehouse sessions",
+    "Frontend PortalSessions shows 'Import Stock' button for store sessions",
+    "All report tables (BinWise, Detailed, BarcodeWise, ArticleWise, CategorySummary) have overflow-auto max-h-[70vh]",
+    "All report tables have sticky thead with 'sticky top-0 z-10' classes",
+    "BinWise table has 'Status' column as first header (not barcode)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_schema_refresh_stock.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "100% - All features verified"
+  },
+  "test_credentials": {
+    "username": "admin",
+    "password": "admin123",
+    "client_id": "77eff157-ed53-43b5-86ad-df67fd8ccc91",
+    "session_id": "ab04c2f0-34a2-4bb8-a543-86eb8d72c1e0"
+  },
+  "seed_data_creation": "Created temporary store client and session to test refresh-stock error case. Cleaned up after testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Schema template, refresh stock, and report table scroll testing complete. Backend: schema/template endpoint returns only enabled fields (barcode only for default). Frontend: Sessions page shows Refresh Stock for warehouse, Import Stock for store. Reports tables have fixed height (70vh) with sticky headers.",
+  "features_verified": {
+    "backend_schema_template_enabled_fields": "PASS - Template only includes enabled fields from client schema",
+    "backend_schema_template_default": "PASS - Default schema (no config) returns only 'barcode' field",
+    "backend_schema_template_stock_type": "PASS - Stock template includes Location and Qty columns",
+    "backend_refresh_stock_warehouse": "PASS - Re-snapshots client_stock into expected_stock",
+    "backend_refresh_stock_store_error": "PASS - Returns 400 error for non-warehouse clients",
+    "backend_refresh_stock_404": "PASS - Returns 404 for non-existent session",
+    "backend_sessions_client_type": "PASS - Sessions endpoint returns client_type field",
+    "frontend_refresh_stock_button_warehouse": "PASS - Refresh Stock button shown for warehouse sessions",
+    "frontend_import_stock_button_store": "PASS - Import Stock button shown for store sessions",
+    "frontend_table_overflow_maxh": "PASS - Tables have overflow-auto max-h-[70vh]",
+    "frontend_table_sticky_header": "PASS - Tables have sticky top-0 z-10 thead",
+    "frontend_binwise_status_column": "PASS - BinWise table has Status as first column"
+  }
+}
