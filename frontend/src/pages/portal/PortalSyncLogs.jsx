@@ -427,7 +427,7 @@ export default function PortalSyncLogs() {
         </>
       )}
 
-      {/* TAB: Raw Logs */}
+      {/* TAB: Raw Logs — Scanner-Grouped */}
       {activeTab === 'logs' && (
         <>
           {loading ? (
@@ -435,21 +435,94 @@ export default function PortalSyncLogs() {
               <div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4" />
               <p className="text-gray-500">Loading sync logs...</p>
             </div>
-          ) : groupedData.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-              <Database className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500">No sync logs found</p>
-            </div>
-          ) : (
+          ) : selectedClient && scannerLogs.length > 0 ? (
             <div className="space-y-4">
               <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
-                  {groupedData.length} client{groupedData.length !== 1 ? 's' : ''}
-                </span>
                 <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                  {totalLogs} sync log{totalLogs !== 1 ? 's' : ''}
+                  {scannerLogs.length} scanner{scannerLogs.length !== 1 ? 's' : ''}
+                </span>
+                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                  {scannerLogs.reduce((sum, s) => sum + s.sync_count, 0)} total syncs
                 </span>
               </div>
+              {scannerLogs.map((scanner) => (
+                <div key={scanner.device_name} data-testid={`scanner-group-${scanner.device_name}`}
+                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Scanner Header */}
+                  <div className="px-5 py-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                    onClick={() => setExpandedScanner(expandedScanner === scanner.device_name ? null : scanner.device_name)}>
+                    <div className="flex items-center gap-3">
+                      {expandedScanner === scanner.device_name ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Smartphone className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">{scanner.device_name}</p>
+                        <p className="text-xs text-gray-500">Last sync: {formatDate(scanner.last_synced_at)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span data-testid={`scanner-sync-count-${scanner.device_name}`} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                        {scanner.sync_count} sync{scanner.sync_count !== 1 ? 's' : ''}
+                      </span>
+                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                        <MapPin className="w-3 h-3 inline mr-0.5" />{scanner.total_locations} loc
+                      </span>
+                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                        <Package className="w-3 h-3 inline mr-0.5" />{scanner.total_items} items / {scanner.total_quantity} qty
+                      </span>
+                    </div>
+                  </div>
+                  {/* Individual Sync Entries */}
+                  {expandedScanner === scanner.device_name && (
+                    <div className="border-t border-gray-200 divide-y divide-gray-100">
+                      {scanner.syncs.map((sync, idx) => (
+                        <div key={sync.id} data-testid={`sync-entry-${sync.id}`}
+                          className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+                          <div className="flex items-center gap-3 pl-8">
+                            <div className="w-7 h-7 bg-gray-100 rounded flex items-center justify-center text-xs font-semibold text-gray-500">
+                              #{scanner.syncs.length - idx}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800 text-sm">
+                                {formatDateShort(sync.sync_date)}
+                                <span className="text-gray-400 font-normal ml-2">{formatDate(sync.synced_at).split(',').pop()?.trim()}</span>
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {sync.session_name || sync.session_id?.substring(0, 8) + '...'}
+                                <span className="mx-1">&middot;</span>
+                                {sync.action === 'chunked_sync' ? 'Chunked sync' : 'Direct sync'}
+                                <span className="mx-1">&middot;</span>
+                                ID: {sync.id?.substring(0, 8)}...
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{sync.location_count} loc</span>
+                            <span><Package className="w-3 h-3 inline mr-0.5" />{sync.total_items} items</span>
+                            <span className="font-medium text-gray-700">{sync.total_quantity} qty</span>
+                            <Button variant="outline" size="sm"
+                              data-testid={`export-sync-${sync.id}`}
+                              className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 h-7 text-xs"
+                              onClick={() => handleExportSingleLog(sync.id, scanner.device_name, sync.sync_date)}>
+                              <Download className="w-3 h-3 mr-1" />Export
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : selectedClient && scannerLogs.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <Database className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500">No sync logs found for this client</p>
+            </div>
+          ) : !selectedClient && groupedData.length > 0 ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">Select a client to view scanner-wise grouping. Showing all logs by date:</p>
               {groupedData.map((clientGroup) => (
                 <div key={clientGroup.client_id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   <div className="px-5 py-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between border-b border-gray-100"
@@ -464,75 +537,39 @@ export default function PortalSyncLogs() {
                         <p className="text-xs text-gray-500">Code: {clientGroup.client_code || clientGroup.client_id.substring(0, 8)}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                        {clientGroup.dates.length} day{clientGroup.dates.length !== 1 ? 's' : ''}
-                      </span>
-                      <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                        {clientGroup.dates.reduce((sum, d) => sum + d.sync_count, 0)} syncs
-                      </span>
-                    </div>
+                    <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                      {clientGroup.dates.reduce((sum, d) => sum + d.sync_count, 0)} syncs
+                    </span>
                   </div>
                   {expandedClient === clientGroup.client_id && (
                     <div className="divide-y divide-gray-100">
-                      {clientGroup.dates.map((dateGroup) => {
-                        const dateKey = `${clientGroup.client_id}|${dateGroup.date}`;
-                        return (
-                          <div key={dateKey}>
-                            <div className="px-5 py-3 cursor-pointer hover:bg-emerald-50/30 flex items-center justify-between bg-gray-50/50"
-                              onClick={() => setExpandedDate(expandedDate === dateKey ? null : dateKey)}>
-                              <div className="flex items-center gap-3 pl-8">
-                                {expandedDate === dateKey ? <ChevronDown className="w-4 h-4 text-emerald-500" /> : <ChevronRight className="w-4 h-4 text-emerald-500" />}
-                                <Calendar className="w-4 h-4 text-emerald-500" />
-                                <span className="font-medium text-gray-800 text-sm">{formatDateShort(dateGroup.date)}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-xs">
-                                <span className="text-gray-500">{dateGroup.sync_count} sync{dateGroup.sync_count !== 1 ? 's' : ''}</span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-500"><MapPin className="w-3 h-3 inline mr-0.5" />{dateGroup.total_locations} loc</span>
-                                <span className="text-gray-400">|</span>
-                                <span className="text-gray-500"><Package className="w-3 h-3 inline mr-0.5" />{dateGroup.total_items} items / {dateGroup.total_quantity} qty</span>
-                                <Button variant="outline" size="sm"
-                                  className="ml-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); handleExportDayLogs(clientGroup.client_id, dateGroup.date, clientGroup.client_name); }}>
-                                  <Download className="w-3 h-3 mr-1" />Export Day
-                                </Button>
-                              </div>
-                            </div>
-                            {expandedDate === dateKey && (
-                              <div className="pl-16 pr-5 py-2 space-y-2 bg-white">
-                                {dateGroup.logs.map((log) => (
-                                  <div key={log.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                                    <div className="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50">
-                                      <div className="flex items-center gap-3">
-                                        <Smartphone className="w-4 h-4 text-blue-500" />
-                                        <div>
-                                          <p className="font-medium text-gray-800 text-sm">{log.device_name}</p>
-                                          <p className="text-xs text-gray-400">Session: {log.session_id?.substring(0, 8)}... &middot; ID: {log.id?.substring(0, 8)}...</p>
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-4 text-xs text-gray-500">
-                                        <span><MapPin className="w-3 h-3 inline mr-0.5" />{log.location_count} loc</span>
-                                        <span><Package className="w-3 h-3 inline mr-0.5" />{log.total_items} items / {log.total_quantity} qty</span>
-                                        <span className="text-gray-400"><Clock className="w-3 h-3 inline mr-0.5" />{formatDate(log.synced_at)}</span>
-                                        <Button variant="outline" size="sm"
-                                          className="ml-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 h-7 text-xs"
-                                          onClick={() => handleExportSingleLog(log.id, log.device_name, log.sync_date)}>
-                                          <Download className="w-3 h-3 mr-1" />Export
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                      {clientGroup.dates.map((dateGroup) => (
+                        <div key={dateGroup.date} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50">
+                          <div className="flex items-center gap-3 pl-8">
+                            <Calendar className="w-4 h-4 text-emerald-500" />
+                            <span className="font-medium text-gray-800 text-sm">{formatDateShort(dateGroup.date)}</span>
                           </div>
-                        );
-                      })}
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span>{dateGroup.sync_count} syncs</span>
+                            <span><MapPin className="w-3 h-3 inline mr-0.5" />{dateGroup.total_locations} loc</span>
+                            <span><Package className="w-3 h-3 inline mr-0.5" />{dateGroup.total_items} items / {dateGroup.total_quantity} qty</span>
+                            <Button variant="outline" size="sm"
+                              className="ml-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 h-7 text-xs"
+                              onClick={(e) => { e.stopPropagation(); handleExportDayLogs(clientGroup.client_id, dateGroup.date, clientGroup.client_name); }}>
+                              <Download className="w-3 h-3 mr-1" />Export Day
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <Database className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500">No sync logs found</p>
             </div>
           )}
         </>
