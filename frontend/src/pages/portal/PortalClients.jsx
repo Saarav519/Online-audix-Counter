@@ -748,6 +748,143 @@ export default function PortalClients() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Schema Builder Dialog */}
+      <Dialog open={showSchemaDialog} onOpenChange={setShowSchemaDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh]" data-testid="schema-builder-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-purple-600" />
+                Schema Builder — {schemaClient?.name}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          {schemaLoading ? (
+            <div className="text-center py-8 text-gray-500">Loading schema...</div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500">
+                Configure which fields are included in master/stock uploads and reports. Toggle fields on/off and add custom fields.
+              </p>
+
+              {/* Field List */}
+              <div className="border rounded-lg divide-y max-h-[40vh] overflow-y-auto">
+                {schemaFields.map((field, idx) => (
+                  <div key={field.name} className={`flex items-center gap-3 px-4 py-2.5 ${field.enabled ? 'bg-white' : 'bg-gray-50 opacity-60'}`} data-testid={`schema-field-${field.name}`}>
+                    <button onClick={() => toggleField(idx)} className="flex-shrink-0" data-testid={`toggle-field-${field.name}`}>
+                      {field.enabled ? (
+                        <ToggleRight className="w-6 h-6 text-emerald-500" />
+                      ) : (
+                        <ToggleLeft className="w-6 h-6 text-gray-400" />
+                      )}
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-900">{field.label}</span>
+                      <span className="ml-2 text-xs text-gray-400 font-mono">{field.name}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded ${field.type === 'number' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {field.type}
+                    </span>
+                    {field.required && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">required</span>
+                    )}
+                    {field.is_standard ? (
+                      <span className="text-xs text-gray-400">standard</span>
+                    ) : (
+                      <button onClick={() => removeCustomField(idx)} className="text-red-400 hover:text-red-600 p-1" data-testid={`remove-field-${field.name}`}>
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Custom Field */}
+              <div className="bg-purple-50 rounded-lg p-4">
+                <p className="text-sm font-medium text-purple-900 mb-3">Add Custom Field</p>
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Label className="text-xs text-purple-700">Field Name</Label>
+                    <Input
+                      value={newFieldName}
+                      onChange={e => setNewFieldName(e.target.value)}
+                      placeholder="e.g. Brand, Supplier Code"
+                      className="mt-1"
+                      data-testid="new-field-name-input"
+                      onKeyDown={e => e.key === 'Enter' && addCustomField()}
+                    />
+                  </div>
+                  <div className="w-28">
+                    <Label className="text-xs text-purple-700">Type</Label>
+                    <select
+                      value={newFieldType}
+                      onChange={e => setNewFieldType(e.target.value)}
+                      className="mt-1 w-full h-9 px-3 rounded-md border border-gray-200 text-sm"
+                      data-testid="new-field-type-select"
+                    >
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                    </select>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={addCustomField}
+                    className="bg-purple-600 hover:bg-purple-700"
+                    data-testid="add-custom-field-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              {/* Download Templates */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadSchemaTemplate('master')}
+                  className="text-blue-600"
+                  data-testid="download-master-template-schema"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Master Template
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadSchemaTemplate('stock')}
+                  className="text-emerald-600"
+                  data-testid="download-stock-template-schema"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Stock Template
+                </Button>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 justify-end pt-2 border-t">
+                <Button type="button" variant="outline" onClick={() => setShowSchemaDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={saveSchema}
+                  disabled={schemaSaving}
+                  className="bg-purple-600 hover:bg-purple-700"
+                  data-testid="save-schema-btn"
+                >
+                  {schemaSaving ? 'Saving...' : 'Save Schema'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
