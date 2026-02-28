@@ -378,7 +378,10 @@ export default function PortalReports() {
 
   // Apply all filters: variance category → column filters → sort
   const filteredData = useMemo(() => {
-    if (!reportData || !reportData.report) return null;
+    if (!reportData) return null;
+    // For pending-locations and empty-bins, return data as-is (no filtering needed)
+    if (reportType === 'pending-locations' || reportType === 'empty-bins') return reportData;
+    if (!reportData.report) return null;
     let rows = [...reportData.report];
 
     // Step 1: Variance category filter
