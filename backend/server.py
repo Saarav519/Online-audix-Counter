@@ -2539,17 +2539,20 @@ async def get_detailed_report(session_id: str):
         totals["diff_qty"] += diff_qty
         totals["diff_value"] += diff_value
         
-        report.append({
+        row = {
             "location": location, "barcode": barcode, "description": description, "category": category,
             "mrp": mrp, "cost": cost, "stock_qty": stock_qty, "stock_value": stock_value,
             "physical_qty": physical_qty, "physical_value": physical_value,
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value": final_value,
             "diff_qty": diff_qty, "diff_value": diff_value, "accuracy_pct": accuracy, "remark": remark,
             "in_master": barcode in master_by_barcode, "in_expected_stock": key in expected_map
-        })
+        }
+        if extra_columns:
+            _merge_custom_fields(row, master_by_barcode.get(barcode, {}), extra_columns)
+        report.append(row)
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
-    return {"report": report, "totals": totals}
+    return {"report": report, "totals": totals, "extra_columns": extra_columns}
 
 
 @portal_router.get("/reports/{session_id}/barcode-wise")
