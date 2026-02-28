@@ -1579,7 +1579,10 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row.barcode, reco_qty: val })} />
                   </td>
                 )}
+                {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
                 {isConsolidated && <td className="py-2 px-3 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
+                {isConsolidated && <td className="py-2 px-3 text-right text-gray-500">{(row.final_value_mrp || 0).toFixed(2)}</td>}
+                {isConsolidated && <td className="py-2 px-3 text-right text-gray-500">{(row.final_value_cost || 0).toFixed(2)}</td>}
                 <td className="py-2 px-3 text-right">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(row.diff_qty)}`}>
                     {getVarianceIcon(row.diff_qty)}
