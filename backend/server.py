@@ -1026,6 +1026,266 @@ async def cancel_sync_staging(batch_id: str):
     result = await db.sync_staging.delete_many({"batch_id": batch_id})
     return {"message": "Staging data cleared", "deleted_chunks": result.deleted_count}
 
+# ==================== SYNC INBOX & FORWARD TO VARIANCE ====================
+
+@portal_router.get("/sync-inbox/summary")
+async def get_sync_inbox_summary(session_id: str):
+    """Get summary of pending inbox items grouped by scanner for a session."""
+    pipeline = [
+        {"$match": {"session_id": session_id, "status": "pending"}},
+        {"$group": {
+            "_id": "$device_name",
+            "sync_count": {"$sum": 1},
+            "total_locations": {"$sum": 1},
+            "total_items": {"$sum": "$total_items"},
+            "total_quantity": {"$sum": "$total_quantity"},
+            "last_synced_at": {"$max": "$synced_at"},
+            "sync_dates": {"$addToSet": "$sync_date"}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
+    scanner_groups = await db.sync_inbox.aggregate(pipeline).to_list(1000)
+
+    total_pending = await db.sync_inbox.count_documents({"session_id": session_id, "status": "pending"})
+    unique_scanners = len(scanner_groups)
+
+    scanners = []
+    for sg in scanner_groups:
+        scanners.append({
+            "device_name": sg["_id"],
+            "location_count": sg["total_locations"],
+            "total_items": sg["total_items"],
+            "total_quantity": sg["total_quantity"],
+            "last_synced_at": sg["last_synced_at"],
+            "sync_dates": sg["sync_dates"]
+        })
+
+    return {
+        "session_id": session_id,
+        "total_pending": total_pending,
+        "scanner_count": unique_scanners,
+        "scanners": scanners
+    }
+
+@portal_router.get("/sync-inbox")
+async def get_sync_inbox(session_id: str, device_name: str = None):
+    """Get pending inbox items, optionally filtered by device."""
+    query = {"session_id": session_id, "status": "pending"}
+    if device_name:
+        query["device_name"] = device_name
+    items = await db.sync_inbox.find(query, {"_id": 0}).sort("synced_at", -1).to_list(10000)
+    return items
+
+class ForwardRequest(BaseModel):
+    session_id: str
+    client_id: str
+    forwarded_by: str = "admin"
+
+@portal_router.post("/forward-to-variance")
+async def forward_to_variance(req: ForwardRequest):
+    """Forward all pending inbox items to variance (synced_locations) with conflict detection."""
+    pending = await db.sync_inbox.find(
+        {"session_id": req.session_id, "status": "pending"}, {"_id": 0}
+    ).to_list(100000)
+
+    if not pending:
+        raise HTTPException(status_code=400, detail="No pending data to forward")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    batch_id = str(uuid.uuid4())
+    sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Group inbox items by location_name
+    location_groups = {}
+    for item in pending:
+        loc = item["location_name"]
+        if loc not in location_groups:
+            location_groups[loc] = []
+        location_groups[loc].append(item)
+
+    # For each location group, deduplicate per device (keep latest per device)
+    locations_forwarded = 0
+    conflicts_created = 0
+
+    for location_name, entries in location_groups.items():
+        # Deduplicate: for each device, keep only the latest entry
+        by_device = {}
+        for e in entries:
+            dn = e["device_name"]
+            if dn not in by_device or e["synced_at"] > by_device[dn]["synced_at"]:
+                by_device[dn] = e
+        unique_entries = list(by_device.values())
+
+        # Check for existing conflict for this location
+        existing_conflict = await db.conflict_locations.find_one({
+            "session_id": req.session_id,
+            "location_name": location_name,
+            "status": "pending"
+        })
+
+        # Check for existing forwarded data in variance
+        existing_synced = await db.synced_locations.find_one({
+            "session_id": req.session_id,
+            "location_name": location_name
+        })
+
+        def _make_conflict_entry(e):
+            return {
+                "entry_id": str(uuid.uuid4()),
+                "device_name": e.get("device_name", "Unknown"),
+                "device_id": e.get("device_id", ""),
+                "location_id": e.get("location_id", ""),
+                "synced_at": e.get("synced_at", timestamp),
+                "items": e.get("items", []),
+                "total_items": e.get("total_items", 0),
+                "total_quantity": e.get("total_quantity", 0),
+                "is_empty": e.get("is_empty", False),
+                "empty_remarks": e.get("empty_remarks", ""),
+                "status": "pending"
+            }
+
+        # Case 1: Multiple devices scanned this location in this batch → conflict among them
+        if len(unique_entries) > 1:
+            conflict_entries = [_make_conflict_entry(e) for e in unique_entries]
+
+            if existing_conflict:
+                # Add all as new entries to existing conflict
+                await db.conflict_locations.update_one(
+                    {"id": existing_conflict["id"]},
+                    {"$push": {"entries": {"$each": conflict_entries}}, "$set": {"updated_at": timestamp}}
+                )
+            else:
+                # Also pull existing variance data into this conflict if any
+                if existing_synced:
+                    conflict_entries.insert(0, _make_conflict_entry(existing_synced))
+                    await db.synced_locations.delete_many({
+                        "session_id": req.session_id,
+                        "location_name": location_name
+                    })
+                conflict_doc = {
+                    "id": str(uuid.uuid4()),
+                    "session_id": req.session_id,
+                    "client_id": req.client_id,
+                    "location_name": location_name,
+                    "status": "pending",
+                    "entries": conflict_entries,
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "resolved_at": None,
+                    "resolved_by": None
+                }
+                await db.conflict_locations.insert_one(conflict_doc)
+            conflicts_created += 1
+            locations_forwarded += len(unique_entries)
+            continue
+
+        # Single entry for this location
+        entry = unique_entries[0]
+
+        # Case 2: Existing conflict → add this entry
+        if existing_conflict:
+            await db.conflict_locations.update_one(
+                {"id": existing_conflict["id"]},
+                {"$push": {"entries": _make_conflict_entry(entry)}, "$set": {"updated_at": timestamp}}
+            )
+            locations_forwarded += 1
+            continue
+
+        # Case 3: Existing in variance from different device → create conflict, pull from variance
+        if existing_synced and existing_synced.get("device_name") != entry["device_name"]:
+            first_entry = _make_conflict_entry(existing_synced)
+            new_entry = _make_conflict_entry(entry)
+            conflict_doc = {
+                "id": str(uuid.uuid4()),
+                "session_id": req.session_id,
+                "client_id": req.client_id,
+                "location_name": location_name,
+                "status": "pending",
+                "entries": [first_entry, new_entry],
+                "created_at": timestamp,
+                "updated_at": timestamp,
+                "resolved_at": None,
+                "resolved_by": None
+            }
+            await db.conflict_locations.insert_one(conflict_doc)
+            await db.synced_locations.delete_many({
+                "session_id": req.session_id,
+                "location_name": location_name
+            })
+            conflicts_created += 1
+            locations_forwarded += 1
+            continue
+
+        # Case 4: Same device re-forward or first time → insert/replace in variance
+        await db.synced_locations.delete_many({
+            "session_id": req.session_id,
+            "location_name": location_name
+        })
+        synced_loc = SyncedLocation(
+            session_id=req.session_id,
+            device_id=entry.get("device_id", ""),
+            device_name=entry["device_name"],
+            location_id=entry.get("location_id", ""),
+            location_name=location_name,
+            items=entry.get("items", []),
+            total_items=entry.get("total_items", 0),
+            total_quantity=entry.get("total_quantity", 0),
+            is_empty=entry.get("is_empty", False),
+            empty_remarks=entry.get("empty_remarks", ""),
+            sync_date=entry.get("sync_date", sync_date)
+        )
+        doc = synced_loc.model_dump()
+        doc['synced_at'] = doc['synced_at'].isoformat()
+        await db.synced_locations.insert_one(doc)
+        locations_forwarded += 1
+
+    # Mark all pending inbox items as forwarded
+    inbox_ids = [item["id"] for item in pending]
+    await db.sync_inbox.update_many(
+        {"id": {"$in": inbox_ids}},
+        {"$set": {"status": "forwarded", "forward_batch_id": batch_id}}
+    )
+
+    # Create batch record
+    all_scanners = list(set(item["device_name"] for item in pending))
+    batch_doc = {
+        "id": batch_id,
+        "session_id": req.session_id,
+        "client_id": req.client_id,
+        "forwarded_by": req.forwarded_by,
+        "forwarded_at": timestamp,
+        "location_count": locations_forwarded,
+        "item_count": sum(item.get("total_items", 0) for item in pending),
+        "quantity_count": sum(item.get("total_quantity", 0) for item in pending),
+        "scanner_count": len(all_scanners),
+        "scanners": all_scanners,
+        "conflicts_created": conflicts_created,
+        "inbox_entries_processed": len(pending)
+    }
+    await db.forward_batches.insert_one(batch_doc)
+
+    # Generate alerts for high variance
+    await check_and_generate_alerts(req.session_id, req.client_id)
+
+    return {
+        "message": "Data forwarded to variance",
+        "batch_id": batch_id,
+        "locations_forwarded": locations_forwarded,
+        "conflicts_created": conflicts_created,
+        "scanners_processed": len(all_scanners)
+    }
+
+@portal_router.get("/forward-batches")
+async def get_forward_batches(session_id: str = None, client_id: str = None):
+    """Get forward batch history."""
+    query = {}
+    if session_id:
+        query["session_id"] = session_id
+    if client_id:
+        query["client_id"] = client_id
+    batches = await db.forward_batches.find(query, {"_id": 0}).sort("forwarded_at", -1).to_list(100)
+    return batches
+
 @sync_router.get("/config")
 async def get_sync_config():
     """Get available clients and sessions for device configuration"""
