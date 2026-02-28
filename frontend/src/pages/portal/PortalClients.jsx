@@ -13,7 +13,11 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  Download
+  Download,
+  Settings,
+  GripVertical,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
