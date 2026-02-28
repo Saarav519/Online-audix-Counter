@@ -1572,32 +1572,23 @@ const ScanItems = () => {
         <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)', minHeight: '400px' }}>
           {/* Scrollable Content Area */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden pb-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {/* Header */}
-            <div className="text-center pt-4">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MapPin className="w-8 h-8 text-emerald-600" />
-              </div>
-              <h1 className="text-xl font-bold text-slate-800">Select Location</h1>
-              <p className="text-slate-500 text-sm mt-1">
-                {settings.locationScanMode === 'dynamic' 
-                  ? 'Scan or enter any location code'
-                  : 'Scan pre-assigned location code'}
-              </p>
-              <div className="flex gap-2 justify-center mt-3">
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs ${settings.locationScanMode === 'dynamic' 
-                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                    : 'bg-blue-50 text-blue-700 border-blue-200'}`}
-                >
-                  {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Location Scanner Card */}
-            <Card className="border-0 shadow-md mx-2">
+            {/* Location Scanner Card - AT TOP */}
+            <Card className="border-0 shadow-md mx-2 mt-2">
               <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-bold text-slate-800">Select Location</h1>
+                    <p className="text-slate-500 text-xs">
+                      {settings.locationScanMode === 'dynamic' 
+                        ? 'Scan or enter any location code'
+                        : 'Scan pre-assigned location code'}
+                    </p>
+                  </div>
+                </div>
+
                 <Label className="text-sm text-slate-600 mb-2 block font-medium">
                   <MapPin className="w-4 h-4 inline mr-2" />
                   Location Code
@@ -1639,8 +1630,16 @@ const ScanItems = () => {
               </CardContent>
             </Card>
 
-            {/* Help Text */}
-            <div className="text-center px-4">
+            {/* Mode Badge + Help */}
+            <div className="text-center px-4 space-y-2">
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${settings.locationScanMode === 'dynamic' 
+                  ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                  : 'bg-blue-50 text-blue-700 border-blue-200'}`}
+              >
+                {settings.locationScanMode === 'dynamic' ? 'Dynamic Mode' : 'Pre-Assigned Mode'}
+              </Badge>
               <p className="text-xs text-slate-400">
                 {settings.locationScanMode === 'dynamic' 
                   ? 'New location codes will be created automatically'
