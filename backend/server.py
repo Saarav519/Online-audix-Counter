@@ -784,25 +784,29 @@ async def delete_session(session_id: str):
 
 @portal_router.post("/sessions/{session_id}/import-expected")
 async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
-    # Verify session exists
     session = await db.audit_sessions.find_one({"id": session_id})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
     variance_mode = session.get("variance_mode", "bin-wise")
+    client_id = session.get("client_id", "")
     
-    # Read CSV file
+    # Get client schema for dynamic fields
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    extra_field_names = []
+    if schema:
+        for f in schema.get("fields", []):
+            if f.get("enabled", True) and f["name"] not in STANDARD_MASTER_FIELD_NAMES and f["name"] not in ("location", "qty"):
+                extra_field_names.append(f["name"])
+    
     content = await file.read()
     decoded = content.decode('utf-8')
     reader = csv.DictReader(io.StringIO(decoded))
     
-    # Clear existing expected stock for this session
     await db.expected_stock.delete_many({"session_id": session_id})
     
-    # Import new expected stock based on variance mode
     records = []
     for row in reader:
-        # Normalize column names (case-insensitive, strip whitespace)
         norm_row = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
         
         expected = ExpectedStock(
@@ -819,12 +823,21 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
         )
         doc = expected.model_dump()
         doc['imported_at'] = doc['imported_at'].isoformat()
+        
+        # Extract extra/custom fields from schema
+        custom_fields = {}
+        for fn in extra_field_names:
+            val = norm_row.get(fn, '')
+            if val:
+                custom_fields[fn] = val
+        if custom_fields:
+            doc['custom_fields'] = custom_fields
+        
         records.append(doc)
     
     if records:
         await db.expected_stock.insert_many(records)
     
-    # Update session flag
     await db.audit_sessions.update_one(
         {"id": session_id},
         {"$set": {"expected_stock_imported": True}}
