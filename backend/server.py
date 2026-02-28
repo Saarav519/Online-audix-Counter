@@ -2587,7 +2587,9 @@ async def get_bin_wise_report(session_id: str):
         loc = key.split("|")[0]
         location_reco[loc] = location_reco.get(loc, 0) + reco
     
-    all_locations = set(expected_by_location.keys()) | set(physical_by_location.keys()) | set(conflict_map.keys())
+    # Session-wise: only show locations that have scan data, empty marks, or conflicts
+    # Stock-only (unscanned) locations are hidden — they appear in consolidated view
+    all_locations = set(physical_by_location.keys()) | set(empty_bin_map.keys()) | set(conflict_map.keys())
     
     report = []
     total_stock = total_physical = total_reco = total_final = total_diff = 0
