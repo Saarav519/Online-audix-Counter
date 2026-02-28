@@ -222,6 +222,29 @@ export default function PortalSyncLogs() {
     }
   };
 
+  const handleExportAllSessionLogs = async () => {
+    if (!selectedClient) return;
+    try {
+      let url = `${BACKEND_URL}/api/portal/sync-logs/export?client_id=${selectedClient}`;
+      if (selectedSession) url += `&session_id=${selectedSession}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      const clientName = clients.find(c => c.id === selectedClient)?.name || 'export';
+      a.download = `sync_logs_${clientName}_all.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success('All session logs exported!');
+    } catch (error) {
+      toast.error('Failed to export logs');
+    }
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
