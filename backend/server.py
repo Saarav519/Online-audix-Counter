@@ -829,8 +829,8 @@ async def get_client_stock_stats(client_id: str):
     locations = await db.client_stock.distinct("location", {"client_id": client_id})
     return {
         "total_records": total,
-        "unique_locations": len([l for l in locations if l]),
-        "locations": [l for l in sorted(locations) if l][:20]
+        "unique_locations": len([loc for loc in locations if loc]),
+        "locations": [loc for loc in sorted(locations) if loc][:20]
     }
 
 @portal_router.delete("/clients/{client_id}/stock")
