@@ -562,51 +562,31 @@ export default function PortalSessions() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const mode = importingSession?.variance_mode || 'bin-wise';
-                    let sampleCSV = '';
-                    let filename = '';
-                    
-                    if (mode === 'bin-wise') {
-                      sampleCSV = `Location,Barcode,Description,Category,MRP,Cost,Qty
-Bin-A01,8901234567890,Rice 5kg,Food & Groceries,250,200,100
-Bin-A01,8901234567891,Flour 1kg,Food & Groceries,45,35,50
-Bin-A02,8901234567892,Sugar 2kg,Food & Groceries,90,75,75
-Warehouse-B,8901234567893,Cooking Oil 1L,Food & Groceries,180,150,200
-Cold-Storage,8901234567895,Butter 500g,Dairy,280,240,80`;
-                      filename = 'sample_binwise_stock.csv';
-                    } else if (mode === 'barcode-wise') {
-                      sampleCSV = `Barcode,Description,Category,MRP,Cost,Qty
-8901234567890,Rice 5kg,Food & Groceries,250,200,100
-8901234567891,Flour 1kg,Food & Groceries,45,35,50
-8901234567892,Sugar 2kg,Food & Groceries,90,75,75
-8901234567893,Cooking Oil 1L,Food & Groceries,180,150,200
-8901234567895,Butter 500g,Dairy,280,240,80`;
-                      filename = 'sample_barcodewise_stock.csv';
-                    } else {
-                      sampleCSV = `Barcode,Description,Category,MRP,Cost,Qty
-8901234567890,Rice 5kg,Food & Groceries,250,200,10
-8901234567891,Flour 1kg,Food & Groceries,45,35,8
-8901234567892,Sugar 2kg,Food & Groceries,90,75,5
-8901234567893,Cooking Oil 1L,Food & Groceries,180,150,12`;
-                      filename = 'sample_articlewise_stock.csv';
+                  onClick={async () => {
+                    if (!importingSession) return;
+                    const clientId = importingSession.client_id;
+                    try {
+                      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${clientId}/schema/template?template_type=stock`);
+                      if (!res.ok) throw new Error('Failed');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `stock_template_${importingSession.name.replace(/\s+/g, '_')}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast.success('Template downloaded!');
+                    } catch {
+                      toast.error('Failed to download template');
                     }
-                    
-                    const blob = new Blob([sampleCSV], { type: 'text/csv' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    toast.success('Sample file downloaded!');
                   }}
                   className="text-emerald-600 hover:text-emerald-700"
+                  data-testid="download-session-stock-template"
                 >
                   <FileSpreadsheet className="w-4 h-4 mr-1" />
-                  Download Sample
+                  Download Template
                 </Button>
               </div>
               <code className="text-xs text-gray-600 block bg-white p-2 rounded border">
