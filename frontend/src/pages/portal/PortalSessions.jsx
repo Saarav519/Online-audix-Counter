@@ -41,6 +41,8 @@ export default function PortalSessions() {
   const [showStockViewer, setShowStockViewer] = useState(null);
   const [stockData, setStockData] = useState([]);
   const [stockLoading, setStockLoading] = useState(false);
+  const [schemaFields, setSchemaFields] = useState([]);
+  const [schemaLoading, setSchemaLoading] = useState(false);
   const [formData, setFormData] = useState({
     client_id: '',
     name: '',
