@@ -305,6 +305,7 @@ export default function PortalClients() {
     setMasterViewLoading(true);
     setShowMasterViewDialog(true);
     setMasterProducts([]);
+    setMasterExtraColumns([]);
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products?limit=200`);
@@ -312,6 +313,7 @@ export default function PortalClients() {
         const data = await res.json();
         setMasterProducts(data.products);
         setMasterProductsTotal(data.total);
+        setMasterExtraColumns(data.extra_columns || []);
       }
     } catch (err) {
       console.error('Failed to fetch master products:', err);
