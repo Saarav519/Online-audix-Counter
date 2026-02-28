@@ -1479,7 +1479,7 @@ async def export_sync_logs(client_id: str, date: str = None, session_id: str = N
     return StreamingResponse(
         iter([csv_content]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=sync_logs_{client_name}_{date}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=sync_logs_{client_name}{suffix}.csv"}
     )
 
 @portal_router.get("/sync-logs/{log_id}")
