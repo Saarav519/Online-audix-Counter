@@ -334,7 +334,6 @@ export default function PortalReports() {
   useEffect(() => {
     if (selectedSession && reportType) {
       fetchReport();
-      fetchDailyProgress();
     }
   }, [selectedSession, reportType]);
 
