@@ -161,6 +161,54 @@ const Settings = () => {
     });
   };
 
+  // Import Master/Locations from Portal
+  const handlePortalImport = async () => {
+    if (!syncConfig.clientId) { setPortalImportResult({ success: false, msg: 'Select a client first' }); return; }
+    if (portalImportType === 'pending' && !syncConfig.deviceName) { setPortalImportResult({ success: false, msg: 'Set device name first' }); return; }
+    
+    setPortalImporting(true);
+    setPortalImportResult(null);
+    
+    try {
+      if (portalImportType === 'master') {
+        // Fetch product master from portal
+        const res = await fetch(`${BACKEND_URL}/api/sync/master-products?client_id=${syncConfig.clientId}`);
+        if (!res.ok) throw new Error('Failed to fetch master products');
+        const data = await res.json();
+        const products = (data.products || []).map((p, idx) => ({
+          id: `portal_prod_${Date.now()}_${idx}`,
+          barcode: p.barcode,
+          name: p.name,
+          price: p.price,
+          isMaster: true
+        }));
+        setMasterProductsDirect(products);
+        setPortalImportResult({ success: true, msg: `Imported ${products.length} products from portal` });
+      } else {
+        // Fetch assigned pending locations
+        const url = `${BACKEND_URL}/api/sync/my-locations?device_name=${encodeURIComponent(syncConfig.deviceName)}&client_id=${encodeURIComponent(syncConfig.clientId)}${syncConfig.sessionId ? `&session_id=${encodeURIComponent(syncConfig.sessionId)}` : ''}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to fetch assigned locations');
+        const data = await res.json();
+        const locs = (data.locations || []).map(locName => ({
+          code: locName,
+          name: locName,
+          description: '',
+          isMaster: true
+        }));
+        if (locs.length === 0) {
+          setPortalImportResult({ success: false, msg: 'No locations assigned to this device. Ask admin to assign from Portal → Pending Locations.' });
+        } else {
+          setMasterLocationsDirect(locs);
+          setPortalImportResult({ success: true, msg: `Imported ${locs.length} assigned locations` });
+        }
+      }
+    } catch (e) {
+      setPortalImportResult({ success: false, msg: e.message || 'Import failed' });
+    }
+    setPortalImporting(false);
+  };
+
   // Get next backup number for today
   const getNextBackupNumber = () => {
     const today = new Date().toISOString().split('T')[0];
