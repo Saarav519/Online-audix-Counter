@@ -180,7 +180,7 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
     }
   };
 
-  return (
+  return ReactDOM.createPortal(
     <div ref={dropdownRef} className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-64 max-h-96 flex flex-col" style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}>
       {/* Numeric Quick Filter (for number columns) */}
       {isNumeric && (
@@ -241,7 +241,8 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
         })}
         {filteredValues.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No values found</p>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
