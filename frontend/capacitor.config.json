@@ -1,6 +1,6 @@
 {
-  "appId": "com.audix.stockmanagement",
-  "appName": "Audix",
+  "appId": "com.audix.online",
+  "appName": "Audix Online",
   "webDir": "build",
   "bundledWebRuntime": false,
   "android": {
