@@ -2028,13 +2028,95 @@ function EmptyBinsView({ data }) {
 }
 
 // ============ Pending Locations View ============
-function PendingLocationsView({ data }) {
+function PendingLocationsView({ data, clientId }) {
+  const [selectedLocs, setSelectedLocs] = useState(new Set());
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [devices, setDevices] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignments, setAssignments] = useState([]);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+
   if (!data) return <div className="text-center py-8 text-gray-500">Loading...</div>;
   
   const summary = data.summary || {};
   const pending = data.pending || [];
   const completed = data.completed || [];
   const emptyBins = data.empty_bins || [];
+
+  // Build a map: location_name → assigned device
+  const assignedMap = useMemo(() => {
+    const m = {};
+    (assignments || []).forEach(a => {
+      (a.location_names || []).forEach(loc => { m[loc] = a.device_name; });
+    });
+    return m;
+  }, [assignments]);
+
+  // Fetch devices & existing assignments
+  const fetchDevicesAndAssignments = useCallback(async () => {
+    setLoadingDevices(true);
+    try {
+      const [devRes, assRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/portal/devices`),
+        fetch(`${BACKEND_URL}/api/portal/location-assignments?client_id=${clientId}`)
+      ]);
+      if (devRes.ok) { const devs = await devRes.json(); setDevices(devs || []); }
+      if (assRes.ok) { const ass = await assRes.json(); setAssignments(ass.assignments || []); }
+    } catch (e) { console.error(e); }
+    setLoadingDevices(false);
+  }, [clientId]);
+
+  useEffect(() => { if (clientId) fetchDevicesAndAssignments(); }, [clientId, fetchDevicesAndAssignments]);
+
+  const toggleLoc = (locName) => {
+    setSelectedLocs(prev => {
+      const next = new Set(prev);
+      if (next.has(locName)) next.delete(locName); else next.add(locName);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedLocs.size === pending.length) setSelectedLocs(new Set());
+    else setSelectedLocs(new Set(pending.map(l => l.location_name)));
+  };
+
+  const handleAssign = async () => {
+    if (!selectedDevice || selectedLocs.size === 0) return;
+    setAssigning(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/assign-pending-locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          session_id: '',
+          device_name: selectedDevice,
+          location_names: Array.from(selectedLocs)
+        })
+      });
+      if (res.ok) {
+        const r = await res.json();
+        toast.success(r.message || 'Locations assigned!');
+        setSelectedLocs(new Set());
+        setShowAssignModal(false);
+        setSelectedDevice('');
+        fetchDevicesAndAssignments();
+      } else {
+        const err = await res.json();
+        toast.error(err.detail || 'Assignment failed');
+      }
+    } catch (e) { toast.error('Network error'); }
+    setAssigning(false);
+  };
+
+  const handleRemoveAssignment = async (assignmentId) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/location-assignments/${assignmentId}`, { method: 'DELETE' });
+      if (res.ok) { toast.success('Assignment removed'); fetchDevicesAndAssignments(); }
+    } catch (e) { toast.error('Failed to remove'); }
+  };
   
   return (
     <div className="space-y-4">
@@ -2078,47 +2160,143 @@ function PendingLocationsView({ data }) {
         </div>
       </div>
 
-      {/* Pending Locations */}
+      {/* Device Assignments Summary */}
+      {assignments.length > 0 && (
+        <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden">
+          <div className="bg-indigo-50 px-4 py-3 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-indigo-800 flex items-center gap-2">
+              <Smartphone className="w-4 h-4" />
+              Location Assignments
+            </h3>
+          </div>
+          <div className="p-3 space-y-2">
+            {assignments.map((a) => (
+              <div key={a.id} className="flex items-center justify-between bg-indigo-50/50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Smartphone className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <span className="text-sm font-medium text-gray-800 truncate">{a.device_name}</span>
+                  <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full font-medium shrink-0">{(a.location_names || []).length} locations</span>
+                </div>
+                <button onClick={() => handleRemoveAssignment(a.id)} className="text-red-400 hover:text-red-600 p-1" title="Remove assignment">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pending Locations with Checkboxes */}
       {pending.length > 0 && (
         <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
           <div className="bg-red-50 px-4 py-3 border-b">
-            <h3 className="font-semibold text-red-800 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Pending Locations ({pending.length})
-            </h3>
-            <p className="text-xs text-red-600 mt-0.5">These locations have not been scanned yet — need physical verification</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-red-800 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Pending Locations ({pending.length})
+                </h3>
+                <p className="text-xs text-red-600 mt-0.5">Select locations and assign to a scanner device</p>
+              </div>
+              {selectedLocs.size > 0 && (
+                <Button size="sm" onClick={() => setShowAssignModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1">
+                  <Send className="w-3.5 h-3.5" />
+                  Assign {selectedLocs.size} to Device
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[50vh] overflow-y-auto">
             <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                  <th className="py-2 px-4 text-left">#</th>
-                  <th className="py-2 px-4 text-left">Location Name</th>
-                  <th className="py-2 px-4 text-center">Status</th>
-                  <th className="py-2 px-4 text-center">In Expected</th>
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="text-xs text-gray-500 uppercase tracking-wider">
+                  <th className="py-2 px-3 text-left w-10">
+                    <input type="checkbox" checked={selectedLocs.size === pending.length && pending.length > 0} onChange={toggleAll} className="rounded border-gray-300 text-indigo-500 focus:ring-indigo-400 w-4 h-4" />
+                  </th>
+                  <th className="py-2 px-3 text-left">#</th>
+                  <th className="py-2 px-3 text-left">Location Name</th>
+                  <th className="py-2 px-3 text-center">Status</th>
+                  <th className="py-2 px-3 text-center">Assigned To</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {pending.map((loc, idx) => (
-                  <tr key={idx} className="hover:bg-red-50/30">
-                    <td className="py-2.5 px-4 text-sm text-gray-500">{idx + 1}</td>
-                    <td className="py-2.5 px-4 text-sm font-medium text-gray-900">{loc.location_name}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">Pending</span>
-                    </td>
-                    <td className="py-2.5 px-4 text-center">
-                      {loc.in_expected ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                      ) : (
-                        <XCircle className="w-4 h-4 text-gray-300 mx-auto" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {pending.map((loc, idx) => {
+                  const isSelected = selectedLocs.has(loc.location_name);
+                  const assignedTo = assignedMap[loc.location_name];
+                  return (
+                    <tr key={idx} className={`hover:bg-red-50/30 ${isSelected ? 'bg-indigo-50/40' : ''}`}>
+                      <td className="py-2 px-3">
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleLoc(loc.location_name)} className="rounded border-gray-300 text-indigo-500 focus:ring-indigo-400 w-4 h-4" />
+                      </td>
+                      <td className="py-2 px-3 text-sm text-gray-500">{idx + 1}</td>
+                      <td className="py-2 px-3 text-sm font-medium text-gray-900">{loc.location_name}</td>
+                      <td className="py-2 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">Pending</span>
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        {assignedTo ? (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700 font-medium inline-flex items-center gap-1">
+                            <Smartphone className="w-3 h-3" />
+                            {assignedTo}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {/* Assign Modal */}
+      {showAssignModal && ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={() => setShowAssignModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-indigo-600 px-6 py-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Send className="w-5 h-5" />
+                Assign {selectedLocs.size} Locations
+              </h3>
+              <p className="text-sm text-indigo-200 mt-0.5">Select a scanner device to assign these locations</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Device</label>
+                {loadingDevices ? (
+                  <p className="text-sm text-gray-500">Loading devices...</p>
+                ) : (
+                  <select value={selectedDevice} onChange={(e) => setSelectedDevice(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                    <option value="">-- Choose Device --</option>
+                    {devices.map((d) => (
+                      <option key={d.id || d.device_name} value={d.device_name}>
+                        {d.device_name} {d.is_online ? '(Online)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                <p className="text-xs font-medium text-gray-500 mb-2">Selected Locations:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from(selectedLocs).map((loc) => (
+                    <span key={loc} className="bg-white border border-gray-200 text-xs text-gray-700 px-2 py-1 rounded-md">{loc}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowAssignModal(false)} className="text-sm">Cancel</Button>
+              <Button onClick={handleAssign} disabled={!selectedDevice || assigning} className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm gap-1">
+                {assigning ? 'Assigning...' : 'Assign'}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Empty Bins */}
