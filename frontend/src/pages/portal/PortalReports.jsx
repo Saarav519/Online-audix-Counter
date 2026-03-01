@@ -24,7 +24,9 @@ import {
   EyeOff,
   Pin,
   PinOff,
-  Columns
+  Columns,
+  Smartphone,
+  Send
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
