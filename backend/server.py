@@ -2586,6 +2586,17 @@ async def _get_extra_columns_for_client(client_id: str):
             extra.append({"name": f["name"], "label": f.get("label", f["name"]), "type": f.get("type", "text")})
     return extra
 
+async def _get_schema_value_fields(client_id: str):
+    """Get which value fields (mrp, cost) are enabled in the client schema."""
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    has_mrp = True  # default if no schema
+    has_cost = True
+    if schema:
+        field_map = {f["name"]: f for f in schema.get("fields", [])}
+        has_mrp = field_map.get("mrp", {}).get("enabled", True)
+        has_cost = field_map.get("cost", {}).get("enabled", True)
+    return {"has_mrp": has_mrp, "has_cost": has_cost}
+
 def _merge_custom_fields(row: dict, master: dict, extra_columns: list) -> dict:
     """Merge custom_fields from master into a report row based on extra_columns."""
     cf = master.get("custom_fields", {})
