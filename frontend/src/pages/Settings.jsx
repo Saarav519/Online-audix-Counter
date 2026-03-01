@@ -127,7 +127,7 @@ const Settings = () => {
 
   const fetchSyncConfig = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/sync/config`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/sync/config`);
       if (response.ok) {
         const data = await response.json();
         setClients(data.clients || []);
@@ -143,7 +143,7 @@ const Settings = () => {
 
   const fetchSessions = async (clientId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${clientId}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
       if (response.ok) {
         const data = await response.json();
         setSessions(data.filter(s => s.status === 'active'));
@@ -172,7 +172,7 @@ const Settings = () => {
     try {
       if (portalImportType === 'master') {
         // Fetch product master from portal
-        const res = await fetch(`${BACKEND_URL}/api/sync/master-products?client_id=${syncConfig.clientId}`);
+        const res = await fetch(`${BACKEND_URL}/api/audit/sync/master-products?client_id=${syncConfig.clientId}`);
         if (!res.ok) throw new Error('Failed to fetch master products');
         const data = await res.json();
         const products = (data.products || []).map((p, idx) => ({
@@ -186,7 +186,7 @@ const Settings = () => {
         setPortalImportResult({ success: true, msg: `Imported ${products.length} products from portal` });
       } else {
         // Fetch assigned pending locations
-        const url = `${BACKEND_URL}/api/sync/my-locations?device_name=${encodeURIComponent(syncConfig.deviceName)}&client_id=${encodeURIComponent(syncConfig.clientId)}${syncConfig.sessionId ? `&session_id=${encodeURIComponent(syncConfig.sessionId)}` : ''}`;
+        const url = `${BACKEND_URL}/api/audit/sync/my-locations?device_name=${encodeURIComponent(syncConfig.deviceName)}&client_id=${encodeURIComponent(syncConfig.clientId)}${syncConfig.sessionId ? `&session_id=${encodeURIComponent(syncConfig.sessionId)}` : ''}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to fetch assigned locations');
         const data = await res.json();
@@ -349,7 +349,7 @@ const Settings = () => {
       // Upload each chunk
       for (let idx = 0; idx < totalChunks; idx++) {
         const chunk = chunks[idx];
-        const response = await fetch(`${BACKEND_URL}/api/sync/chunk`, {
+        const response = await fetch(`${BACKEND_URL}/api/audit/sync/chunk`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -367,7 +367,7 @@ const Settings = () => {
         if (!response.ok) {
           const error = await response.json();
           // Clean up staged data on failure
-          await fetch(`${BACKEND_URL}/api/sync/staging/${batchId}`, { method: 'DELETE' }).catch(() => {});
+          await fetch(`${BACKEND_URL}/api/audit/sync/staging/${batchId}`, { method: 'DELETE' }).catch(() => {});
           throw new Error(error.detail || `Chunk ${idx + 1} upload failed`);
         }
 
@@ -379,7 +379,7 @@ const Settings = () => {
       // --- Finalize ---
       setSyncProgress({ current: totalLocations, total: totalLocations, phase: 'Finalizing...' });
 
-      const finalizeResponse = await fetch(`${BACKEND_URL}/api/sync/finalize`, {
+      const finalizeResponse = await fetch(`${BACKEND_URL}/api/audit/sync/finalize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
