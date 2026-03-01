@@ -1437,6 +1437,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 
 // ============ Detailed Item-wise Table ============
 function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [] }) {
+  const t = data.totals || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1446,7 +1447,30 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
       </div>
       <div className="overflow-auto max-h-[70vh]">
         <table className="min-w-full text-xs report-table">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <thead className="bg-gray-50">
+            <tr>
+              <th data-col="location" className="py-1.5 px-3 text-left text-[11px] font-bold text-emerald-800">Subtotals</th>
+              <th data-col="barcode" className="py-1.5 px-3"></th>
+              <th data-col="description" className="py-1.5 px-3"></th>
+              <th data-col="category" className="py-1.5 px-3"></th>
+              {extraColumns.map(col => <th key={col.name} data-col={col.name} className="py-1.5 px-3"></th>)}
+              <SubtotalCell value={t.stock_qty} />
+              <SubtotalCell value={t.stock_value_mrp || 0} />
+              <SubtotalCell value={t.stock_value_cost || 0} />
+              <SubtotalCell value={t.physical_qty} />
+              <SubtotalCell value={t.physical_value_mrp || 0} />
+              <SubtotalCell value={t.physical_value_cost || 0} />
+              {isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
+              {isConsolidated && !isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
+              {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
+              {isConsolidated && <SubtotalCell value={t.final_value_mrp || 0} />}
+              {isConsolidated && <SubtotalCell value={t.final_value_cost || 0} />}
+              <SubtotalCell value={t.diff_qty} isVariance />
+              <SubtotalCell value={t.diff_value_mrp || 0} isVariance />
+              <SubtotalCell value={t.diff_value_cost || 0} isVariance />
+              <SubtotalCell value={`${t.accuracy_pct || 0}%`} isAccuracy />
+              <th data-col="remark" className="py-1.5 px-3"></th>
+            </tr>
             <tr>
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="barcode" label="Barcode" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
