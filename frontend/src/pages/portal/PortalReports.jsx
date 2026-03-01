@@ -1251,6 +1251,25 @@ function SummaryCard({ label, value, variant, isAccuracy, pct }) {
   );
 }
 
+// ============ Subtotal Cell Helper ============
+function SubtotalCell({ value, isVariance, isAccuracy, className = '' }) {
+  if (value === undefined || value === null || value === '') return <th className={`py-1.5 px-3 text-right text-[11px] font-semibold ${className}`}></th>;
+  let colorClass = 'text-gray-800';
+  const numVal = typeof value === 'number' ? value : parseFloat(String(value).replace(/[,%]/g, ''));
+  if (isVariance && !isNaN(numVal)) {
+    if (numVal > 0) colorClass = 'text-emerald-700';
+    else if (numVal < 0) colorClass = 'text-red-700';
+  }
+  if (isAccuracy && !isNaN(numVal)) {
+    if (numVal >= 98) colorClass = 'text-emerald-700';
+    else if (numVal >= 90) colorClass = 'text-blue-700';
+    else if (numVal >= 75) colorClass = 'text-amber-700';
+    else colorClass = 'text-red-700';
+  }
+  const display = typeof value === 'number' ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : value;
+  return <th className={`py-1.5 px-3 text-right text-[11px] font-bold ${colorClass} ${className}`}>{display}</th>;
+}
+
 // ============ Bin-wise Table ============
 function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
   const summary = data.summary || {};
