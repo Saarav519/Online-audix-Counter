@@ -4132,6 +4132,148 @@ async def update_settings(settings: PortalSettings):
     )
     return {"message": "Settings updated"}
 
+# ==================== LOCATION ASSIGNMENT ROUTES ====================
+
+class LocationAssignmentRequest(BaseModel):
+    client_id: str
+    session_id: str = ""  # empty = consolidated (all sessions)
+    device_name: str
+    location_names: list[str]
+
+@portal_router.post("/assign-pending-locations")
+async def assign_pending_locations(req: LocationAssignmentRequest):
+    """Admin assigns pending locations to a scanner device."""
+    if not req.device_name or not req.location_names:
+        raise HTTPException(status_code=400, detail="device_name and location_names required")
+    
+    # Verify device exists
+    device = await db.devices.find_one({"device_name": req.device_name})
+    if not device:
+        raise HTTPException(status_code=404, detail=f"Device '{req.device_name}' not found")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    assignment_id = str(uuid.uuid4())
+    
+    doc = {
+        "id": assignment_id,
+        "client_id": req.client_id,
+        "session_id": req.session_id,
+        "device_name": req.device_name,
+        "location_names": req.location_names,
+        "assigned_at": now,
+        "status": "active"
+    }
+    await db.location_assignments.insert_one(doc)
+    
+    return {
+        "message": f"Assigned {len(req.location_names)} locations to {req.device_name}",
+        "assignment_id": assignment_id,
+        "count": len(req.location_names)
+    }
+
+@portal_router.get("/location-assignments")
+async def get_location_assignments(client_id: str = None, session_id: str = None):
+    """Get all location assignments, optionally filtered by client/session."""
+    query = {"status": "active"}
+    if client_id:
+        query["client_id"] = client_id
+    if session_id:
+        query["session_id"] = session_id
+    
+    assignments = await db.location_assignments.find(query, {"_id": 0}).sort("assigned_at", -1).to_list(10000)
+    
+    # Build a summary: device → [locations]
+    device_summary = {}
+    for a in assignments:
+        dn = a["device_name"]
+        if dn not in device_summary:
+            device_summary[dn] = {"device_name": dn, "total_locations": 0, "locations": [], "assignment_ids": []}
+        device_summary[dn]["total_locations"] += len(a.get("location_names", []))
+        device_summary[dn]["locations"].extend(a.get("location_names", []))
+        device_summary[dn]["assignment_ids"].append(a["id"])
+    
+    return {
+        "assignments": assignments,
+        "device_summary": list(device_summary.values())
+    }
+
+@portal_router.delete("/location-assignments/{assignment_id}")
+async def delete_location_assignment(assignment_id: str):
+    """Remove a location assignment."""
+    result = await db.location_assignments.delete_one({"id": assignment_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"message": "Assignment deleted"}
+
+@portal_router.delete("/location-assignments/device/{device_name}")
+async def delete_device_assignments(device_name: str, client_id: str = None):
+    """Remove all assignments for a device (optionally for a specific client)."""
+    query = {"device_name": device_name, "status": "active"}
+    if client_id:
+        query["client_id"] = client_id
+    result = await db.location_assignments.delete_many(query)
+    return {"message": f"Removed {result.deleted_count} assignments for {device_name}"}
+
+# ==================== SCANNER SYNC - PULL ENDPOINTS ====================
+
+@sync_router.get("/my-locations")
+async def get_my_assigned_locations(device_name: str, client_id: str, session_id: str = ""):
+    """Scanner pulls its assigned pending locations."""
+    if not device_name or not client_id:
+        raise HTTPException(status_code=400, detail="device_name and client_id required")
+    
+    query = {"device_name": device_name, "client_id": client_id, "status": "active"}
+    if session_id:
+        query["session_id"] = session_id
+    
+    assignments = await db.location_assignments.find(query, {"_id": 0}).to_list(10000)
+    
+    all_locations = []
+    for a in assignments:
+        for loc_name in a.get("location_names", []):
+            if loc_name not in all_locations:
+                all_locations.append(loc_name)
+    
+    return {
+        "device_name": device_name,
+        "client_id": client_id,
+        "location_count": len(all_locations),
+        "locations": all_locations
+    }
+
+@sync_router.get("/master-products")
+async def get_master_products_for_scanner(client_id: str):
+    """Scanner pulls product master from client stock. Returns only barcode, product_name, price."""
+    if not client_id:
+        raise HTTPException(status_code=400, detail="client_id required")
+    
+    records = await db.client_stock.find(
+        {"client_id": client_id},
+        {"_id": 0, "barcode": 1, "description": 1, "article_name": 1, "mrp": 1, "cost": 1, "category": 1}
+    ).to_list(100000)
+    
+    # Map to scanner-friendly format (barcode, name, price)
+    products = []
+    seen_barcodes = set()
+    for r in records:
+        barcode = r.get("barcode", "")
+        if not barcode or barcode in seen_barcodes:
+            continue
+        seen_barcodes.add(barcode)
+        name = r.get("description", "") or r.get("article_name", "")
+        price = r.get("mrp", 0) or r.get("cost", 0)
+        products.append({
+            "barcode": barcode,
+            "name": name,
+            "price": float(price)
+        })
+    
+    return {
+        "client_id": client_id,
+        "product_count": len(products),
+        "products": products
+    }
+
 # ==================== INCLUDE ROUTERS ====================
 
 app.include_router(api_router)
