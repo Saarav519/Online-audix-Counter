@@ -1,7 +1,7 @@
 {
-  "name": "Audix Stock Management",
-  "short_name": "Audix",
-  "description": "Stock Count & Inventory Management - Works Offline",
+  "name": "Audix Online",
+  "short_name": "Audix O",
+  "description": "Stock Count & Inventory Management - Online Sync Enabled",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
