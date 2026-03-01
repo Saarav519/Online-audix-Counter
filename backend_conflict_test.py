@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 # Backend URL from environment
-BACKEND_URL = "https://tally-app-15.preview.emergentagent.com/api"
+BACKEND_URL = "https://count-test.preview.emergentagent.com/api"
 
 print("🔄 AUDIX CONFLICT RESOLUTION FLOW - COMPREHENSIVE END-TO-END TESTING")
 print("=" * 80)

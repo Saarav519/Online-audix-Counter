@@ -9,7 +9,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tally-app-15.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://count-test.preview.emergentagent.com').rstrip('/')
 
 # Test data - using existing seeded data
 RELIANCE_CLIENT_ID = "0a2045d2-dc5f-4f6b-b622-8c2a67788b8d"

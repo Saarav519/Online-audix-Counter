@@ -9,7 +9,7 @@ import io
 import csv
 
 # Backend URL from the review request
-BASE_URL = "https://tally-app-15.preview.emergentagent.com"
+BASE_URL = "https://count-test.preview.emergentagent.com"
 
 def create_test_csv():
     """Create the test CSV file as specified in the review request"""

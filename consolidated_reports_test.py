@@ -7,7 +7,7 @@ Testing Flow as specified in review request:
 3. Test all 5 consolidated report endpoints
 4. Verify existing individual session reports still work
 
-Backend URL: https://tally-app-15.preview.emergentagent.com
+Backend URL: https://count-test.preview.emergentagent.com
 """
 
 import requests
@@ -15,7 +15,7 @@ import json
 import sys
 
 # Backend configuration
-BACKEND_URL = "https://tally-app-15.preview.emergentagent.com"
+BACKEND_URL = "https://count-test.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class ConsolidatedReportsTester:

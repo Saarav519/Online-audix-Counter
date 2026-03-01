@@ -2,7 +2,7 @@
 """
 AUDIX Backend Testing - Empty Bin Feature APIs
 Testing Flow as specified in review request.
-Backend URL: https://tally-app-15.preview.emergentagent.com
+Backend URL: https://count-test.preview.emergentagent.com
 
 Test Plan:
 1. Get session ID and client ID from existing data  
@@ -19,7 +19,7 @@ import sys
 from datetime import datetime
 
 # Backend configuration
-BACKEND_URL = "https://tally-app-15.preview.emergentagent.com"
+BACKEND_URL = "https://count-test.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 class EmptyBinTester:
