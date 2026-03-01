@@ -102,7 +102,7 @@ function recalcTotals(rows, reportType) {
 }
 
 // ============ Column Filter Dropdown ============
-function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose }) {
+function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose, triggerRef }) {
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
   const isNumeric = NUMERIC_COLUMNS.has(column);
@@ -120,28 +120,28 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   }, [allValues, search]);
 
   useEffect(() => {
-    // Calculate position relative to the trigger button
-    if (dropdownRef.current) {
-      const parent = dropdownRef.current.parentElement;
-      if (parent) {
-        const rect = parent.getBoundingClientRect();
-        const dropH = 384; // max-h-96 = 24rem = 384px
-        const spaceBelow = window.innerHeight - rect.bottom;
-        setPosition({
-          top: spaceBelow < dropH ? Math.max(8, rect.top - dropH) : rect.bottom + 4,
-          left: Math.min(rect.left, window.innerWidth - 272)
-        });
-      }
+    // Calculate position from the trigger button
+    const trigger = triggerRef?.current;
+    if (trigger) {
+      const rect = trigger.getBoundingClientRect();
+      const dropW = 256; // w-64 = 16rem = 256px
+      const dropH = 384; // max-h-96 = 24rem = 384px
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceRight = window.innerWidth - rect.left;
+      setPosition({
+        top: spaceBelow < dropH ? Math.max(8, rect.top - dropH) : rect.bottom + 4,
+        left: spaceRight < dropW ? Math.max(8, rect.right - dropW) : rect.left
+      });
     }
-  }, []);
+  }, [triggerRef]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) onClose();
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && triggerRef?.current && !triggerRef.current.contains(e.target)) onClose();
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   const isChecked = (strVal) => {
     if (isDefaultState) return true;
