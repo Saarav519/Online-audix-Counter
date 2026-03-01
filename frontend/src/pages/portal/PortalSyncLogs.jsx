@@ -862,6 +862,65 @@ export default function PortalSyncLogs() {
       {/* TAB: Forward Batches */}
       {activeTab === 'batches' && (
         <>
+          {/* Location Search */}
+          {selectedSession && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search location by name..."
+                    value={locationSearch}
+                    onChange={(e) => setLocationSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearchLocation(); }}
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <Button size="sm" onClick={handleSearchLocation} disabled={searching || locationSearch.length < 2} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  {searching ? 'Searching...' : 'Search'}
+                </Button>
+                {searchResults && (
+                  <Button size="sm" variant="outline" onClick={() => { setSearchResults(null); setLocationSearch(''); }}>Clear</Button>
+                )}
+              </div>
+              {/* Search Results */}
+              {searchResults && (
+                <div className="mt-3 border-t pt-3">
+                  {searchResults.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-2">No forwarded locations found matching "{locationSearch}"</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-gray-500">{searchResults.length} location(s) found:</p>
+                      {searchResults.map((r, i) => (
+                        <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{r.location_name}</p>
+                              <p className="text-xs text-gray-500">
+                                Scanner: <span className="font-medium text-blue-600">{r.device_name}</span> &middot;
+                                Batch: <span className="font-medium">{r.batch_id.slice(0, 8)}...</span> &middot;
+                                {r.total_items} items, Qty: {r.total_quantity}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2 shrink-0"
+                            onClick={() => handleDeleteLocation(r.session_id, r.location_name, r.batch_id)}>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {!selectedSession ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
               <History className="w-16 h-16 mx-auto mb-4 text-gray-300" />
