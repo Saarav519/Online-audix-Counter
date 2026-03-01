@@ -580,6 +580,25 @@ export default function PortalReports() {
     }
   };
 
+  const fetchSchemaValueFields = async (clientId) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/portal/clients/${clientId}/schema`);
+      if (response.ok) {
+        const schema = await response.json();
+        const fields = schema.fields || [];
+        const fieldMap = {};
+        fields.forEach(f => { fieldMap[f.name] = f; });
+        setSchemaValueFields({
+          has_mrp: fieldMap.mrp ? fieldMap.mrp.enabled : true,
+          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch schema:', error);
+      setSchemaValueFields({ has_mrp: true, has_cost: true });
+    }
+  };
+
   const fetchReport = async () => {
     if (!selectedSession || !reportType) return;
     setLoading(true);
