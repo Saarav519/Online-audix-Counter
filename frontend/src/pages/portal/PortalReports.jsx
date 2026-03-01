@@ -374,6 +374,7 @@ export default function PortalReports() {
   const [hiddenColumns, setHiddenColumns] = useState(new Set());
   const [frozenColumns, setFrozenColumns] = useState(new Set());
   const tableContainerRef = useRef(null);
+  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true });
 
   useEffect(() => {
     fetchClients();
