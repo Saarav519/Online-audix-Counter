@@ -91,51 +91,108 @@ export default function PortalSyncLogs() {
       toast.error('Please enter a client name');
       return;
     }
-    if (!backupForm.sessionName.trim()) {
-      toast.error('Please enter a session name');
+    if (!backupForm.sessionId && !backupForm.sessionName.trim()) {
+      toast.error('Please select an existing session or enter a new session name');
       return;
     }
-    if (!backupForm.file) {
-      toast.error('Please select a CSV backup file');
+    if (!backupForm.files || backupForm.files.length === 0) {
+      toast.error('Please select at least one CSV backup file');
       return;
     }
 
     setBackupUploading(true);
     setBackupResult(null);
     try {
-      const formData = new FormData();
-      formData.append('file', backupForm.file);
-      formData.append('client_name', backupForm.clientName.trim());
-      formData.append('session_name', backupForm.sessionName.trim());
-      formData.append('variance_mode', backupForm.varianceMode);
-      formData.append('device_name', backupForm.deviceName.trim() || 'backup-restore');
+      let lastResult = null;
+      let totalLocations = 0;
+      let totalItems = 0;
+      let totalQty = 0;
+      let usedSessionId = backupForm.sessionId || '';
 
-      const res = await fetch(`${BACKEND_URL}/api/portal/sync-inbox/upload-backup`, {
-        method: 'POST',
-        body: formData
-      });
+      for (let i = 0; i < backupForm.files.length; i++) {
+        const file = backupForm.files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('client_name', backupForm.clientName.trim());
+        formData.append('device_name', backupForm.deviceName.trim() || 'backup-restore');
+        formData.append('variance_mode', backupForm.varianceMode);
+        
+        if (usedSessionId) {
+          // Use existing session (either pre-selected or from first file's result)
+          formData.append('session_id', usedSessionId);
+          formData.append('session_name', '');
+        } else {
+          // First file creates new session
+          formData.append('session_name', backupForm.sessionName.trim());
+          formData.append('session_id', '');
+        }
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || 'Upload failed');
+        const res = await fetch(`${BACKEND_URL}/api/portal/sync-inbox/upload-backup`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Upload failed for file: ${file.name}`);
+        }
+
+        const result = await res.json();
+        lastResult = result;
+        totalLocations += result.locations_restored || 0;
+        totalItems += result.total_items || 0;
+        totalQty += result.total_quantity || 0;
+
+        // After first file, use the returned session_id for subsequent files
+        if (!usedSessionId && result.session_id) {
+          usedSessionId = result.session_id;
+        }
       }
 
-      const result = await res.json();
-      setBackupResult(result);
-      toast.success(`Backup restored! ${result.locations_restored} locations, ${result.total_items} items`);
+      const combinedResult = {
+        ...lastResult,
+        locations_restored: totalLocations,
+        total_items: totalItems,
+        total_quantity: totalQty,
+        files_uploaded: backupForm.files.length
+      };
+      setBackupResult(combinedResult);
+      toast.success(`Backup restored! ${backupForm.files.length} file(s), ${totalLocations} locations, ${totalItems} items`);
 
       // Refresh clients list and auto-select the restored client/session
       await fetchClients();
-      setSelectedClient(result.client_id);
-      // We need to wait for sessions to load after client change
+      setSelectedClient(lastResult.client_id);
       setTimeout(async () => {
-        await fetchSessions(result.client_id);
-        setSelectedSession(result.session_id);
+        await fetchSessions(lastResult.client_id);
+        setSelectedSession(lastResult.session_id);
       }, 500);
     } catch (err) {
       toast.error(err.message || 'Failed to restore backup');
     } finally {
       setBackupUploading(false);
+    }
+  };
+
+  // Fetch sessions for the selected client in backup dialog
+  const fetchBackupSessions = async (clientName) => {
+    if (!clientName.trim()) {
+      setBackupSessions([]);
+      return;
+    }
+    try {
+      // Find matching client
+      const matchedClient = clients.find(c => c.name.toLowerCase() === clientName.trim().toLowerCase());
+      if (matchedClient) {
+        const res = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${matchedClient.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBackupSessions(data);
+        }
+      } else {
+        setBackupSessions([]);
+      }
+    } catch (err) {
+      setBackupSessions([]);
     }
   };
 
