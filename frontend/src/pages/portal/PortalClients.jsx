@@ -926,13 +926,33 @@ export default function PortalClients() {
                 <thead className="sticky top-0 bg-gray-50 border-b">
                   <tr>
                     <th className="text-left p-2 font-medium text-gray-600">#</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Description</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Category</th>
-                    <th className="text-right p-2 font-medium text-gray-600">MRP</th>
-                    <th className="text-right p-2 font-medium text-gray-600">Cost</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Article Code</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Article Name</th>
+                    {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'barcode')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
+                    )}
+                    {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'description')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Description</th>
+                    )}
+                    {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'category')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Category</th>
+                    )}
+                    {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'mrp') && (
+                      <th className="text-right p-2 font-medium text-gray-600">MRP</th>
+                    )}
+                    {(!masterViewSchemaFields) && (
+                      <th className="text-right p-2 font-medium text-gray-600">MRP</th>
+                    )}
+                    {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'cost') && (
+                      <th className="text-right p-2 font-medium text-gray-600">Cost</th>
+                    )}
+                    {(!masterViewSchemaFields) && (
+                      <th className="text-right p-2 font-medium text-gray-600">Cost</th>
+                    )}
+                    {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'article_code') && (
+                      <th className="text-left p-2 font-medium text-gray-600">Article Code</th>
+                    )}
+                    {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'article_name') && (
+                      <th className="text-left p-2 font-medium text-gray-600">Article Name</th>
+                    )}
                     {masterExtraColumns.map(col => (
                       <th key={col.name} className="text-left p-2 font-medium text-purple-600">{col.label}</th>
                     ))}
@@ -942,17 +962,31 @@ export default function PortalClients() {
                   {masterProducts.map((product, idx) => (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td className="p-2 text-gray-400">{idx + 1}</td>
-                      <td className="p-2 font-mono text-xs">{product.barcode}</td>
-                      <td className="p-2">{product.description}</td>
-                      <td className="p-2">
-                        {product.category && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{product.category}</span>
-                        )}
-                      </td>
-                      <td className="p-2 text-right">{product.mrp > 0 ? product.mrp.toFixed(2) : '-'}</td>
-                      <td className="p-2 text-right">{product.cost > 0 ? product.cost.toFixed(2) : '-'}</td>
-                      <td className="p-2 text-xs">{product.article_code || '-'}</td>
-                      <td className="p-2 text-xs">{product.article_name || '-'}</td>
+                      {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'barcode')) && (
+                        <td className="p-2 font-mono text-xs">{product.barcode}</td>
+                      )}
+                      {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'description')) && (
+                        <td className="p-2">{product.description}</td>
+                      )}
+                      {(!masterViewSchemaFields || masterViewSchemaFields.some(f => f.name === 'category')) && (
+                        <td className="p-2">
+                          {product.category && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{product.category}</span>
+                          )}
+                        </td>
+                      )}
+                      {(masterViewSchemaFields ? masterViewSchemaFields.some(f => f.name === 'mrp') : true) && (
+                        <td className="p-2 text-right">{product.mrp > 0 ? product.mrp.toFixed(2) : '-'}</td>
+                      )}
+                      {(masterViewSchemaFields ? masterViewSchemaFields.some(f => f.name === 'cost') : true) && (
+                        <td className="p-2 text-right">{product.cost > 0 ? product.cost.toFixed(2) : '-'}</td>
+                      )}
+                      {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'article_code') && (
+                        <td className="p-2 text-xs">{product.article_code || '-'}</td>
+                      )}
+                      {masterViewSchemaFields && masterViewSchemaFields.some(f => f.name === 'article_name') && (
+                        <td className="p-2 text-xs">{product.article_name || '-'}</td>
+                      )}
                       {masterExtraColumns.map(col => (
                         <td key={col.name} className="p-2 text-xs text-purple-700">{product.custom_fields?.[col.name] || '-'}</td>
                       ))}
