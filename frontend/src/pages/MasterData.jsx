@@ -442,7 +442,7 @@ RT-SF,Retail Store Front,Front retail area`;
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-800">Master Data</h1>
-          <p className="text-slate-500 mt-1">Manage products, locations and user credentials</p>
+          <p className="text-slate-500 mt-1">Manage products and locations</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {activeTab === 'products' ? (
