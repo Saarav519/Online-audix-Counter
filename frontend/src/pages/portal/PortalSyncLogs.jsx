@@ -46,12 +46,14 @@ export default function PortalSyncLogs() {
   const [backupUploading, setBackupUploading] = useState(false);
   const [backupForm, setBackupForm] = useState({
     clientName: '',
-    sessionName: '',
+    sessionId: '',  // existing session ID (if selected)
+    sessionName: '', // new session name (if creating new)
     varianceMode: 'bin-wise',
     deviceName: 'backup-restore',
-    file: null
+    files: []  // support multiple files
   });
   const [backupResult, setBackupResult] = useState(null);
+  const [backupSessions, setBackupSessions] = useState([]); // sessions for selected client in backup dialog
 
   useEffect(() => {
     fetchClients();
