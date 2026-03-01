@@ -1171,6 +1171,8 @@ export default function PortalSyncLogs() {
                   <div className="font-medium">{backupResult.client_name}</div>
                   <div className="text-gray-600">Session:</div>
                   <div className="font-medium">{backupResult.session_name}</div>
+                  <div className="text-gray-600">Files Uploaded:</div>
+                  <div className="font-medium">{backupResult.files_uploaded || 1}</div>
                   <div className="text-gray-600">Locations:</div>
                   <div className="font-medium">{backupResult.locations_restored}</div>
                   <div className="text-gray-600">Total Items:</div>
@@ -1194,7 +1196,11 @@ export default function PortalSyncLogs() {
                 <input
                   type="text"
                   value={backupForm.clientName}
-                  onChange={(e) => setBackupForm(prev => ({ ...prev, clientName: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setBackupForm(prev => ({ ...prev, clientName: val, sessionId: '', sessionName: '' }));
+                    fetchBackupSessions(val);
+                  }}
                   placeholder="e.g., Reliance Retail"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                   list="existing-clients"
@@ -1206,17 +1212,51 @@ export default function PortalSyncLogs() {
                 <p className="text-xs text-gray-400 mt-1">Type an existing client name or enter a new one</p>
               </div>
 
-              {/* Session Name */}
+              {/* Session Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Session Name *</label>
-                <input
-                  type="text"
-                  value={backupForm.sessionName}
-                  onChange={(e) => setBackupForm(prev => ({ ...prev, sessionName: e.target.value }))}
-                  placeholder="e.g., Q1 2026 Audit Restore"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  data-testid="backup-session-name"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Session *</label>
+                {backupSessions.length > 0 ? (
+                  <div className="space-y-2">
+                    <select
+                      value={backupForm.sessionId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__new__') {
+                          setBackupForm(prev => ({ ...prev, sessionId: '', sessionName: '' }));
+                        } else {
+                          setBackupForm(prev => ({ ...prev, sessionId: val, sessionName: '' }));
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      data-testid="backup-session-select"
+                    >
+                      <option value="">-- Select existing session --</option>
+                      {backupSessions.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.variance_mode})</option>
+                      ))}
+                      <option value="__new__">+ Create New Session</option>
+                    </select>
+                    {!backupForm.sessionId && (
+                      <input
+                        type="text"
+                        value={backupForm.sessionName}
+                        onChange={(e) => setBackupForm(prev => ({ ...prev, sessionName: e.target.value }))}
+                        placeholder="Enter new session name..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        data-testid="backup-session-name"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={backupForm.sessionName}
+                    onChange={(e) => setBackupForm(prev => ({ ...prev, sessionName: e.target.value }))}
+                    placeholder="e.g., Q1 2026 Audit Restore"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    data-testid="backup-session-name"
+                  />
+                )}
               </div>
 
               {/* Variance Mode + Device Name */}
@@ -1228,6 +1268,7 @@ export default function PortalSyncLogs() {
                     onChange={(e) => setBackupForm(prev => ({ ...prev, varianceMode: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     data-testid="backup-variance-mode"
+                    disabled={!!backupForm.sessionId}
                   >
                     <option value="bin-wise">Bin-wise</option>
                     <option value="barcode-wise">Barcode-wise</option>
@@ -1247,29 +1288,53 @@ export default function PortalSyncLogs() {
                 </div>
               </div>
 
-              {/* File Upload */}
+              {/* File Upload - Multiple */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Backup CSV File *</label>
-                <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${backupForm.file ? 'border-amber-400 bg-amber-50' : 'border-gray-300 hover:border-amber-400'}`}>
-                  {backupForm.file ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <FileUp className="w-5 h-5 text-amber-600" />
-                      <span className="text-sm font-medium text-amber-700">{backupForm.file.name}</span>
-                      <button onClick={() => setBackupForm(prev => ({ ...prev, file: null }))} className="text-gray-400 hover:text-red-500 ml-2">✕</button>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Backup CSV Files * <span className="text-gray-400 font-normal">(select one or multiple)</span></label>
+                <div className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors ${backupForm.files.length > 0 ? 'border-amber-400 bg-amber-50' : 'border-gray-300 hover:border-amber-400'}`}>
+                  {backupForm.files.length > 0 ? (
+                    <div className="space-y-2">
+                      {backupForm.files.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-2 bg-white rounded-lg px-3 py-1.5 text-sm">
+                          <div className="flex items-center gap-2">
+                            <FileUp className="w-4 h-4 text-amber-600" />
+                            <span className="font-medium text-amber-700">{file.name}</span>
+                            <span className="text-xs text-gray-400">({(file.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                          <button onClick={() => setBackupForm(prev => ({ ...prev, files: prev.files.filter((_, i) => i !== idx) }))} className="text-gray-400 hover:text-red-500">✕</button>
+                        </div>
+                      ))}
+                      <label className="cursor-pointer inline-flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 mt-1">
+                        <Upload className="w-3 h-3" /> Add more files
+                        <input
+                          type="file"
+                          accept=".csv,.txt"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files.length > 0) {
+                              setBackupForm(prev => ({ ...prev, files: [...prev.files, ...Array.from(e.target.files)] }));
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
                     </div>
                   ) : (
                     <label className="cursor-pointer">
                       <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">Click to select CSV file</p>
-                      <p className="text-xs text-gray-400 mt-1">Format: Location, Barcode, Product Name, Price, Quantity, Scanned At</p>
+                      <p className="text-sm text-gray-600">Click to select CSV file(s)</p>
+                      <p className="text-xs text-gray-400 mt-1">You can select multiple files at once</p>
                       <input
                         type="file"
                         accept=".csv,.txt"
+                        multiple
                         className="hidden"
                         onChange={(e) => {
-                          if (e.target.files[0]) {
-                            setBackupForm(prev => ({ ...prev, file: e.target.files[0] }));
+                          if (e.target.files.length > 0) {
+                            setBackupForm(prev => ({ ...prev, files: Array.from(e.target.files) }));
                           }
+                          e.target.value = '';
                         }}
                         data-testid="backup-file-input"
                       />
@@ -1283,7 +1348,7 @@ export default function PortalSyncLogs() {
                 <p className="text-xs text-blue-700">
                   <strong>How it works:</strong> The CSV data will be parsed and placed in the <strong>Sync Inbox</strong> as pending items. 
                   You can then review and <strong>Forward</strong> them to variance, just like normal scanner syncs.
-                  If the client already exists, it will be reused (matched by name).
+                  {backupForm.files.length > 1 && <> All {backupForm.files.length} files will be uploaded to the same session.</>}
                 </p>
               </div>
 
@@ -1292,14 +1357,14 @@ export default function PortalSyncLogs() {
                 <Button variant="outline" onClick={() => setShowBackupDialog(false)} className="flex-1">Cancel</Button>
                 <Button 
                   onClick={handleBackupUpload} 
-                  disabled={backupUploading || !backupForm.clientName || !backupForm.sessionName || !backupForm.file}
+                  disabled={backupUploading || !backupForm.clientName || (!backupForm.sessionId && !backupForm.sessionName) || backupForm.files.length === 0}
                   className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
                   data-testid="backup-upload-submit"
                 >
                   {backupUploading ? (
-                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Restoring...</>
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Restoring {backupForm.files.length} file(s)...</>
                   ) : (
-                    <><Upload className="w-4 h-4 mr-2" />Restore Backup</>
+                    <><Upload className="w-4 h-4 mr-2" />Restore {backupForm.files.length > 1 ? `${backupForm.files.length} Files` : 'Backup'}</>
                   )}
                 </Button>
               </div>
