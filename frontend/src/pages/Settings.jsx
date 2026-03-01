@@ -885,21 +885,6 @@ const Settings = () => {
             </select>
           </div>
 
-          {/* Sync Password */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-slate-500" />
-              Sync Password
-            </Label>
-            <Input
-              type="password"
-              placeholder="Enter sync password"
-              value={syncConfig.syncPassword}
-              onChange={(e) => handleSyncConfigChange('syncPassword', e.target.value)}
-            />
-            <p className="text-xs text-slate-500">Required to sync data to portal</p>
-          </div>
-
           <Separator />
 
           {/* Sync Info */}
