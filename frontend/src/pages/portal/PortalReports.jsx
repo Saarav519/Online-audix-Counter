@@ -1240,7 +1240,7 @@ export default function PortalReports() {
           {reportType === 'category-summary' && <CategorySummaryTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
           </div>
           {reportType === 'empty-bins' && <EmptyBinsView data={reportData} />}
-          {reportType === 'pending-locations' && <PendingLocationsView data={reportData} />}
+          {reportType === 'pending-locations' && <PendingLocationsView data={reportData} clientId={selectedClient} />}
         </>
       )}
     </div>
