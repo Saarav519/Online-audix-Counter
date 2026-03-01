@@ -337,17 +337,17 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
   return (
     <th data-col={column} className={`py-3 px-3 font-medium text-gray-600 relative group whitespace-nowrap text-xs ${align === 'right' ? 'text-right' : 'text-left'} ${className || ''}`}>
       <div className={`flex items-center gap-1 w-full ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
-        <button className="flex items-center gap-0.5 hover:text-emerald-600 transition-colors" onClick={() => onSort(column)}>
+        <button className="flex items-center gap-0.5 hover:text-emerald-700 transition-colors" onClick={() => onSort(column)}>
           <span className="select-none">{label}</span>
           {isSorted ? (
-            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 text-emerald-500" /> : <ArrowDown className="w-3 h-3 text-emerald-500" />
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-600" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-600" />
           ) : (
-            <ArrowUpDown className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ArrowUpDown className="w-3 h-3 text-gray-400" />
           )}
         </button>
         {allValues && allValues.length > 0 && (
-          <button ref={filterBtnRef} className={`ml-0.5 p-0.5 rounded hover:bg-gray-100 ${isFiltered ? 'text-emerald-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'} transition-all`} onClick={(e) => { e.stopPropagation(); setShowFilter(!showFilter); }}>
-            <Filter className="w-3 h-3" />
+          <button ref={filterBtnRef} className={`ml-0.5 p-0.5 rounded hover:bg-gray-200 ${isFiltered ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'} transition-all`} onClick={(e) => { e.stopPropagation(); setShowFilter(!showFilter); }}>
+            <Filter className="w-3.5 h-3.5" />
           </button>
         )}
       </div>
