@@ -1119,6 +1119,12 @@ export const AppProvider = ({ children }) => {
     setMasterLocations(prev => prev.filter(l => l.code !== code));
   };
 
+  // Delete multiple master locations by code (used after sync)
+  const deleteMasterLocationsBatch = (codes) => {
+    const codeSet = new Set(codes.map(c => c.toLowerCase()));
+    setMasterLocations(prev => prev.filter(l => !codeSet.has((l.code || '').toLowerCase())));
+  };
+
   // Clear ALL master products
   const clearMasterProducts = async () => {
     setMasterProducts([]);
