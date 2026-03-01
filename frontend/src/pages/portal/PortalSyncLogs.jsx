@@ -32,6 +32,9 @@ export default function PortalSyncLogs() {
   const [forwardBatches, setForwardBatches] = useState([]);
   const [expandedBatch, setExpandedBatch] = useState(null);
   const [batchLocations, setBatchLocations] = useState({});
+  const [locationSearch, setLocationSearch] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [expandedScanner, setExpandedScanner] = useState(null);
