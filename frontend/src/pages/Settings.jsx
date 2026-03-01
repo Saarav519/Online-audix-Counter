@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { downloadCSV, buildCSV } from '../utils/fileDownload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -230,7 +231,7 @@ const Settings = () => {
   };
 
   // Create backup CSV file
-  const createBackupFile = (locationsToSync) => {
+  const createBackupFile = async (locationsToSync) => {
     try {
       const today = new Date().toISOString().split('T')[0];
       const backupNum = getNextBackupNumber();
@@ -254,16 +255,8 @@ const Settings = () => {
         });
       });
 
-      // Create and download the file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      // Use downloadCSV which saves to Documents/Audix_Exports on Android
+      await downloadCSV(csvContent, filename, false);
 
       console.log(`Backup created: ${filename}`);
     } catch (error) {
@@ -406,7 +399,7 @@ const Settings = () => {
       setLastSyncTime(now);
       localStorage.setItem('audix_last_sync', now);
 
-      createBackupFile(locationsToSync);
+      await createBackupFile(locationsToSync);
 
       const syncedLocationIds = locationsToSync.map(loc => loc.id);
       deleteLocationData(syncedLocationIds);
