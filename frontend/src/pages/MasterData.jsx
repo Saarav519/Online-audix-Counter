@@ -514,19 +514,6 @@ RT-SF,Retail Store Front,Front retail area`;
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-purple-100 rounded-lg">
-                <Users className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{authorizationUsers.length}</p>
-                <p className="text-sm text-slate-500">Auth Users</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
               <div className="p-2.5 bg-teal-100 rounded-lg">
                 <CheckCircle2 className="w-5 h-5 text-teal-600" />
               </div>
