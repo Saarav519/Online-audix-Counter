@@ -9,7 +9,7 @@ import json
 import sys
 from typing import Dict, Any, List, Optional
 
-BACKEND_URL = "https://counter-preview-2.preview.emergentagent.com"
+BACKEND_URL = "https://tally-app-15.preview.emergentagent.com"
 API_BASE = f"{BACKEND_URL}/api"
 
 def make_request(method: str, endpoint: str, data: Optional[Dict] = None, headers: Optional[Dict] = None, expect_csv: bool = False) -> Dict[str, Any]:

@@ -3,7 +3,7 @@
 import requests
 import json
 
-BACKEND_URL = "https://counter-preview-2.preview.emergentagent.com/api"
+BACKEND_URL = "https://tally-app-15.preview.emergentagent.com/api"
 
 # Login and get session
 login_data = {"username": "admin", "password": "admin123"}

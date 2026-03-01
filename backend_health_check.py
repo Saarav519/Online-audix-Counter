@@ -5,7 +5,7 @@ Quick health check for existing AUDIX backend endpoints after Restore Sync Backu
 import requests
 import json
 
-BASE_URL = "https://counter-preview-2.preview.emergentagent.com"
+BASE_URL = "https://tally-app-15.preview.emergentagent.com"
 
 def test_portal_login():
     """Test portal login functionality"""
