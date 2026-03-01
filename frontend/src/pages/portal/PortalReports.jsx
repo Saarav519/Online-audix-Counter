@@ -1200,37 +1200,45 @@ export default function PortalReports() {
         </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          {filteredData.totals && (
-            <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mb-6`}>
-              <SummaryCard label="Stock Qty" value={filteredData.totals.stock_qty || 0} />
-              {schemaValueFields.has_mrp && (
-                <SummaryCard label={schemaValueFields.has_cost ? "Stock Value (MRP)" : "Stock Value"} value={(filteredData.totals.stock_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
-              )}
-              {schemaValueFields.has_cost && (
-                <SummaryCard label={schemaValueFields.has_mrp ? "Stock Value (Cost)" : "Stock Value"} value={(filteredData.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
-              )}
-              <SummaryCard label="Physical Qty" value={filteredData.totals.physical_qty || 0} />
-              {schemaValueFields.has_mrp && (
-                <SummaryCard label={schemaValueFields.has_cost ? "Physical Value (MRP)" : "Physical Value"} value={(filteredData.totals.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
-              )}
-              {schemaValueFields.has_cost && (
-                <SummaryCard label={schemaValueFields.has_mrp ? "Physical Value (Cost)" : "Physical Value"} value={(filteredData.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
-              )}
-              {isConsolidatedView && <SummaryCard label="Reco Qty" value={filteredData.totals.reco_qty || 0} />}
-              {isConsolidatedView && <SummaryCard label="Final Qty" value={filteredData.totals.final_qty ?? filteredData.totals.physical_qty ?? 0} />}
-              {isConsolidatedView && schemaValueFields.has_mrp && <SummaryCard label="Final Val(MRP)" value={(filteredData.totals.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
-              {isConsolidatedView && schemaValueFields.has_cost && <SummaryCard label="Final Val(Cost)" value={(filteredData.totals.final_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
-              <SummaryCard label="Difference Qty" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
-              {schemaValueFields.has_mrp && (
-                <SummaryCard label={schemaValueFields.has_cost ? "Diff Value (MRP)" : "Diff Value"} value={(filteredData.totals.diff_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
-              )}
-              {schemaValueFields.has_cost && (
-                <SummaryCard label={schemaValueFields.has_mrp ? "Diff Value (Cost)" : "Diff Value"} value={(filteredData.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
-              )}
-              <SummaryCard label="Accuracy" value={`${filteredData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={filteredData.totals.accuracy_pct || 0} />
-            </div>
-          )}
+          {/* Summary Cards — derived from report type columns */}
+          {filteredData.totals && (() => {
+            const t = filteredData.totals;
+            // Map column keys to their totals values — only numeric summary columns
+            const summaryMap = {
+              'stock_qty': { label: 'Stock Qty', value: t.stock_qty || 0 },
+              'stock_value_mrp': { label: 'Stock Val(MRP)', value: (t.stock_value_mrp || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'stock_value_cost': { label: 'Stock Val(Cost)', value: (t.stock_value_cost || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'physical_qty': { label: 'Physical Qty', value: t.physical_qty || 0 },
+              'physical_value_mrp': { label: 'Phys Val(MRP)', value: (t.physical_value_mrp || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'physical_value_cost': { label: 'Phys Val(Cost)', value: (t.physical_value_cost || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'reco_qty': { label: 'Reco Qty', value: t.reco_qty || 0 },
+              'final_qty': { label: 'Final Qty', value: t.final_qty ?? t.physical_qty ?? 0 },
+              'final_value_mrp': { label: 'Final Val(MRP)', value: (t.final_value_mrp || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'final_value_cost': { label: 'Final Val(Cost)', value: (t.final_value_cost || 0).toLocaleString(undefined, {maximumFractionDigits: 0}) },
+              'difference_qty': { label: 'Diff Qty', value: t.difference_qty || t.diff_qty || 0, variant: true },
+              'diff_qty': { label: 'Diff Qty', value: t.diff_qty || t.difference_qty || 0, variant: true },
+              'diff_value_mrp': { label: 'Diff Val(MRP)', value: (t.diff_value_mrp || 0).toLocaleString(undefined, {maximumFractionDigits: 0}), variant: true },
+              'diff_value_cost': { label: 'Diff Val(Cost)', value: (t.diff_value_cost || 0).toLocaleString(undefined, {maximumFractionDigits: 0}), variant: true },
+              'accuracy_pct': { label: 'Accuracy', value: `${t.accuracy_pct || 0}%`, isAccuracy: true, pct: t.accuracy_pct || 0 },
+            };
+            // Only show cards for columns present in current report type's columnConfig
+            const colKeys = new Set(columnConfig.map(c => c.key));
+            const cards = [];
+            const seen = new Set();
+            columnConfig.forEach(col => {
+              if (summaryMap[col.key] && !seen.has(col.key)) {
+                seen.add(col.key);
+                cards.push({ key: col.key, ...summaryMap[col.key] });
+              }
+            });
+            return (
+              <div className={`grid gap-2 mb-4`} style={{ gridTemplateColumns: `repeat(${Math.min(cards.length, 8)}, minmax(0, 1fr))` }}>
+                {cards.map(card => (
+                  <SummaryCard key={card.key} label={card.label} value={card.value} variant={card.variant} isAccuracy={card.isAccuracy} pct={card.pct} />
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Report Table — Reco editing only on the primary report type for the session's variance mode */}
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
