@@ -45,7 +45,7 @@ export default function PortalLayout() {
               <span className="text-lg font-bold text-emerald-600">A</span>
             </div>
             <div>
-              <h1 className="font-bold text-gray-900">AUDIX</h1>
+              <h1 className="font-bold text-gray-900">Audix Data Management</h1>
               <p className="text-xs text-gray-500">Admin Portal</p>
             </div>
           </div>
