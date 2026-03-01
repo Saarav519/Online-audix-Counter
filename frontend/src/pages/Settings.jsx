@@ -37,7 +37,9 @@ import {
   Building2,
   FolderOpen,
   Wifi,
-  WifiOff
+  WifiOff,
+  Download,
+  Database
 } from 'lucide-react';
 
 const Settings = () => {
