@@ -554,27 +554,26 @@ const Settings = () => {
 
       {/* User Info */}
       <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="w-5 h-5 text-emerald-600" />
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <User className="w-4 h-4 text-emerald-600" />
             User Account
           </CardTitle>
-          <CardDescription>Manage your login credentials</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-            <div>
-              <p className="font-medium text-slate-800">{user?.name}</p>
-              <p className="text-sm text-slate-500">User ID: {user?.userId}</p>
-              <p className="text-xs text-slate-400 capitalize">Role: {user?.role}</p>
+        <CardContent className="px-4 pb-4 pt-0">
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div className="min-w-0">
+              <p className="font-medium text-sm text-slate-800">{user?.name}</p>
+              <p className="text-xs text-slate-500">ID: {user?.userId} · <span className="capitalize">{user?.role}</span></p>
             </div>
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setShowPasswordModal(true)}
-              className="border-slate-200"
+              className="border-slate-200 text-xs shrink-0 ml-2"
             >
-              <Key className="w-4 h-4 mr-2" />
-              Change Credentials
+              <Key className="w-3.5 h-3.5 mr-1" />
+              Change
             </Button>
           </div>
         </CardContent>
