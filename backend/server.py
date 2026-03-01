@@ -4222,9 +4222,13 @@ async def get_my_assigned_locations(device_name: str, client_id: str, session_id
     if not device_name or not client_id:
         raise HTTPException(status_code=400, detail="device_name and client_id required")
     
-    query = {"device_name": device_name, "client_id": client_id, "status": "active"}
+    # Always fetch consolidated assignments (session_id="") PLUS session-specific if provided
+    base_query = {"device_name": device_name, "client_id": client_id, "status": "active"}
     if session_id:
-        query["session_id"] = session_id
+        # Fetch both: consolidated (session_id="") AND session-specific
+        query = {**base_query, "$or": [{"session_id": ""}, {"session_id": session_id}]}
+    else:
+        query = base_query
     
     assignments = await db.location_assignments.find(query, {"_id": 0}).to_list(10000)
     
