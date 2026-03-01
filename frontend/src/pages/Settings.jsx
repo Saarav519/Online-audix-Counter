@@ -72,7 +72,6 @@ const Settings = () => {
     deviceName: localStorage.getItem('audix_device_name') || '',
     clientId: localStorage.getItem('audix_client_id') || '',
     sessionId: localStorage.getItem('audix_session_id') || '',
-    syncPassword: localStorage.getItem('audix_sync_password') || '',
     autoSync: localStorage.getItem('audix_auto_sync') === 'true',
     clearAfterSync: localStorage.getItem('audix_clear_after_sync') === 'true'
   });
