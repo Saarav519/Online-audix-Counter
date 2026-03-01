@@ -884,9 +884,13 @@ export default function PortalReports() {
     let css = '';
 
     // CRITICAL: Apply sticky top to ALL th elements individually
-    // This prevents conflict between thead sticky and individual th sticky for frozen columns
-    css += `#report-table-area thead tr th {
-      position: sticky !important; top: 0; z-index: 10 !important;
+    // Two rows in thead: subtotals row (first-child) at top:0, headers (last-child) at top:28px
+    css += `#report-table-area thead tr:first-child th {
+      position: sticky !important; top: 0; z-index: 11 !important;
+      background-color: #f0fdf4 !important;
+    }\n`;
+    css += `#report-table-area thead tr:last-child th {
+      position: sticky !important; top: 28px; z-index: 10 !important;
       background-color: #f9fafb !important;
     }\n`;
     // Remove sticky from thead itself to avoid conflicts
