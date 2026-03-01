@@ -429,14 +429,23 @@ export default function PortalClients() {
     setShowMasterViewDialog(true);
     setMasterProducts([]);
     setMasterExtraColumns([]);
+    setMasterViewSchemaFields(null);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products?limit=200`);
+      const [res, schemaRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products?limit=200`),
+        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`)
+      ]);
       if (res.ok) {
         const data = await res.json();
         setMasterProducts(data.products);
         setMasterProductsTotal(data.total);
         setMasterExtraColumns(data.extra_columns || []);
+      }
+      if (schemaRes.ok) {
+        const schemaData = await schemaRes.json();
+        const enabledFields = (schemaData.fields || []).filter(f => f.enabled);
+        setMasterViewSchemaFields(enabledFields);
       }
     } catch (err) {
       console.error('Failed to fetch master products:', err);
