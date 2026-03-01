@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import { 
   FileBarChart, 
   Download,
