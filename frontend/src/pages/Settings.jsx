@@ -581,49 +581,48 @@ const Settings = () => {
 
       {/* Location Scanning Mode */}
       <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-emerald-600" />
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-600" />
             Location Scanning Mode
           </CardTitle>
-          <CardDescription>Choose how location scanning works</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="px-4 pb-4 pt-1">
           <RadioGroup 
             value={pendingSettings.locationScanMode} 
             onValueChange={(value) => handlePendingSettingChange('locationScanMode', value)}
-            className="space-y-4"
+            className="space-y-2"
           >
-            <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
+            <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${
               pendingSettings.locationScanMode === 'preassigned' 
                 ? 'border-blue-500 bg-blue-50' 
                 : 'border-slate-200 hover:border-slate-300'
             }`}>
-              <RadioGroupItem value="preassigned" id="preassigned" className="mt-1" />
-              <div className="flex-1">
-                <Label htmlFor="preassigned" className="flex items-center gap-2 text-base font-medium cursor-pointer">
-                  <Shield className="w-5 h-5 text-blue-600" />
-                  Pre-Assigned Location Mode
+              <RadioGroupItem value="preassigned" id="preassigned" />
+              <div className="flex-1 min-w-0">
+                <Label htmlFor="preassigned" className="flex items-center gap-1.5 text-sm font-medium cursor-pointer">
+                  <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                  Pre-Assigned Mode
                 </Label>
-                <p className="text-sm text-slate-500 mt-1">
-                  Only scan locations that are already imported/created in the system.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Only scan imported/created locations
                 </p>
               </div>
             </div>
 
-            <div className={`flex items-start space-x-4 p-4 rounded-xl border-2 transition-all ${
+            <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-all ${
               pendingSettings.locationScanMode === 'dynamic' 
                 ? 'border-purple-500 bg-purple-50' 
                 : 'border-slate-200 hover:border-slate-300'
             }`}>
-              <RadioGroupItem value="dynamic" id="dynamic" className="mt-1" />
-              <div className="flex-1">
-                <Label htmlFor="dynamic" className="flex items-center gap-2 text-base font-medium cursor-pointer">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  Dynamic Location Mode
+              <RadioGroupItem value="dynamic" id="dynamic" />
+              <div className="flex-1 min-w-0">
+                <Label htmlFor="dynamic" className="flex items-center gap-1.5 text-sm font-medium cursor-pointer">
+                  <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                  Dynamic Mode
                 </Label>
-                <p className="text-sm text-slate-500 mt-1">
-                  Scan any location code - new locations created automatically.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  New locations created automatically on scan
                 </p>
               </div>
             </div>
