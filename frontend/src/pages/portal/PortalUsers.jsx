@@ -34,7 +34,7 @@ export default function PortalUsers() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users`);
       if (response.ok) {
         setUsers(await response.json());
       }
@@ -59,7 +59,7 @@ export default function PortalUsers() {
     setAuthLoading(true);
     try {
       // Verify admin credentials
-      const verifyRes = await fetch(`${BACKEND_URL}/api/portal/login`, {
+      const verifyRes = await fetch(`${BACKEND_URL}/api/audit/portal/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: currentUser.username, password: authPassword })
@@ -76,13 +76,13 @@ export default function PortalUsers() {
       let response;
 
       if (action === 'delete') {
-        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}`, { method: 'DELETE' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}`, { method: 'DELETE' });
       } else if (action === 'disable') {
-        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT' });
       } else if (action === 'enable') {
-        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT' });
       } else if (action === 'reject') {
-        response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/reject`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/reject`, { method: 'PUT' });
       }
 
       if (response && response.ok) {
@@ -111,7 +111,7 @@ export default function PortalUsers() {
   // ---- Actions that don't need auth ----
   const handleApprove = async (userId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/approve`, { method: 'PUT' });
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/approve`, { method: 'PUT' });
       if (response.ok) {
         toast.success('User approved — they can now login');
         fetchUsers();
@@ -123,7 +123,7 @@ export default function PortalUsers() {
 
   const handleChangeRole = async (userId, newRole) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/users/${userId}/role`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/role`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole })

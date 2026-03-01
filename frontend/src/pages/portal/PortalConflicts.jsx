@@ -29,7 +29,7 @@ export default function PortalConflicts() {
 
   const fetchClients = useCallback(async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients`);
       if (response.ok) {
         const data = await response.json();
         setClients(data);
@@ -42,8 +42,8 @@ export default function PortalConflicts() {
   const fetchSessions = useCallback(async () => {
     try {
       const url = selectedClient
-        ? `${BACKEND_URL}/api/portal/sessions?client_id=${selectedClient}`
-        : `${BACKEND_URL}/api/portal/sessions`;
+        ? `${BACKEND_URL}/api/audit/portal/sessions?client_id=${selectedClient}`
+        : `${BACKEND_URL}/api/audit/portal/sessions`;
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
@@ -57,7 +57,7 @@ export default function PortalConflicts() {
   const fetchConflicts = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `${BACKEND_URL}/api/portal/conflicts?`;
+      let url = `${BACKEND_URL}/api/audit/portal/conflicts?`;
       if (selectedClient) url += `client_id=${selectedClient}&`;
       if (selectedSession) url += `session_id=${selectedSession}&`;
       if (statusFilter) url += `status=${statusFilter}&`;
@@ -90,7 +90,7 @@ export default function PortalConflicts() {
     if (!window.confirm(`Approve entry from "${deviceName}"? This will add its data to the variance and reject all other entries.`)) return;
     setActionLoading(`${conflictId}-${entryId}`);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/conflicts/${conflictId}/approve/${entryId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/conflicts/${conflictId}/approve/${entryId}`, {
         method: 'POST'
       });
       if (response.ok) {
@@ -112,7 +112,7 @@ export default function PortalConflicts() {
     if (!window.confirm(`Reject ALL entries for "${locationName}"? The location will go back to Pending (needs re-scan).`)) return;
     setActionLoading(`${conflictId}-reject-all`);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/conflicts/${conflictId}/reject-all`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/conflicts/${conflictId}/reject-all`, {
         method: 'POST'
       });
       if (response.ok) {

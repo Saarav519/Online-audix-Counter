@@ -29,7 +29,7 @@ export default function PortalSettings() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/settings`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/settings`);
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
@@ -44,7 +44,7 @@ export default function PortalSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/settings`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings)

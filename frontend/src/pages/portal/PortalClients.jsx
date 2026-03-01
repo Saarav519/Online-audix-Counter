@@ -87,7 +87,7 @@ export default function PortalClients() {
 
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients`);
       if (response.ok) {
         const data = await response.json();
         setClients(data);
@@ -113,8 +113,8 @@ export default function PortalClients() {
 
     try {
       const url = editingClient
-        ? `${BACKEND_URL}/api/portal/clients/${editingClient.id}`
-        : `${BACKEND_URL}/api/portal/clients`;
+        ? `${BACKEND_URL}/api/audit/portal/clients/${editingClient.id}`
+        : `${BACKEND_URL}/api/audit/portal/clients`;
       
       const response = await fetch(url, {
         method: editingClient ? 'PUT' : 'POST',
@@ -154,7 +154,7 @@ export default function PortalClients() {
     if (!window.confirm('Are you sure you want to delete this client? This will also delete all master products.')) return;
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients/${clientId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${clientId}`, {
         method: 'DELETE'
       });
 
@@ -177,7 +177,7 @@ export default function PortalClients() {
     setNewFieldType('text');
     
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`);
       if (res.ok) {
         const data = await res.json();
         setSchemaFields(data.fields || []);
@@ -216,7 +216,7 @@ export default function PortalClients() {
   const saveSchema = async () => {
     setSchemaSaving(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${schemaClient.id}/schema`, {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${schemaClient.id}/schema`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields: schemaFields })
@@ -233,7 +233,7 @@ export default function PortalClients() {
   const downloadSchemaTemplate = async (templateType = 'master') => {
     if (!schemaClient) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${schemaClient.id}/schema/template?template_type=${templateType}`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${schemaClient.id}/schema/template?template_type=${templateType}`);
       if (!res.ok) throw new Error('Failed to download');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -260,7 +260,7 @@ export default function PortalClients() {
     setStockSchemaFields([]);
     setStockSchemaLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`);
       if (res.ok) {
         const data = await res.json();
         const enabledFields = (data.fields || []).filter(f => f.enabled);
@@ -282,7 +282,7 @@ export default function PortalClients() {
     setStockUploading(true);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${stockClient.id}/import-stock`, {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${stockClient.id}/import-stock`, {
         method: 'POST',
         body: fd
       });
@@ -311,7 +311,7 @@ export default function PortalClients() {
     setStockExtraColumns([]);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/stock?limit=200`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/stock?limit=200`);
       if (res.ok) {
         const data = await res.json();
         setStockRecords(data.records);
@@ -327,7 +327,7 @@ export default function PortalClients() {
 
   const downloadStockTemplate = async (client) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema/template?template_type=stock`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema/template?template_type=stock`);
       if (!res.ok) throw new Error('Failed to download');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -354,8 +354,8 @@ export default function PortalClients() {
     // Fetch stats and schema in parallel
     try {
       const [statsRes, schemaRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products/stats`),
-        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`)
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/master-products/stats`),
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`)
       ]);
       if (statsRes.ok) {
         setMasterStats(await statsRes.json());
@@ -382,7 +382,7 @@ export default function PortalClients() {
 
     try {
       const response = await fetch(
-        `${BACKEND_URL}/api/portal/clients/${masterClient.id}/import-master`,
+        `${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/import-master`,
         { method: 'POST', body: fd }
       );
 
@@ -395,7 +395,7 @@ export default function PortalClients() {
       toast.success(`${result.message}`);
 
       // Refresh stats
-      const statsRes = await fetch(`${BACKEND_URL}/api/portal/clients/${masterClient.id}/master-products/stats`);
+      const statsRes = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/master-products/stats`);
       if (statsRes.ok) setMasterStats(await statsRes.json());
 
       // Refresh clients list
@@ -412,7 +412,7 @@ export default function PortalClients() {
     if (!window.confirm(`Clear ALL master products for ${masterClient.name}? This cannot be undone.`)) return;
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${masterClient.id}/master-products`, { method: 'DELETE' });
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/master-products`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to clear');
       const result = await res.json();
       toast.success(result.message);
@@ -433,8 +433,8 @@ export default function PortalClients() {
 
     try {
       const [res, schemaRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/master-products?limit=200`),
-        fetch(`${BACKEND_URL}/api/portal/clients/${client.id}/schema`)
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/master-products?limit=200`),
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`)
       ]);
       if (res.ok) {
         const data = await res.json();
@@ -457,7 +457,7 @@ export default function PortalClients() {
   const downloadSampleMasterCSV = async () => {
     if (!masterClient) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${masterClient.id}/schema/template?template_type=master`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/schema/template?template_type=master`);
       if (!res.ok) throw new Error('Failed to download');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

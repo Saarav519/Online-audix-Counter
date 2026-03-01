@@ -18,9 +18,9 @@ export default function PortalDevices() {
   const fetchData = async () => {
     try {
       const [devicesRes, clientsRes, sessionsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portal/devices`),
-        fetch(`${BACKEND_URL}/api/portal/clients`),
-        fetch(`${BACKEND_URL}/api/portal/sessions`)
+        fetch(`${BACKEND_URL}/api/audit/portal/devices`),
+        fetch(`${BACKEND_URL}/api/audit/portal/clients`),
+        fetch(`${BACKEND_URL}/api/audit/portal/sessions`)
       ]);
       
       if (devicesRes.ok) setDevices(await devicesRes.json());

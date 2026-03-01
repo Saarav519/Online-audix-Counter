@@ -42,13 +42,13 @@ export default function PortalLogin() {
       let endpoint, body;
 
       if (mode === 'login') {
-        endpoint = '/api/portal/login';
+        endpoint = '/api/audit/portal/login';
         body = { username: formData.username, password: formData.password };
       } else if (mode === 'register') {
-        endpoint = '/api/portal/register';
+        endpoint = '/api/audit/portal/register';
         body = { username: formData.username, password: formData.password, role: 'viewer' };
       } else {
-        endpoint = '/api/portal/reset-password';
+        endpoint = '/api/audit/portal/reset-password';
         body = { username: formData.username, new_password: formData.password };
       }
 

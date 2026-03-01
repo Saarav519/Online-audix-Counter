@@ -24,7 +24,7 @@ export default function PortalDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/dashboard`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/dashboard`);
       if (response.ok) {
         const data = await response.json();
         setDashboardData(data);

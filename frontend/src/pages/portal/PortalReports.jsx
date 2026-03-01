@@ -564,7 +564,7 @@ export default function PortalReports() {
 
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients`);
       if (response.ok) setClients(await response.json());
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -573,7 +573,7 @@ export default function PortalReports() {
 
   const fetchSessions = async (clientId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${clientId}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
       if (response.ok) setSessions(await response.json());
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
@@ -582,7 +582,7 @@ export default function PortalReports() {
 
   const fetchSchemaValueFields = async (clientId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients/${clientId}/schema`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${clientId}/schema`);
       if (response.ok) {
         const schema = await response.json();
         const fields = schema.fields || [];
@@ -606,9 +606,9 @@ export default function PortalReports() {
       let response;
       if (selectedSession === '__consolidated__') {
         // Consolidated: fetch from all sessions endpoint
-        response = await fetch(`${BACKEND_URL}/api/portal/reports/consolidated/${selectedClient}/${reportType}`);
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/consolidated/${selectedClient}/${reportType}`);
       } else {
-        response = await fetch(`${BACKEND_URL}/api/portal/reports/${selectedSession}/${reportType}`);
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/${selectedSession}/${reportType}`);
       }
       if (response.ok) {
         setReportData(await response.json());
@@ -624,7 +624,7 @@ export default function PortalReports() {
     try {
       if (selectedSession !== '__consolidated__' || !selectedClient) { toast.error('Reco is only available in consolidated view'); return; }
       const body = { client_id: selectedClient, ...params };
-      const response = await fetch(`${BACKEND_URL}/api/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
         // Optimistic local state update - no full page refresh
         setReportData(prev => {
@@ -2159,8 +2159,8 @@ function PendingLocationsView({ data, clientId }) {
     setLoadingDevices(true);
     try {
       const [devRes, assRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portal/devices`),
-        fetch(`${BACKEND_URL}/api/portal/location-assignments?client_id=${clientId}`)
+        fetch(`${BACKEND_URL}/api/audit/portal/devices`),
+        fetch(`${BACKEND_URL}/api/audit/portal/location-assignments?client_id=${clientId}`)
       ]);
       if (devRes.ok) { const devs = await devRes.json(); setDevices(devs || []); }
       if (assRes.ok) { const ass = await assRes.json(); setAssignments(ass.assignments || []); }
@@ -2189,7 +2189,7 @@ function PendingLocationsView({ data, clientId }) {
     if (!selectedDevice || selectedLocs.size === 0) return;
     setAssigning(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/assign-pending-locations`, {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/assign-pending-locations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2216,7 +2216,7 @@ function PendingLocationsView({ data, clientId }) {
 
   const handleRemoveAssignment = async (assignmentId) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/location-assignments/${assignmentId}`, { method: 'DELETE' });
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/location-assignments/${assignmentId}`, { method: 'DELETE' });
       if (res.ok) { toast.success('Assignment removed'); fetchDevicesAndAssignments(); }
     } catch (e) { toast.error('Failed to remove'); }
   };

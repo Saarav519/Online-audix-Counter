@@ -127,7 +127,7 @@ export default function PortalSyncLogs() {
           formData.append('session_id', '');
         }
 
-        const res = await fetch(`${BACKEND_URL}/api/portal/sync-inbox/upload-backup`, {
+        const res = await fetch(`${BACKEND_URL}/api/audit/portal/sync-inbox/upload-backup`, {
           method: 'POST',
           body: formData
         });
@@ -183,7 +183,7 @@ export default function PortalSyncLogs() {
       // Find matching client
       const matchedClient = clients.find(c => c.name.toLowerCase() === clientName.trim().toLowerCase());
       if (matchedClient) {
-        const res = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${matchedClient.id}`);
+        const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${matchedClient.id}`);
         if (res.ok) {
           const data = await res.json();
           setBackupSessions(data);
@@ -202,7 +202,7 @@ export default function PortalSyncLogs() {
 
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/clients`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/clients`);
       if (response.ok) setClients(await response.json());
     } catch (error) {
       console.error('Failed to fetch clients:', error);
@@ -211,7 +211,7 @@ export default function PortalSyncLogs() {
 
   const fetchSessions = async (clientId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions?client_id=${clientId}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
       if (response.ok) {
         const data = await response.json();
         setSessions(data);
@@ -228,7 +228,7 @@ export default function PortalSyncLogs() {
     if (!selectedSession) return;
     setLoading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sync-inbox/summary?session_id=${selectedSession}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sync-inbox/summary?session_id=${selectedSession}`);
       if (response.ok) setInboxSummary(await response.json());
     } catch (error) {
       console.error('Failed to fetch inbox:', error);
@@ -240,7 +240,7 @@ export default function PortalSyncLogs() {
   const fetchForwardBatches = async () => {
     if (!selectedSession) return;
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/forward-batches?session_id=${selectedSession}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/forward-batches?session_id=${selectedSession}`);
       if (response.ok) setForwardBatches(await response.json());
     } catch (error) {
       console.error('Failed to fetch batches:', error);
@@ -250,7 +250,7 @@ export default function PortalSyncLogs() {
   const fetchScannerLogs = async () => {
     setLoading(true);
     try {
-      let url = `${BACKEND_URL}/api/portal/sync-logs/by-scanner?client_id=${selectedClient}`;
+      let url = `${BACKEND_URL}/api/audit/portal/sync-logs/by-scanner?client_id=${selectedClient}`;
       if (selectedSession) url += `&session_id=${selectedSession}`;
       const response = await fetch(url);
       if (response.ok) {
@@ -268,7 +268,7 @@ export default function PortalSyncLogs() {
   const fetchGroupedLogs = async () => {
     setLoading(true);
     try {
-      let url = `${BACKEND_URL}/api/portal/sync-logs/grouped`;
+      let url = `${BACKEND_URL}/api/audit/portal/sync-logs/grouped`;
       if (selectedClient) url += `?client_id=${selectedClient}`;
       const response = await fetch(url);
       if (response.ok) {
@@ -294,7 +294,7 @@ export default function PortalSyncLogs() {
     }
     setForwarding(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/forward-to-variance`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/forward-to-variance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -321,7 +321,7 @@ export default function PortalSyncLogs() {
   const handleDeleteBatch = async (batchId) => {
     if (!window.confirm('Are you sure? This will permanently remove this batch and its data from variance.')) return;
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/forward-batches/${batchId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/forward-batches/${batchId}`, {
         method: 'DELETE'
       });
       if (!response.ok) {
@@ -344,7 +344,7 @@ export default function PortalSyncLogs() {
     setExpandedBatch(batchId);
     if (!batchLocations[batchId]) {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/portal/forward-batch-locations/${batchId}`);
+        const res = await fetch(`${BACKEND_URL}/api/audit/portal/forward-batch-locations/${batchId}`);
         if (res.ok) {
           const data = await res.json();
           setBatchLocations(prev => ({ ...prev, [batchId]: data }));
@@ -356,7 +356,7 @@ export default function PortalSyncLogs() {
   const handleDeleteLocation = async (sessionId, locationName, batchId) => {
     if (!window.confirm(`Delete location "${locationName}" from variance and raw data? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/delete-synced-location`, {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/delete-synced-location`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, location_name: locationName })
@@ -389,7 +389,7 @@ export default function PortalSyncLogs() {
     }
     setSearching(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/search-synced-location?query=${encodeURIComponent(locationSearch)}`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/search-synced-location?query=${encodeURIComponent(locationSearch)}`);
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data.results);
@@ -408,7 +408,7 @@ export default function PortalSyncLogs() {
     if (!window.confirm('This will CLEAR all existing variance data and conflicts for this session, then rebuild from raw sync logs. Are you sure?')) return;
     setRebuilding(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/rebuild-variance`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/rebuild-variance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -434,7 +434,7 @@ export default function PortalSyncLogs() {
 
   const handleExportDayLogs = async (clientId, date, clientName) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sync-logs/export?client_id=${clientId}&date=${date}`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sync-logs/export?client_id=${clientId}&date=${date}`);
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -453,7 +453,7 @@ export default function PortalSyncLogs() {
 
   const handleExportSingleLog = async (logId, deviceName, syncDate) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sync-logs/${logId}/export`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sync-logs/${logId}/export`);
       if (!response.ok) throw new Error('Export failed');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -473,7 +473,7 @@ export default function PortalSyncLogs() {
   const handleExportAllSessionLogs = async () => {
     if (!selectedClient) return;
     try {
-      let url = `${BACKEND_URL}/api/portal/sync-logs/export?client_id=${selectedClient}`;
+      let url = `${BACKEND_URL}/api/audit/portal/sync-logs/export?client_id=${selectedClient}`;
       if (selectedSession) url += `&session_id=${selectedSession}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Export failed');

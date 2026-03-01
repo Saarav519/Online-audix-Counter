@@ -1,4 +1,4 @@
-package com.audix.stockmanagement;
+package com.audix.online;
 
 import com.getcapacitor.BridgeActivity;
 

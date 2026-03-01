@@ -20,8 +20,8 @@ export default function PortalAlerts() {
   const fetchAlerts = async () => {
     try {
       const url = filter === 'unread' 
-        ? `${BACKEND_URL}/api/portal/alerts?unread_only=true`
-        : `${BACKEND_URL}/api/portal/alerts`;
+        ? `${BACKEND_URL}/api/audit/portal/alerts?unread_only=true`
+        : `${BACKEND_URL}/api/audit/portal/alerts`;
       const response = await fetch(url);
       if (response.ok) {
         setAlerts(await response.json());
@@ -39,7 +39,7 @@ export default function PortalAlerts() {
 
   const markAsRead = async (alertId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/alerts/${alertId}/read`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/alerts/${alertId}/read`, {
         method: 'PUT'
       });
       if (response.ok) {
@@ -52,7 +52,7 @@ export default function PortalAlerts() {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/alerts/mark-all-read`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/alerts/mark-all-read`, {
         method: 'PUT'
       });
       if (response.ok) {

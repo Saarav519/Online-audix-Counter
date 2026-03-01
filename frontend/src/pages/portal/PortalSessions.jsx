@@ -54,8 +54,8 @@ export default function PortalSessions() {
   const fetchData = async () => {
     try {
       const [sessionsRes, clientsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portal/sessions`),
-        fetch(`${BACKEND_URL}/api/portal/clients`)
+        fetch(`${BACKEND_URL}/api/audit/portal/sessions`),
+        fetch(`${BACKEND_URL}/api/audit/portal/clients`)
       ]);
       
       if (sessionsRes.ok) setSessions(await sessionsRes.json());
@@ -77,7 +77,7 @@ export default function PortalSessions() {
     setSchemaLoading(true);
     setSchemaFields([]);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${session.client_id}/schema`);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${session.client_id}/schema`);
       if (res.ok) {
         const data = await res.json();
         const enabledFields = (data.fields || []).filter(f => f.enabled);
@@ -99,7 +99,7 @@ export default function PortalSessions() {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -124,7 +124,7 @@ export default function PortalSessions() {
 
   const handleStatusChange = async (sessionId, status) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}/status?status=${status}`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${sessionId}/status?status=${status}`, {
         method: 'PUT'
       });
 
@@ -143,7 +143,7 @@ export default function PortalSessions() {
     }
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${sessionId}`, {
         method: 'DELETE'
       });
 
@@ -165,7 +165,7 @@ export default function PortalSessions() {
 
     try {
       const response = await fetch(
-        `${BACKEND_URL}/api/portal/sessions/${importingSession.id}/import-expected`,
+        `${BACKEND_URL}/api/audit/portal/sessions/${importingSession.id}/import-expected`,
         {
           method: 'POST',
           body: formData
@@ -190,7 +190,7 @@ export default function PortalSessions() {
   const fetchStockData = async (sessionId) => {
     setStockLoading(true);
     try {
-      const response = await fetch(`${BACKEND_URL}/api/portal/sessions/${sessionId}/expected-stock`);
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${sessionId}/expected-stock`);
       if (response.ok) {
         const data = await response.json();
         setStockData(data);
@@ -218,7 +218,7 @@ export default function PortalSessions() {
     if (!window.confirm(`Refresh stock for "${session.name}"?\n\nThis will re-import the latest warehouse stock into this session, replacing the current snapshot.`)) return;
     setRefreshingStock(session.id);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/portal/sessions/${session.id}/refresh-stock`, { method: 'POST' });
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${session.id}/refresh-stock`, { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
         toast.success(data.message);
@@ -625,7 +625,7 @@ export default function PortalSessions() {
                     if (!importingSession) return;
                     const clientId = importingSession.client_id;
                     try {
-                      const res = await fetch(`${BACKEND_URL}/api/portal/clients/${clientId}/schema/template?template_type=stock`);
+                      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${clientId}/schema/template?template_type=stock`);
                       if (!res.ok) throw new Error('Failed');
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
