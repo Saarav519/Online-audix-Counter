@@ -1051,6 +1051,80 @@ const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Import Master from Session Data */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Database className="w-4 h-4 text-indigo-600" />
+            Import from Portal
+          </CardTitle>
+          <CardDescription className="text-xs">Sync master data or assigned locations from the admin portal</CardDescription>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 pt-1 space-y-3">
+          {(!syncConfig.clientId) ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-700">Configure Client in Cloud Sync above to enable portal import</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">Import Type</Label>
+                <select
+                  value={portalImportType}
+                  onChange={(e) => { setPortalImportType(e.target.value); setPortalImportResult(null); }}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                >
+                  <option value="master">Master Sync (Products)</option>
+                  <option value="pending">Pending Location Sync</option>
+                </select>
+              </div>
+
+              {portalImportType === 'master' && (
+                <div className="p-2.5 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-700">Fetches product master (Barcode, Name, Price) from the selected client's uploaded stock data.</p>
+                  <p className="text-xs text-blue-600 mt-1">Current: <strong>{masterProducts.length}</strong> products loaded</p>
+                </div>
+              )}
+
+              {portalImportType === 'pending' && (
+                <div className="p-2.5 bg-purple-50 rounded-lg">
+                  <p className="text-xs text-purple-700">Fetches locations assigned to <strong>{syncConfig.deviceName || 'this device'}</strong> by the admin from Pending Locations.</p>
+                  <p className="text-xs text-purple-600 mt-1">Current: <strong>{masterLocations.length}</strong> locations loaded</p>
+                  {!syncConfig.deviceName && (
+                    <p className="text-xs text-red-500 mt-1">⚠ Set Device Name in Cloud Sync above first</p>
+                  )}
+                </div>
+              )}
+
+              {portalImportResult && (
+                <div className={`p-2.5 rounded-lg flex items-center gap-2 ${portalImportResult.success ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+                  {portalImportResult.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
+                  <span className={`text-xs ${portalImportResult.success ? 'text-emerald-700' : 'text-red-700'}`}>{portalImportResult.msg}</span>
+                </div>
+              )}
+
+              <Button
+                onClick={handlePortalImport}
+                disabled={portalImporting || !syncConfig.clientId || (portalImportType === 'pending' && !syncConfig.deviceName)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm"
+              >
+                {portalImporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    {portalImportType === 'master' ? 'Import Products from Portal' : 'Import Assigned Locations'}
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Manual Sync Password Modal */}
       <Dialog open={showSyncPasswordModal} onOpenChange={setShowSyncPasswordModal}>
         <DialogContent className="sm:max-w-md">
