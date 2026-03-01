@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
         <header className="fixed top-0 left-0 right-0 h-12 bg-white border-b border-slate-200 z-50 px-3 flex items-center justify-between shadow-sm">
           {/* Logo moved to corner - smaller and non-interactive to avoid accidental clicks */}
           <div className="flex items-center pointer-events-none select-none">
-            <span className="text-sm font-bold text-emerald-700">AUDIX</span>
+            <span className="text-sm font-bold text-emerald-700">AUDIX O</span>
           </div>
 
           <DropdownMenu>
