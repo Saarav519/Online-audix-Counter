@@ -70,6 +70,7 @@ export default function PortalClients() {
   const [newFieldName, setNewFieldName] = useState('');
   const [newFieldType, setNewFieldType] = useState('text');
   const [masterExtraColumns, setMasterExtraColumns] = useState([]);
+  const [masterViewSchemaFields, setMasterViewSchemaFields] = useState(null); // schema fields for master view table
 
   // Stock upload state (warehouse clients)
   const [showStockDialog, setShowStockDialog] = useState(false);
