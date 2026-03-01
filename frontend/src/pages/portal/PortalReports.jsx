@@ -1273,6 +1273,7 @@ function SubtotalCell({ value, isVariance, isAccuracy, className = '' }) {
 // ============ Bin-wise Table ============
 function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
   const summary = data.summary || {};
+  const t = data.totals || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1300,7 +1301,18 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
       </div>
       <div className="overflow-auto max-h-[70vh]">
         <table className="min-w-full text-sm report-table">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <thead className="bg-gray-50">
+            <tr>
+              <th data-col="status" className="py-1.5 px-4 text-left text-[11px] font-bold text-emerald-800">Subtotals</th>
+              <th data-col="location" className="py-1.5 px-4"></th>
+              <SubtotalCell value={t.stock_qty} />
+              <SubtotalCell value={t.physical_qty} />
+              {isConsolidated && <SubtotalCell value={t.reco_qty || 0} />}
+              {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
+              <SubtotalCell value={t.difference_qty} isVariance />
+              <SubtotalCell value={`${t.accuracy_pct || 0}%`} isAccuracy />
+              <th data-col="remark" className="py-1.5 px-4"></th>
+            </tr>
             <tr>
               <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
