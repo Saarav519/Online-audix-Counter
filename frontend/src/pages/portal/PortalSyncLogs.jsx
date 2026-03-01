@@ -901,6 +901,37 @@ export default function PortalSyncLogs() {
                           </span>
                         ))}
                       </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                          onClick={() => handleExpandBatch(batch.id)}>
+                          {expandedBatch === batch.id ? <ChevronDown className="w-3.5 h-3.5 mr-1" /> : <ChevronRight className="w-3.5 h-3.5 mr-1" />}
+                          Locations
+                        </Button>
+                        <Button
+                          data-testid={`delete-batch-${batch.id}`}
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          onClick={() => handleDeleteBatch(batch.id)}>
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Delete Batch
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {(!batch.scanners || batch.scanners.length === 0) && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200"
+                        onClick={() => handleExpandBatch(batch.id)}>
+                        {expandedBatch === batch.id ? <ChevronDown className="w-3.5 h-3.5 mr-1" /> : <ChevronRight className="w-3.5 h-3.5 mr-1" />}
+                        Locations
+                      </Button>
                       <Button
                         data-testid={`delete-batch-${batch.id}`}
                         variant="outline"
@@ -912,17 +943,33 @@ export default function PortalSyncLogs() {
                       </Button>
                     </div>
                   )}
-                  {(!batch.scanners || batch.scanners.length === 0) && (
-                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
-                      <Button
-                        data-testid={`delete-batch-${batch.id}`}
-                        variant="outline"
-                        size="sm"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        onClick={() => handleDeleteBatch(batch.id)}>
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Delete Batch
-                      </Button>
+                  {/* Expanded location list */}
+                  {expandedBatch === batch.id && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      {batchLocations[batch.id]?.locations?.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {batchLocations[batch.id].locations.map((loc, li) => (
+                            <div key={li} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <span className="text-sm font-medium text-gray-800 truncate">{loc.location_name}</span>
+                                <span className="text-xs text-gray-500 shrink-0">{loc.total_items || 0} items</span>
+                                <span className="text-xs text-gray-500 shrink-0">Qty: {loc.total_quantity || 0}</span>
+                                <span className="px-1.5 py-0.5 text-[10px] rounded bg-blue-50 text-blue-600 shrink-0">{loc.device_name}</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2"
+                                onClick={() => handleDeleteLocation(batchLocations[batch.id].session_id, loc.location_name, batch.id)}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 text-center py-2">No locations found or all deleted</p>
+                      )}
                     </div>
                   )}
                 </div>
