@@ -222,12 +222,14 @@ const Settings = () => {
   };
 
   const confirmManualSync = () => {
-    if (manualSyncPassword !== syncConfig.syncPassword) {
-      alert('Invalid sync password');
+    if (!manualSyncPassword) {
+      alert('Please enter sync password');
       return;
     }
     setShowSyncPasswordModal(false);
-    performSync(true);
+    // Store password for auto-sync use
+    localStorage.setItem('audix_sync_password', manualSyncPassword);
+    performSync(true, manualSyncPassword);
   };
 
   const CHUNK_SIZE = 10;
