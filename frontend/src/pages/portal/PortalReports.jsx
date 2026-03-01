@@ -872,7 +872,7 @@ export default function PortalReports() {
     const table = tableContainerRef.current.querySelector('table');
     if (!table) { setColumnStyleCSS(''); return; }
 
-    const headerCells = Array.from(table.querySelectorAll('thead > tr > th'));
+    const headerCells = Array.from(table.querySelectorAll('thead > tr:last-child > th'));
 
     // Build column key → nth-child index map (1-based)
     const colIndexMap = {};
