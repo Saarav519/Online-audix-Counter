@@ -4247,23 +4247,21 @@ async def get_my_assigned_locations(device_name: str, client_id: str, session_id
 
 @sync_router.get("/master-products")
 async def get_master_products_for_scanner(client_id: str):
-    """Scanner pulls product master from client stock. Returns only barcode, product_name, price."""
+    """Scanner pulls product master from client stock. Returns all records."""
     if not client_id:
         raise HTTPException(status_code=400, detail="client_id required")
     
     records = await db.client_stock.find(
         {"client_id": client_id},
         {"_id": 0, "barcode": 1, "description": 1, "article_name": 1, "mrp": 1, "cost": 1, "category": 1}
-    ).to_list(100000)
+    ).to_list(200000)
     
-    # Map to scanner-friendly format (barcode, name, price)
+    # Map to scanner-friendly format — no dedup, return all records
     products = []
-    seen_barcodes = set()
     for r in records:
         barcode = r.get("barcode", "")
-        if not barcode or barcode in seen_barcodes:
+        if not barcode:
             continue
-        seen_barcodes.add(barcode)
         name = r.get("description", "") or r.get("article_name", "")
         price = r.get("mrp", 0) or r.get("cost", 0)
         products.append({
