@@ -86,6 +86,11 @@ const Settings = () => {
   const [lastSyncTime, setLastSyncTime] = useState(localStorage.getItem('audix_last_sync') || null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // Import from Portal state
+  const [portalImportType, setPortalImportType] = useState('master'); // 'master' or 'pending'
+  const [portalImporting, setPortalImporting] = useState(false);
+  const [portalImportResult, setPortalImportResult] = useState(null);
+
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // Fetch sync config on mount
