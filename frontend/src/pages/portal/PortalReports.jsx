@@ -745,6 +745,20 @@ export default function PortalReports() {
 
   const columnConfig = useMemo(() => {
     const ec = extraColumns.map(c => ({ key: c.name, label: c.label }));
+    const { has_mrp, has_cost } = schemaValueFields;
+    
+    // Helper to conditionally include MRP/Cost value columns
+    const valCols = (prefix, mrpLabel, costLabel) => {
+      const cols = [];
+      if (has_mrp) cols.push({ key: `${prefix}_mrp`, label: mrpLabel });
+      if (has_cost) cols.push({ key: `${prefix}_cost`, label: costLabel });
+      // If neither, show a generic "Value" column using whichever is available
+      if (!has_mrp && !has_cost) {
+        cols.push({ key: `${prefix}_mrp`, label: mrpLabel.replace('(MRP)', 'Value') });
+      }
+      return cols;
+    };
+    
     switch (reportType) {
       case 'bin-wise':
         return [
@@ -766,20 +780,16 @@ export default function PortalReports() {
           { key: 'category', label: 'Category' },
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
-          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
-          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical Qty' },
-          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
-          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
-            { key: 'final_value_mrp', label: 'Final Val(MRP)' },
-            { key: 'final_value_cost', label: 'Final Val(Cost)' },
+            ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
           { key: 'diff_qty', label: 'Diff Qty' },
-          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
-          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          ...valCols('diff_value', 'Diff Val(MRP)', 'Diff Val(Cost)'),
           { key: 'accuracy_pct', label: 'Accuracy' },
           { key: 'remark', label: 'Remarks' },
         ];
@@ -790,20 +800,16 @@ export default function PortalReports() {
           { key: 'category', label: 'Category' },
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
-          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
-          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
-          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
-          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
-            { key: 'final_value_mrp', label: 'Final Val(MRP)' },
-            { key: 'final_value_cost', label: 'Final Val(Cost)' },
+            ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
           { key: 'diff_qty', label: 'Diff Qty' },
-          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
-          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          ...valCols('diff_value', 'Diff Val(MRP)', 'Diff Val(Cost)'),
           { key: 'accuracy_pct', label: 'Accuracy' },
           { key: 'remark', label: 'Remarks' },
         ];
@@ -816,20 +822,16 @@ export default function PortalReports() {
           ...ec,
           { key: 'barcode_count', label: 'Barcodes' },
           { key: 'stock_qty', label: 'Stock Qty' },
-          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
-          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
-          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
-          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
-            { key: 'final_value_mrp', label: 'Final Val(MRP)' },
-            { key: 'final_value_cost', label: 'Final Val(Cost)' },
+            ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
           { key: 'diff_qty', label: 'Diff Qty' },
-          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
-          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          ...valCols('diff_value', 'Diff Val(MRP)', 'Diff Val(Cost)'),
           { key: 'accuracy_pct', label: 'Accuracy' },
           { key: 'remark', label: 'Remarks' },
         ];
@@ -838,27 +840,23 @@ export default function PortalReports() {
           { key: 'category', label: 'Category' },
           { key: 'item_count', label: 'Items' },
           { key: 'stock_qty', label: 'Stock Qty' },
-          { key: 'stock_value_mrp', label: 'Stock Val(MRP)' },
-          { key: 'stock_value_cost', label: 'Stock Val(Cost)' },
+          ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
-          { key: 'physical_value_mrp', label: 'Phys Val(MRP)' },
-          { key: 'physical_value_cost', label: 'Phys Val(Cost)' },
+          ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
-            { key: 'final_value_mrp', label: 'Final Val(MRP)' },
-            { key: 'final_value_cost', label: 'Final Val(Cost)' },
+            ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
           { key: 'diff_qty', label: 'Diff Qty' },
-          { key: 'diff_value_mrp', label: 'Diff Val(MRP)' },
-          { key: 'diff_value_cost', label: 'Diff Val(Cost)' },
+          ...valCols('diff_value', 'Diff Val(MRP)', 'Diff Val(Cost)'),
           { key: 'accuracy_pct', label: 'Accuracy' },
           { key: 'remark', label: 'Remarks' },
         ];
       default:
         return [];
     }
-  }, [reportType, isConsolidatedView, extraColumns]);
+  }, [reportType, isConsolidatedView, extraColumns, schemaValueFields]);
 
   // Reset column settings when report type changes
   useEffect(() => {
