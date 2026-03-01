@@ -168,7 +168,7 @@ const Layout = ({ children }) => {
         </button>
         
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-emerald-700">AUDIX</span>
+          <span className="text-xl font-bold text-emerald-700">AUDIX O</span>
         </div>
 
         <DropdownMenu>
@@ -211,7 +211,7 @@ const Layout = ({ children }) => {
       >
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-emerald-700">AUDIX</span>
+            <span className="text-xl font-bold text-emerald-700">AUDIX O</span>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors"
