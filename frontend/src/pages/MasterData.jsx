@@ -1021,21 +1021,6 @@ RT-SF,Retail Store Front,Front retail area`;
               </div>
               <MapPin className="w-5 h-5 text-slate-400" />
             </label>
-
-            {/* Auth Users checkbox */}
-            <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={clearOptions.authUsers} 
-                onChange={(e) => setClearOptions(prev => ({ ...prev, authUsers: e.target.checked }))}
-                className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
-              />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-800">Authorization Users</p>
-                <p className="text-xs text-slate-500">{authorizationUsers.length} user(s)</p>
-              </div>
-              <Users className="w-5 h-5 text-slate-400" />
-            </label>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowClearModal(false)}>Cancel</Button>
