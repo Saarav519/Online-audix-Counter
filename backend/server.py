@@ -1395,12 +1395,14 @@ async def cancel_sync_staging(batch_id: str):
 async def upload_sync_backup(
     file: UploadFile = File(...),
     client_name: str = Form(...),
-    session_name: str = Form(...),
+    session_name: str = Form(""),
+    session_id: str = Form(""),
     variance_mode: str = Form("bin-wise"),
     device_name: str = Form("backup-restore")
 ):
     """Upload a scanner backup CSV to restore sync data.
-    Creates client/session if needed, then populates sync_inbox."""
+    If session_id is provided and valid, uses that existing session.
+    Otherwise creates client/session if needed, then populates sync_inbox."""
     import csv as csv_module
     import io
 
@@ -1451,18 +1453,31 @@ async def upload_sync_backup(
             "updated_at": datetime.now(timezone.utc).isoformat()
         })
 
-    # 3. Create session
-    session_id = str(uuid.uuid4())
-    new_session = {
-        "id": session_id,
-        "name": session_name.strip(),
-        "client_id": client_id,
-        "variance_mode": variance_mode,
-        "status": "active",
-        "start_date": datetime.now(timezone.utc).isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.audit_sessions.insert_one(new_session)
+    # 3. Use existing session or create new
+    used_existing_session = False
+    if session_id and session_id.strip():
+        # Try to use existing session
+        existing_session = await db.audit_sessions.find_one({"id": session_id.strip()}, {"_id": 0})
+        if existing_session:
+            session_id = existing_session["id"]
+            session_name = existing_session.get("name", session_name)
+            used_existing_session = True
+        else:
+            raise HTTPException(status_code=404, detail="Specified session not found")
+    else:
+        if not session_name or not session_name.strip():
+            raise HTTPException(status_code=400, detail="Either session_id or session_name is required")
+        session_id = str(uuid.uuid4())
+        new_session = {
+            "id": session_id,
+            "name": session_name.strip(),
+            "client_id": client_id,
+            "variance_mode": variance_mode,
+            "status": "active",
+            "start_date": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.audit_sessions.insert_one(new_session)
 
     # 4. Ensure device exists
     device = await db.devices.find_one({"device_name": device_name}, {"_id": 0})
