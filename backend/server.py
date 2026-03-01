@@ -1876,8 +1876,17 @@ class DeleteSyncedLocationRequest(BaseModel):
 
 @portal_router.post("/delete-synced-location")
 async def delete_synced_location(req: DeleteSyncedLocationRequest):
-    """Delete a specific forwarded location from variance, raw data, and conflicts."""
+    """Delete a specific forwarded location from variance, raw data, conflicts, and update batch stats."""
     removed = {}
+    
+    # Find inbox entry first to get batch_id and counts for batch update
+    inbox_entry = await db.sync_inbox.find_one({
+        "session_id": req.session_id,
+        "location_name": req.location_name
+    })
+    batch_id = inbox_entry.get("forward_batch_id") if inbox_entry else None
+    deleted_items = inbox_entry.get("total_items", 0) if inbox_entry else 0
+    deleted_qty = inbox_entry.get("total_quantity", 0) if inbox_entry else 0
     
     # 1. Remove from synced_locations (variance)
     result = await db.synced_locations.delete_many({
@@ -1886,7 +1895,7 @@ async def delete_synced_location(req: DeleteSyncedLocationRequest):
     })
     removed["synced_locations"] = result.deleted_count
     
-    # 2. Remove from sync_raw_logs — remove location entries within raw log documents
+    # 2. Remove from sync_raw_logs
     raw_logs = await db.sync_raw_logs.find({
         "session_id": req.session_id
     }, {"_id": 0, "id": 1, "raw_payload": 1}).to_list(10000)
@@ -1900,7 +1909,6 @@ async def delete_synced_location(req: DeleteSyncedLocationRequest):
         if len(filtered) < original_len:
             raw_cleaned += (original_len - len(filtered))
             if len(filtered) == 0:
-                # Remove the entire raw log entry if no locations remain
                 await db.sync_raw_logs.delete_one({"id": log["id"]})
             else:
                 await db.sync_raw_logs.update_one(
@@ -1923,11 +1931,68 @@ async def delete_synced_location(req: DeleteSyncedLocationRequest):
     })
     removed["inbox_entries"] = result.deleted_count
     
+    # 5. Update forward_batch stats to reflect removal
+    if batch_id:
+        batch = await db.forward_batches.find_one({"id": batch_id})
+        if batch:
+            new_loc_count = max(0, batch.get("location_count", 0) - 1)
+            new_item_count = max(0, batch.get("item_count", 0) - deleted_items)
+            new_qty_count = max(0, batch.get("quantity_count", 0) - deleted_qty)
+            remaining_scanners = await db.sync_inbox.distinct("device_name", {"forward_batch_id": batch_id})
+            await db.forward_batches.update_one(
+                {"id": batch_id},
+                {"$set": {
+                    "location_count": new_loc_count,
+                    "item_count": new_item_count,
+                    "quantity_count": new_qty_count,
+                    "scanner_count": len(remaining_scanners),
+                    "scanners": remaining_scanners
+                }}
+            )
+    
     total = sum(removed.values())
     return {
         "message": f"Location '{req.location_name}' deleted. {total} records removed.",
         "removed": removed
     }
+
+@portal_router.get("/search-synced-location")
+async def search_synced_location(query: str = ""):
+    """Search for a location across all forwarded batches."""
+    if not query or len(query) < 2:
+        return {"results": []}
+    
+    entries = await db.sync_inbox.find(
+        {"location_name": {"$regex": query, "$options": "i"}, "status": "forwarded"},
+        {"_id": 0, "location_name": 1, "device_name": 1, "total_items": 1, "total_quantity": 1,
+         "forward_batch_id": 1, "session_id": 1, "synced_at": 1}
+    ).to_list(100)
+    
+    batch_ids = list(set(e.get("forward_batch_id", "") for e in entries if e.get("forward_batch_id")))
+    batches = {}
+    if batch_ids:
+        batch_docs = await db.forward_batches.find(
+            {"id": {"$in": batch_ids}},
+            {"_id": 0, "id": 1, "forwarded_at": 1}
+        ).to_list(1000)
+        batches = {b["id"]: b for b in batch_docs}
+    
+    results = []
+    for e in entries:
+        bid = e.get("forward_batch_id", "")
+        batch_info = batches.get(bid, {})
+        results.append({
+            "location_name": e["location_name"],
+            "device_name": e.get("device_name", ""),
+            "total_items": e.get("total_items", 0),
+            "total_quantity": e.get("total_quantity", 0),
+            "session_id": e.get("session_id", ""),
+            "batch_id": bid,
+            "batch_forwarded_at": batch_info.get("forwarded_at", ""),
+            "synced_at": e.get("synced_at", "")
+        })
+    
+    return {"results": results, "count": len(results)}
 
 @portal_router.get("/forward-batch-locations/{batch_id}")
 async def get_forward_batch_locations(batch_id: str):
