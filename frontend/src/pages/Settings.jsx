@@ -234,9 +234,9 @@ const Settings = () => {
 
   const CHUNK_SIZE = 10;
 
-  const performSync = async (isManual = false) => {
-    if (!syncConfig.deviceName || !syncConfig.sessionId || !syncConfig.syncPassword) {
-      if (isManual) alert('Please configure device name, client, session, and sync password first');
+  const performSync = async (isManual = false, syncPassword = '') => {
+    if (!syncConfig.deviceName || !syncConfig.sessionId || !syncPassword) {
+      if (isManual) alert('Please configure device name, client, and session first');
       return;
     }
 
