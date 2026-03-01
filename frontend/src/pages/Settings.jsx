@@ -104,9 +104,10 @@ const Settings = () => {
 
   // Auto-sync when online
   useEffect(() => {
-    if (isOnline && syncConfig.autoSync && syncConfig.deviceName && syncConfig.sessionId && syncConfig.syncPassword) {
+    const storedSyncPwd = localStorage.getItem('audix_sync_password') || '';
+    if (isOnline && syncConfig.autoSync && syncConfig.deviceName && syncConfig.sessionId && storedSyncPwd) {
       // Auto sync in background (no password prompt)
-      performSync(false);
+      performSync(false, storedSyncPwd);
     }
   }, [isOnline]);
 
