@@ -4,7 +4,7 @@ android {
     namespace "com.audix.online"
     compileSdkVersion rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.audix.stockmanagement"
+        applicationId "com.audix.online"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
