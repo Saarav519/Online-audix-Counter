@@ -1931,14 +1931,18 @@ async def delete_synced_location(req: DeleteSyncedLocationRequest):
     })
     removed["inbox_entries"] = result.deleted_count
     
-    # 5. Update forward_batch stats to reflect removal
+    # 5. Recalculate forward_batch stats from actual remaining data
     if batch_id:
         batch = await db.forward_batches.find_one({"id": batch_id})
         if batch:
-            new_loc_count = max(0, batch.get("location_count", 0) - 1)
-            new_item_count = max(0, batch.get("item_count", 0) - deleted_items)
-            new_qty_count = max(0, batch.get("quantity_count", 0) - deleted_qty)
-            remaining_scanners = await db.sync_inbox.distinct("device_name", {"forward_batch_id": batch_id})
+            remaining = await db.sync_inbox.find(
+                {"forward_batch_id": batch_id},
+                {"_id": 0, "device_name": 1, "total_items": 1, "total_quantity": 1}
+            ).to_list(10000)
+            new_loc_count = len(remaining)
+            new_item_count = sum(e.get("total_items", 0) for e in remaining)
+            new_qty_count = sum(e.get("total_quantity", 0) for e in remaining)
+            remaining_scanners = list(set(e.get("device_name", "") for e in remaining if e.get("device_name")))
             await db.forward_batches.update_one(
                 {"id": batch_id},
                 {"$set": {
