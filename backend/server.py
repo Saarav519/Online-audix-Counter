@@ -1577,11 +1577,12 @@ async def upload_sync_backup(
         "client_id": client_id,
         "client_name": client_name.strip(),
         "session_id": session_id,
-        "session_name": session_name.strip(),
+        "session_name": session_name.strip() if session_name else "",
         "locations_restored": synced_count,
         "total_items": raw_log["total_items"],
         "total_quantity": raw_log["total_quantity"],
-        "sync_log_id": sync_log_id
+        "sync_log_id": sync_log_id,
+        "used_existing_session": used_existing_session
     }
 
 # ==================== SYNC INBOX & FORWARD TO VARIANCE ====================
