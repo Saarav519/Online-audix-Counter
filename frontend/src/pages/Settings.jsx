@@ -411,6 +411,12 @@ const Settings = () => {
       const syncedLocationIds = locationsToSync.map(loc => loc.id);
       deleteLocationData(syncedLocationIds);
 
+      // In Preassigned Mode: also remove synced locations from master list so they don't reappear
+      if (isPreAssigned) {
+        const syncedLocationNames = locationsToSync.map(loc => loc.name);
+        deleteMasterLocationsBatch(syncedLocationNames);
+      }
+
       if (isManual) {
         alert(`Sync successful! ${result.locations_synced} locations synced.\n\nBackup file created and data cleared from Reports.`);
       }
