@@ -305,7 +305,7 @@ export default function PortalSyncLogs() {
       if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Delete failed'); }
       const result = await res.json();
       toast.success(result.message);
-      // Refresh batch locations and batch list
+      // Refresh batch locations
       setBatchLocations(prev => {
         const updated = { ...prev };
         if (updated[batchId]) {
@@ -316,8 +316,27 @@ export default function PortalSyncLogs() {
         }
         return updated;
       });
+      // Refresh batches list to update stats
       fetchForwardBatches();
+      // Clear search results if active
+      if (searchResults) handleSearchLocation();
     } catch (e) { toast.error(e.message); }
+  };
+
+  const handleSearchLocation = async () => {
+    if (!locationSearch || locationSearch.length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/search-synced-location?query=${encodeURIComponent(locationSearch)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.results);
+      }
+    } catch (e) { console.error(e); }
+    setSearching(false);
   };
 
   const [rebuilding, setRebuilding] = useState(false);
