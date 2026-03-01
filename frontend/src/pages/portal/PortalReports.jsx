@@ -1247,16 +1247,32 @@ export default function PortalReports() {
         <>
           {/* Summary Cards */}
           {filteredData.totals && (
-            <div className={`grid grid-cols-2 md:grid-cols-4 ${isConsolidatedView ? 'lg:grid-cols-10' : 'lg:grid-cols-7'} gap-3 mb-6`}>
+            <div className={`grid grid-cols-2 md:grid-cols-4 gap-3 mb-6`}>
               <SummaryCard label="Stock Qty" value={filteredData.totals.stock_qty || 0} />
-              <SummaryCard label="Stock Value" value={(filteredData.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              {schemaValueFields.has_mrp && (
+                <SummaryCard label={schemaValueFields.has_cost ? "Stock Value (MRP)" : "Stock Value"} value={(filteredData.totals.stock_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              )}
+              {schemaValueFields.has_cost && (
+                <SummaryCard label={schemaValueFields.has_mrp ? "Stock Value (Cost)" : "Stock Value"} value={(filteredData.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              )}
               <SummaryCard label="Physical Qty" value={filteredData.totals.physical_qty || 0} />
-              <SummaryCard label="Physical Value" value={(filteredData.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              {schemaValueFields.has_mrp && (
+                <SummaryCard label={schemaValueFields.has_cost ? "Physical Value (MRP)" : "Physical Value"} value={(filteredData.totals.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              )}
+              {schemaValueFields.has_cost && (
+                <SummaryCard label={schemaValueFields.has_mrp ? "Physical Value (Cost)" : "Physical Value"} value={(filteredData.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />
+              )}
+              {isConsolidatedView && <SummaryCard label="Reco Qty" value={filteredData.totals.reco_qty || 0} />}
               {isConsolidatedView && <SummaryCard label="Final Qty" value={filteredData.totals.final_qty ?? filteredData.totals.physical_qty ?? 0} />}
-              {isConsolidatedView && <SummaryCard label="Final Val(MRP)" value={(filteredData.totals.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
-              {isConsolidatedView && <SummaryCard label="Final Val(Cost)" value={(filteredData.totals.final_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
+              {isConsolidatedView && schemaValueFields.has_mrp && <SummaryCard label="Final Val(MRP)" value={(filteredData.totals.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
+              {isConsolidatedView && schemaValueFields.has_cost && <SummaryCard label="Final Val(Cost)" value={(filteredData.totals.final_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} />}
               <SummaryCard label="Difference Qty" value={filteredData.totals.diff_qty || filteredData.totals.difference_qty || 0} variant={true} />
-              <SummaryCard label="Difference Value" value={(filteredData.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
+              {schemaValueFields.has_mrp && (
+                <SummaryCard label={schemaValueFields.has_cost ? "Diff Value (MRP)" : "Diff Value"} value={(filteredData.totals.diff_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
+              )}
+              {schemaValueFields.has_cost && (
+                <SummaryCard label={schemaValueFields.has_mrp ? "Diff Value (Cost)" : "Diff Value"} value={(filteredData.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})} variant={true} />
+              )}
               <SummaryCard label="Accuracy" value={`${filteredData.totals.accuracy_pct || 0}%`} isAccuracy={true} pct={filteredData.totals.accuracy_pct || 0} />
             </div>
           )}
