@@ -863,6 +863,17 @@ export default function PortalReports() {
 
     let css = '';
 
+    // CRITICAL: Apply sticky top to ALL th elements individually
+    // This prevents conflict between thead sticky and individual th sticky for frozen columns
+    css += `#report-table-area thead tr th {
+      position: sticky !important; top: 0; z-index: 10 !important;
+      background-color: #f9fafb !important;
+    }\n`;
+    // Remove sticky from thead itself to avoid conflicts
+    css += `#report-table-area thead {
+      position: static !important;
+    }\n`;
+
     // Hidden columns — CSS nth-child rules (instant, no row iteration)
     hiddenColumns.forEach(colKey => {
       const nth = colIndexMap[colKey];
@@ -881,7 +892,7 @@ export default function PortalReports() {
       const width = th.getBoundingClientRect().width;
       const nth = idx + 1;
 
-      // Header: sticky both top AND left
+      // Header: sticky both top AND left (z-index higher than non-frozen headers)
       css += `#report-table-area thead tr th:nth-child(${nth}) {
         position: sticky !important; left: ${offset}px; top: 0;
         z-index: 30 !important; background-color: #f9fafb !important;
