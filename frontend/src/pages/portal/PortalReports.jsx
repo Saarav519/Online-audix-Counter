@@ -1273,9 +1273,9 @@ function SummaryCard({ label, value, variant, isAccuracy, pct }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={`text-xl font-bold ${colorClass}`}>{typeof value === 'number' ? value.toLocaleString() : value}</p>
+    <div className="bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
+      <p className="text-[10px] text-gray-500 leading-tight truncate">{label}</p>
+      <p className={`text-sm font-bold ${colorClass} leading-snug`}>{typeof value === 'number' ? value.toLocaleString() : value}</p>
     </div>
   );
 }
