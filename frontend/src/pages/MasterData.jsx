@@ -484,48 +484,34 @@ RT-SF,Retail Store Front,Front retail area`;
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-emerald-100 rounded-lg">
-                <Package className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{masterProducts.length}</p>
-                <p className="text-sm text-slate-500">Products</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <MapPin className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">{masterLocations.length}</p>
-                <p className="text-sm text-slate-500">Locations</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-teal-100 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-teal-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-slate-800">
-                  {masterProducts.filter(p => p.isMaster).length}
-                </p>
-                <p className="text-sm text-slate-500">Master Items</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-white border border-slate-100 shadow-sm rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="p-1.5 bg-emerald-100 rounded-md">
+            <Package className="w-3.5 h-3.5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-slate-800 leading-tight">{masterProducts.length}</p>
+            <p className="text-[10px] text-slate-500">Products</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-100 shadow-sm rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="p-1.5 bg-blue-100 rounded-md">
+            <MapPin className="w-3.5 h-3.5 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-slate-800 leading-tight">{masterLocations.length}</p>
+            <p className="text-[10px] text-slate-500">Locations</p>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-100 shadow-sm rounded-lg px-3 py-2 flex items-center gap-2">
+          <div className="p-1.5 bg-teal-100 rounded-md">
+            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+          </div>
+          <div>
+            <p className="text-lg font-bold text-slate-800 leading-tight">{masterProducts.filter(p => p.isMaster).length}</p>
+            <p className="text-[10px] text-slate-500">Master Items</p>
+          </div>
+        </div>
       </div>
 
       {/* Tabs: Products | Locations */}
