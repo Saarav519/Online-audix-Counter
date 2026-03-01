@@ -916,9 +916,14 @@ export default function PortalReports() {
       const width = th.getBoundingClientRect().width;
       const nth = idx + 1;
 
-      // Header: sticky both top AND left (z-index higher than non-frozen headers)
-      css += `#report-table-area thead tr th:nth-child(${nth}) {
+      // Header: sticky both top AND left for BOTH thead rows (z-index higher than non-frozen)
+      css += `#report-table-area thead tr:first-child th:nth-child(${nth}) {
         position: sticky !important; left: ${offset}px; top: 0;
+        z-index: 31 !important; background-color: #f0fdf4 !important;
+        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
+      }\n`;
+      css += `#report-table-area thead tr:last-child th:nth-child(${nth}) {
+        position: sticky !important; left: ${offset}px; top: 28px;
         z-index: 30 !important; background-color: #f9fafb !important;
         box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
       }\n`;
