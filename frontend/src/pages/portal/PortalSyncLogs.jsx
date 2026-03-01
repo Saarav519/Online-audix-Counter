@@ -3,7 +3,7 @@ import {
   Database, RefreshCw, ChevronDown, ChevronRight, Smartphone, Clock,
   MapPin, Package, Download, Building2, Calendar, Filter, ArrowRight,
   CheckCircle2, AlertTriangle, Inbox, History, Layers, Trash2, RotateCcw,
-  Upload, FileUp
+  Upload, FileUp, Search
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
