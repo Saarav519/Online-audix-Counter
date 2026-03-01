@@ -2037,12 +2037,10 @@ function PendingLocationsView({ data, clientId }) {
   const [assignments, setAssignments] = useState([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
 
-  if (!data) return <div className="text-center py-8 text-gray-500">Loading...</div>;
-  
-  const summary = data.summary || {};
-  const pending = data.pending || [];
-  const completed = data.completed || [];
-  const emptyBins = data.empty_bins || [];
+  const summary = data?.summary || {};
+  const pending = data?.pending || [];
+  const completed = data?.completed || [];
+  const emptyBins = data?.empty_bins || [];
 
   // Build a map: location_name → assigned device
   const assignedMap = useMemo(() => {
@@ -2068,6 +2066,8 @@ function PendingLocationsView({ data, clientId }) {
   }, [clientId]);
 
   useEffect(() => { if (clientId) fetchDevicesAndAssignments(); }, [clientId, fetchDevicesAndAssignments]);
+
+  if (!data) return <div className="text-center py-8 text-gray-500">Loading...</div>;
 
   const toggleLoc = (locName) => {
     setSelectedLocs(prev => {
