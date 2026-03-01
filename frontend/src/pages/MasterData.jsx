@@ -451,10 +451,6 @@ RT-SF,Retail Store Front,Front retail area`;
                 <Upload className="w-4 h-4 mr-2" />
                 Import Products
               </Button>
-              <Button variant="outline" onClick={() => setShowUserImportModal(true)} className="border-blue-200 text-blue-700 hover:bg-blue-50">
-                <Users className="w-4 h-4 mr-2" />
-                Import Users
-              </Button>
               <Button variant="outline" onClick={handleExport} className="border-slate-200">
                 <Download className="w-4 h-4 mr-2" />
                 Export CSV
