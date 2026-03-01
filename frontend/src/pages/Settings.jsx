@@ -300,7 +300,7 @@ const Settings = () => {
           body: JSON.stringify({
             batch_id: batchId,
             device_name: syncConfig.deviceName,
-            sync_password: syncConfig.syncPassword,
+            sync_password: syncPassword,
             client_id: syncConfig.clientId,
             session_id: syncConfig.sessionId,
             chunk_index: idx,
