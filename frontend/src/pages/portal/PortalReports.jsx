@@ -383,6 +383,8 @@ export default function PortalReports() {
   useEffect(() => {
     if (selectedClient) {
       fetchSessions(selectedClient);
+      // Fetch schema to determine MRP/Cost visibility
+      fetchSchemaValueFields(selectedClient);
     }
   }, [selectedClient]);
 
