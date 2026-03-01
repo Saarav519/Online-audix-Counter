@@ -523,7 +523,7 @@ export default function PortalSyncLogs() {
           <p className="text-gray-500">Manage scanner data — review, forward to variance, track batches</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', file: null }); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
+          <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionId: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', files: [] }); setBackupSessions([]); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
             <Upload className="w-4 h-4 mr-2" />
             Restore Backup
           </Button>
