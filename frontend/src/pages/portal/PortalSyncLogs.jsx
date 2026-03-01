@@ -274,6 +274,49 @@ export default function PortalSyncLogs() {
     }
   };
 
+  const handleExpandBatch = async (batchId) => {
+    if (expandedBatch === batchId) {
+      setExpandedBatch(null);
+      return;
+    }
+    setExpandedBatch(batchId);
+    if (!batchLocations[batchId]) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/portal/forward-batch-locations/${batchId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBatchLocations(prev => ({ ...prev, [batchId]: data }));
+        }
+      } catch (e) { console.error(e); }
+    }
+  };
+
+  const handleDeleteLocation = async (sessionId, locationName, batchId) => {
+    if (!window.confirm(`Delete location "${locationName}" from variance and raw data? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/portal/delete-synced-location`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, location_name: locationName })
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Delete failed'); }
+      const result = await res.json();
+      toast.success(result.message);
+      // Refresh batch locations and batch list
+      setBatchLocations(prev => {
+        const updated = { ...prev };
+        if (updated[batchId]) {
+          updated[batchId] = {
+            ...updated[batchId],
+            locations: updated[batchId].locations.filter(l => l.location_name !== locationName)
+          };
+        }
+        return updated;
+      });
+      fetchForwardBatches();
+    } catch (e) { toast.error(e.message); }
+  };
+
   const [rebuilding, setRebuilding] = useState(false);
 
   const handleRebuildVariance = async () => {
