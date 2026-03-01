@@ -325,6 +325,7 @@ function ColumnSettingsPanel({ columns, hiddenColumns, frozenColumns, onToggleVi
 // ============ Sortable + Filterable Header ============
 function SortableHeader({ column, label, align, sortConfig, onSort, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, className }) {
   const [showFilter, setShowFilter] = useState(false);
+  const filterBtnRef = useRef(null);
   const currentFilter = activeFilters[column];
   const hasCheckboxFilter = currentFilter !== undefined && currentFilter !== null && currentFilter.length > 0 && currentFilter.length < (allValues || []).length;
   const hasNumericFilter = numericFilters?.[column] != null;
@@ -343,13 +344,13 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
           )}
         </button>
         {allValues && allValues.length > 0 && (
-          <button className={`ml-0.5 p-0.5 rounded hover:bg-gray-100 ${isFiltered ? 'text-emerald-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'} transition-all`} onClick={(e) => { e.stopPropagation(); setShowFilter(!showFilter); }}>
+          <button ref={filterBtnRef} className={`ml-0.5 p-0.5 rounded hover:bg-gray-100 ${isFiltered ? 'text-emerald-500' : 'text-gray-300 opacity-0 group-hover:opacity-100'} transition-all`} onClick={(e) => { e.stopPropagation(); setShowFilter(!showFilter); }}>
             <Filter className="w-3 h-3" />
           </button>
         )}
       </div>
       {showFilter && (
-        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} onClose={() => setShowFilter(false)} />
+        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} onClose={() => setShowFilter(false)} triggerRef={filterBtnRef} />
       )}
     </th>
   );
