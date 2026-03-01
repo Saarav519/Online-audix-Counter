@@ -1870,6 +1870,86 @@ async def delete_forward_batch(batch_id: str):
         "locations_removed": removed_count
     }
 
+class DeleteSyncedLocationRequest(BaseModel):
+    session_id: str
+    location_name: str
+
+@portal_router.post("/delete-synced-location")
+async def delete_synced_location(req: DeleteSyncedLocationRequest):
+    """Delete a specific forwarded location from variance, raw data, and conflicts."""
+    removed = {}
+    
+    # 1. Remove from synced_locations (variance)
+    result = await db.synced_locations.delete_many({
+        "session_id": req.session_id,
+        "location_name": req.location_name
+    })
+    removed["synced_locations"] = result.deleted_count
+    
+    # 2. Remove from sync_raw_logs — remove location entries within raw log documents
+    raw_logs = await db.sync_raw_logs.find({
+        "session_id": req.session_id
+    }, {"_id": 0, "id": 1, "raw_payload": 1}).to_list(10000)
+    
+    raw_cleaned = 0
+    for log in raw_logs:
+        payload = log.get("raw_payload", {})
+        locations = payload.get("locations", [])
+        original_len = len(locations)
+        filtered = [loc for loc in locations if loc.get("name", "") != req.location_name]
+        if len(filtered) < original_len:
+            raw_cleaned += (original_len - len(filtered))
+            if len(filtered) == 0:
+                # Remove the entire raw log entry if no locations remain
+                await db.sync_raw_logs.delete_one({"id": log["id"]})
+            else:
+                await db.sync_raw_logs.update_one(
+                    {"id": log["id"]},
+                    {"$set": {"raw_payload.locations": filtered}}
+                )
+    removed["raw_log_entries"] = raw_cleaned
+    
+    # 3. Remove from conflict_locations
+    result = await db.conflict_locations.delete_many({
+        "session_id": req.session_id,
+        "location_name": req.location_name
+    })
+    removed["conflicts"] = result.deleted_count
+    
+    # 4. Remove from sync_inbox
+    result = await db.sync_inbox.delete_many({
+        "session_id": req.session_id,
+        "location_name": req.location_name
+    })
+    removed["inbox_entries"] = result.deleted_count
+    
+    total = sum(removed.values())
+    return {
+        "message": f"Location '{req.location_name}' deleted. {total} records removed.",
+        "removed": removed
+    }
+
+@portal_router.get("/forward-batch-locations/{batch_id}")
+async def get_forward_batch_locations(batch_id: str):
+    """Get individual locations in a forwarded batch."""
+    batch = await db.forward_batches.find_one({"id": batch_id})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    
+    session_id = batch["session_id"]
+    
+    # Get inbox entries for this batch
+    inbox_entries = await db.sync_inbox.find(
+        {"forward_batch_id": batch_id},
+        {"_id": 0, "location_name": 1, "device_name": 1, "total_items": 1, "total_quantity": 1, "status": 1, "synced_at": 1}
+    ).to_list(10000)
+    
+    return {
+        "batch_id": batch_id,
+        "session_id": session_id,
+        "locations": inbox_entries
+    }
+
 class RebuildVarianceRequest(BaseModel):
     session_id: str
     client_id: str
