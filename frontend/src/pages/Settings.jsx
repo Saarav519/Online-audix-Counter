@@ -43,7 +43,7 @@ import {
 } from 'lucide-react';
 
 const Settings = () => {
-  const { settings, updateSettings, user, playSound, verifyCredentials, updateUserCredentials, locations, scannedItems, deleteLocationData, masterProducts, setMasterProductsDirect, setMasterLocationsDirect, masterLocations } = useApp();
+  const { settings, updateSettings, user, playSound, verifyCredentials, updateUserCredentials, locations, scannedItems, deleteLocationData, masterProducts, setMasterProductsDirect, setMasterLocationsDirect, masterLocations, deleteMasterLocationsBatch } = useApp();
   
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
