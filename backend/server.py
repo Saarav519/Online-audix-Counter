@@ -28,8 +28,8 @@ app = FastAPI(title="Audix Stock Management API")
 
 # Create routers
 api_router = APIRouter(prefix="/api")
-portal_router = APIRouter(prefix="/api/portal")
-sync_router = APIRouter(prefix="/api/sync")
+portal_router = APIRouter(prefix="/api/audit/portal")
+sync_router = APIRouter(prefix="/api/audit/sync")
 
 security = HTTPBasic()
 
