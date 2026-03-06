@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { List as FixedSizeList } from 'react-window';
+import { FixedSizeList } from 'react-window';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection, useHardwareScanner } from '../hooks/useDeviceDetection';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
