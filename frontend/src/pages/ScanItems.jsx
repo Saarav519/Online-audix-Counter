@@ -325,7 +325,7 @@ const ScanItems = () => {
   // Saves every 500ms instead of on every scan - major performance boost
   // ============================================
   const saveItemsToStorage = useCallback((items, locationId) => {
-    if (locationId) {
+    if (locationId && locationId !== '___cancel___') {
       const key = `audix_temp_items_${locationId}`;
       try {
         if (items.length > 0) {
@@ -350,18 +350,34 @@ const ScanItems = () => {
     }
   }, [tempScannedItems, selectedLocationId, debouncedSaveItems]);
   
-  // Flush save on unmount to prevent data loss
-  // SAFETY: Only flush when data belongs to the current location
+  // Keep refs updated for unmount-only flush (avoids stale closure issues)
+  const tempScannedItemsRef = useRef(tempScannedItems);
+  useEffect(() => { tempScannedItemsRef.current = tempScannedItems; }, [tempScannedItems]);
+  
+  // Flush save on UNMOUNT ONLY to prevent data loss
+  // Uses refs to always have current values (no stale closure issues)
+  // Empty deps = runs cleanup only on component unmount
   useEffect(() => {
     return () => {
-      if (selectedLocationId && tempItemsOwnerRef.current === selectedLocationId) {
-        flushSaveItems(tempScannedItems, selectedLocationId);
+      const currentLocationId = selectedLocationIdRef.current;
+      const currentItems = tempScannedItemsRef.current;
+      const currentOwner = tempItemsOwnerRef.current;
+      if (currentLocationId && currentOwner === currentLocationId && currentItems.length > 0) {
+        // Direct synchronous save on unmount
+        const key = `audix_temp_items_${currentLocationId}`;
+        try {
+          localStorage.setItem(key, JSON.stringify(currentItems));
+          console.log(`💾 Unmount flush: saved ${currentItems.length} items for ${currentLocationId}`);
+        } catch (e) {
+          console.warn('localStorage unmount save failed:', e);
+        }
       }
       // Cleanup auto-confirm/auto-process timers
       if (locationAutoConfirmTimerRef.current) clearTimeout(locationAutoConfirmTimerRef.current);
       if (barcodeAutoProcessTimerRef.current) clearTimeout(barcodeAutoProcessTimerRef.current);
     };
-  }, [selectedLocationId, tempScannedItems, flushSaveItems]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Track if we've loaded items for current location to prevent re-loading
   // Uses composite key: "locationId_isSubmitted" to detect reopen changes
@@ -675,8 +691,15 @@ const ScanItems = () => {
       if (result.success) {
         // CRITICAL: Clear temp items from previous location BEFORE setting new location
         if (selectedLocationIdRef.current && selectedLocationIdRef.current !== result.location.id) {
+          if (tempItemsOwnerRef.current === selectedLocationIdRef.current && tempScannedItemsRef.current.length > 0) {
+            const oldKey = `audix_temp_items_${selectedLocationIdRef.current}`;
+            try {
+              localStorage.setItem(oldKey, JSON.stringify(tempScannedItemsRef.current));
+            } catch (e) { /* ignore */ }
+          }
           setTempScannedItems([]);
           tempItemsOwnerRef.current = null;
+          tempScannedItemsRef.current = [];
           loadedLocationRef.current = null;
         }
         setSelectedLocationId(result.location.id);
@@ -823,6 +846,15 @@ const ScanItems = () => {
     if (urlLocation && urlLocation !== prevUrlLocationRef.current) {
       prevUrlLocationRef.current = urlLocation;
       // New location from URL (sequential navigation after submit)
+      // Synchronously save old location's data before switching
+      const oldLocId = selectedLocationIdRef.current;
+      if (oldLocId && oldLocId !== urlLocation && tempItemsOwnerRef.current === oldLocId) {
+        const oldItems = tempScannedItemsRef.current;
+        if (oldItems.length > 0) {
+          const oldKey = `audix_temp_items_${oldLocId}`;
+          try { localStorage.setItem(oldKey, JSON.stringify(oldItems)); } catch (e) { /* ignore */ }
+        }
+      }
       setSelectedLocationId(urlLocation);
       setLocationInput('');
       setBarcodeInput('');
@@ -830,6 +862,7 @@ const ScanItems = () => {
       setWaitingForLocationScan(false);
       loadedLocationRef.current = null; // Force reload items for new location
       tempItemsOwnerRef.current = null; // Reset ownership to prevent cross-contamination
+      tempScannedItemsRef.current = []; // Reset ref immediately
       // IMPORTANT: Only clear tempLocation if the new URL location is NOT the current temp
       // This prevents the URL sync from clearing tempLocation when navigating within the same scan session
       const currentTemp = tempLocationRef.current;
@@ -1021,13 +1054,22 @@ const ScanItems = () => {
     if (result.success) {
       // CRITICAL: Clear temp items from previous location BEFORE setting new location
       // This prevents cross-contamination where old data gets saved under new location ID
+      // All operations are SYNCHRONOUS to avoid race conditions
       if (selectedLocationId && selectedLocationId !== result.location.id) {
-        // Flush current items to the OLD location first
-        if (tempItemsOwnerRef.current === selectedLocationId) {
-          flushSaveItems(tempScannedItems, selectedLocationId);
+        // 1. Synchronously save current items to OLD location's localStorage
+        if (tempItemsOwnerRef.current === selectedLocationId && tempScannedItems.length > 0) {
+          const oldKey = `audix_temp_items_${selectedLocationId}`;
+          try {
+            localStorage.setItem(oldKey, JSON.stringify(tempScannedItems));
+            console.log(`💾 Sync-saved ${tempScannedItems.length} items to old location ${selectedLocationId}`);
+          } catch (e) { console.warn('Sync save failed:', e); }
         }
+        // 2. Cancel any pending debounced saves
+        flushSaveItems([], '___cancel___'); // This clears the timeout without writing
+        // 3. Reset all tracking state
         setTempScannedItems([]);
         tempItemsOwnerRef.current = null;
+        tempScannedItemsRef.current = [];
         loadedLocationRef.current = null;
       }
       

@@ -1,0 +1,84 @@
+{
+  "summary": "Frontend-only testing of Audix Counter Scanner App bug fixes. Both Bug 1 (items vanishing after submit) and Bug 2 (cross-location data contamination) have been VERIFIED AS FIXED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "bugs_status": {
+    "bug_1": {
+      "description": "Location data vanishes from UI after submit",
+      "status": "FIXED",
+      "evidence": [
+        "Submitted location (RT-SF) displays items in read-only mode",
+        "Console shows: '📥 Loaded 2 existing items from context (submitted: true)'",
+        "UI shows 'Location is submitted and locked' banner",
+        "Items displayed: Organic Rice 5kg (qty 37), Notebook A4 (qty 30)",
+        "Barcode input is disabled, delete buttons hidden in read-only view"
+      ],
+      "fix_verified": "The composite loadKey (locationId_isSubmitted) and loading items for submitted locations works correctly"
+    },
+    "bug_2": {
+      "description": "Data duplication across locations when switching",
+      "status": "FIXED",
+      "evidence": [
+        "Scanned Rice Basmati (8901234567894) in WH-A1",
+        "Clicked Back, confirmed 'Yes, Go Back' to discard",
+        "Console shows: '🗑️ Cleared temp items for location loc_temp_...'",
+        "Selected WH-B-CS - it shows ONLY its own items (LED Bulb, Hand Sanitizer)",
+        "Rice Basmati from WH-A1 did NOT appear in WH-B-CS",
+        "Console shows: '📥 Loaded 2 existing items from context (submitted: false)' for WH-B-CS"
+      ],
+      "fix_verified": "Synchronous localStorage save+clear on location switch prevents cross-contamination"
+    }
+  },
+  "test_scenarios_executed": [
+    {
+      "name": "Bug 2: Location switching with discard",
+      "steps": [
+        "1. Login with admin/admin123",
+        "2. Navigate to /scan",
+        "3. Select WH-A1, scan barcode 8901234567894 (Rice Basmati)",
+        "4. Click Back, confirm 'Yes, Go Back' in discard dialog",
+        "5. Select WH-B-CS",
+        "6. Verify WH-B-CS shows ONLY its own items (LED Bulb, Hand Sanitizer)"
+      ],
+      "result": "PASS - No cross-contamination"
+    },
+    {
+      "name": "Bug 1: View submitted location items",
+      "steps": [
+        "1. Navigate to location RT-SF (loc_4) that has items",
+        "2. Click Submit Location -> Submit & Lock",
+        "3. Navigate back to /scan?location=loc_4",
+        "4. Verify items are visible in read-only mode"
+      ],
+      "result": "PASS - Items visible after submit"
+    }
+  ],
+  "test_report_links": [
+    "/app/test_reports/iteration_2.json"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A - backend testing skipped per request",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "admin": "userId: admin, password: admin123"
+  },
+  "seed_data_creation": "Used existing mockData - WH-A1, WH-B-CS, RT-SF locations with their mock scannedItems",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both critical bugs are now fixed. Bug 1 fixed by composite loadKey including isSubmitted status. Bug 2 fixed by synchronous localStorage save+clear during location switch. The tempItemsOwnerRef tracking prevents cross-contamination. Test with rapid location switching to ensure no race conditions.",
+  "rca_of_the_issue": {
+    "bug_1_fix_explanation": "The load effect now uses a composite key (locationId_isSubmitted) to detect when a location is reopened. Items are loaded for BOTH submitted and non-submitted locations, with submitted locations displayed in read-only mode.",
+    "bug_2_fix_explanation": "handleLocationScan now does SYNCHRONOUS localStorage.setItem for the old location before clearing tempScannedItems. The flushSaveItems with '___cancel___' sentinel clears pending debounced saves without writing data. tempItemsOwnerRef tracks data ownership to prevent cross-contamination."
+  }
+}
