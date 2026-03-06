@@ -645,54 +645,18 @@ export const AppProvider = ({ children }) => {
   };
 
   // BATCH SAVE: Save multiple items to a location at once
-  // This is more reliable than calling addScannedItem multiple times
-  // because it performs a single atomic state update
+  // REPLACES all existing items for the location (not merge)
+  // This ensures deleted items don't come back after re-submit
   const batchSaveScannedItems = useCallback((locationId, items) => {
     if (!items || items.length === 0) return;
     
     setScannedItems(prev => {
-      const existingItems = prev[locationId] || [];
-      
-      // Merge items - update existing by barcode or add new
-      const itemMap = new Map();
-      
-      // First, add existing items to map
-      existingItems.forEach(item => {
-        itemMap.set(item.barcode, item);
-      });
-      
-      // Then, update/add new items
-      items.forEach(item => {
-        const existingItem = itemMap.get(item.barcode);
-        if (existingItem) {
-          // Update existing item with new quantity
-          itemMap.set(item.barcode, {
-            ...existingItem,
-            quantity: item.quantity,
-            scannedAt: item.scannedAt || new Date().toISOString()
-          });
-        } else {
-          // Add new item
-          itemMap.set(item.barcode, {
-            id: item.id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            barcode: item.barcode,
-            productName: item.productName || `Unknown (${item.barcode.slice(-6)})`,
-            quantity: item.quantity,
-            scannedAt: item.scannedAt || new Date().toISOString(),
-            isMaster: item.isMaster
-          });
-        }
-      });
-      
-      // Convert map back to array
-      const mergedItems = Array.from(itemMap.values());
-      
-      const newState = { ...prev, [locationId]: mergedItems };
+      const newState = { ...prev, [locationId]: items };
       
       // Immediately persist to localStorage (safety measure)
       try {
         localStorage.setItem('audix_scanned_items', JSON.stringify(newState));
-        console.log(`✅ Batch saved ${mergedItems.length} items to location ${locationId}`);
+        console.log(`✅ Batch saved ${items.length} items to location ${locationId} (replaced)`);
       } catch (e) {
         console.warn('localStorage batch save failed:', e);
       }

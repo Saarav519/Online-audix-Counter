@@ -343,16 +343,18 @@ const ScanItems = () => {
   const [debouncedSaveItems, flushSaveItems] = useDebouncedCallback(saveItemsToStorage, 500);
   
   // Auto-save temp items with debouncing (500ms delay for performance)
+  // SAFETY: Only save when data belongs to the current location (prevents cross-contamination)
   useEffect(() => {
-    if (selectedLocationId) {
+    if (selectedLocationId && tempItemsOwnerRef.current === selectedLocationId) {
       debouncedSaveItems(tempScannedItems, selectedLocationId);
     }
   }, [tempScannedItems, selectedLocationId, debouncedSaveItems]);
   
   // Flush save on unmount to prevent data loss
+  // SAFETY: Only flush when data belongs to the current location
   useEffect(() => {
     return () => {
-      if (selectedLocationId) {
+      if (selectedLocationId && tempItemsOwnerRef.current === selectedLocationId) {
         flushSaveItems(tempScannedItems, selectedLocationId);
       }
       // Cleanup auto-confirm/auto-process timers
@@ -362,45 +364,61 @@ const ScanItems = () => {
   }, [selectedLocationId, tempScannedItems, flushSaveItems]);
   
   // Track if we've loaded items for current location to prevent re-loading
+  // Uses composite key: "locationId_isSubmitted" to detect reopen changes
   const loadedLocationRef = useRef(null);
+  
+  // Track which location's data is currently in tempScannedItems
+  // Prevents cross-contamination when switching locations
+  const tempItemsOwnerRef = useRef(null);
   
   // ============================================
   // LOAD: Load existing temp items when a location is selected
-  // Only loads once per location selection
+  // Loads for both submitted (read-only) and non-submitted locations
+  // Re-loads when location is reopened (isSubmitted changes)
   // ============================================
   useEffect(() => {
-    // Skip if already loaded for this location or no location selected
-    if (!selectedLocationId || loadedLocationRef.current === selectedLocationId) {
+    if (!selectedLocationId) return;
+    
+    const location = locations.find(l => l.id === selectedLocationId);
+    const isSubmitted = !!location?.isSubmitted;
+    // Composite key includes submission status so reopening triggers reload
+    const loadKey = `${selectedLocationId}_${isSubmitted}`;
+    
+    // Skip if already loaded for this exact state
+    if (loadedLocationRef.current === loadKey) {
       return;
     }
     
-    console.log(`🔄 Location changed to: ${selectedLocationId}, loading items...`);
+    console.log(`🔄 Location changed to: ${selectedLocationId}, isSubmitted: ${isSubmitted}, loading items...`);
     
     // First, try to load temp items from localStorage (unsaved scanning session)
-    const key = `audix_temp_items_${selectedLocationId}`;
-    const savedTempItems = localStorage.getItem(key);
-    
-    if (savedTempItems) {
-      try {
-        const items = JSON.parse(savedTempItems);
-        if (Array.isArray(items) && items.length > 0) {
-          setTempScannedItems(items);
-          loadedLocationRef.current = selectedLocationId;
-          console.log(`📥 Loaded ${items.length} temp items (${items.reduce((s, i) => s + i.quantity, 0)} qty) from localStorage`);
-          return;
+    // Only for non-submitted locations (submitted locations should load from context)
+    if (!isSubmitted) {
+      const key = `audix_temp_items_${selectedLocationId}`;
+      const savedTempItems = localStorage.getItem(key);
+      
+      if (savedTempItems) {
+        try {
+          const items = JSON.parse(savedTempItems);
+          if (Array.isArray(items) && items.length > 0) {
+            setTempScannedItems(items);
+            tempItemsOwnerRef.current = selectedLocationId;
+            loadedLocationRef.current = loadKey;
+            console.log(`📥 Loaded ${items.length} temp items (${items.reduce((s, i) => s + i.quantity, 0)} qty) from localStorage`);
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse saved temp items:', e);
         }
-      } catch (e) {
-        console.warn('Failed to parse saved temp items:', e);
       }
     }
     
-    // If no temp items, check if this location has submitted items in context
-    // and load them for editing (if location is not locked)
+    // Load from context - for BOTH submitted and non-submitted locations
+    // Submitted locations display in read-only mode
     const existingItems = scannedItems[selectedLocationId];
-    const location = locations.find(l => l.id === selectedLocationId);
     
-    if (existingItems && existingItems.length > 0 && !location?.isSubmitted) {
-      // Convert context items to temp format for editing
+    if (existingItems && existingItems.length > 0) {
+      // Convert context items to temp format for display/editing
       const tempFormat = existingItems.map(item => ({
         id: item.id || `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         barcode: item.barcode,
@@ -410,12 +428,14 @@ const ScanItems = () => {
         isMaster: item.isMaster
       }));
       setTempScannedItems(tempFormat);
-      loadedLocationRef.current = selectedLocationId;
-      console.log(`📥 Loaded ${tempFormat.length} existing items from context`);
+      tempItemsOwnerRef.current = selectedLocationId;
+      loadedLocationRef.current = loadKey;
+      console.log(`📥 Loaded ${tempFormat.length} existing items from context (submitted: ${isSubmitted})`);
     } else {
       // No items to load - start fresh
       setTempScannedItems([]);
-      loadedLocationRef.current = selectedLocationId;
+      tempItemsOwnerRef.current = selectedLocationId;
+      loadedLocationRef.current = loadKey;
       console.log(`📥 No items found for location, starting fresh`);
     }
   }, [selectedLocationId, scannedItems, locations]);
@@ -424,6 +444,7 @@ const ScanItems = () => {
   useEffect(() => {
     if (!selectedLocationId) {
       loadedLocationRef.current = null;
+      tempItemsOwnerRef.current = null;
       setTempScannedItems([]);
     }
   }, [selectedLocationId]);
@@ -543,6 +564,11 @@ const ScanItems = () => {
       return { success: false, error: 'Barcode not in master list', isValid: false };
     }
     
+    // Ensure ownership is set when adding items
+    if (selectedLocationId) {
+      tempItemsOwnerRef.current = selectedLocationId;
+    }
+    
     let newItem = null;
     
     setTempScannedItems(prev => {
@@ -630,6 +656,7 @@ const ScanItems = () => {
       console.log(`🗑️ Cleared temp items for location ${selectedLocationId}`);
     }
     setTempScannedItems([]);
+    tempItemsOwnerRef.current = null;
   }, [selectedLocationId]);
 
   // HIGH-PERFORMANCE Hardware scanner callback
@@ -646,6 +673,12 @@ const ScanItems = () => {
       setLocationInput(scannedValue);
       const result = scanLocation(scannedValue);
       if (result.success) {
+        // CRITICAL: Clear temp items from previous location BEFORE setting new location
+        if (selectedLocationIdRef.current && selectedLocationIdRef.current !== result.location.id) {
+          setTempScannedItems([]);
+          tempItemsOwnerRef.current = null;
+          loadedLocationRef.current = null;
+        }
         setSelectedLocationId(result.location.id);
         // Store temp location if it's a new dynamic location
         // IMPORTANT: Set tempLocation BEFORE navigate to avoid URL sync clearing it
@@ -796,6 +829,7 @@ const ScanItems = () => {
       setLastScanResult(null);
       setWaitingForLocationScan(false);
       loadedLocationRef.current = null; // Force reload items for new location
+      tempItemsOwnerRef.current = null; // Reset ownership to prevent cross-contamination
       // IMPORTANT: Only clear tempLocation if the new URL location is NOT the current temp
       // This prevents the URL sync from clearing tempLocation when navigating within the same scan session
       const currentTemp = tempLocationRef.current;
@@ -985,6 +1019,18 @@ const ScanItems = () => {
     const result = scanLocation(input);
     
     if (result.success) {
+      // CRITICAL: Clear temp items from previous location BEFORE setting new location
+      // This prevents cross-contamination where old data gets saved under new location ID
+      if (selectedLocationId && selectedLocationId !== result.location.id) {
+        // Flush current items to the OLD location first
+        if (tempItemsOwnerRef.current === selectedLocationId) {
+          flushSaveItems(tempScannedItems, selectedLocationId);
+        }
+        setTempScannedItems([]);
+        tempItemsOwnerRef.current = null;
+        loadedLocationRef.current = null;
+      }
+      
       setSelectedLocationId(result.location.id);
       setLocationInput(result.location.code);
       setLocationError('');
