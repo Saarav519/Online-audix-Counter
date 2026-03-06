@@ -235,11 +235,56 @@ export const AppProvider = ({ children }) => {
 
   // ============================================
   // PERFORMANCE: Debounced localStorage save for scannedItems
-  // Saves every 300ms instead of on every change - major performance boost
-  // Still fast enough to prevent data loss in normal usage
+  // Saves every 500ms instead of on every change - major performance boost
+  // Includes storage quota protection to prevent silent data loss
   // ============================================
   const lastSavedRef = useRef(JSON.stringify(scannedItems));
   const saveTimeoutRef2 = useRef(null);
+  const storageWarningShownRef = useRef(false);
+  
+  // Safe localStorage save with quota protection
+  const safeLocalStorageSave = useCallback((key, data) => {
+    try {
+      localStorage.setItem(key, data);
+      storageWarningShownRef.current = false;
+      return true;
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+        console.error('localStorage FULL! Data may be lost. Size:', (data.length / 1024).toFixed(1), 'KB');
+        // Show warning to user only once per session
+        if (!storageWarningShownRef.current) {
+          storageWarningShownRef.current = true;
+          // Use setTimeout to avoid blocking the save flow
+          setTimeout(() => {
+            alert(
+              'Storage is almost full! Your scanned data may not be saved properly.\n\n' +
+              'Please sync/export your data and clear old locations to free up space.'
+            );
+          }, 100);
+        }
+        // Try to save by removing submitted locations' temp items to free space
+        try {
+          const keysToClean = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('audix_temp_items_')) {
+              keysToClean.push(k);
+            }
+          }
+          keysToClean.forEach(k => localStorage.removeItem(k));
+          console.log(`Cleaned ${keysToClean.length} temp item keys to free space`);
+          // Retry save
+          localStorage.setItem(key, data);
+          return true;
+        } catch (retryErr) {
+          console.error('Still cannot save after cleanup:', retryErr);
+          return false;
+        }
+      }
+      console.warn('localStorage save failed:', e);
+      return false;
+    }
+  }, []);
   
   useEffect(() => {
     const currentData = JSON.stringify(scannedItems);
@@ -250,15 +295,12 @@ export const AppProvider = ({ children }) => {
         clearTimeout(saveTimeoutRef2.current);
       }
       
-      // Debounced save - 300ms delay for performance
+      // Debounced save - 500ms delay for performance (was 300ms)
       saveTimeoutRef2.current = setTimeout(() => {
-        try {
-          localStorage.setItem('audix_scanned_items', currentData);
+        if (safeLocalStorageSave('audix_scanned_items', currentData)) {
           lastSavedRef.current = currentData;
-        } catch (e) {
-          console.warn('localStorage save failed:', e);
         }
-      }, 300);
+      }, 500);
     }
     
     // Cleanup timeout on unmount
@@ -266,14 +308,10 @@ export const AppProvider = ({ children }) => {
       if (saveTimeoutRef2.current) {
         clearTimeout(saveTimeoutRef2.current);
         // Force immediate save on unmount to prevent data loss
-        try {
-          localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
-        } catch (e) {
-          console.warn('localStorage save failed on unmount:', e);
-        }
+        safeLocalStorageSave('audix_scanned_items', JSON.stringify(scannedItems));
       }
     };
-  }, [scannedItems]);
+  }, [scannedItems, safeLocalStorageSave]);
 
   // ============================================
   // CLEANUP: Remove orphaned scannedItems keys
@@ -653,12 +691,29 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const newState = { ...prev, [locationId]: items };
       
-      // Immediately persist to localStorage (safety measure)
+      // Immediately persist to localStorage (safety measure) with quota protection
       try {
-        localStorage.setItem('audix_scanned_items', JSON.stringify(newState));
-        console.log(`✅ Batch saved ${items.length} items to location ${locationId} (replaced)`);
+        const data = JSON.stringify(newState);
+        localStorage.setItem('audix_scanned_items', data);
+        console.log(`Batch saved ${items.length} items to location ${locationId} (replaced)`);
       } catch (e) {
-        console.warn('localStorage batch save failed:', e);
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+          console.error('localStorage FULL during batch save! Cleaning temp items...');
+          // Clean temp items to free space and retry
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('audix_temp_items_')) {
+              localStorage.removeItem(k);
+            }
+          }
+          try {
+            localStorage.setItem('audix_scanned_items', JSON.stringify(newState));
+          } catch (retryErr) {
+            console.error('Batch save failed even after cleanup:', retryErr);
+          }
+        } else {
+          console.warn('localStorage batch save failed:', e);
+        }
       }
       
       return newState;

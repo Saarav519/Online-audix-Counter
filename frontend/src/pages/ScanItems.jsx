@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { List as FixedSizeList } from 'react-window';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection, useHardwareScanner } from '../hooks/useDeviceDetection';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -1918,32 +1919,28 @@ const ScanItems = () => {
                   </p>
                 </div>
               ) : (
-                <div 
-                  ref={itemsListRef}
-                  className="space-y-2 overflow-y-auto"
-                  style={{ 
-                    maxHeight: '220px',
-                    paddingBottom: '8px',
-                    WebkitOverflowScrolling: 'touch'
-                  }}
-                >
-                  {reversedItems.map((item) => (
-                    <ScannedItemRow
-                      key={item.id}
-                      item={item}
-                      isEditing={editingItemId === item.id}
-                      editQuantity={editQuantity}
-                      setEditQuantity={setEditQuantity}
-                      onQuantityUpdate={handleQuantityUpdate}
-                      onDelete={handleDelete}
-                      singleSkuMode={isSingleSkuMode}
-                      isLocationLocked={isLocationLocked}
-                      onStartEdit={(id, qty) => {
-                        setEditingItemId(id);
-                        setEditQuantity(String(qty));
-                      }}
-                    />
-                  ))}
+                <div ref={itemsListRef}>
+                  <FixedSizeList
+                    height={Math.min(reversedItems.length * 68, 220)}
+                    itemCount={reversedItems.length}
+                    itemSize={68}
+                    width="100%"
+                    overscanCount={3}
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                    itemData={{
+                      items: reversedItems,
+                      editingItemId,
+                      editQuantity,
+                      setEditQuantity,
+                      handleQuantityUpdate,
+                      handleDelete,
+                      isSingleSkuMode,
+                      isLocationLocked,
+                      setEditingItemId
+                    }}
+                  >
+                    {VirtualizedItemRow}
+                  </FixedSizeList>
                 </div>
               )}
             </CardContent>
