@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { mockUsers, mockLocations, mockMasterProducts, mockMasterLocations, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
-import { MasterProductsDB, MasterLocationsDB, ScannedItemsDB, getStorageInfo } from '../utils/indexedDB';
+import { MasterProductsDB, MasterLocationsDB, ScannedItemsDB, ScannedItemsByLocationDB, getStorageInfo } from '../utils/indexedDB';
 
 const AppContext = createContext();
 
@@ -40,8 +40,8 @@ export const AppProvider = ({ children }) => {
   // This prevents race conditions where mock data could overwrite real data
   const indexedDBLoadedRef = useRef(false);
   
-  // Load scanned items from localStorage or use mock data
-  // Also cleanup orphaned items (items for locations that no longer exist)
+  // Load scanned items - starts with localStorage (sync), then migrates to IndexedDB (async)
+  // IndexedDB load will overwrite this once ready
   const [scannedItems, setScannedItems] = useState(() => {
     const savedItems = localStorage.getItem('audix_scanned_items');
     const savedLocations = localStorage.getItem('audix_locations');
@@ -65,9 +65,7 @@ export const AppProvider = ({ children }) => {
         });
         
         if (orphanedCount > 0) {
-          console.log(`🧹 Cleaned up ${orphanedCount} orphaned scanned items`);
-          // Save cleaned data back to localStorage
-          localStorage.setItem('audix_scanned_items', JSON.stringify(cleanedItems));
+          console.log(`Cleaned up ${orphanedCount} orphaned scanned items`);
         }
         
         return cleanedItems;
@@ -79,6 +77,9 @@ export const AppProvider = ({ children }) => {
     
     return savedItems ? JSON.parse(savedItems) : mockScannedItems;
   });
+  
+  // Flag: IndexedDB scanned items loaded (prevents overwriting real data with mock)
+  const scannedItemsFromIDBRef = useRef(false);
   
   const [sessions, setSessions] = useState(mockSessions);
   const [settings, setSettings] = useState(() => {
@@ -152,6 +153,58 @@ export const AppProvider = ({ children }) => {
     };
     
     loadMasterLocations();
+  }, []);
+
+  // ============================================
+  // INDEXEDDB: Load Scanned Items on startup (V3 migration)
+  // Migrates from localStorage (5MB) to IndexedDB (100MB+)
+  // ============================================
+  useEffect(() => {
+    const loadScannedItems = async () => {
+      try {
+        const idbData = await ScannedItemsByLocationDB.getAll();
+        const idbKeys = Object.keys(idbData);
+        
+        if (idbKeys.length > 0) {
+          // IndexedDB has data - use it as primary source
+          setScannedItems(idbData);
+          scannedItemsFromIDBRef.current = true;
+          console.log(`Loaded ${idbKeys.length} locations' scanned items from IndexedDB`);
+          
+          // Clean up localStorage copy (no longer needed)
+          localStorage.removeItem('audix_scanned_items');
+        } else {
+          // No IndexedDB data - migrate from localStorage
+          const savedItems = localStorage.getItem('audix_scanned_items');
+          if (savedItems) {
+            try {
+              const items = JSON.parse(savedItems);
+              const keys = Object.keys(items);
+              if (keys.length > 0) {
+                // Save to IndexedDB
+                await ScannedItemsByLocationDB.saveAll(items);
+                scannedItemsFromIDBRef.current = true;
+                console.log(`Migrated ${keys.length} locations' scanned items from localStorage to IndexedDB`);
+                // Remove from localStorage to free space
+                localStorage.removeItem('audix_scanned_items');
+              }
+            } catch (e) {
+              console.warn('Failed to migrate localStorage items to IndexedDB:', e);
+            }
+          } else {
+            // First time - save mock data to IndexedDB
+            await ScannedItemsByLocationDB.saveAll(mockScannedItems);
+            scannedItemsFromIDBRef.current = true;
+            console.log('Initialized IndexedDB with mock scanned items');
+          }
+        }
+      } catch (err) {
+        console.warn('IndexedDB scanned items load failed, using localStorage fallback:', err);
+        // Keep using localStorage data (already loaded in useState init)
+      }
+    };
+    
+    loadScannedItems();
   }, []);
 
   // ============================================
@@ -234,59 +287,20 @@ export const AppProvider = ({ children }) => {
   }, [locations]);
 
   // ============================================
-  // PERFORMANCE: Debounced localStorage save for scannedItems
-  // Saves every 500ms instead of on every change - major performance boost
-  // Includes storage quota protection to prevent silent data loss
+  // INDEXEDDB: Debounced save for scannedItems (replaces localStorage)
+  // Saves every 500ms to IndexedDB (100MB+ capacity)
   // ============================================
   const lastSavedRef = useRef(JSON.stringify(scannedItems));
   const saveTimeoutRef2 = useRef(null);
-  const storageWarningShownRef = useRef(false);
-  
-  // Safe localStorage save with quota protection
-  const safeLocalStorageSave = useCallback((key, data) => {
-    try {
-      localStorage.setItem(key, data);
-      storageWarningShownRef.current = false;
-      return true;
-    } catch (e) {
-      if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-        console.error('localStorage FULL! Data may be lost. Size:', (data.length / 1024).toFixed(1), 'KB');
-        // Show warning to user only once per session
-        if (!storageWarningShownRef.current) {
-          storageWarningShownRef.current = true;
-          // Use setTimeout to avoid blocking the save flow
-          setTimeout(() => {
-            alert(
-              'Storage is almost full! Your scanned data may not be saved properly.\n\n' +
-              'Please sync/export your data and clear old locations to free up space.'
-            );
-          }, 100);
-        }
-        // Try to save by removing submitted locations' temp items to free space
-        try {
-          const keysToClean = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith('audix_temp_items_')) {
-              keysToClean.push(k);
-            }
-          }
-          keysToClean.forEach(k => localStorage.removeItem(k));
-          console.log(`Cleaned ${keysToClean.length} temp item keys to free space`);
-          // Retry save
-          localStorage.setItem(key, data);
-          return true;
-        } catch (retryErr) {
-          console.error('Still cannot save after cleanup:', retryErr);
-          return false;
-        }
-      }
-      console.warn('localStorage save failed:', e);
-      return false;
-    }
-  }, []);
+  const scannedItemsInitializedRef = useRef(false);
   
   useEffect(() => {
+    // Skip initial render and IndexedDB-triggered setState to prevent overwriting
+    if (!scannedItemsInitializedRef.current) {
+      scannedItemsInitializedRef.current = true;
+      return;
+    }
+    
     const currentData = JSON.stringify(scannedItems);
     // Only save if data actually changed (prevents unnecessary writes)
     if (currentData !== lastSavedRef.current) {
@@ -295,11 +309,24 @@ export const AppProvider = ({ children }) => {
         clearTimeout(saveTimeoutRef2.current);
       }
       
-      // Debounced save - 500ms delay for performance (was 300ms)
+      // Debounced save - 500ms delay for performance
       saveTimeoutRef2.current = setTimeout(() => {
-        if (safeLocalStorageSave('audix_scanned_items', currentData)) {
-          lastSavedRef.current = currentData;
-        }
+        // Save to IndexedDB (async, non-blocking, 100MB+ capacity)
+        ScannedItemsByLocationDB.saveAll(scannedItems)
+          .then(() => {
+            lastSavedRef.current = currentData;
+            console.log(`Saved scanned items to IndexedDB (${Object.keys(scannedItems).length} locations)`);
+          })
+          .catch(err => {
+            console.warn('IndexedDB save failed, falling back to localStorage:', err);
+            // Fallback to localStorage if IndexedDB fails
+            try {
+              localStorage.setItem('audix_scanned_items', currentData);
+              lastSavedRef.current = currentData;
+            } catch (lsErr) {
+              console.error('Both IndexedDB and localStorage save failed:', lsErr);
+            }
+          });
       }, 500);
     }
     
@@ -307,16 +334,23 @@ export const AppProvider = ({ children }) => {
     return () => {
       if (saveTimeoutRef2.current) {
         clearTimeout(saveTimeoutRef2.current);
-        // Force immediate save on unmount to prevent data loss
-        safeLocalStorageSave('audix_scanned_items', JSON.stringify(scannedItems));
+        // Force immediate save on unmount - use localStorage as sync fallback
+        // (IndexedDB is async and may not complete before page unload)
+        try {
+          localStorage.setItem('audix_scanned_items', JSON.stringify(scannedItems));
+        } catch (e) {
+          // Last resort - at least try IndexedDB
+          ScannedItemsByLocationDB.saveAll(scannedItems).catch(() => {});
+        }
       }
     };
-  }, [scannedItems, safeLocalStorageSave]);
+  }, [scannedItems]);
 
   // ============================================
   // CLEANUP: Remove orphaned scannedItems keys
   // When locations change, clean up any scannedItems entries
   // for location IDs that no longer exist in the locations array
+  // Also cleans up orphaned IndexedDB entries
   // ============================================
   useEffect(() => {
     if (!locations || locations.length === 0) return;
@@ -326,7 +360,9 @@ export const AppProvider = ({ children }) => {
       if (orphanKeys.length === 0) return prev; // no orphans, no update
       const cleaned = { ...prev };
       orphanKeys.forEach(k => delete cleaned[k]);
-      console.log(`🧹 Cleaned ${orphanKeys.length} orphaned scannedItems keys`);
+      console.log(`Cleaned ${orphanKeys.length} orphaned scannedItems keys`);
+      // Also remove from IndexedDB
+      ScannedItemsByLocationDB.deleteLocations(orphanKeys).catch(() => {});
       return cleaned;
     });
   }, [locations]);
@@ -659,12 +695,11 @@ export const AppProvider = ({ children }) => {
       locationIds.forEach(locId => {
         delete updated[locId];
       });
-      try {
-        localStorage.setItem('audix_scanned_items', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to sync localStorage after sync clear:', e);
-      }
       return updated;
+    });
+    // Also remove from IndexedDB
+    ScannedItemsByLocationDB.deleteLocations(locationIds).catch(err => {
+      console.warn('IndexedDB delete after sync clear failed:', err);
     });
     // Also remove the locations themselves (they've been synced)
     setLocations(prev => {
@@ -691,30 +726,17 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const newState = { ...prev, [locationId]: items };
       
-      // Immediately persist to localStorage (safety measure) with quota protection
-      try {
-        const data = JSON.stringify(newState);
-        localStorage.setItem('audix_scanned_items', data);
-        console.log(`Batch saved ${items.length} items to location ${locationId} (replaced)`);
-      } catch (e) {
-        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-          console.error('localStorage FULL during batch save! Cleaning temp items...');
-          // Clean temp items to free space and retry
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith('audix_temp_items_')) {
-              localStorage.removeItem(k);
-            }
-          }
+      // Immediately persist to IndexedDB (single location save is fast)
+      ScannedItemsByLocationDB.saveLocation(locationId, items)
+        .then(() => console.log(`Batch saved ${items.length} items to location ${locationId} (IndexedDB)`))
+        .catch(err => {
+          console.warn('IndexedDB batch save failed, trying localStorage:', err);
           try {
             localStorage.setItem('audix_scanned_items', JSON.stringify(newState));
-          } catch (retryErr) {
-            console.error('Batch save failed even after cleanup:', retryErr);
+          } catch (lsErr) {
+            console.error('Both IndexedDB and localStorage batch save failed:', lsErr);
           }
-        } else {
-          console.warn('localStorage batch save failed:', e);
-        }
-      }
+        });
       
       return newState;
     });
@@ -848,14 +870,11 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const newItems = { ...prev };
       delete newItems[locationId];
-      // Immediately persist to localStorage to prevent orphaned data
-      try {
-        localStorage.setItem('audix_scanned_items', JSON.stringify(newItems));
-        console.log(`🗑️ Deleted scanned items for location ${locationId}`);
-      } catch (e) {
-        console.warn('Failed to sync localStorage after delete:', e);
-      }
       return newItems;
+    });
+    // Remove from IndexedDB
+    ScannedItemsByLocationDB.deleteLocation(locationId).catch(err => {
+      console.warn('IndexedDB delete failed for location:', err);
     });
     // Also clear any temp items from localStorage
     localStorage.removeItem(`audix_temp_items_${locationId}`);
@@ -867,18 +886,14 @@ export const AppProvider = ({ children }) => {
     setScannedItems(prev => {
       const newItems = { ...prev };
       delete newItems[locationId];
-      // Immediately persist to localStorage to prevent orphaned data
-      try {
-        localStorage.setItem('audix_scanned_items', JSON.stringify(newItems));
-        console.log(`🗑️ Deleted scanned items for location ${locationId} from reports`);
-      } catch (e) {
-        console.warn('Failed to sync localStorage after delete:', e);
-      }
       return newItems;
+    });
+    // Remove from IndexedDB
+    ScannedItemsByLocationDB.deleteLocation(locationId).catch(err => {
+      console.warn('IndexedDB delete failed for location from reports:', err);
     });
     
     // Then, remove the location from the locations list
-    // (since reports are tied to locations, deleting from reports means deleting the location)
     setLocations(prev => prev.filter(loc => loc.id !== locationId));
     
     // Also clear any temp items from localStorage

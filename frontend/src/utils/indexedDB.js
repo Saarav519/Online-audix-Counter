@@ -5,13 +5,14 @@
  */
 
 const DB_NAME = 'AudixStockDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 // Store names
 const STORES = {
   MASTER_PRODUCTS: 'masterProducts',
   MASTER_LOCATIONS: 'masterLocations',
   SCANNED_ITEMS: 'scannedItems',
+  SCANNED_ITEMS_BY_LOC: 'scannedItemsByLocation',
   LOCATIONS: 'locations',
   SETTINGS: 'settings',
   AUTH_USERS: 'authUsers'
@@ -78,6 +79,13 @@ const initDB = () => {
       // Authorization Users store
       if (!db.objectStoreNames.contains(STORES.AUTH_USERS)) {
         db.createObjectStore(STORES.AUTH_USERS, { keyPath: 'id' });
+      }
+
+      // Scanned Items By Location store (V3) - stores items grouped by locationId
+      // Format: { locationId: "loc_123", items: [...], updatedAt: "..." }
+      // This replaces localStorage for scanned items (supports 100MB+ vs 5MB limit)
+      if (!db.objectStoreNames.contains(STORES.SCANNED_ITEMS_BY_LOC)) {
+        db.createObjectStore(STORES.SCANNED_ITEMS_BY_LOC, { keyPath: 'locationId' });
       }
     };
   });
@@ -439,6 +447,66 @@ export const AuthUsersDB = {
 };
 
 /**
+ * Scanned Items By Location API (V3 - replaces localStorage)
+ * Stores: { locationId: "loc_123", items: [...], updatedAt: "2026-..." }
+ * Supports 100MB+ (vs localStorage's 5MB limit)
+ */
+export const ScannedItemsByLocationDB = {
+  // Get all location data as { [locationId]: items[] } object
+  getAll: async () => {
+    const records = await getAll(STORES.SCANNED_ITEMS_BY_LOC);
+    const result = {};
+    records.forEach(rec => {
+      result[rec.locationId] = rec.items || [];
+    });
+    return result;
+  },
+  
+  // Save items for a single location (replaces existing)
+  saveLocation: async (locationId, items) => {
+    return put(STORES.SCANNED_ITEMS_BY_LOC, {
+      locationId,
+      items: items || [],
+      updatedAt: new Date().toISOString()
+    });
+  },
+  
+  // Save entire scannedItems object { [locationId]: items[] }
+  saveAll: async (scannedItemsObj) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.SCANNED_ITEMS_BY_LOC, 'readwrite');
+      const store = transaction.objectStore(STORES.SCANNED_ITEMS_BY_LOC);
+      const now = new Date().toISOString();
+      
+      Object.entries(scannedItemsObj).forEach(([locationId, items]) => {
+        store.put({ locationId, items: items || [], updatedAt: now });
+      });
+      
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  },
+  
+  // Delete items for a location
+  deleteLocation: (locationId) => deleteByKey(STORES.SCANNED_ITEMS_BY_LOC, locationId),
+  
+  // Delete multiple locations
+  deleteLocations: async (locationIds) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORES.SCANNED_ITEMS_BY_LOC, 'readwrite');
+      const store = transaction.objectStore(STORES.SCANNED_ITEMS_BY_LOC);
+      locationIds.forEach(id => store.delete(id));
+      transaction.oncomplete = () => resolve(locationIds.length);
+      transaction.onerror = () => reject(transaction.error);
+    });
+  },
+  
+  clear: () => clearStore(STORES.SCANNED_ITEMS_BY_LOC)
+};
+
+/**
  * Check available storage quota
  */
 export const getStorageInfo = async () => {
@@ -463,6 +531,7 @@ export default {
   MasterProductsDB,
   MasterLocationsDB,
   ScannedItemsDB,
+  ScannedItemsByLocationDB,
   LocationsDB,
   SettingsDB,
   AuthUsersDB,
