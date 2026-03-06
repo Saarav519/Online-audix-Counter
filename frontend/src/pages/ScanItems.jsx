@@ -274,6 +274,7 @@ const ScanItems = () => {
   });
   const [scanCount, setScanCount] = useState(0); // Track successful scans for feedback
   const [showBackConfirmDialog, setShowBackConfirmDialog] = useState(false); // Back confirmation dialog
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState(null); // Delete confirmation popup
   
   // "Ask Quantity Before Adding" toggle (Punching Mode)
   const [askQuantityBeforeAdding, setAskQuantityBeforeAdding] = useState(() => {
@@ -1383,7 +1384,16 @@ const ScanItems = () => {
   // Delete from TEMP state (not from context)
   const handleDelete = (itemId) => {
     if (isLocationLocked) return;
-    deleteTempItem(itemId);
+    // Show confirmation popup before deleting
+    const item = tempScannedItems.find(i => i.id === itemId);
+    setDeleteConfirmItem(item || { id: itemId });
+  };
+
+  // Confirmed delete - permanently remove from IndexedDB and temp state
+  const handleDeleteConfirmed = () => {
+    if (!deleteConfirmItem) return;
+    deleteTempItem(deleteConfirmItem.id);
+    setDeleteConfirmItem(null);
     
     // Keep focus on barcode input after deletion (mobile)
     if (showScannerMode && barcodeInputRef.current) {
@@ -1391,6 +1401,11 @@ const ScanItems = () => {
         barcodeInputRef.current.focus();
       }, 50);
     }
+  };
+
+  // Cancel delete - return to same screen
+  const handleDeleteCancelled = () => {
+    setDeleteConfirmItem(null);
   };
 
   // Update quantity in TEMP state
@@ -1801,6 +1816,39 @@ const ScanItems = () => {
                   className="flex-1"
                 >
                   Yes, Go Back
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation Dialog */}
+          <Dialog open={!!deleteConfirmItem} onOpenChange={(open) => !open && setDeleteConfirmItem(null)}>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-600">
+                  <Trash2 className="w-5 h-5" />
+                  Delete Barcode
+                </DialogTitle>
+                <DialogDescription className="text-base pt-2">
+                  Hey, you want to delete this barcode{deleteConfirmItem?.barcode ? ` (${deleteConfirmItem.barcode})` : ''} or not?
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex gap-2 sm:gap-2">
+                <Button
+                  data-testid="delete-cancel-btn"
+                  variant="outline"
+                  onClick={handleDeleteCancelled}
+                  className="flex-1"
+                >
+                  No
+                </Button>
+                <Button
+                  data-testid="delete-confirm-btn"
+                  variant="destructive"
+                  onClick={handleDeleteConfirmed}
+                  className="flex-1"
+                >
+                  Yes, Delete
                 </Button>
               </DialogFooter>
             </DialogContent>
