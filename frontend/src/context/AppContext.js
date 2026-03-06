@@ -919,8 +919,10 @@ export const AppProvider = ({ children }) => {
   // Find location by code (for scanner auto-select) - respects mode separation
   const findLocationByCode = (code) => {
     return locations.find(l => {
+      // EXACT match only - no partial matching to prevent false positives
+      // e.g. location "123456789" should NOT match code "1" or "24"
       const codeMatch = l.code.toLowerCase() === code.toLowerCase() || 
-                        l.name.toLowerCase().includes(code.toLowerCase());
+                        l.name.toLowerCase() === code.toLowerCase();
       
       if (!codeMatch) return false;
       
