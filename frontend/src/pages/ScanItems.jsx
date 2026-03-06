@@ -581,8 +581,10 @@ const ScanItems = () => {
     }
     
     // Ensure ownership is set when adding items
-    if (selectedLocationId) {
-      tempItemsOwnerRef.current = selectedLocationId;
+    // CRITICAL: Use ref instead of state to avoid stale closure
+    // (addTempItem's deps don't include selectedLocationId for performance)
+    if (selectedLocationIdRef.current) {
+      tempItemsOwnerRef.current = selectedLocationIdRef.current;
     }
     
     let newItem = null;
@@ -624,8 +626,10 @@ const ScanItems = () => {
       
       // Immediately persist deletion to localStorage (not debounced)
       // This prevents deleted items from reappearing when navigating away and back
-      if (selectedLocationId) {
-        const key = `audix_temp_items_${selectedLocationId}`;
+      // Use ref for current location to avoid stale closure issues
+      const currentLocId = selectedLocationIdRef.current;
+      if (currentLocId && tempItemsOwnerRef.current === currentLocId) {
+        const key = `audix_temp_items_${currentLocId}`;
         try {
           if (updated.length > 0) {
             localStorage.setItem(key, JSON.stringify(updated));
@@ -641,7 +645,7 @@ const ScanItems = () => {
       
       return updated;
     });
-  }, [selectedLocationId]);
+  }, []);
   
   // Update item quantity in temp state - IMMEDIATELY persists to localStorage
   const updateTempItemQuantity = useCallback((itemId, newQuantity) => {
@@ -651,8 +655,10 @@ const ScanItems = () => {
       );
       
       // Immediately persist to localStorage
-      if (selectedLocationId) {
-        const key = `audix_temp_items_${selectedLocationId}`;
+      // Use ref for current location to avoid stale closure issues
+      const currentLocId = selectedLocationIdRef.current;
+      if (currentLocId && tempItemsOwnerRef.current === currentLocId) {
+        const key = `audix_temp_items_${currentLocId}`;
         try {
           localStorage.setItem(key, JSON.stringify(updated));
         } catch (e) {
@@ -662,18 +668,20 @@ const ScanItems = () => {
       
       return updated;
     });
-  }, [selectedLocationId]);
+  }, []);
   
   // Clear all temp items (including from localStorage)
   const clearTempItems = useCallback(() => {
-    if (selectedLocationId) {
-      const key = `audix_temp_items_${selectedLocationId}`;
+    // Use ref for current location to avoid stale closure issues
+    const currentLocId = selectedLocationIdRef.current;
+    if (currentLocId) {
+      const key = `audix_temp_items_${currentLocId}`;
       localStorage.removeItem(key);
-      console.log(`🗑️ Cleared temp items for location ${selectedLocationId}`);
+      console.log(`🗑️ Cleared temp items for location ${currentLocId}`);
     }
     setTempScannedItems([]);
     tempItemsOwnerRef.current = null;
-  }, [selectedLocationId]);
+  }, []);
 
   // HIGH-PERFORMANCE Hardware scanner callback
   // Uses refs instead of state to avoid re-render delays during fast scanning
