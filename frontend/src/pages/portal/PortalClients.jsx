@@ -85,6 +85,7 @@ export default function PortalClients() {
   const [stockTotal, setStockTotal] = useState(0);
   const [stockViewLoading, setStockViewLoading] = useState(false);
   const [stockExtraColumns, setStockExtraColumns] = useState([]);
+  const [stockViewSchemaFields, setStockViewSchemaFields] = useState(null);
   const stockFileRef = useRef(null);
 
   const fetchClients = async () => {
@@ -313,14 +314,23 @@ export default function PortalClients() {
     setShowStockViewDialog(true);
     setStockRecords([]);
     setStockExtraColumns([]);
+    setStockViewSchemaFields(null);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/stock?limit=200`);
+      const [res, schemaRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/stock?limit=200`),
+        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`)
+      ]);
       if (res.ok) {
         const data = await res.json();
         setStockRecords(data.records);
         setStockTotal(data.total);
         setStockExtraColumns(data.extra_columns || []);
+      }
+      if (schemaRes.ok) {
+        const schemaData = await schemaRes.json();
+        const enabledFields = (schemaData.fields || []).filter(f => f.enabled);
+        setStockViewSchemaFields(enabledFields);
       }
     } catch (err) {
       console.error('Failed to fetch stock:', err);
@@ -1262,7 +1272,7 @@ export default function PortalClients() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                  Warehouse Stock — {stockClient?.name}
+                  Imported Stock Data — {stockClient?.name}
                 </div>
                 <span className="text-sm font-normal text-gray-500">
                   {stockTotal} total records
@@ -1281,12 +1291,30 @@ export default function PortalClients() {
                 <thead className="sticky top-0 bg-gray-50 border-b">
                   <tr>
                     <th className="text-left p-2 font-medium text-gray-600">#</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Location</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Description</th>
-                    <th className="text-left p-2 font-medium text-gray-600">Category</th>
-                    <th className="text-right p-2 font-medium text-gray-600">MRP</th>
-                    <th className="text-right p-2 font-medium text-gray-600">Cost</th>
+                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'location')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Location</th>
+                    )}
+                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'barcode')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
+                    )}
+                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'description')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Description</th>
+                    )}
+                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'category')) && (
+                      <th className="text-left p-2 font-medium text-gray-600">Category</th>
+                    )}
+                    {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'mrp') : true) && (
+                      <th className="text-right p-2 font-medium text-gray-600">MRP</th>
+                    )}
+                    {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'cost') : true) && (
+                      <th className="text-right p-2 font-medium text-gray-600">Cost</th>
+                    )}
+                    {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_code') && (
+                      <th className="text-left p-2 font-medium text-gray-600">Article Code</th>
+                    )}
+                    {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_name') && (
+                      <th className="text-left p-2 font-medium text-gray-600">Article Name</th>
+                    )}
                     <th className="text-right p-2 font-medium text-gray-600">Qty</th>
                     {stockExtraColumns.map(col => (
                       <th key={col.name} className="text-left p-2 font-medium text-purple-600">{col.label}</th>
@@ -1297,14 +1325,32 @@ export default function PortalClients() {
                   {stockRecords.map((rec, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="p-2 text-gray-400">{idx + 1}</td>
-                      <td className="p-2">{rec.location || '-'}</td>
-                      <td className="p-2 font-mono text-xs">{rec.barcode}</td>
-                      <td className="p-2">{rec.description || '-'}</td>
-                      <td className="p-2">
-                        {rec.category ? <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{rec.category}</span> : '-'}
-                      </td>
-                      <td className="p-2 text-right">{rec.mrp > 0 ? rec.mrp.toFixed(2) : '-'}</td>
-                      <td className="p-2 text-right">{rec.cost > 0 ? rec.cost.toFixed(2) : '-'}</td>
+                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'location')) && (
+                        <td className="p-2">{rec.location || '-'}</td>
+                      )}
+                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'barcode')) && (
+                        <td className="p-2 font-mono text-xs">{rec.barcode}</td>
+                      )}
+                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'description')) && (
+                        <td className="p-2">{rec.description || '-'}</td>
+                      )}
+                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'category')) && (
+                        <td className="p-2">
+                          {rec.category ? <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{rec.category}</span> : '-'}
+                        </td>
+                      )}
+                      {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'mrp') : true) && (
+                        <td className="p-2 text-right">{rec.mrp > 0 ? rec.mrp.toFixed(2) : '-'}</td>
+                      )}
+                      {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'cost') : true) && (
+                        <td className="p-2 text-right">{rec.cost > 0 ? rec.cost.toFixed(2) : '-'}</td>
+                      )}
+                      {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_code') && (
+                        <td className="p-2 text-xs">{rec.article_code || '-'}</td>
+                      )}
+                      {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_name') && (
+                        <td className="p-2 text-xs">{rec.article_name || '-'}</td>
+                      )}
                       <td className="p-2 text-right font-semibold">{rec.qty}</td>
                       {stockExtraColumns.map(col => (
                         <td key={col.name} className="p-2 text-xs text-purple-700">{rec.custom_fields?.[col.name] || '-'}</td>

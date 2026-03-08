@@ -2929,6 +2929,8 @@ async def get_consolidated_detailed(client_id: str):
         
         row = {
             "location": location, "barcode": barcode, "description": description, "category": category,
+            "article_code": exp.get("article_code") or master.get("article_code", ""),
+            "article_name": exp.get("article_name") or master.get("article_name", ""),
             "mrp": mrp, "cost": cost, "stock_qty": stock_qty,
             "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty,
@@ -3004,7 +3006,10 @@ async def get_consolidated_barcode_wise(client_id: str):
         totals["stock_value_cost"] += sv["cost"]; totals["physical_value_cost"] += pv["cost"]; totals["final_value_cost"] += fv["cost"]; totals["diff_value_cost"] += dv_cost
         
         row = {
-            "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
+            "barcode": bc, "description": description, "category": category,
+            "article_code": exp.get("article_code") or master.get("article_code", ""),
+            "article_name": exp.get("article_name") or master.get("article_name", ""),
+            "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
@@ -3338,6 +3343,8 @@ async def get_detailed_report(session_id: str):
         
         row = {
             "location": location, "barcode": barcode, "description": description, "category": category,
+            "article_code": exp.get("article_code") or master_info.get("article_code", ""),
+            "article_name": exp.get("article_name") or master_info.get("article_name", ""),
             "mrp": mrp, "cost": cost, "stock_qty": stock_qty,
             "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
@@ -3418,7 +3425,10 @@ async def get_barcode_wise_report(session_id: str):
         totals["stock_value_cost"] += sv["cost"]; totals["physical_value_cost"] += pv["cost"]; totals["final_value_cost"] += fv["cost"]; totals["diff_value_cost"] += dv_cost
         
         row = {
-            "barcode": bc, "description": description, "category": category, "mrp": mrp, "cost": cost,
+            "barcode": bc, "description": description, "category": category,
+            "article_code": exp.get("article_code") or master_info.get("article_code", ""),
+            "article_name": exp.get("article_name") or master_info.get("article_name", ""),
+            "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
             "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],

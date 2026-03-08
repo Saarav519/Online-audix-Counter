@@ -1,7 +1,7 @@
 # Audix Online Counter App - PRD
 
 ## Original Problem Statement
-User connected their existing Audix Online Counter App repo and uploaded a zip file (audix-dm-latest.zip) containing the latest admin portal code changes from another development environment. Task was to compare and apply all latest changes. Subsequently, user requested building a desktop app with Electron + SQLite for offline capability.
+User connected their existing Audix Online Counter App repo and uploaded a zip file (audix-dm-latest.zip) containing the latest admin portal code changes. Task was to compare and apply all latest changes. Subsequently, user requested building a desktop app with Electron + SQLite for offline capability.
 
 ## Architecture
 - **Backend**: FastAPI + MongoDB (Python)
@@ -17,13 +17,14 @@ User connected their existing Audix Online Counter App repo and uploaded a zip f
 - Multi-client audit management
 - Audit sessions with expected vs physical stock
 - Barcode scanning and sync
-- Variance reports (bin-wise, barcode-wise, article-wise)
+- Variance reports (bin-wise, barcode-wise, article-wise, detailed, category-summary)
+- Schema-based column visibility in all views and reports
 - Device management
 - User management with approval workflow
 
 ## What's Been Implemented
 
-### March 8, 2026 - Initial Changes from ZIP:
+### March 8, 2026 - Session 1: Initial Changes from ZIP
 1. Dashboard - Audit Summary Section
 2. Clients - Upload Progress (XHR-based)
 3. Devices - Delete Feature
@@ -32,11 +33,15 @@ User connected their existing Audix Online Counter App repo and uploaded a zip f
 6. Reports - BarcodeEditCell Component
 7. 6 new backend endpoints
 
-### March 8, 2026 - Bug Fixes (Session 2):
+### March 8, 2026 - Session 2: Bug Fixes (3 bugs)
 1. **Master CSV Upload Fix** - Multi-encoding fallback (utf-8/utf-8-sig/latin-1/cp1252) for non-UTF-8 CSV files
 2. **Barcode Edit Fix** - Pencil icon now pre-populates input with current barcode value for editing
 3. **Report Export Fix** - Changed from plain CSV to XLSX with Excel formulas (Difference, Accuracy, SUM totals)
 4. **safe_float helper** - Handles comma-separated numbers (e.g., '1,109') in CSV imports
+
+### March 8, 2026 - Session 2: Schema Issues (2 bugs)
+1. **Stock View Schema-Aware** - Stock view dialog now fetches and respects schema. Shows/hides columns (MRP, Cost, Article Code, Article Name) based on which fields are enabled in schema.
+2. **Reports Schema Columns** - Backend report endpoints (detailed, barcode-wise, consolidated) now include `article_code` and `article_name` in response data. Frontend report column config shows these columns when schema has them enabled.
 
 ### Backend Endpoints:
 - `DELETE /api/audit/portal/devices/{device_id}`
@@ -45,11 +50,6 @@ User connected their existing Audix Online Counter App repo and uploaded a zip f
 - `GET /api/audit/portal/reports/edits/{client_id}`
 - `GET /api/audit/portal/master/search/{client_id}`
 - `GET /api/audit/portal/dashboard/audit-summary`
-
-### Testing Results:
-- Backend: 100% (11/11 endpoints pass - iteration 7)
-- Frontend: 100% (Login, Reports, Export verified)
-- All 3 bug fixes verified
 
 ## Prioritized Backlog
 
@@ -62,16 +62,13 @@ User connected their existing Audix Online Counter App repo and uploaded a zip f
 
 ### P1 (High)
 - Missing MongoDB indexes (clients.id/code, portal_users.username/id, barcode_edits, reco_adjustments)
-- PortalLogin redesign from zip (multi-product landing page)
 - Backend API caching (TTL-based for repeated queries)
 
 ### P2 (Medium)
-- Backend `_apply_barcode_edits` helper for report generation with edits
 - Frontend response caching
 - Increase FastAPI workers from 1 to 4
 - SaaS features from AUDIX_SAAS_IMPLEMENTATION_PLAN.md
 
 ## Next Tasks
-- User to review 3 bug fixes
-- Proceed with Desktop App (Electron) build
-- User decision: web portal optimization vs desktop app priority
+- User to review schema-based column fixes
+- Proceed with Desktop App (Electron) build when ready

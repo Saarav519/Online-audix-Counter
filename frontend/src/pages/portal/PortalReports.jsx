@@ -418,7 +418,7 @@ export default function PortalReports() {
   const [hiddenColumns, setHiddenColumns] = useState(new Set());
   const [frozenColumns, setFrozenColumns] = useState(new Set());
   const tableContainerRef = useRef(null);
-  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true });
+  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true, has_article_code: false, has_article_name: false });
 
   useEffect(() => {
     fetchClients();
@@ -634,12 +634,14 @@ export default function PortalReports() {
         fields.forEach(f => { fieldMap[f.name] = f; });
         setSchemaValueFields({
           has_mrp: fieldMap.mrp ? fieldMap.mrp.enabled : true,
-          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true
+          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true,
+          has_article_code: fieldMap.article_code ? fieldMap.article_code.enabled : false,
+          has_article_name: fieldMap.article_name ? fieldMap.article_name.enabled : false
         });
       }
     } catch (error) {
       console.error('Failed to fetch schema:', error);
-      setSchemaValueFields({ has_mrp: true, has_cost: true });
+      setSchemaValueFields({ has_mrp: true, has_cost: true, has_article_code: false, has_article_name: false });
     }
   };
 
@@ -794,7 +796,18 @@ export default function PortalReports() {
 
   const columnConfig = useMemo(() => {
     const ec = extraColumns.map(c => ({ key: c.name, label: c.label }));
-    const { has_mrp, has_cost } = schemaValueFields;
+    const { has_mrp, has_cost, has_article_code } = schemaValueFields;
+    
+    // Schema-based standard columns that are optionally shown
+    const articleCols = [];
+    if (has_article_code) {
+      articleCols.push({ key: 'article_code', label: 'Article Code' });
+    }
+    // Check article_name from schema too
+    const hasArticleName = schemaValueFields.has_article_name;
+    if (hasArticleName) {
+      articleCols.push({ key: 'article_name', label: 'Article Name' });
+    }
     
     // Helper to conditionally include MRP/Cost value columns
     const valCols = (prefix, mrpLabel, costLabel) => {
@@ -827,6 +840,7 @@ export default function PortalReports() {
           { key: 'barcode', label: 'Barcode' },
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
+          ...articleCols,
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
@@ -847,6 +861,7 @@ export default function PortalReports() {
           { key: 'barcode', label: 'Barcode' },
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
+          ...articleCols,
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
