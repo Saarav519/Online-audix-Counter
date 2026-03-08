@@ -1,7 +1,7 @@
 # Audix Online Counter App - PRD
 
 ## Original Problem Statement
-User connected their existing Audix Online Counter App repo and uploaded a zip file (audix-dm-latest.zip) containing the latest admin portal code changes from another development environment. Task was to compare and apply all latest changes.
+User connected their existing Audix Online Counter App repo and uploaded a zip file (audix-dm-latest.zip) containing the latest admin portal code changes from another development environment. Task was to compare and apply all latest changes. Subsequently, user requested building a desktop app with Electron + SQLite for offline capability.
 
 ## Architecture
 - **Backend**: FastAPI + MongoDB (Python)
@@ -21,41 +21,57 @@ User connected their existing Audix Online Counter App repo and uploaded a zip f
 - Device management
 - User management with approval workflow
 
-## What's Been Implemented (March 8, 2026)
+## What's Been Implemented
 
-### Changes Applied from ZIP:
-1. **Dashboard - Audit Summary Section**: New `Audit Summary by Client` cards showing accuracy %, expected/physical/variance qty, top mismatches per client
-2. **Clients - Upload Progress**: XHR-based upload with progress bar (uploading/processing phases)
-3. **Devices - Delete Feature**: Delete device button with confirmation dialog
-4. **Sessions - Conditional Location Column**: Location column only shows for bin-wise variance mode
-5. **Reports - FullScreenReport Component**: New virtualized grid report viewer with search, sort, filter, freeze columns, cell navigation
-6. **Reports - BarcodeEditCell Component**: Inline barcode editing with master data auto-complete
+### March 8, 2026 - Initial Changes from ZIP:
+1. Dashboard - Audit Summary Section
+2. Clients - Upload Progress (XHR-based)
+3. Devices - Delete Feature
+4. Sessions - Conditional Location Column
+5. Reports - FullScreenReport Component
+6. Reports - BarcodeEditCell Component
+7. 6 new backend endpoints
 
-### New Backend Endpoints Added:
-- `DELETE /api/audit/portal/devices/{device_id}` - Delete device
-- `POST /api/audit/portal/reports/edit-barcode` - Edit barcode in reports
-- `POST /api/audit/portal/reports/undo-edit` - Undo barcode edit
-- `GET /api/audit/portal/reports/edits/{client_id}` - Get active edits
-- `GET /api/audit/portal/master/search/{client_id}` - Master data search
-- `GET /api/audit/portal/dashboard/audit-summary` - Dashboard audit summary
+### March 8, 2026 - Bug Fixes (Session 2):
+1. **Master CSV Upload Fix** - Multi-encoding fallback (utf-8/utf-8-sig/latin-1/cp1252) for non-UTF-8 CSV files
+2. **Barcode Edit Fix** - Pencil icon now pre-populates input with current barcode value for editing
+3. **Report Export Fix** - Changed from plain CSV to XLSX with Excel formulas (Difference, Accuracy, SUM totals)
+4. **safe_float helper** - Handles comma-separated numbers (e.g., '1,109') in CSV imports
+
+### Backend Endpoints:
+- `DELETE /api/audit/portal/devices/{device_id}`
+- `POST /api/audit/portal/reports/edit-barcode`
+- `POST /api/audit/portal/reports/undo-edit`
+- `GET /api/audit/portal/reports/edits/{client_id}`
+- `GET /api/audit/portal/master/search/{client_id}`
+- `GET /api/audit/portal/dashboard/audit-summary`
 
 ### Testing Results:
-- Backend: 100% (10/10 endpoints pass)
-- Frontend: 90% (all pages render correctly)
+- Backend: 100% (11/11 endpoints pass - iteration 7)
+- Frontend: 100% (Login, Reports, Export verified)
+- All 3 bug fixes verified
 
 ## Prioritized Backlog
-### P0 (Critical)
-- None outstanding
+
+### P0 (Critical) - Desktop App
+- Phase 1: Electron Setup (main.js, preload.js, electron-builder)
+- Phase 2: SQLite Local Cache
+- Phase 3: Background Sync + Offline Mode
+- Phase 4: System Tray + Auto-Update
+- Phase 5: GitHub Actions for .exe build
 
 ### P1 (High)
-- PortalLogin redesign from zip (multi-product landing page) - not applied as it changes routing structure
-- Apply remaining minor changes from other portal files (PortalAlerts, PortalConflicts, etc.)
+- Missing MongoDB indexes (clients.id/code, portal_users.username/id, barcode_edits, reco_adjustments)
+- PortalLogin redesign from zip (multi-product landing page)
+- Backend API caching (TTL-based for repeated queries)
 
 ### P2 (Medium)
 - Backend `_apply_barcode_edits` helper for report generation with edits
-- Mobile scanner app code updates (if any in zip)
+- Frontend response caching
+- Increase FastAPI workers from 1 to 4
+- SaaS features from AUDIX_SAAS_IMPLEMENTATION_PLAN.md
 
 ## Next Tasks
-- User to review the applied changes and provide feedback
-- Apply PortalLogin redesign if desired
-- Further testing of new features with real data
+- User to review 3 bug fixes
+- Proceed with Desktop App (Electron) build
+- User decision: web portal optimization vs desktop app priority
