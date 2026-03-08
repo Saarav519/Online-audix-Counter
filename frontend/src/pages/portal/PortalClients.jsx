@@ -60,6 +60,8 @@ export default function PortalClients() {
   const [masterProductsTotal, setMasterProductsTotal] = useState(0);
   const [masterViewLoading, setMasterViewLoading] = useState(false);
   const masterFileRef = useRef(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState(''); // 'uploading' | 'processing' | ''
 
   // Schema Builder state
   const [showSchemaDialog, setShowSchemaDialog] = useState(false);
@@ -287,8 +289,9 @@ export default function PortalClients() {
         body: fd
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || 'Import failed');
+        let msg = 'Import failed';
+        try { const data = await res.json(); msg = data.detail || msg; } catch (_) {}
+        throw new Error(msg);
       }
       const result = await res.json();
       toast.success(result.message);
@@ -296,7 +299,8 @@ export default function PortalClients() {
       setStockClient(null);
       fetchClients();
     } catch (err) {
-      toast.error(err.message);
+      const msg = typeof err?.message === 'string' ? err.message : 'Upload failed';
+      toast.error(msg);
     } finally {
       setStockUploading(false);
       if (stockFileRef.current) stockFileRef.current.value = '';
@@ -377,33 +381,51 @@ export default function PortalClients() {
     if (!file) return;
 
     setMasterUploading(true);
+    setUploadProgress(0);
+    setUploadPhase('uploading');
     const fd = new FormData();
     fd.append('file', file);
 
     try {
-      const response = await fetch(
-        `${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/import-master`,
-        { method: 'POST', body: fd }
-      );
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/import-master`);
+        
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const pct = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(pct);
+            if (pct >= 100) setUploadPhase('processing');
+          }
+        };
+        
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); } catch (_) { reject(new Error('Invalid response')); }
+          } else {
+            let msg = 'Import failed';
+            try { msg = JSON.parse(xhr.responseText).detail || msg; } catch (_) {}
+            reject(new Error(msg));
+          }
+        };
+        
+        xhr.onerror = () => reject(new Error('Upload failed - network error'));
+        xhr.send(fd);
+      });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.detail || 'Import failed');
-      }
-
-      const result = await response.json();
-      toast.success(`${result.message}`);
-
-      // Refresh stats
-      const statsRes = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/master-products/stats`);
-      if (statsRes.ok) setMasterStats(await statsRes.json());
-
-      // Refresh clients list
+      toast.success(result.message);
+      try {
+        const statsRes = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${masterClient.id}/master-products/stats`);
+        if (statsRes.ok) setMasterStats(await statsRes.json());
+      } catch (_) {}
       fetchClients();
     } catch (error) {
-      toast.error(error.message);
+      const msg = typeof error?.message === 'string' ? error.message : 'Upload failed';
+      toast.error(msg);
     } finally {
       setMasterUploading(false);
+      setUploadProgress(0);
+      setUploadPhase('');
       if (masterFileRef.current) masterFileRef.current.value = '';
     }
   };
@@ -585,44 +607,42 @@ export default function PortalClients() {
 
               {/* Master Products Status */}
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      client.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {client.is_active ? 'Active' : 'Inactive'}
+                <div className="flex items-center flex-wrap gap-2 mb-3">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    client.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {client.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  {client.master_imported ? (
+                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Master: {client.master_product_count || 0} products
                     </span>
-                    {client.master_imported ? (
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                  ) : (
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      No Master
+                    </span>
+                  )}
+                  {client.client_type === 'warehouse' && (
+                    client.stock_imported ? (
+                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
                         <CheckCircle className="w-3 h-3" />
-                        Master: {client.master_product_count || 0} products
+                        Stock: {client.stock_record_count || 0} records
                       </span>
                     ) : (
                       <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
-                        No Master
+                        No Stock
                       </span>
-                    )}
-                    {client.client_type === 'warehouse' && (
-                      client.stock_imported ? (
-                        <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          Stock: {client.stock_record_count || 0} records
-                        </span>
-                      ) : (
-                        <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          No Stock
-                        </span>
-                      )
-                    )}
-                  </div>
+                    )
+                  )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200"
+                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 text-xs"
                     onClick={() => openSchemaBuilder(client)}
                     data-testid={`schema-btn-${client.code}`}
                   >
@@ -632,7 +652,7 @@ export default function PortalClients() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 flex-1"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 text-xs"
                     onClick={() => openMasterUpload(client)}
                   >
                     <Upload className="w-3.5 h-3.5 mr-1" />
@@ -642,7 +662,7 @@ export default function PortalClients() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-gray-600 hover:text-gray-700 flex-1"
+                      className="text-gray-600 hover:text-gray-700 text-xs"
                       onClick={() => openMasterView(client)}
                     >
                       <Package className="w-3.5 h-3.5 mr-1" />
@@ -800,10 +820,13 @@ export default function PortalClients() {
                   </div>
                 </div>
                 {masterStats.categories.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {masterStats.categories.map(cat => (
+                  <div className="mt-2 flex flex-wrap gap-1 items-center">
+                    {masterStats.categories.slice(0, 5).map(cat => (
                       <span key={cat} className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{cat}</span>
                     ))}
+                    {masterStats.categories.length > 5 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">+{masterStats.categories.length - 5} more</span>
+                    )}
                   </div>
                 )}
               </div>
@@ -856,27 +879,46 @@ export default function PortalClients() {
 
             {/* Upload Area */}
             <div className="border-2 border-dashed border-blue-200 rounded-lg p-6 text-center bg-blue-50/30">
-              <Package className="w-10 h-10 mx-auto mb-3 text-blue-400" />
-              <p className="text-sm text-gray-600 mb-3">
-                {masterUploading ? 'Uploading...' : 'Select your master product catalog CSV'}
-              </p>
-              <input
-                ref={masterFileRef}
-                type="file"
-                accept=".csv"
-                onChange={handleMasterUpload}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => masterFileRef.current?.click()}
-                disabled={masterUploading}
-                className="border-blue-300 text-blue-600 hover:bg-blue-50"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                {masterUploading ? 'Uploading...' : 'Select CSV File'}
-              </Button>
+              {masterUploading ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+                    <p className="text-sm font-medium text-blue-700">
+                      {uploadPhase === 'uploading' ? `Uploading... ${uploadProgress}%` : 'Processing records...'}
+                    </p>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${uploadPhase === 'processing' ? 'bg-amber-500 animate-pulse w-full' : 'bg-blue-600'}`}
+                      style={uploadPhase === 'uploading' ? { width: `${uploadProgress}%` } : {}}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {uploadPhase === 'processing' ? 'File uploaded, server is importing records...' : 'Uploading file to server...'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Package className="w-10 h-10 mx-auto mb-3 text-blue-400" />
+                  <p className="text-sm text-gray-600 mb-3">Select your master product catalog CSV</p>
+                  <input
+                    ref={masterFileRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleMasterUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => masterFileRef.current?.click()}
+                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Select CSV File
+                  </Button>
+                </>
+              )}
             </div>
 
             {/* Actions */}
@@ -1006,87 +1048,82 @@ export default function PortalClients() {
 
       {/* Schema Builder Dialog */}
       <Dialog open={showSchemaDialog} onOpenChange={setShowSchemaDialog}>
-        <DialogContent className="max-w-2xl max-h-[85vh]" data-testid="schema-builder-dialog">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col" data-testid="schema-builder-dialog">
+          <DialogHeader className="pb-3 border-b">
             <DialogTitle>
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-purple-600" />
                 Schema Builder — {schemaClient?.name}
               </div>
             </DialogTitle>
+            <p className="text-xs text-gray-500 mt-1">
+              Configure which fields are included in master/stock uploads and reports.
+            </p>
           </DialogHeader>
           {schemaLoading ? (
             <div className="text-center py-8 text-gray-500">Loading schema...</div>
           ) : (
-            <div className="space-y-4">
-              <p className="text-xs text-gray-500">
-                Configure which fields are included in master/stock uploads and reports. Toggle fields on/off and add custom fields.
-              </p>
-
-              {/* Field List */}
-              <div className="border rounded-lg divide-y max-h-[40vh] overflow-y-auto">
+            <div className="flex flex-col flex-1 overflow-hidden gap-4 pt-2">
+              {/* Field List - Scrollable */}
+              <div className="border rounded-lg flex-1 overflow-y-auto min-h-0">
                 {schemaFields.map((field, idx) => (
-                  <div key={field.name} className={`flex items-center gap-3 px-4 py-2.5 ${field.enabled ? 'bg-white' : 'bg-gray-50 opacity-60'}`} data-testid={`schema-field-${field.name}`}>
+                  <div key={field.name} className={`flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 ${field.enabled ? 'bg-white' : 'bg-gray-50 opacity-60'}`} data-testid={`schema-field-${field.name}`}>
                     <button onClick={() => toggleField(idx)} className="flex-shrink-0" data-testid={`toggle-field-${field.name}`}>
                       {field.enabled ? (
-                        <ToggleRight className="w-6 h-6 text-emerald-500" />
+                        <ToggleRight className="w-5 h-5 text-emerald-500" />
                       ) : (
-                        <ToggleLeft className="w-6 h-6 text-gray-400" />
+                        <ToggleLeft className="w-5 h-5 text-gray-400" />
                       )}
                     </button>
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium text-gray-900">{field.label}</span>
-                      <span className="ml-2 text-xs text-gray-400 font-mono">{field.name}</span>
+                      <span className="ml-2 text-xs text-gray-400 font-mono">({field.name})</span>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded ${field.type === 'number' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {field.type}
-                    </span>
-                    {field.required && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">required</span>
-                    )}
-                    {field.is_standard ? (
-                      <span className="text-xs text-gray-400">standard</span>
-                    ) : (
-                      <button onClick={() => removeCustomField(idx)} className="text-red-400 hover:text-red-600 p-1" data-testid={`remove-field-${field.name}`}>
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-xs px-2 py-0.5 rounded ${field.type === 'number' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {field.type}
+                      </span>
+                      {field.required && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">req</span>
+                      )}
+                      {!field.is_standard && (
+                        <button onClick={() => removeCustomField(idx)} className="text-red-400 hover:text-red-600 ml-1" data-testid={`remove-field-${field.name}`}>
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
               {/* Add Custom Field */}
-              <div className="bg-purple-50 rounded-lg p-4">
-                <p className="text-sm font-medium text-purple-900 mb-3">Add Custom Field</p>
+              <div className="bg-purple-50 rounded-lg p-3">
+                <p className="text-xs font-medium text-purple-900 mb-2">Add Custom Field</p>
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <Label className="text-xs text-purple-700">Field Name</Label>
                     <Input
                       value={newFieldName}
                       onChange={e => setNewFieldName(e.target.value)}
                       placeholder="e.g. Brand, Supplier Code"
-                      className="mt-1"
+                      className="h-8 text-sm"
                       data-testid="new-field-name-input"
                       onKeyDown={e => e.key === 'Enter' && addCustomField()}
                     />
                   </div>
-                  <div className="w-28">
-                    <Label className="text-xs text-purple-700">Type</Label>
-                    <select
-                      value={newFieldType}
-                      onChange={e => setNewFieldType(e.target.value)}
-                      className="mt-1 w-full h-9 px-3 rounded-md border border-gray-200 text-sm"
-                      data-testid="new-field-type-select"
-                    >
-                      <option value="text">Text</option>
-                      <option value="number">Number</option>
-                    </select>
-                  </div>
+                  <select
+                    value={newFieldType}
+                    onChange={e => setNewFieldType(e.target.value)}
+                    className="h-8 px-2 rounded-md border border-gray-200 text-sm bg-white w-24"
+                    data-testid="new-field-type-select"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                  </select>
                   <Button
                     type="button"
                     size="sm"
                     onClick={addCustomField}
-                    className="bg-purple-600 hover:bg-purple-700"
+                    className="bg-purple-600 hover:bg-purple-700 h-8 px-3"
                     data-testid="add-custom-field-btn"
                   >
                     <Plus className="w-4 h-4 mr-1" />
@@ -1095,46 +1132,31 @@ export default function PortalClients() {
                 </div>
               </div>
 
-              {/* Download Templates */}
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadSchemaTemplate('master')}
-                  className="text-blue-600"
-                  data-testid="download-master-template-schema"
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Master Template
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadSchemaTemplate('stock')}
-                  className="text-emerald-600"
-                  data-testid="download-stock-template-schema"
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  Stock Template
-                </Button>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 justify-end pt-2 border-t">
-                <Button type="button" variant="outline" onClick={() => setShowSchemaDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={saveSchema}
-                  disabled={schemaSaving}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  data-testid="save-schema-btn"
-                >
-                  {schemaSaving ? 'Saving...' : 'Save Schema'}
-                </Button>
+              {/* Footer: Templates + Actions */}
+              <div className="flex items-center justify-between pt-3 border-t">
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => downloadSchemaTemplate('master')} className="text-blue-600 h-8 text-xs" data-testid="download-master-template-schema">
+                    <Download className="w-3.5 h-3.5 mr-1" /> Master Template
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => downloadSchemaTemplate('stock')} className="text-emerald-600 h-8 text-xs" data-testid="download-stock-template-schema">
+                    <Download className="w-3.5 h-3.5 mr-1" /> Stock Template
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowSchemaDialog(false)} className="h-8">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={saveSchema}
+                    disabled={schemaSaving}
+                    className="bg-purple-600 hover:bg-purple-700 h-8"
+                    data-testid="save-schema-btn"
+                  >
+                    {schemaSaving ? 'Saving...' : 'Save Schema'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}

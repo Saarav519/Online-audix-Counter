@@ -4,8 +4,10 @@ import {
   Wifi, 
   WifiOff,
   Clock,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,6 +16,7 @@ export default function PortalDevices() {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -38,6 +41,21 @@ export default function PortalDevices() {
     const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
     return () => clearInterval(interval);
   }, []);
+
+  const handleDeleteDevice = async (deviceId, deviceName) => {
+    if (!window.confirm(`Are you sure you want to delete "${deviceName}"?`)) return;
+    setDeleting(deviceId);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/devices/${deviceId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDevices(prev => prev.filter(d => d.id !== deviceId));
+        toast.success(`Device "${deviceName}" deleted`);
+      } else {
+        toast.error('Failed to delete device');
+      }
+    } catch { toast.error('Failed to delete device'); }
+    finally { setDeleting(null); }
+  };
 
   const getClientName = (clientId) => {
     const client = clients.find(c => c.id === clientId);
@@ -119,6 +137,15 @@ export default function PortalDevices() {
                       </div>
                     </div>
                   </div>
+                  <button
+                    data-testid={`delete-device-${device.id}`}
+                    onClick={() => handleDeleteDevice(device.id, device.device_name)}
+                    disabled={deleting === device.id}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete device"
+                  >
+                    <Trash2 className={`w-4 h-4 ${deleting === device.id ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
 
                 <div className="space-y-3 text-sm">

@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { FullScreenButton, FullScreenReport } from '../../components/FullScreenReport';
+import { BarcodeEditCell } from '../../components/BarcodeEditCell';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -104,9 +106,11 @@ function recalcTotals(rows, reportType) {
 }
 
 // ============ Column Filter Dropdown ============
-function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose, triggerRef }) {
+function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose, triggerRef, sortConfig, onSort }) {
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
+  const listRef = useRef(null);
+  const [focusIdx, setFocusIdx] = useState(-1);
   const isNumeric = NUMERIC_COLUMNS.has(column);
   const currentNumeric = numericFilters?.[column] || null;
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -183,7 +187,31 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
   };
 
   return ReactDOM.createPortal(
-    <div ref={dropdownRef} className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-64 max-h-96 flex flex-col" style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}>
+    <div ref={dropdownRef} className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-64 max-h-96 flex flex-col" style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+      {/* Sort Options */}
+      {onSort && (
+        <div className="p-2 border-b border-gray-100">
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { onSort(column); onClose(); }}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
+                sortConfig?.key === column && sortConfig?.direction === 'asc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <ArrowUp className="w-3 h-3" /> Sort A-Z
+            </button>
+            <button
+              onClick={() => { onSort(column); if (sortConfig?.key !== column || sortConfig?.direction !== 'desc') onSort(column); onClose(); }}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
+                sortConfig?.key === column && sortConfig?.direction === 'desc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <ArrowDown className="w-3 h-3" /> Sort Z-A
+            </button>
+          </div>
+        </div>
+      )}
       {/* Numeric Quick Filter (for number columns) */}
       {isNumeric && (
         <div className="p-2 border-b border-gray-100">
@@ -213,8 +241,10 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
         {isNumeric && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value List</p>}
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input type="text" placeholder="Search & press Enter..." value={search} onChange={(e) => setSearch(e.target.value)}
+          <input type="text" placeholder="Search & press Enter..." value={search} onChange={(e) => { setSearch(e.target.value); setFocusIdx(-1); }}
             onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+              if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(0); listRef.current?.querySelector('[data-filter-item="0"]')?.focus(); return; }
               if (e.key === 'Enter' && search.trim()) {
                 const matchedValues = filteredValues.map(String);
                 if (matchedValues.length > 0) {
@@ -230,15 +260,27 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
           <button className="text-xs text-red-500 hover:underline" onClick={clearAll}>Clear All</button>
         </div>
       </div>
-      <div className="overflow-y-auto flex-1 p-1.5">
+      <div className="overflow-y-auto flex-1 p-1.5" ref={listRef} onKeyDown={(e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+        const max = filteredValues.length - 1;
+        if (e.key === 'ArrowDown') { e.preventDefault(); const next = Math.min(max, focusIdx + 1); setFocusIdx(next); listRef.current?.querySelector(`[data-filter-item="${next}"]`)?.focus(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); const prev = Math.max(0, focusIdx - 1); setFocusIdx(prev); listRef.current?.querySelector(`[data-filter-item="${prev}"]`)?.focus(); }
+        if ((e.key === 'Enter' || e.key === ' ') && focusIdx >= 0) { e.preventDefault(); toggleValue(filteredValues[focusIdx]); }
+      }}>
         {filteredValues.map((val, i) => {
           const strVal = String(val);
           const checked = isChecked(strVal);
           return (
-            <label key={i} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs">
-              <input type="checkbox" checked={checked} onChange={() => toggleValue(strVal)} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5" />
+            <div key={i} data-filter-item={i} tabIndex={0}
+              className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs outline-none ${
+                focusIdx === i ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-gray-50'
+              }`}
+              onClick={() => toggleValue(strVal)}
+              onFocus={() => setFocusIdx(i)}
+            >
+              <input type="checkbox" checked={checked} readOnly className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5 pointer-events-none" />
               <span className="truncate">{strVal || '(empty)'}</span>
-            </label>
+            </div>
           );
         })}
         {filteredValues.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No values found</p>}
@@ -352,7 +394,7 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
         )}
       </div>
       {showFilter && (
-        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} onClose={() => setShowFilter(false)} triggerRef={filterBtnRef} />
+        <ColumnFilterDropdown column={column} allValues={allValues} activeFilters={activeFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} onClose={() => setShowFilter(false)} triggerRef={filterBtnRef} sortConfig={sortConfig} onSort={onSort} />
       )}
     </th>
   );
@@ -367,6 +409,7 @@ export default function PortalReports() {
   const [reportType, setReportType] = useState('');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const [varianceCategory, setVarianceCategory] = useState('all');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [columnFilters, setColumnFilters] = useState({});
@@ -701,8 +744,11 @@ export default function PortalReports() {
         optMap.set('article-wise', { value: 'article-wise', label: 'Article-wise Variance' });
       }
       optMap.set('category-summary', { value: 'category-summary', label: 'Category-wise Summary' });
-      optMap.set('empty-bins', { value: 'empty-bins', label: 'Empty Bins' });
-      optMap.set('pending-locations', { value: 'pending-locations', label: 'Pending Locations' });
+      // Empty Bins and Pending Locations only for bin-wise mode
+      if (activeModes.has('bin-wise')) {
+        optMap.set('empty-bins', { value: 'empty-bins', label: 'Empty Bins' });
+        optMap.set('pending-locations', { value: 'pending-locations', label: 'Pending Locations' });
+      }
       return Array.from(optMap.values());
     }
     const mode = sessionInfo?.variance_mode || 'bin-wise';
@@ -721,8 +767,10 @@ export default function PortalReports() {
     // Category summary always available
     options.push({ value: 'category-summary', label: 'Category-wise Summary' });
     
-    // Empty bins available in session view
-    options.push({ value: 'empty-bins', label: 'Empty Bins' });
+    // Empty bins only for bin-wise mode
+    if (mode === 'bin-wise') {
+      options.push({ value: 'empty-bins', label: 'Empty Bins' });
+    }
     
     // Pending Locations only in consolidated view (not session-wise)
     // Session-wise only shows scanned data, pending makes sense only in consolidated
@@ -1092,6 +1140,9 @@ export default function PortalReports() {
               Export CSV
             </Button>
           )}
+          {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (
+            <FullScreenButton onClick={() => setIsFullScreen(true)} />
+          )}
         </div>
       </div>
 
@@ -1215,15 +1266,45 @@ export default function PortalReports() {
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
           {reportType === 'bin-wise' && <BinWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
-          {reportType === 'detailed' && <DetailedTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} />}
+          {reportType === 'detailed' && <DetailedTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
           {reportType === 'category-summary' && <CategorySummaryTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
           </div>
           {reportType === 'empty-bins' && <EmptyBinsView data={reportData} />}
           {reportType === 'pending-locations' && <PendingLocationsView data={reportData} clientId={selectedClient} />}
         </>
       )}
+
+      {/* Full Screen Report View */}
+      <FullScreenReport
+        open={isFullScreen}
+        onClose={() => setIsFullScreen(false)}
+        title={`${reportOptions.find(o => o.value === reportType)?.label || reportType} — ${sessions.find(s => s.id === selectedSession)?.name || 'All Consolidated'}`}
+        onExport={exportCSV}
+        gridData={filteredData?.report || []}
+        gridTotals={filteredData?.totals || null}
+        gridColumns={columnConfig}
+        sortConfig={sortConfig}
+        onSort={handleSort}
+        activeFilters={columnFilters}
+        onFilterChange={handleColumnFilter}
+        numericFilters={numericFilters}
+        onNumericFilterChange={handleNumericFilter}
+        getColumnValues={getColumnValues}
+        frozenColumns={frozenColumns}
+        hiddenColumns={hiddenColumns}
+        onToggleFreeze={toggleColumnFreeze}
+        onToggleVisibility={toggleColumnVisibility}
+        onShowAllColumns={showAllColumns}
+        onResetColumns={resetColumnSettings}
+        onSaveReco={saveRecoAdjustment}
+        isConsolidated={isConsolidatedView}
+        reportType={reportType}
+        totalRows={filteredData?.report?.length || 0}
+        clientId={selectedClient}
+        onRefresh={fetchReport}
+      />
     </div>
   );
 }
@@ -1378,28 +1459,6 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               );
             })}
           </tbody>
-          <tfoot className="bg-gray-50 font-semibold text-sm">
-            <tr>
-              <td className="py-3 px-4"></td>
-              <td className="py-3 px-4">TOTAL</td>
-              <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
-              {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && <td className="py-3 px-4 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
-              <td className="py-3 px-4 text-right">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${getVarianceClass(data.totals.difference_qty)}`}>
-                  {getVarianceIcon(data.totals.difference_qty)}
-                  {data.totals.difference_qty > 0 ? '+' : ''}{data.totals.difference_qty}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>
-                  {data.totals.accuracy_pct}%
-                </span>
-              </td>
-              <td className="py-3 px-4"></td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>
@@ -1436,7 +1495,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 }
 
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [] }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh }) {
   const t = data.totals || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1501,7 +1560,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
             {data.report.map((row, i) => (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-3">{row.location || '-'}</td>
-                <td className="py-2 px-3 font-mono">{row.barcode || '-'}</td>
+                <td className="py-2 px-3 font-mono"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="detailed" field="barcode" onEditComplete={onRefresh} /></td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">{row.category || '-'}</td>
                 {extraColumns.map(col => (
@@ -1558,7 +1617,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [] }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh }) {
   const t = data.totals || {};
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1628,7 +1687,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <tbody>
             {data.report.map((row, i) => (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-2 px-3 font-mono text-xs">{row.barcode}</td>
+                <td className="py-2 px-3 font-mono text-xs"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="barcode-wise" field="barcode" onEditComplete={onRefresh} compact /></td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">
                   {row.category ? (
@@ -1683,43 +1742,6 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50 font-semibold text-sm">
-            <tr>
-              <td colSpan={3 + extraColumns.length} className="py-3 px-3">TOTALS</td>
-              <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_mrp || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_cost || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_mrp || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_cost || 0).toFixed(2)}</td>
-              {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && !isRecoEditable && <td className="py-3 px-3 text-right text-blue-600">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right text-gray-500">{(data.totals.final_value_mrp || 0).toFixed(2)}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right text-gray-500">{(data.totals.final_value_cost || 0).toFixed(2)}</td>}
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
-                  {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_mrp)}`}>
-                  {(data.totals.diff_value_mrp || 0).toFixed(2)}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_cost)}`}>
-                  {(data.totals.diff_value_cost || 0).toFixed(2)}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>
-                  {data.totals.accuracy_pct}%
-                </span>
-              </td>
-              <td></td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>
@@ -1727,7 +1749,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Article-wise Table ============
-function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [] }) {
+function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh }) {
   const [expandedRows, setExpandedRows] = React.useState(new Set());
 
   const toggleRow = (index) => {
@@ -1815,7 +1837,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-2 text-center">
                     <span className={`inline-block transition-transform duration-200 text-gray-400 ${expandedRows.has(i) ? 'rotate-90' : ''}`}>&#9654;</span>
                   </td>
-                  <td className="py-2 px-3 font-mono text-xs font-medium">{row.article_code}</td>
+                  <td className="py-2 px-3 font-mono text-xs font-medium"><BarcodeEditCell value={row.article_code} row={row} clientId={clientId} reportType="article-wise" field="article_code" onEditComplete={onRefresh} compact /></td>
                   <td className="py-2 px-3">{row.article_name || '-'}</td>
                   <td className="py-2 px-3">
                     {row.category ? <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span> : '-'}
@@ -1881,42 +1903,6 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               </React.Fragment>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50 font-semibold text-sm">
-            <tr>
-              <td className="py-3 px-2"></td>
-              <td colSpan={4 + extraColumns.length} className="py-3 px-3">TOTALS</td>
-              <td className="py-3 px-3 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_mrp || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.stock_value_cost || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right">{data.totals.physical_qty}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_mrp || 0).toFixed(2)}</td>
-              <td className="py-3 px-3 text-right text-gray-500">{(data.totals.physical_value_cost || 0).toFixed(2)}</td>
-              {isRecoEditable && <td className="py-3 px-3 text-right text-blue-700">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && !isRecoEditable && <td className="py-3 px-3 text-right text-blue-600">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right text-gray-500">{(data.totals.final_value_mrp || 0).toFixed(2)}</td>}
-              {isConsolidated && <td className="py-3 px-3 text-right text-gray-500">{(data.totals.final_value_cost || 0).toFixed(2)}</td>}
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
-                  {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_mrp)}`}>
-                  {(data.totals.diff_value_mrp || 0).toFixed(2)}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_cost)}`}>
-                  {(data.totals.diff_value_cost || 0).toFixed(2)}
-                </span>
-              </td>
-              <td className="py-3 px-3 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>{data.totals.accuracy_pct}%</span>
-              </td>
-              <td></td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>
@@ -2022,41 +2008,6 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50 font-semibold text-sm">
-            <tr>
-              <td className="py-3 px-4">TOTAL</td>
-              <td className="py-3 px-4 text-right">{data.totals.item_count}</td>
-              <td className="py-3 px-4 text-right">{data.totals.stock_qty}</td>
-              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.stock_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.stock_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-              <td className="py-3 px-4 text-right">{data.totals.physical_qty}</td>
-              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-              <td className="py-3 px-4 text-right text-gray-500">{(data.totals.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-              {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{data.totals.reco_qty || 0}</td>}
-              {isConsolidated && <td className="py-3 px-4 text-right font-bold">{data.totals.final_qty ?? data.totals.physical_qty}</td>}
-              {isConsolidated && <td className="py-3 px-4 text-right text-gray-500">{(data.totals.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}
-              {isConsolidated && <td className="py-3 px-4 text-right text-gray-500">{(data.totals.final_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}
-              <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded ${getVarianceClass(data.totals.diff_qty)}`}>
-                  {data.totals.diff_qty > 0 ? '+' : ''}{data.totals.diff_qty}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_mrp)}`}>
-                  {(data.totals.diff_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs ${getVarianceClass(data.totals.diff_value_cost)}`}>
-                  {(data.totals.diff_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                </span>
-              </td>
-              <td className="py-3 px-4 text-right">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getAccuracyClass(data.totals.accuracy_pct)}`}>{data.totals.accuracy_pct}%</span>
-              </td>
-              <td></td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>

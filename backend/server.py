@@ -1141,6 +1141,13 @@ async def update_device(device_id: str, update: DeviceUpdate):
         raise HTTPException(status_code=404, detail="Device not found")
     return {"message": "Device updated"}
 
+@portal_router.delete("/devices/{device_id}")
+async def delete_device(device_id: str):
+    result = await db.devices.delete_one({"id": device_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return {"message": "Device deleted successfully"}
+
 # ==================== SYNC ROUTES ====================
 
 @sync_router.post("/")
@@ -2502,6 +2509,125 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
         return f"High Surplus — {abs(diff):.0f} units excess, requires investigation ({accuracy}% accuracy)"
     else:
         return f"Critical Shortage — {abs(diff):.0f} units deficit, immediate attention needed ({accuracy}% accuracy)"
+
+# ==================== BARCODE EDIT ENDPOINTS ====================
+
+@portal_router.post("/reports/edit-barcode")
+async def edit_barcode(data: dict):
+    """Edit a barcode/article code for an extra scanned item (not in expected stock)."""
+    client_id = data.get("client_id")
+    report_type = data.get("report_type")
+    original_value = data.get("original_value")
+    new_value = data.get("new_value")
+    location = data.get("location", "")
+
+    if not client_id or not report_type or not original_value or not new_value:
+        raise HTTPException(400, "Missing required fields: client_id, report_type, original_value, new_value")
+
+    if original_value == new_value:
+        raise HTTPException(400, "New value must be different from original")
+
+    master_by_barcode = await _load_master_for_client(client_id)
+
+    if report_type in ["barcode-wise", "detailed"]:
+        if new_value not in master_by_barcode:
+            raise HTTPException(400, f"Barcode '{new_value}' not found in master data")
+        master_info = master_by_barcode[new_value]
+    elif report_type == "article-wise":
+        master_info = None
+        for bc, m in master_by_barcode.items():
+            if m.get("article_code") == new_value:
+                master_info = m
+                break
+        if not master_info:
+            raise HTTPException(400, f"Article code '{new_value}' not found in master data")
+    else:
+        raise HTTPException(400, f"Invalid report_type: {report_type}")
+
+    existing = await db.barcode_edits.find_one({
+        "client_id": client_id, "report_type": report_type,
+        "original_value": original_value, "is_active": True
+    }, {"_id": 0})
+    if existing:
+        await db.barcode_edits.update_one(
+            {"id": existing["id"]},
+            {"$set": {"new_value": new_value, "master_info": {
+                "description": master_info.get("description", ""),
+                "category": master_info.get("category", ""),
+                "article_code": master_info.get("article_code", ""),
+                "article_name": master_info.get("article_name", ""),
+                "mrp": master_info.get("mrp", 0) or 0,
+                "cost": master_info.get("cost", 0) or 0,
+            }, "edited_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        return {"success": True, "edit_id": existing["id"], "updated": True}
+
+    edit = {
+        "id": str(uuid.uuid4()),
+        "client_id": client_id,
+        "report_type": report_type,
+        "original_value": original_value,
+        "new_value": new_value,
+        "location": location,
+        "master_info": {
+            "description": master_info.get("description", ""),
+            "category": master_info.get("category", ""),
+            "article_code": master_info.get("article_code", ""),
+            "article_name": master_info.get("article_name", ""),
+            "mrp": master_info.get("mrp", 0) or 0,
+            "cost": master_info.get("cost", 0) or 0,
+        },
+        "edited_at": datetime.now(timezone.utc).isoformat(),
+        "is_active": True
+    }
+    await db.barcode_edits.insert_one(edit)
+    return {"success": True, "edit_id": edit["id"]}
+
+@portal_router.post("/reports/undo-edit")
+async def undo_barcode_edit(data: dict):
+    """Undo a barcode/article edit."""
+    edit_id = data.get("edit_id")
+    if not edit_id:
+        raise HTTPException(400, "Missing edit_id")
+    result = await db.barcode_edits.update_one({"id": edit_id}, {"$set": {"is_active": False}})
+    if result.modified_count == 0:
+        raise HTTPException(404, "Edit not found")
+    return {"success": True}
+
+@portal_router.get("/reports/edits/{client_id}")
+async def get_active_edits(client_id: str):
+    """Get all active barcode/article edits for a client."""
+    edits = await db.barcode_edits.find({"client_id": client_id, "is_active": True}, {"_id": 0}).to_list(10000)
+    return {"edits": edits}
+
+@portal_router.get("/master/search/{client_id}")
+async def search_master_data(client_id: str, q: str = "", field: str = "barcode"):
+    """Search master/expected stock data by barcode or article_code for auto-complete."""
+    if not q or len(q) < 2:
+        return {"results": []}
+
+    master = await _load_master_for_client(client_id)
+    if not master:
+        session_ids = await _get_all_session_ids_for_client(client_id)
+        expected = await db.expected_stock.find({"session_id": {"$in": session_ids}}, {"_id": 0}).to_list(500000)
+        for e in expected:
+            bc = e.get("barcode", "")
+            if bc and bc not in master:
+                master[bc] = e
+
+    results = []
+    seen_articles = set()
+    for bc, m in master.items():
+        if field == "barcode" and q.lower() in bc.lower():
+            results.append({"barcode": bc, "description": m.get("description", ""), "article_code": m.get("article_code", ""), "mrp": m.get("mrp", 0), "cost": m.get("cost", 0), "category": m.get("category", "")})
+        elif field == "article_code":
+            ac = m.get("article_code", "")
+            if ac and q.lower() in ac.lower() and ac not in seen_articles:
+                seen_articles.add(ac)
+                results.append({"article_code": ac, "article_name": m.get("article_name", ""), "description": m.get("description", ""), "category": m.get("category", ""), "mrp": m.get("mrp", 0), "cost": m.get("cost", 0)})
+        if len(results) >= 20:
+            break
+    return {"results": results}
 
 # ==================== RECONCILIATION (RECO) ENDPOINTS ====================
 
@@ -3921,6 +4047,97 @@ async def get_dashboard():
         "recent_syncs": recent_syncs,
         "devices": devices
     }
+
+@portal_router.get("/dashboard/audit-summary")
+async def get_audit_summary():
+    """Audit summary per active client — overview card data for dashboard."""
+    clients = await db.clients.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    summaries = []
+    for client_doc in clients:
+        cid = client_doc["id"]
+        sessions = await db.audit_sessions.find({"client_id": cid}, {"_id": 0, "id": 1, "session_name": 1, "status": 1}).to_list(1000)
+        if not sessions:
+            continue
+
+        session_ids = [s["id"] for s in sessions]
+        active_count = sum(1 for s in sessions if s.get("status") == "active")
+        completed_count = sum(1 for s in sessions if s.get("status") == "completed")
+
+        expected_pipeline = [
+            {"$match": {"session_id": {"$in": session_ids}}},
+            {"$group": {"_id": None, "total_qty": {"$sum": "$qty"}, "unique_items": {"$sum": 1}}}
+        ]
+        exp_result = await db.expected_stock.aggregate(expected_pipeline).to_list(1)
+        exp = exp_result[0] if exp_result else {"total_qty": 0, "unique_items": 0}
+
+        synced_pipeline = [
+            {"$match": {"session_id": {"$in": session_ids}}},
+            {"$group": {"_id": None, "total_qty": {"$sum": "$total_quantity"}, "total_items": {"$sum": "$total_items"}, "locations": {"$sum": 1}}}
+        ]
+        sync_result = await db.synced_locations.aggregate(synced_pipeline).to_list(1)
+        syn = sync_result[0] if sync_result else {"total_qty": 0, "total_items": 0, "locations": 0}
+
+        expected_qty = exp.get("total_qty", 0)
+        physical_qty = syn.get("total_qty", 0)
+        variance_qty = physical_qty - expected_qty
+        accuracy = calc_accuracy(expected_qty, physical_qty)
+
+        top_mismatches = []
+        try:
+            master_by_barcode = await _load_master_for_client(cid)
+            expected_by_bc = {}
+            all_expected = await db.expected_stock.find({"session_id": {"$in": session_ids}}, {"_id": 0}).to_list(100000)
+            for e in all_expected:
+                bc = e.get("barcode", "")
+                if bc:
+                    expected_by_bc[bc] = expected_by_bc.get(bc, 0) + (e.get("qty", 0) or 0)
+
+            all_synced = await db.synced_locations.find({"session_id": {"$in": session_ids}}, {"_id": 0}).to_list(100000)
+            physical_by_bc = {}
+            for loc in all_synced:
+                for item in loc.get("items", []):
+                    bc = item.get("barcode", "")
+                    if bc:
+                        physical_by_bc[bc] = physical_by_bc.get(bc, 0) + (item.get("quantity", 0) or 0)
+
+            all_barcodes = set(list(expected_by_bc.keys()) + list(physical_by_bc.keys()))
+            mismatches = []
+            for bc in all_barcodes:
+                eq = expected_by_bc.get(bc, 0)
+                pq = physical_by_bc.get(bc, 0)
+                diff = pq - eq
+                if diff != 0:
+                    m = master_by_barcode.get(bc, {})
+                    mismatches.append({
+                        "barcode": bc,
+                        "description": m.get("description", "Unknown"),
+                        "expected_qty": eq,
+                        "physical_qty": pq,
+                        "diff_qty": diff,
+                        "diff_value": round(diff * (m.get("mrp", 0) or 0), 2)
+                    })
+            mismatches.sort(key=lambda x: abs(x["diff_qty"]), reverse=True)
+            top_mismatches = mismatches[:5]
+        except Exception:
+            pass
+
+        summaries.append({
+            "client_id": cid,
+            "client_name": client_doc.get("name", ""),
+            "client_code": client_doc.get("code", ""),
+            "total_sessions": len(sessions),
+            "active_sessions": active_count,
+            "completed_sessions": completed_count,
+            "expected_qty": expected_qty,
+            "physical_qty": physical_qty,
+            "variance_qty": variance_qty,
+            "accuracy_pct": accuracy,
+            "unique_expected_items": exp.get("unique_items", 0),
+            "locations_scanned": syn.get("locations", 0),
+            "top_mismatches": top_mismatches
+        })
+
+    return {"summaries": summaries}
 
 @portal_router.get("/dashboard/live/{session_id}")
 async def get_live_session_data(session_id: str):

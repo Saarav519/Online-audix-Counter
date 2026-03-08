@@ -470,7 +470,9 @@ export default function PortalSessions() {
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                           <tr>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Location</th>
+                            {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
+                              <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Location</th>
+                            )}
                             <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Barcode</th>
                             <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Description</th>
                             <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Category</th>
@@ -482,7 +484,9 @@ export default function PortalSessions() {
                         <tbody>
                           {stockData.map((item, idx) => (
                             <tr key={idx} className="border-t border-gray-50 hover:bg-gray-50">
-                              <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
+                              {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
+                                <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
+                              )}
                               <td className="py-1.5 px-3 font-mono text-gray-700">{item.barcode}</td>
                               <td className={`py-1.5 px-3 ${item.description ? 'text-gray-700' : 'text-gray-300 italic'}`}>
                                 {item.description || 'Not provided'}
@@ -625,7 +629,7 @@ export default function PortalSessions() {
                     if (!importingSession) return;
                     const clientId = importingSession.client_id;
                     try {
-                      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${clientId}/schema/template?template_type=stock`);
+                      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${clientId}/schema/template?template_type=stock&variance_mode=${importingSession.variance_mode || 'bin-wise'}`);
                       if (!res.ok) throw new Error('Failed');
                       const blob = await res.blob();
                       const url = URL.createObjectURL(blob);
