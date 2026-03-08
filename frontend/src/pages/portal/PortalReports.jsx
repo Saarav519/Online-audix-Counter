@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
+import * as XLSX from 'xlsx';
 import { 
   FileBarChart, 
   Download,
@@ -1028,52 +1029,125 @@ export default function PortalReports() {
     const rows = filteredData.report || [];
     const visibleCols = columnConfig.filter(c => c.key !== '_expand' && !hiddenColumns.has(c.key));
     
-    // Headers
-    let csv = visibleCols.map(c => `"${c.label}"`).join(',') + '\n';
-    
-    // Data rows
-    rows.forEach(row => {
-      csv += visibleCols.map(col => {
+    // Helper: column index to Excel letter (0=A, 1=B, ..., 25=Z, 26=AA)
+    const colLetter = (idx) => {
+      let s = '';
+      let n = idx;
+      while (n >= 0) {
+        s = String.fromCharCode(65 + (n % 26)) + s;
+        n = Math.floor(n / 26) - 1;
+      }
+      return s;
+    };
+
+    // Find column indices for formula references
+    const colIdx = {};
+    visibleCols.forEach((c, i) => { colIdx[c.key] = i; });
+
+    const wb = XLSX.utils.book_new();
+    const wsData = [];
+
+    // Header row
+    wsData.push(visibleCols.map(c => c.label));
+
+    // Data rows with formulas
+    rows.forEach((row, ri) => {
+      const excelRow = ri + 2; // Excel row (1-indexed, +1 for header)
+      const rowData = visibleCols.map((col, ci) => {
         let val = row[col.key];
         if (col.key === 'status') {
-          val = val === 'empty_bin' ? 'Empty Bin' : val === 'pending' ? 'Pending' : val === 'conflict' ? 'Conflict' : 'Completed';
-        }
-        if (col.key === 'accuracy_pct') {
-          val = `${val || 0}%`;
+          return val === 'empty_bin' ? 'Empty Bin' : val === 'pending' ? 'Pending' : val === 'conflict' ? 'Conflict' : 'Completed';
         }
         if (col.key === 'barcode_count') {
-          val = row.barcodes ? row.barcodes.length : (val || 0);
+          return row.barcodes ? row.barcodes.length : (val || 0);
         }
-        if (val === undefined || val === null) val = '';
-        return typeof val === 'string' ? `"${val.replace(/"/g, '""')}"` : val;
-      }).join(',') + '\n';
+        if (val === undefined || val === null) return '';
+        return val;
+      });
+      wsData.push(rowData);
     });
-    
-    // Totals row
-    if (filteredData.totals) {
-      const t = filteredData.totals;
-      csv += visibleCols.map(col => {
-        if (col.key === 'location' || col.key === 'barcode' || col.key === 'description' || col.key === 'category' || col.key === 'article_code' || col.key === 'article_name' || col.key === 'status') {
-          return col.key === (visibleCols[0]?.key) ? '"TOTAL"' : '""';
-        }
-        if (col.key === 'accuracy_pct') return `"${t.accuracy_pct || 0}%"`;
-        if (col.key === 'remark') return '""';
-        const val = t[col.key] || 0;
-        return typeof val === 'number' ? val : `"${val}"`;
-      }).join(',') + '\n';
+
+    // Total row placeholder
+    const totalRowIdx = rows.length + 1; // 0-indexed in wsData
+    if (rows.length > 0) {
+      const totalRow = visibleCols.map(() => '');
+      totalRow[0] = 'TOTAL';
+      wsData.push(totalRow);
     }
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    // Create worksheet from data
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Now inject formulas into cells
+    const dataStartRow = 2; // Excel row where data starts
+    const dataEndRow = rows.length + 1; // Last data row in Excel
+
+    // Determine formula columns based on what's available
+    const stockCol = colIdx['stock_qty'] !== undefined ? colLetter(colIdx['stock_qty']) : null;
+    const physCol = colIdx['physical_qty'] !== undefined ? colLetter(colIdx['physical_qty']) : null;
+    const finalCol = colIdx['final_qty'] !== undefined ? colLetter(colIdx['final_qty']) : null;
+    const recoCol = colIdx['reco_qty'] !== undefined ? colLetter(colIdx['reco_qty']) : (colIdx['reco'] !== undefined ? colLetter(colIdx['reco']) : null);
+    const effectivePhysCol = finalCol || physCol; // Use final_qty if available, else physical_qty
+
+    // Add formulas for each data row
+    for (let ri = 0; ri < rows.length; ri++) {
+      const excelRow = ri + 2;
+
+      // Difference formula: = Final/Physical - Stock
+      const diffKey = colIdx['difference_qty'] !== undefined ? 'difference_qty' : (colIdx['diff_qty'] !== undefined ? 'diff_qty' : null);
+      if (diffKey && stockCol && effectivePhysCol) {
+        const cellRef = colLetter(colIdx[diffKey]) + excelRow;
+        ws[cellRef] = { f: `${effectivePhysCol}${excelRow}-${stockCol}${excelRow}` };
+      }
+
+      // Final Qty formula: = Physical + Reco (if both exist)
+      if (finalCol && physCol && recoCol) {
+        const cellRef = finalCol + excelRow;
+        ws[cellRef] = { f: `${physCol}${excelRow}+${recoCol}${excelRow}` };
+      }
+
+      // Accuracy formula: = IF(Stock>0, MIN(Effective,Stock)/Stock*100, IF(Effective=0,100,0))
+      if (colIdx['accuracy_pct'] !== undefined && stockCol && effectivePhysCol) {
+        const accCol = colLetter(colIdx['accuracy_pct']);
+        const cellRef = accCol + excelRow;
+        ws[cellRef] = { f: `IF(${stockCol}${excelRow}>0,ROUND(MIN(${effectivePhysCol}${excelRow},${stockCol}${excelRow})/${stockCol}${excelRow}*100,1),IF(${effectivePhysCol}${excelRow}=0,100,0))` };
+      }
+
+      // Value formulas: stock_value = stock_qty * mrp/cost etc.
+      // These depend on mrp/cost being in the data but NOT in columns, so we keep calculated values
+    }
+
+    // Total row formulas (SUM for numeric columns)
+    if (rows.length > 0) {
+      const totalExcelRow = dataEndRow + 1;
+      visibleCols.forEach((col, ci) => {
+        if (NUMERIC_COLUMNS.has(col.key) && col.key !== 'accuracy_pct') {
+          const cl = colLetter(ci);
+          const cellRef = cl + totalExcelRow;
+          ws[cellRef] = { f: `SUM(${cl}${dataStartRow}:${cl}${dataEndRow})` };
+        }
+      });
+      // Accuracy in total row
+      if (colIdx['accuracy_pct'] !== undefined && stockCol && effectivePhysCol) {
+        const accCol = colLetter(colIdx['accuracy_pct']);
+        const totalStockRef = `${stockCol}${totalExcelRow}`;
+        const totalEffRef = `${effectivePhysCol}${totalExcelRow}`;
+        ws[accCol + totalExcelRow] = { f: `IF(${totalStockRef}>0,ROUND(MIN(${totalEffRef},${totalStockRef})/${totalStockRef}*100,1),IF(${totalEffRef}=0,100,0))` };
+      }
+    }
+
+    // Set column widths
+    ws['!cols'] = visibleCols.map(col => {
+      if (col.key === 'description' || col.key === 'remark' || col.key === 'article_name') return { wch: 30 };
+      if (col.key === 'barcode' || col.key === 'location') return { wch: 18 };
+      if (col.key === 'category' || col.key === 'article_code') return { wch: 15 };
+      return { wch: 12 };
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
     const suffix = varianceCategory !== 'all' ? `_${varianceCategory}` : '';
-    a.download = `${reportType}_report${suffix}_${selectedSession}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success(`Report exported! (${rows.length} rows)`);
+    XLSX.writeFile(wb, `${reportType}_report${suffix}_${selectedSession}.xlsx`);
+    toast.success(`Report exported as Excel! (${rows.length} rows with formulas)`);
   };
 
   const getVarianceIcon = (value) => {
@@ -1137,7 +1211,7 @@ export default function PortalReports() {
           {filteredData && (
             <Button onClick={exportCSV} variant="outline">
               <Download className="w-4 h-4 mr-2" />
-              Export CSV
+              Export Excel
             </Button>
           )}
           {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (

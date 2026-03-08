@@ -48,10 +48,15 @@ export function BarcodeEditCell({
   const startEdit = (e) => {
     e.stopPropagation();
     setEditing(true);
-    setInputVal('');
+    setInputVal(value || '');
     setSuggestions([]);
     setFocusIdx(-1);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
+    }, 50);
   };
 
   const cancelEdit = () => {

@@ -462,6 +462,16 @@ def normalize_barcode(value):
         pass
     return value
 
+def safe_float(value, default=0):
+    """Parse float from string, handling comma-separated numbers like '1,109'"""
+    if not value:
+        return default
+    try:
+        return float(str(value).replace(',', '').strip())
+    except (ValueError, TypeError):
+        return default
+
+
 class SchemaField(BaseModel):
     name: str
     label: str
@@ -645,7 +655,16 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
                 extra_field_names.append(f["name"])
     
     content = await file.read()
-    decoded = content.decode('utf-8')
+    # Try multiple encodings to handle non-UTF-8 CSV files (e.g., Windows-1252, Latin-1)
+    decoded = None
+    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+        try:
+            decoded = content.decode(encoding)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if decoded is None:
+        decoded = content.decode('utf-8', errors='replace')
     reader = csv.DictReader(io.StringIO(decoded))
     
     await db.master_products.delete_many({"client_id": client_id})
@@ -665,8 +684,8 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
             category=norm_row.get('category', ''),
             article_code=norm_row.get('article_code', ''),
             article_name=norm_row.get('article_name', ''),
-            mrp=float(norm_row.get('mrp', 0) or 0),
-            cost=float(norm_row.get('cost', 0) or 0),
+            mrp=safe_float(norm_row.get('mrp', 0)),
+            cost=safe_float(norm_row.get('cost', 0)),
         )
         doc = master.model_dump()
         doc['imported_at'] = doc['imported_at'].isoformat()
@@ -768,7 +787,15 @@ async def import_client_stock(client_id: str, file: UploadFile = File(...)):
                 extra_field_names.append(f["name"])
     
     content = await file.read()
-    decoded = content.decode('utf-8')
+    decoded = None
+    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+        try:
+            decoded = content.decode(encoding)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if decoded is None:
+        decoded = content.decode('utf-8', errors='replace')
     reader = csv.DictReader(io.StringIO(decoded))
     
     await db.client_stock.delete_many({"client_id": client_id})
@@ -789,9 +816,9 @@ async def import_client_stock(client_id: str, file: UploadFile = File(...)):
             "category": norm_row.get('category', ''),
             "article_code": norm_row.get('article_code', ''),
             "article_name": norm_row.get('article_name', ''),
-            "mrp": float(norm_row.get('mrp', 0) or 0),
-            "cost": float(norm_row.get('cost', 0) or 0),
-            "qty": float(norm_row.get('qty', 0) or 0),
+            "mrp": safe_float(norm_row.get('mrp', 0)),
+            "cost": safe_float(norm_row.get('cost', 0)),
+            "qty": safe_float(norm_row.get('qty', 0)),
             "imported_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -1042,7 +1069,15 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
                 extra_field_names.append(f["name"])
     
     content = await file.read()
-    decoded = content.decode('utf-8')
+    decoded = None
+    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
+        try:
+            decoded = content.decode(encoding)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if decoded is None:
+        decoded = content.decode('utf-8', errors='replace')
     reader = csv.DictReader(io.StringIO(decoded))
     
     await db.expected_stock.delete_many({"session_id": session_id})
@@ -1059,9 +1094,9 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
             category=norm_row.get('category', ''),
             article_code=norm_row.get('article_code', ''),
             article_name=norm_row.get('article_name', ''),
-            mrp=float(norm_row.get('mrp', 0) or 0),
-            cost=float(norm_row.get('cost', 0) or 0),
-            qty=float(norm_row.get('qty', 0) or 0)
+            mrp=safe_float(norm_row.get('mrp', 0)),
+            cost=safe_float(norm_row.get('cost', 0)),
+            qty=safe_float(norm_row.get('qty', 0))
         )
         doc = expected.model_dump()
         doc['imported_at'] = doc['imported_at'].isoformat()
