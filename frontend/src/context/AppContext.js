@@ -93,7 +93,18 @@ export const AppProvider = ({ children }) => {
   const [hideBottomNav, setHideBottomNav] = useState(false);
 
   // Reports page selected locations - shared with Settings for sync
-  const [reportSelectedLocations, setReportSelectedLocations] = useState(['all']);
+  // Persisted in localStorage to survive navigation
+  const [reportSelectedLocations, setReportSelectedLocationsState] = useState(() => {
+    const saved = localStorage.getItem('audix_report_selected_locations');
+    return saved ? JSON.parse(saved) : ['all'];
+  });
+
+  // Wrapper to persist selection to localStorage
+  const setReportSelectedLocations = (newValue) => {
+    const value = typeof newValue === 'function' ? newValue(reportSelectedLocations) : newValue;
+    setReportSelectedLocationsState(value);
+    localStorage.setItem('audix_report_selected_locations', JSON.stringify(value));
+  };
 
   // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
