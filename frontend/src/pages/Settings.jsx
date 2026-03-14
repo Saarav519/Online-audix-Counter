@@ -987,38 +987,32 @@ const Settings = () => {
             </p>
           </div>
 
-          {/* Pending Sync Count */}
+          {/* Pending Sync Count - Based on Reports Selection */}
           {(() => {
-            // Filter locations by current scan mode (matching Reports page logic)
-            const isPreAssigned = settings.locationScanMode === 'preassigned';
-            const modeLocations = locations.filter(loc => {
-              if (isPreAssigned) return loc.isAssigned === true;
-              return loc.autoCreated === true || loc.isAssigned === false;
-            });
-            // Only count items from mode-relevant locations with data
-            const pendingLocations = modeLocations.filter(loc => 
-              (scannedItems && scannedItems[loc.id] && scannedItems[loc.id].length > 0) || loc.isEmpty
-            );
-            // Derive items ONLY from valid mode-filtered locations
-            const allItems = pendingLocations.flatMap(loc => scannedItems[loc.id] || []);
-            const pendingItems = allItems.length;
-            const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            // Get selected locations from Reports (uses getSelectedLocationsForSync)
+            const selectedLocs = getSelectedLocationsForSync();
             
-            if (pendingLocations.length > 0) {
-              const emptyBinCount = pendingLocations.filter(loc => loc.isEmpty).length;
+            if (selectedLocs.length === 0) {
               return (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm font-medium text-amber-800">Ready to sync:</p>
-                  <p className="text-sm text-amber-700">
-                    {pendingLocations.length} location{pendingLocations.length !== 1 ? 's' : ''} • {pendingItems} item{pendingItems !== 1 ? 's' : ''} • {pendingQty} qty
-                    {emptyBinCount > 0 && ` • ${emptyBinCount} empty bin${emptyBinCount !== 1 ? 's' : ''}`}
-                  </p>
+                <div className="p-3 bg-slate-100 rounded-lg">
+                  <p className="text-sm text-slate-500">Reports mein locations select karein jo sync karni hain</p>
                 </div>
               );
             }
+            
+            // Calculate stats for selected locations only
+            const allItems = selectedLocs.flatMap(loc => scannedItems[loc.id] || []);
+            const pendingItems = allItems.length;
+            const pendingQty = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+            const emptyBinCount = selectedLocs.filter(loc => loc.isEmpty).length;
+            
             return (
-              <div className="p-3 bg-slate-100 rounded-lg">
-                <p className="text-sm text-slate-500">No data to sync</p>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <p className="text-sm font-medium text-emerald-800">Selected for sync:</p>
+                <p className="text-sm text-emerald-700">
+                  {selectedLocs.length} location{selectedLocs.length !== 1 ? 's' : ''} • {pendingItems} item{pendingItems !== 1 ? 's' : ''} • {pendingQty} qty
+                  {emptyBinCount > 0 && ` • ${emptyBinCount} empty bin${emptyBinCount !== 1 ? 's' : ''}`}
+                </p>
               </div>
             );
           })()}
