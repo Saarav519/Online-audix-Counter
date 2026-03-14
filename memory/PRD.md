@@ -20,31 +20,26 @@ User requested two specific changes to their scanner app:
 
 ## What's Been Implemented (March 2026)
 
-### 1. Selective Location Sync
-- **File**: `/app/frontend/src/pages/Settings.jsx`
-- Added `showSyncSelectionModal` state and `selectedSyncLocations` state
-- Created `getSyncableLocations()` function to get locations with data
-- Modified `handleManualSync()` to show location selection modal first
-- Added `handleSyncSelectionConfirm()` for proceeding with selected locations
-- Updated `performSync()` to accept `selectedLocationIds` parameter
-- Added comprehensive location selection modal with:
-  - Select All / Deselect All functionality
-  - Location list with checkboxes
-  - Item count and quantity display
-  - Continue button shows selected count
+### 1. Selective Location Sync (CORRECTED)
+- **Files**: `/app/frontend/src/context/AppContext.js`, `/app/frontend/src/pages/Settings.jsx`, `/app/frontend/src/pages/Reports.jsx`
+- Added `reportSelectedLocations` and `setReportSelectedLocations` to AppContext (shared state)
+- Reports page now uses context state for selection instead of local state
+- Settings page reads Reports selection via context
+- `getSelectedLocationsForSync()` function filters locations based on Reports selection
+- Sync button shows count: "Sync Now (X locations)" where X = Reports selection
+- Only locations selected in Reports page are synced
 
 ### 2. Location Name Display Enhancement  
 - **File**: `/app/frontend/src/pages/Reports.jsx`
 - Changed font from `text-sm` to `text-xs` for location names
-- Optimized row layout: reduced gaps, smaller status icons
-- Compact Qty column and 3-dot menu
+- Optimized row layout: reduced gaps, smaller status icons (w-6 h-6)
+- Compact Qty column (w-[30px]) and 3-dot menu (h-6 w-6)
 - Result: 26 characters now visible (was ~20 before)
 
 ## Prioritized Backlog
 - P0: None (core changes complete)
-- P1: Add location selection count in Settings sync summary
-- P2: Add toast notification after successful selective sync
+- P1: Sync confirmation message showing which locations were synced
+- P2: Mobile responsive testing on different screen sizes
 
 ## Next Tasks
 - User testing and feedback
-- Mobile responsive testing on different screen sizes

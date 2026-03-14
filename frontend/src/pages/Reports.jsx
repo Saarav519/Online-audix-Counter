@@ -78,14 +78,17 @@ const Reports = () => {
     getOrCreateAssignedLocation,
     playSound,
     getMasterLocationByCode,
-    user
+    user,
+    reportSelectedLocations,
+    setReportSelectedLocations
   } = useApp();
 
   // ---- Search ----
   const [searchTerm, setSearchTerm] = useState('');
 
-  // ---- Selection (for bulk export/delete) ----
-  const [selectedLocations, setSelectedLocations] = useState(['all']);
+  // ---- Selection (for bulk export/delete) - uses shared context state ----
+  const selectedLocations = reportSelectedLocations;
+  const setSelectedLocations = setReportSelectedLocations;
   const isAllSelected = selectedLocations.includes('all');
 
   // ---- Add Location Modal (Dynamic mode) ----

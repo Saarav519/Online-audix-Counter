@@ -92,6 +92,9 @@ export const AppProvider = ({ children }) => {
   // UI state: hide bottom nav during active scanning
   const [hideBottomNav, setHideBottomNav] = useState(false);
 
+  // Reports page selected locations - shared with Settings for sync
+  const [reportSelectedLocations, setReportSelectedLocations] = useState(['all']);
+
   // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
   // CRITICAL: This must complete BEFORE any auto-save can run
@@ -1384,7 +1387,9 @@ export const AppProvider = ({ children }) => {
     isLoadingMasterData,
     playSound,
     hideBottomNav,
-    setHideBottomNav
+    setHideBottomNav,
+    reportSelectedLocations,
+    setReportSelectedLocations
   }), [
     user,
     isAuthenticated,
@@ -1443,7 +1448,8 @@ export const AppProvider = ({ children }) => {
     getProductByBarcode,
     // getStorageInfo is stable (imported function) - not included in deps
     isLoadingMasterData,
-    playSound
+    playSound,
+    reportSelectedLocations
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
