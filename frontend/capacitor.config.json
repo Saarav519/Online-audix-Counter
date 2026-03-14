@@ -1,6 +1,6 @@
 {
-  "appId": "com.audix.online",
-  "appName": "Audix Online",
+  "appId": "com.audix.scanner",
+  "appName": "Audix Scanner",
   "webDir": "build",
   "bundledWebRuntime": false,
   "android": {
@@ -16,5 +16,8 @@
       "androidSpinnerStyle": "small",
       "launchShowDuration": 500
     }
+  },
+  "server": {
+    "androidScheme": "https"
   }
 }
