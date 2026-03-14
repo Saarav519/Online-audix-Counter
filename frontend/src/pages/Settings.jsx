@@ -92,6 +92,11 @@ const Settings = () => {
   const [portalImporting, setPortalImporting] = useState(false);
   const [portalImportResult, setPortalImportResult] = useState(null);
 
+  // Sync location selection state
+  const [showSyncSelectionModal, setShowSyncSelectionModal] = useState(false);
+  const [selectedSyncLocations, setSelectedSyncLocations] = useState([]);
+  const [pendingSyncPassword, setPendingSyncPassword] = useState('');
+
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
   // Fetch sync config on mount
@@ -264,7 +269,36 @@ const Settings = () => {
     }
   };
 
+  // Get syncable locations based on current mode
+  const getSyncableLocations = () => {
+    const isPreAssigned = settings.locationScanMode === 'preassigned';
+    const modeLocations = locations.filter(loc => {
+      if (isPreAssigned) return loc.isAssigned === true;
+      return loc.autoCreated === true || loc.isAssigned === false;
+    });
+    return modeLocations.filter(loc => {
+      const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
+      return items.length > 0 || loc.isEmpty;
+    });
+  };
+
   const handleManualSync = () => {
+    const syncableLocations = getSyncableLocations();
+    if (syncableLocations.length === 0) {
+      alert('No data to sync');
+      return;
+    }
+    // Pre-select all locations
+    setSelectedSyncLocations(syncableLocations.map(loc => loc.id));
+    setShowSyncSelectionModal(true);
+  };
+
+  const handleSyncSelectionConfirm = () => {
+    if (selectedSyncLocations.length === 0) {
+      alert('Please select at least one location to sync');
+      return;
+    }
+    setShowSyncSelectionModal(false);
     setManualSyncPassword('');
     setShowSyncPasswordModal(true);
   };
@@ -277,12 +311,13 @@ const Settings = () => {
     setShowSyncPasswordModal(false);
     // Store password for auto-sync use
     localStorage.setItem('audix_sync_password', manualSyncPassword);
-    performSync(true, manualSyncPassword);
+    setPendingSyncPassword(manualSyncPassword);
+    performSync(true, manualSyncPassword, selectedSyncLocations);
   };
 
   const CHUNK_SIZE = 10;
 
-  const performSync = async (isManual = false, syncPassword = '') => {
+  const performSync = async (isManual = false, syncPassword = '', selectedLocationIds = null) => {
     if (!syncConfig.deviceName || !syncConfig.sessionId || !syncPassword) {
       if (isManual) alert('Please configure device name, client, and session first');
       return;
@@ -299,10 +334,16 @@ const Settings = () => {
     try {
       // Filter locations by current scan mode
       const isPreAssigned = settings.locationScanMode === 'preassigned';
-      const modeLocations = locations.filter(loc => {
+      let modeLocations = locations.filter(loc => {
         if (isPreAssigned) return loc.isAssigned === true;
         return loc.autoCreated === true || loc.isAssigned === false;
       });
+
+      // If selectedLocationIds provided, filter to only those locations
+      if (selectedLocationIds && selectedLocationIds.length > 0) {
+        const selectedSet = new Set(selectedLocationIds);
+        modeLocations = modeLocations.filter(loc => selectedSet.has(loc.id));
+      }
 
       const locationsToSync = modeLocations.map(loc => {
         const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
@@ -1123,6 +1164,105 @@ const Settings = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Sync Location Selection Modal */}
+      <Dialog open={showSyncSelectionModal} onOpenChange={setShowSyncSelectionModal}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-emerald-600" />
+              Select Locations to Sync
+            </DialogTitle>
+            <DialogDescription>
+              Choose which locations you want to sync to the portal
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-4">
+            {(() => {
+              const syncableLocations = getSyncableLocations();
+              const allSelected = selectedSyncLocations.length === syncableLocations.length;
+              
+              return (
+                <div className="space-y-3">
+                  {/* Select All */}
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="text-sm font-medium text-slate-700">
+                      {selectedSyncLocations.length} of {syncableLocations.length} selected
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (allSelected) {
+                          setSelectedSyncLocations([]);
+                        } else {
+                          setSelectedSyncLocations(syncableLocations.map(loc => loc.id));
+                        }
+                      }}
+                    >
+                      {allSelected ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                  
+                  {/* Location List */}
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {syncableLocations.map(loc => {
+                      const items = scannedItems && scannedItems[loc.id] ? scannedItems[loc.id] : [];
+                      const totalQty = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                      const isSelected = selectedSyncLocations.includes(loc.id);
+                      
+                      return (
+                        <div
+                          key={loc.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                            isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                          onClick={() => {
+                            setSelectedSyncLocations(prev => {
+                              if (isSelected) {
+                                return prev.filter(id => id !== loc.id);
+                              } else {
+                                return [...prev, loc.id];
+                              }
+                            });
+                          }}
+                        >
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+                          }`}>
+                            {isSelected && (
+                              <CheckCircle2 className="w-4 h-4 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-slate-800 truncate">{loc.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {loc.isEmpty ? 'Empty Bin' : `${items.length} items • ${totalQty} qty`}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowSyncSelectionModal(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSyncSelectionConfirm} 
+              disabled={selectedSyncLocations.length === 0}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Cloud className="w-4 h-4 mr-2" />
+              Continue ({selectedSyncLocations.length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Manual Sync Password Modal */}
       <Dialog open={showSyncPasswordModal} onOpenChange={setShowSyncPasswordModal}>

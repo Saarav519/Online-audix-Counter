@@ -900,9 +900,19 @@ COLD-01,Cold Storage Unit 1`;
                       {/* Location Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className={`font-semibold text-sm truncate ${
-                            isEmptyBin ? 'text-amber-800' : isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
-                          }`}>
+                          <span 
+                            className={`font-semibold text-sm ${
+                              isEmptyBin ? 'text-amber-800' : isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
+                            }`}
+                            style={{ 
+                              maxWidth: '25ch', 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap',
+                              display: 'block'
+                            }}
+                            title={masterLocation.name || masterLocation.code}
+                          >
                             {masterLocation.name || masterLocation.code}
                           </span>
                         </div>
@@ -1245,7 +1255,16 @@ COLD-01,Cold Storage Unit 1`;
 
                     {/* Location Info */}
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-slate-800 text-sm truncate block">
+                      <span 
+                        className="font-semibold text-slate-800 text-sm block"
+                        style={{ 
+                          maxWidth: '25ch', 
+                          overflow: 'hidden', 
+                          textOverflow: 'ellipsis', 
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={loc.name || loc.code}
+                      >
                         {loc.name || loc.code}
                       </span>
                       <div className="flex items-center gap-1">
