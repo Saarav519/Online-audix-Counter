@@ -4714,6 +4714,39 @@ async def get_master_products_for_scanner(client_id: str):
         "products": products
     }
 
+@sync_router.get("/location-master")
+async def get_location_master_for_scanner(client_id: str):
+    """Scanner pulls location master. Returns code, name, zone, floor, area, type."""
+    if not client_id:
+        raise HTTPException(status_code=400, detail="client_id required")
+    
+    # Try to fetch from location_master collection
+    records = await db.location_master.find(
+        {"client_id": client_id, "is_active": {"$ne": False}},
+        {"_id": 0, "location_code": 1, "location_name": 1, "zone": 1, "floor": 1, "area": 1, "location_type": 1}
+    ).to_list(50000)
+    
+    # Map to scanner-friendly format
+    locations = []
+    for r in records:
+        code = r.get("location_code", "")
+        if not code:
+            continue
+        locations.append({
+            "code": code,
+            "name": r.get("location_name", code),
+            "zone": r.get("zone", ""),
+            "floor": r.get("floor", ""),
+            "area": r.get("area", ""),
+            "type": r.get("location_type", "")
+        })
+    
+    return {
+        "client_id": client_id,
+        "location_count": len(locations),
+        "locations": locations
+    }
+
 # ==================== INCLUDE ROUTERS ====================
 
 app.include_router(api_router)

@@ -185,6 +185,27 @@ const Settings = () => {
         }));
         setMasterProductsDirect(products);
         setPortalImportResult({ success: true, msg: `Imported ${products.length} products from portal` });
+      } else if (portalImportType === 'locationMaster') {
+        // Fetch location master from portal
+        const res = await fetch(`${BACKEND_URL}/api/audit/sync/location-master?client_id=${syncConfig.clientId}`);
+        if (!res.ok) throw new Error('Failed to fetch location master');
+        const data = await res.json();
+        const locs = (data.locations || []).map(loc => ({
+          code: loc.code,
+          name: loc.name || loc.code,
+          zone: loc.zone || '',
+          floor: loc.floor || '',
+          area: loc.area || '',
+          type: loc.type || '',
+          description: `${loc.zone || ''}${loc.floor ? ' - ' + loc.floor : ''}`,
+          isMaster: true
+        }));
+        if (locs.length === 0) {
+          setPortalImportResult({ success: false, msg: 'No location master found. Upload location CSV from Portal → Clients → Location Master.' });
+        } else {
+          setMasterLocationsDirect(locs);
+          setPortalImportResult({ success: true, msg: `Imported ${locs.length} locations from location master` });
+        }
       } else {
         // Fetch assigned pending locations
         const url = `${BACKEND_URL}/api/audit/sync/my-locations?device_name=${encodeURIComponent(syncConfig.deviceName)}&client_id=${encodeURIComponent(syncConfig.clientId)}${syncConfig.sessionId ? `&session_id=${encodeURIComponent(syncConfig.sessionId)}` : ''}`;
@@ -1112,6 +1133,7 @@ const Settings = () => {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                 >
                   <option value="master">Master Sync (Products)</option>
+                  <option value="locationMaster">Location Master Sync</option>
                   <option value="pending">Pending Location Sync</option>
                 </select>
               </div>
@@ -1120,6 +1142,13 @@ const Settings = () => {
                 <div className="p-2.5 bg-blue-50 rounded-lg">
                   <p className="text-xs text-blue-700">Fetches product master (Barcode, Name, Price) from the selected client's uploaded stock data.</p>
                   <p className="text-xs text-blue-600 mt-1">Current: <strong>{masterProducts.length}</strong> products loaded</p>
+                </div>
+              )}
+
+              {portalImportType === 'locationMaster' && (
+                <div className="p-2.5 bg-emerald-50 rounded-lg">
+                  <p className="text-xs text-emerald-700">Fetches location master (Code, Name, Zone, Floor) from the selected client's uploaded location data.</p>
+                  <p className="text-xs text-emerald-600 mt-1">Current: <strong>{masterLocations.length}</strong> locations loaded</p>
                 </div>
               )}
 
@@ -1153,7 +1182,9 @@ const Settings = () => {
                 ) : (
                   <>
                     <Download className="w-4 h-4 mr-2" />
-                    {portalImportType === 'master' ? 'Import Products from Portal' : 'Import Assigned Locations'}
+                    {portalImportType === 'master' ? 'Import Products from Portal' : 
+                     portalImportType === 'locationMaster' ? 'Import Location Master' : 
+                     'Import Assigned Locations'}
                   </>
                 )}
               </Button>
