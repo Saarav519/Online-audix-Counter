@@ -1,74 +1,50 @@
-# Audix Online Counter App - PRD
+# Audix Online Counter - PRD
 
 ## Original Problem Statement
-User connected their existing Audix Online Counter App repo and uploaded a zip file (audix-dm-latest.zip) containing the latest admin portal code changes. Task was to compare and apply all latest changes. Subsequently, user requested building a desktop app with Electron + SQLite for offline capability.
+User requested two specific changes to their scanner app:
+1. **Sync**: Only selected location reports should sync, not all data
+2. **Reports**: Location names should display up to 25 characters clearly (was truncating at ~20)
 
 ## Architecture
-- **Backend**: FastAPI + MongoDB (Python)
+- **Backend**: FastAPI + MongoDB
 - **Frontend**: React + Tailwind CSS + shadcn/ui
-- **Database**: MongoDB (audix_db)
-- **Auth**: Portal login with username/password (admin/admin123)
+- **Portal**: Admin dashboard for managing audits
+- **Scanner**: Mobile PWA for barcode scanning
 
-## User Personas
-1. **Admin** - Portal access, manages clients, sessions, devices, reports
-2. **Scanner Operator** - Mobile scanner app, scans barcodes, syncs data
-
-## Core Requirements
+## Core Features (Existing)
 - Multi-client audit management
-- Audit sessions with expected vs physical stock
-- Barcode scanning and sync
-- Variance reports (bin-wise, barcode-wise, article-wise, detailed, category-summary)
-- Schema-based column visibility in all views and reports
-- Device management
+- Audit sessions with variance tracking
+- Barcode scanning with device sync
+- Reports with XLSX export
 - User management with approval workflow
 
-## What's Been Implemented
+## What's Been Implemented (March 2026)
 
-### March 8, 2026 - Session 1: Initial Changes from ZIP
-1. Dashboard - Audit Summary Section
-2. Clients - Upload Progress (XHR-based)
-3. Devices - Delete Feature
-4. Sessions - Conditional Location Column
-5. Reports - FullScreenReport Component
-6. Reports - BarcodeEditCell Component
-7. 6 new backend endpoints
+### 1. Selective Location Sync
+- **File**: `/app/frontend/src/pages/Settings.jsx`
+- Added `showSyncSelectionModal` state and `selectedSyncLocations` state
+- Created `getSyncableLocations()` function to get locations with data
+- Modified `handleManualSync()` to show location selection modal first
+- Added `handleSyncSelectionConfirm()` for proceeding with selected locations
+- Updated `performSync()` to accept `selectedLocationIds` parameter
+- Added comprehensive location selection modal with:
+  - Select All / Deselect All functionality
+  - Location list with checkboxes
+  - Item count and quantity display
+  - Continue button shows selected count
 
-### March 8, 2026 - Session 2: Bug Fixes (3 bugs)
-1. **Master CSV Upload Fix** - Multi-encoding fallback (utf-8/utf-8-sig/latin-1/cp1252) for non-UTF-8 CSV files
-2. **Barcode Edit Fix** - Pencil icon now pre-populates input with current barcode value for editing
-3. **Report Export Fix** - Changed from plain CSV to XLSX with Excel formulas (Difference, Accuracy, SUM totals)
-4. **safe_float helper** - Handles comma-separated numbers (e.g., '1,109') in CSV imports
-
-### March 8, 2026 - Session 2: Schema Issues (2 bugs)
-1. **Stock View Schema-Aware** - Stock view dialog now fetches and respects schema. Shows/hides columns (MRP, Cost, Article Code, Article Name) based on which fields are enabled in schema.
-2. **Reports Schema Columns** - Backend report endpoints (detailed, barcode-wise, consolidated) now include `article_code` and `article_name` in response data. Frontend report column config shows these columns when schema has them enabled.
-
-### Backend Endpoints:
-- `DELETE /api/audit/portal/devices/{device_id}`
-- `POST /api/audit/portal/reports/edit-barcode`
-- `POST /api/audit/portal/reports/undo-edit`
-- `GET /api/audit/portal/reports/edits/{client_id}`
-- `GET /api/audit/portal/master/search/{client_id}`
-- `GET /api/audit/portal/dashboard/audit-summary`
+### 2. Location Name Display Enhancement  
+- **File**: `/app/frontend/src/pages/Reports.jsx`
+- Changed font from `text-sm` to `text-xs` for location names
+- Optimized row layout: reduced gaps, smaller status icons
+- Compact Qty column and 3-dot menu
+- Result: 26 characters now visible (was ~20 before)
 
 ## Prioritized Backlog
-
-### P0 (Critical) - Desktop App
-- Phase 1: Electron Setup (main.js, preload.js, electron-builder)
-- Phase 2: SQLite Local Cache
-- Phase 3: Background Sync + Offline Mode
-- Phase 4: System Tray + Auto-Update
-- Phase 5: GitHub Actions for .exe build
-
-### P1 (High)
-- Missing MongoDB indexes (clients.id/code, portal_users.username/id, barcode_edits, reco_adjustments)
-- Backend API caching (TTL-based for repeated queries)
-
-### P2 (Medium)
-- Frontend response caching
-- Increase FastAPI workers from 1 to 4
-- SaaS features from AUDIX_SAAS_IMPLEMENTATION_PLAN.md
+- P0: None (core changes complete)
+- P1: Add location selection count in Settings sync summary
+- P2: Add toast notification after successful selective sync
 
 ## Next Tasks
-- User to review schema-based column fixes
-- Proceed with Desktop App (Electron) build when ready
+- User testing and feedback
+- Mobile responsive testing on different screen sizes

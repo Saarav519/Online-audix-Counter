@@ -905,7 +905,7 @@ COLD-01,Cold Storage Unit 1`;
                               isEmptyBin ? 'text-amber-800' : isSubmitted ? 'text-emerald-800' : isActive ? 'text-blue-800' : 'text-slate-800'
                             }`}
                             style={{ 
-                              maxWidth: '25ch', 
+                              maxWidth: '200px', 
                               overflow: 'hidden', 
                               textOverflow: 'ellipsis', 
                               whiteSpace: 'nowrap',
@@ -1217,7 +1217,7 @@ COLD-01,Cold Storage Unit 1`;
                 return (
                   <div
                     key={loc.id}
-                    className={`flex items-center gap-2 px-3 py-3 transition-colors ${
+                    className={`flex items-center gap-1.5 px-2 py-3 transition-colors ${
                       isSelected ? 'bg-emerald-50/40' : 'bg-white'
                     }`}
                   >
@@ -1233,7 +1233,7 @@ COLD-01,Cold Storage Unit 1`;
                     </div>
 
                     {/* Status Icon */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
                       loc.isEmpty
                         ? 'bg-amber-100'
                         : loc.isSubmitted
@@ -1243,65 +1243,56 @@ COLD-01,Cold Storage Unit 1`;
                           : 'bg-slate-100'
                     }`}>
                       {loc.isEmpty ? (
-                        <PackageX className="w-4 h-4 text-amber-600" />
+                        <PackageX className="w-3 h-3 text-amber-600" />
                       ) : loc.isSubmitted ? (
-                        <Lock className="w-4 h-4 text-emerald-600" />
+                        <Lock className="w-3 h-3 text-emerald-600" />
                       ) : stats.totalItems > 0 ? (
-                        <Clock className="w-4 h-4 text-amber-600" />
+                        <Clock className="w-3 h-3 text-amber-600" />
                       ) : (
-                        <MapPin className="w-4 h-4 text-slate-400" />
+                        <MapPin className="w-3 h-3 text-slate-400" />
                       )}
                     </div>
 
                     {/* Location Info */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <span 
-                        className="font-semibold text-slate-800 text-sm block"
-                        style={{ 
-                          maxWidth: '25ch', 
-                          overflow: 'hidden', 
-                          textOverflow: 'ellipsis', 
-                          whiteSpace: 'nowrap'
-                        }}
+                        className="font-semibold text-slate-800 text-xs block truncate"
+                        style={{ maxWidth: '100%' }}
                         title={loc.name || loc.code}
                       >
                         {loc.name || loc.code}
                       </span>
                       <div className="flex items-center gap-1">
                         {loc.isEmpty && (
-                          <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] px-1 py-0">
-                            Empty Bin
+                          <Badge className="bg-amber-100 text-amber-700 border-0 text-[9px] px-1 py-0">
+                            Empty
                           </Badge>
                         )}
                         {loc.isSubmitted && !loc.isEmpty && (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[10px] px-1 py-0">
-                            Submitted
+                          <Badge className="bg-emerald-100 text-emerald-700 border-0 text-[9px] px-1 py-0">
+                            ✓
                           </Badge>
                         )}
-                        {loc.autoCreated && !loc.isSubmitted && (
-                          <span className="text-[10px] text-purple-500 font-medium">Dynamic</span>
+                        {loc.autoCreated && !loc.isSubmitted && !loc.isEmpty && (
+                          <span className="text-[9px] text-purple-500">●</span>
                         )}
-                        {loc.isAssigned && !loc.isSubmitted && (
-                          <span className="text-[10px] text-blue-500 font-medium">Assigned</span>
-                        )}
-                        {!loc.isSubmitted && !loc.autoCreated && !loc.isAssigned && (
-                          <span className="text-[10px] text-slate-400 font-mono">{loc.code}</span>
+                        {loc.isAssigned && !loc.isSubmitted && !loc.isEmpty && (
+                          <span className="text-[9px] text-blue-500">●</span>
                         )}
                       </div>
                     </div>
 
                     {/* Quantity */}
-                    <div className="text-center min-w-[40px] flex-shrink-0">
-                      <p className="text-base font-bold text-slate-700">{stats.totalQuantity}</p>
-                      <p className="text-[10px] text-slate-400">Qty</p>
+                    <div className="text-center w-[30px] flex-shrink-0">
+                      <p className="text-sm font-bold text-slate-700">{stats.totalQuantity}</p>
                     </div>
 
                     {/* Three Dots Menu */}
                     <div className="flex-shrink-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="w-5 h-5" />
+                          <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                            <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
