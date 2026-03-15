@@ -48,7 +48,23 @@ User reported that in the Audix scanner mobile app, during scanning the master d
 - Selective location sync (only selected locations sync)
 - Location name display enhancement (26 chars visible)
 
-## Prioritized Backlog
+### Bug Fix 2: Reports Total Quantity Showing Wrong Initially (Jan 2026)
+**Root Causes Identified:**
+1. `scannedItems` loads mock/empty data synchronously from localStorage (which was already migrated to IndexedDB)
+2. Real data loads asynchronously from IndexedDB, causing a delay where Reports shows wrong counts
+3. Orphan cleanup effect runs before IndexedDB load completes, potentially interfering with data
+4. Auto-save effect could save stale/mock data over real IndexedDB data
+
+**Files Modified:**
+- `/app/frontend/src/context/AppContext.js` - Added isLoadingScannedData flag, guarded orphan cleanup and auto-save
+- `/app/frontend/src/pages/Reports.jsx` - Added loading indicator, consumes isLoadingScannedData flag
+
+**Fixes Applied:**
+1. Added `isLoadingScannedData` state flag to track when IndexedDB scanned data is ready
+2. Orphan cleanup now waits for `isLoadingScannedData === false` before running
+3. Auto-save for scanned items waits for IndexedDB load to complete
+4. Reports page shows "Loading scanned data..." spinner until data is ready
+5. Exposed `isLoadingScannedData` through AppContext for any component to use
 - P0: None (core fix complete)
 - P1: Auto-backup master data to localStorage for smaller datasets (<5MB)
 - P2: Add explicit "Export master data backup" button in Settings
