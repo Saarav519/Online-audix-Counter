@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 class AudixPortalAPITester:
-    def __init__(self, base_url="https://audix-counter-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://audix-preview.preview.emergentagent.com"):
         self.base_url = base_url
         self.session = requests.Session()
         self.tests_run = 0
