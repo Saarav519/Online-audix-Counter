@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { mockUsers, mockLocations, mockMasterProducts, mockMasterLocations, mockScannedItems, mockSessions, mockSettings } from '../data/mockData';
-import { MasterProductsDB, MasterLocationsDB, ScannedItemsDB, ScannedItemsByLocationDB, getStorageInfo } from '../utils/indexedDB';
+import { MasterProductsDB, MasterLocationsDB, ScannedItemsDB, ScannedItemsByLocationDB, getStorageInfo, getMasterMeta } from '../utils/indexedDB';
 
 const AppContext = createContext();
 
@@ -109,6 +109,7 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
   // CRITICAL: This must complete BEFORE any auto-save can run
+  // Detects if IndexedDB was evicted by browser and warns user
   // ============================================
   useEffect(() => {
     const loadMasterProducts = async () => {
@@ -116,12 +117,28 @@ export const AppProvider = ({ children }) => {
         const products = await MasterProductsDB.getAll();
         if (products && products.length > 0) {
           setMasterProducts(products);
-          console.log(`✅ Loaded ${products.length} master products from IndexedDB`);
+          console.log(`Loaded ${products.length} master products from IndexedDB`);
         } else {
-          // First time - save mock data to IndexedDB
-          await MasterProductsDB.importAll(mockMasterProducts);
-          setMasterProducts(mockMasterProducts);
-          console.log('✅ Initialized IndexedDB with mock master products');
+          // IndexedDB is empty - check if user previously had data imported
+          const meta = getMasterMeta();
+          const prevCount = meta?.products?.count || 0;
+          
+          if (prevCount > 0) {
+            // DATA LOSS DETECTED: User had imported data but IndexedDB is empty
+            // This happens when mobile browser evicts data under memory pressure
+            console.error(`DATA LOSS: Previously had ${prevCount} products, IndexedDB now empty!`);
+            setMasterProducts([]);
+            // Show alert to user (set a flag that components can check)
+            localStorage.setItem('audix_master_data_lost', JSON.stringify({
+              products: prevCount,
+              detectedAt: new Date().toISOString()
+            }));
+          } else {
+            // Truly first time - save mock data to IndexedDB
+            await MasterProductsDB.importAll(mockMasterProducts);
+            setMasterProducts(mockMasterProducts);
+            console.log('Initialized IndexedDB with mock master products');
+          }
         }
       } catch (err) {
         console.warn('IndexedDB load failed, using localStorage fallback:', err);
@@ -134,7 +151,7 @@ export const AppProvider = ({ children }) => {
         // Mark IndexedDB as loaded - NOW auto-save is allowed
         indexedDBLoadedRef.current = true;
         setIsLoadingMasterData(false);
-        console.log('✅ IndexedDB load complete, auto-save enabled');
+        console.log('IndexedDB load complete, auto-save enabled');
       }
     };
     
@@ -143,6 +160,7 @@ export const AppProvider = ({ children }) => {
 
   // ============================================
   // INDEXEDDB: Load Master Locations on startup
+  // Detects data loss similar to master products
   // ============================================
   useEffect(() => {
     const loadMasterLocations = async () => {
@@ -150,12 +168,21 @@ export const AppProvider = ({ children }) => {
         const locations = await MasterLocationsDB.getAll();
         if (locations && locations.length > 0) {
           setMasterLocations(locations);
-          console.log(`✅ Loaded ${locations.length} master locations from IndexedDB`);
+          console.log(`Loaded ${locations.length} master locations from IndexedDB`);
         } else {
-          // First time - save mock data to IndexedDB
-          await MasterLocationsDB.importAll(mockMasterLocations);
-          setMasterLocations(mockMasterLocations);
-          console.log('✅ Initialized IndexedDB with mock master locations');
+          // Check if user previously had data
+          const meta = getMasterMeta();
+          const prevCount = meta?.locations?.count || 0;
+          
+          if (prevCount > 0) {
+            console.error(`DATA LOSS: Previously had ${prevCount} locations, IndexedDB now empty!`);
+            setMasterLocations([]);
+          } else {
+            // First time - save mock data to IndexedDB
+            await MasterLocationsDB.importAll(mockMasterLocations);
+            setMasterLocations(mockMasterLocations);
+            console.log('Initialized IndexedDB with mock master locations');
+          }
         }
       } catch (err) {
         console.warn('IndexedDB master locations load failed, using localStorage fallback:', err);
@@ -223,6 +250,7 @@ export const AppProvider = ({ children }) => {
 
   // ============================================
   // AUTO-SAVE: Persist master locations to IndexedDB when changed
+  // Uses safeSave (upsert) instead of importAll (clear+insert) to prevent data loss
   // ============================================
   useEffect(() => {
     if (!indexedDBLoadedRef.current) return;
@@ -232,9 +260,9 @@ export const AppProvider = ({ children }) => {
     }
     
     const saveTimeout = setTimeout(() => {
-      console.log(`💾 Saving ${masterLocations.length} master locations to IndexedDB...`);
-      MasterLocationsDB.importAll(masterLocations)
-        .then(() => console.log('✅ Master locations saved to IndexedDB'))
+      console.log(`Saving ${masterLocations.length} master locations to IndexedDB (safe)...`);
+      MasterLocationsDB.safeSave(masterLocations)
+        .then(() => console.log('Master locations saved to IndexedDB'))
         .catch(err => {
           console.warn('IndexedDB master locations save failed:', err);
         });
@@ -384,7 +412,8 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Persist master products (supports 100MB+)
   // Only saves when master products change (not on every scan)
-  // CRITICAL: Only saves AFTER IndexedDB has finished loading to prevent data loss
+  // CRITICAL FIX: Uses safeSave (upsert) instead of importAll (clear+insert)
+  // This prevents data loss if the save is interrupted (mobile memory pressure, tab kill)
   // ============================================
   const masterProductsInitializedRef = useRef(false);
   const saveTimeoutRef = useRef(null);
@@ -393,14 +422,18 @@ export const AppProvider = ({ children }) => {
     // SAFETY CHECK 1: Don't save until IndexedDB has finished loading
     // This prevents race conditions where mock data overwrites real data
     if (!indexedDBLoadedRef.current) {
-      console.log('⏳ Skipping master products save - IndexedDB not loaded yet');
       return;
     }
     
     // SAFETY CHECK 2: Skip first render after IndexedDB load
     if (!masterProductsInitializedRef.current) {
       masterProductsInitializedRef.current = true;
-      console.log('⏳ Skipping first master products save after load');
+      return;
+    }
+
+    // SAFETY CHECK 3: Don't auto-save empty data (would lose everything)
+    if (!masterProducts || masterProducts.length === 0) {
+      console.log('Skipping auto-save: master products empty');
       return;
     }
     
@@ -411,12 +444,17 @@ export const AppProvider = ({ children }) => {
     
     // Save after a short delay to batch multiple changes
     saveTimeoutRef.current = setTimeout(() => {
-      console.log(`💾 Saving ${masterProducts.length} master products to IndexedDB...`);
-      // Save to IndexedDB (async, non-blocking)
-      MasterProductsDB.importAll(masterProducts)
-        .then(() => console.log('✅ Master products saved to IndexedDB'))
+      console.log(`Saving ${masterProducts.length} master products to IndexedDB (safe)...`);
+      // FIXED: Use safeSave (upsert) instead of importAll (clear+insert)
+      // safeSave never clears the store, so interrupted saves can't cause data loss
+      MasterProductsDB.safeSave(masterProducts)
+        .then(() => console.log('Master products saved to IndexedDB'))
         .catch(err => {
-          console.warn('IndexedDB save failed:', err);
+          console.warn('IndexedDB save failed, using localStorage backup:', err);
+          // Backup to localStorage as last resort
+          try {
+            localStorage.setItem('audix_master_products', JSON.stringify(masterProducts));
+          } catch (e) { /* localStorage might be full */ }
         });
     }, 500); // 500ms debounce
     
@@ -1179,6 +1217,7 @@ export const AppProvider = ({ children }) => {
   const clearMasterProducts = async () => {
     setMasterProducts([]);
     localStorage.removeItem('audix_master_products');
+    localStorage.removeItem('audix_master_data_lost');
     try { await MasterProductsDB.clear(); } catch (e) { /* ignore */ }
   };
 

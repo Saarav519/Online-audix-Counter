@@ -21,24 +21,69 @@ const STORES = {
 let dbInstance = null;
 
 /**
- * Initialize IndexedDB
+ * Request persistent storage to prevent browser from evicting IndexedDB data
+ * CRITICAL for mobile devices where browser can clear data under memory pressure
+ */
+const requestPersistentStorage = async () => {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      const isPersisted = await navigator.storage.persisted();
+      if (!isPersisted) {
+        const granted = await navigator.storage.persist();
+        console.log(`Persistent storage ${granted ? 'GRANTED' : 'DENIED'}`);
+        return granted;
+      }
+      console.log('Persistent storage already active');
+      return true;
+    }
+  } catch (err) {
+    console.warn('Persistent storage request failed:', err);
+  }
+  return false;
+};
+
+/**
+ * Initialize IndexedDB with connection health checks
  */
 const initDB = () => {
   return new Promise((resolve, reject) => {
+    // Check if existing connection is still alive
     if (dbInstance) {
-      resolve(dbInstance);
-      return;
+      try {
+        // Test if connection is still valid by checking objectStoreNames
+        const _ = dbInstance.objectStoreNames;
+        resolve(dbInstance);
+        return;
+      } catch (e) {
+        // Connection is stale/closed - reset and reconnect
+        console.warn('IndexedDB connection stale, reconnecting...');
+        dbInstance = null;
+      }
     }
 
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = (event) => {
       console.error('IndexedDB error:', event.target.error);
+      dbInstance = null;
       reject(event.target.error);
     };
 
     request.onsuccess = (event) => {
       dbInstance = event.target.result;
+      
+      // Handle unexpected connection close (mobile browser memory pressure)
+      dbInstance.onclose = () => {
+        console.warn('IndexedDB connection closed unexpectedly');
+        dbInstance = null;
+      };
+      
+      // Handle version change (another tab opened with newer version)
+      dbInstance.onversionchange = () => {
+        dbInstance.close();
+        dbInstance = null;
+      };
+      
       resolve(dbInstance);
     };
 
@@ -92,18 +137,29 @@ const initDB = () => {
 };
 
 /**
- * Get all items from a store
+ * Get all items from a store (with retry on stale connection)
  */
-const getAll = async (storeName) => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.getAll();
+const getAll = async (storeName, retryCount = 0) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readonly');
+      const store = transaction.objectStore(storeName);
+      const request = store.getAll();
 
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+      
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (err) {
+    if (retryCount < 2) {
+      console.warn(`IndexedDB getAll failed, retrying (${retryCount + 1}/2)...`);
+      dbInstance = null; // Force reconnection
+      return getAll(storeName, retryCount + 1);
+    }
+    throw err;
+  }
 };
 
 /**
@@ -238,11 +294,24 @@ export const MasterProductsDB = {
   save: (product) => put(STORES.MASTER_PRODUCTS, product),
   
   // Bulk import - replaces all existing data (OPTIMIZED for large datasets)
+  // ONLY use for user-initiated imports, NOT for auto-save
   importAll: async (products, onProgress = null) => {
     await clearStore(STORES.MASTER_PRODUCTS);
     // Yield to UI after clearing
     await new Promise(resolve => setTimeout(resolve, 0));
-    return putMany(STORES.MASTER_PRODUCTS, products, onProgress);
+    const count = await putMany(STORES.MASTER_PRODUCTS, products, onProgress);
+    // Track import metadata in localStorage for recovery detection
+    _saveMasterMeta('products', count);
+    return count;
+  },
+
+  // SAFE SAVE: Upsert all products WITHOUT clearing first
+  // Use this for auto-save to prevent data loss on interruption
+  safeSave: async (products, onProgress = null) => {
+    if (!products || products.length === 0) return 0;
+    const count = await putMany(STORES.MASTER_PRODUCTS, products, onProgress);
+    _saveMasterMeta('products', count);
+    return count;
   },
   
   // ULTRA-FAST: Direct CSV to IndexedDB import (bypasses React state)
@@ -283,6 +352,9 @@ export const MasterProductsDB = {
     // Save to IndexedDB with progress
     await putMany(STORES.MASTER_PRODUCTS, products, onProgress);
     
+    // Track import metadata
+    _saveMasterMeta('products', products.length);
+    
     return { success: true, count: products.length, products };
   },
   
@@ -291,7 +363,10 @@ export const MasterProductsDB = {
   
   delete: (barcode) => deleteByKey(STORES.MASTER_PRODUCTS, barcode),
   
-  clear: () => clearStore(STORES.MASTER_PRODUCTS),
+  clear: async () => {
+    await clearStore(STORES.MASTER_PRODUCTS);
+    _saveMasterMeta('products', 0);
+  },
   
   count: async () => {
     const all = await getAll(STORES.MASTER_PRODUCTS);
@@ -310,10 +385,21 @@ export const MasterLocationsDB = {
   save: (location) => put(STORES.MASTER_LOCATIONS, location),
   
   // Bulk import - replaces all existing data
+  // ONLY use for user-initiated imports
   importAll: async (locations, onProgress = null) => {
     await clearStore(STORES.MASTER_LOCATIONS);
     await new Promise(resolve => setTimeout(resolve, 0));
-    return putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+    const count = await putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+    _saveMasterMeta('locations', count);
+    return count;
+  },
+
+  // SAFE SAVE: Upsert all locations WITHOUT clearing first
+  safeSave: async (locations, onProgress = null) => {
+    if (!locations || locations.length === 0) return 0;
+    const count = await putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+    _saveMasterMeta('locations', count);
+    return count;
   },
   
   // Direct CSV to IndexedDB import
@@ -348,6 +434,7 @@ export const MasterLocationsDB = {
 
     await clearStore(STORES.MASTER_LOCATIONS);
     await putMany(STORES.MASTER_LOCATIONS, locations, onProgress);
+    _saveMasterMeta('locations', locations.length);
     
     return { success: true, count: locations.length, locations };
   },
@@ -356,7 +443,10 @@ export const MasterLocationsDB = {
   
   delete: (code) => deleteByKey(STORES.MASTER_LOCATIONS, code),
   
-  clear: () => clearStore(STORES.MASTER_LOCATIONS),
+  clear: async () => {
+    await clearStore(STORES.MASTER_LOCATIONS);
+    _saveMasterMeta('locations', 0);
+  },
   
   count: async () => {
     const all = await getAll(STORES.MASTER_LOCATIONS);
@@ -507,6 +597,24 @@ export const ScannedItemsByLocationDB = {
 };
 
 /**
+ * Master data metadata helpers - stored in localStorage for recovery detection
+ * Tracks when user imported master data so we can detect if IndexedDB was evicted
+ */
+const _saveMasterMeta = (type, count) => {
+  try {
+    const meta = JSON.parse(localStorage.getItem('audix_master_meta') || '{}');
+    meta[type] = { count, updatedAt: new Date().toISOString() };
+    localStorage.setItem('audix_master_meta', JSON.stringify(meta));
+  } catch (e) { /* ignore */ }
+};
+
+export const getMasterMeta = () => {
+  try {
+    return JSON.parse(localStorage.getItem('audix_master_meta') || '{}');
+  } catch (e) { return {}; }
+};
+
+/**
  * Check available storage quota
  */
 export const getStorageInfo = async () => {
@@ -523,9 +631,10 @@ export const getStorageInfo = async () => {
 };
 
 /**
- * Initialize database on module load
+ * Initialize database on module load + request persistent storage
  */
 initDB().catch(err => console.warn('IndexedDB init failed:', err));
+requestPersistentStorage();
 
 export default {
   MasterProductsDB,
@@ -536,5 +645,7 @@ export default {
   SettingsDB,
   AuthUsersDB,
   getStorageInfo,
+  getMasterMeta,
+  requestPersistentStorage,
   STORES
 };

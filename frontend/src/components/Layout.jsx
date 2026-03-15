@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection } from '../hooks/useDeviceDetection';
@@ -11,7 +11,8 @@ import {
   LogOut,
   User,
   FileSpreadsheet,
-  Database
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -24,11 +25,31 @@ import {
 } from './ui/dropdown-menu';
 
 const Layout = ({ children }) => {
-  const { user, logout, isAuthenticated, settings, hideBottomNav } = useApp();
+  const { user, logout, isAuthenticated, settings, hideBottomNav, masterProducts } = useApp();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dataLossWarning, setDataLossWarning] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { isScanner, isSmallScreen, isMobile } = useDeviceDetection();
+
+  // Check for data loss on mount
+  useEffect(() => {
+    try {
+      const lossData = localStorage.getItem('audix_master_data_lost');
+      if (lossData) {
+        const parsed = JSON.parse(lossData);
+        setDataLossWarning(parsed);
+      }
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  // Clear warning when master products are reimported
+  useEffect(() => {
+    if (dataLossWarning && masterProducts && masterProducts.length > 10) {
+      localStorage.removeItem('audix_master_data_lost');
+      setDataLossWarning(null);
+    }
+  }, [masterProducts, dataLossWarning]);
 
   // Determine if we should show scanner mode UI
   const showScannerMode = isScanner || isSmallScreen;
@@ -119,6 +140,25 @@ const Layout = ({ children }) => {
         {/* Main Content - Adjusted for smaller header and bottom nav */}
         <main className={`flex-1 pt-12 ${hideBottomNav ? 'pb-4' : 'pb-20'} overflow-y-auto overflow-x-hidden`} style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="p-3 min-h-full">
+            {/* Data Loss Warning Banner */}
+            {dataLossWarning && (
+              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2" data-testid="data-loss-warning">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-800">Master Data Lost</p>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Previously had {dataLossWarning.products} products but browser cleared data. 
+                    Please re-import your master data from Master tab. Scanned data is safe.
+                  </p>
+                  <button 
+                    onClick={() => { setDataLossWarning(null); localStorage.removeItem('audix_master_data_lost'); }}
+                    className="text-xs text-red-500 underline mt-1"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
             {children}
           </div>
         </main>
