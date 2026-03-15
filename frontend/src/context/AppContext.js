@@ -32,6 +32,9 @@ export const AppProvider = ({ children }) => {
   const [masterProducts, setMasterProducts] = useState(mockMasterProducts);
   const [isLoadingMasterData, setIsLoadingMasterData] = useState(true);
   
+  // Loading state for scanned items (prevents showing stale data in Reports)
+  const [isLoadingScannedData, setIsLoadingScannedData] = useState(true);
+  
   // Master locations - loaded from IndexedDB (similar pattern to masterProducts)
   const [masterLocations, setMasterLocations] = useState(mockMasterLocations);
   const masterLocationsInitializedRef = useRef(false);
@@ -199,6 +202,7 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Load Scanned Items on startup (V3 migration)
   // Migrates from localStorage (5MB) to IndexedDB (100MB+)
+  // CRITICAL: Sets isLoadingScannedData=false when done to unblock Reports
   // ============================================
   useEffect(() => {
     const loadScannedItems = async () => {
@@ -224,6 +228,7 @@ export const AppProvider = ({ children }) => {
               if (keys.length > 0) {
                 // Save to IndexedDB
                 await ScannedItemsByLocationDB.saveAll(items);
+                setScannedItems(items);
                 scannedItemsFromIDBRef.current = true;
                 console.log(`Migrated ${keys.length} locations' scanned items from localStorage to IndexedDB`);
                 // Remove from localStorage to free space
@@ -242,6 +247,9 @@ export const AppProvider = ({ children }) => {
       } catch (err) {
         console.warn('IndexedDB scanned items load failed, using localStorage fallback:', err);
         // Keep using localStorage data (already loaded in useState init)
+      } finally {
+        // Mark scanned data as loaded - Reports can now show accurate data
+        setIsLoadingScannedData(false);
       }
     };
     
@@ -331,12 +339,17 @@ export const AppProvider = ({ children }) => {
   // ============================================
   // INDEXEDDB: Debounced save for scannedItems (replaces localStorage)
   // Saves every 500ms to IndexedDB (100MB+ capacity)
+  // CRITICAL: Waits for IndexedDB load to complete before saving
+  // to prevent overwriting real data with stale/mock state
   // ============================================
   const lastSavedRef = useRef(JSON.stringify(scannedItems));
   const saveTimeoutRef2 = useRef(null);
   const scannedItemsInitializedRef = useRef(false);
   
   useEffect(() => {
+    // SAFETY: Don't save until IndexedDB has finished loading scanned data
+    if (isLoadingScannedData) return;
+    
     // Skip initial render and IndexedDB-triggered setState to prevent overwriting
     if (!scannedItemsInitializedRef.current) {
       scannedItemsInitializedRef.current = true;
@@ -393,8 +406,12 @@ export const AppProvider = ({ children }) => {
   // When locations change, clean up any scannedItems entries
   // for location IDs that no longer exist in the locations array
   // Also cleans up orphaned IndexedDB entries
+  // CRITICAL: Only runs AFTER IndexedDB scanned data is loaded to prevent
+  // cleaning up real data based on stale/mock initial state
   // ============================================
   useEffect(() => {
+    // Don't cleanup until IndexedDB data is loaded
+    if (isLoadingScannedData) return;
     if (!locations || locations.length === 0) return;
     const validIds = new Set(locations.map(l => l.id));
     setScannedItems(prev => {
@@ -407,7 +424,7 @@ export const AppProvider = ({ children }) => {
       ScannedItemsByLocationDB.deleteLocations(orphanKeys).catch(() => {});
       return cleaned;
     });
-  }, [locations]);
+  }, [locations, isLoadingScannedData]);
 
   // ============================================
   // INDEXEDDB: Persist master products (supports 100MB+)
@@ -1435,6 +1452,7 @@ export const AppProvider = ({ children }) => {
     getProductByBarcode,
     getStorageInfo,
     isLoadingMasterData,
+    isLoadingScannedData,
     playSound,
     hideBottomNav,
     setHideBottomNav,
@@ -1498,6 +1516,7 @@ export const AppProvider = ({ children }) => {
     getProductByBarcode,
     // getStorageInfo is stable (imported function) - not included in deps
     isLoadingMasterData,
+    isLoadingScannedData,
     playSound,
     reportSelectedLocations
   ]);

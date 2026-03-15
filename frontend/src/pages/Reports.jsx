@@ -80,7 +80,8 @@ const Reports = () => {
     getMasterLocationByCode,
     user,
     reportSelectedLocations,
-    setReportSelectedLocations
+    setReportSelectedLocations,
+    isLoadingScannedData
   } = useApp();
 
   // ---- Search ----
@@ -698,6 +699,13 @@ COLD-01,Cold Storage Unit 1`;
   if (isPreAssignedMode) {
     return (
       <div className="flex flex-col h-full">
+        {/* Loading indicator while IndexedDB loads scanned data */}
+        {isLoadingScannedData && (
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2" data-testid="loading-scanned-data">
+            <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+            <span className="text-sm text-blue-700">Loading scanned data...</span>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -1080,6 +1088,13 @@ COLD-01,Cold Storage Unit 1`;
   // ================================================================
   return (
     <div className="flex flex-col h-full">
+      {/* Loading indicator while IndexedDB loads scanned data */}
+      {isLoadingScannedData && (
+        <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2" data-testid="loading-scanned-data-dynamic">
+          <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+          <span className="text-sm text-blue-700">Loading scanned data...</span>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col gap-3 mb-3">
         <div className="flex items-center justify-between">
