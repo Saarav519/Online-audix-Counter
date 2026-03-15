@@ -110,9 +110,30 @@ export const AppProvider = ({ children }) => {
   };
 
   // ============================================
+  // BACKUP HELPER: Save master data to localStorage as safety net
+  // If IndexedDB gets cleared, this backup will restore data automatically
+  // ============================================
+  const _backupMasterToLocalStorage = (type, data) => {
+    try {
+      const key = type === 'products' ? 'audix_master_products_backup' : 'audix_master_locations_backup';
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      // localStorage might be full - try saving just essential fields
+      try {
+        const minimal = data.map(item => type === 'products' 
+          ? { barcode: item.barcode, name: item.name, price: item.price }
+          : { code: item.code, name: item.name }
+        );
+        const key = type === 'products' ? 'audix_master_products_backup' : 'audix_master_locations_backup';
+        localStorage.setItem(key, JSON.stringify(minimal));
+      } catch (e2) { /* localStorage truly full, skip backup */ }
+    }
+  };
+
+  // ============================================
   // INDEXEDDB: Load Master Products on startup (supports 100MB+)
   // CRITICAL: This must complete BEFORE any auto-save can run
-  // Detects if IndexedDB was evicted by browser and warns user
+  // Recovery chain: IndexedDB → localStorage backup → data loss warning
   // ============================================
   useEffect(() => {
     const loadMasterProducts = async () => {
@@ -122,39 +143,49 @@ export const AppProvider = ({ children }) => {
           setMasterProducts(products);
           console.log(`Loaded ${products.length} master products from IndexedDB`);
         } else {
-          // IndexedDB is empty - check if user previously had data imported
+          // IndexedDB is empty - try localStorage backup first
+          const backup = localStorage.getItem('audix_master_products_backup');
+          if (backup) {
+            try {
+              const restoredProducts = JSON.parse(backup).map((p, i) => ({
+                ...p, isMaster: true, id: p.id || `restored_${Date.now()}_${i}`
+              }));
+              if (restoredProducts.length > 0) {
+                setMasterProducts(restoredProducts);
+                // Restore to IndexedDB
+                await MasterProductsDB.safeSave(restoredProducts);
+                console.log(`Restored ${restoredProducts.length} master products from localStorage backup`);
+                return; // Successfully recovered
+              }
+            } catch (e) { /* backup corrupted, continue */ }
+          }
+
+          // No backup - check metadata for data loss detection
           const meta = getMasterMeta();
           const prevCount = meta?.products?.count || 0;
           
           if (prevCount > 0) {
-            // DATA LOSS DETECTED: User had imported data but IndexedDB is empty
-            // This happens when mobile browser evicts data under memory pressure
-            console.error(`DATA LOSS: Previously had ${prevCount} products, IndexedDB now empty!`);
+            console.error(`DATA LOSS: Previously had ${prevCount} products, no backup available`);
             setMasterProducts([]);
-            // Show alert to user (set a flag that components can check)
             localStorage.setItem('audix_master_data_lost', JSON.stringify({
               products: prevCount,
               detectedAt: new Date().toISOString()
             }));
           } else {
-            // Truly first time - save mock data to IndexedDB
+            // Truly first time - save mock data
             await MasterProductsDB.importAll(mockMasterProducts);
             setMasterProducts(mockMasterProducts);
-            console.log('Initialized IndexedDB with mock master products');
           }
         }
       } catch (err) {
-        console.warn('IndexedDB load failed, using localStorage fallback:', err);
-        // Fallback to localStorage
-        const saved = localStorage.getItem('audix_master_products');
-        if (saved) {
-          setMasterProducts(JSON.parse(saved));
+        console.warn('IndexedDB load failed, trying localStorage backup:', err);
+        const backup = localStorage.getItem('audix_master_products_backup');
+        if (backup) {
+          try { setMasterProducts(JSON.parse(backup)); } catch (e) { /* ignore */ }
         }
       } finally {
-        // Mark IndexedDB as loaded - NOW auto-save is allowed
         indexedDBLoadedRef.current = true;
         setIsLoadingMasterData(false);
-        console.log('IndexedDB load complete, auto-save enabled');
       }
     };
     
@@ -163,7 +194,7 @@ export const AppProvider = ({ children }) => {
 
   // ============================================
   // INDEXEDDB: Load Master Locations on startup
-  // Detects data loss similar to master products
+  // Recovery chain: IndexedDB → localStorage backup → data loss warning
   // ============================================
   useEffect(() => {
     const loadMasterLocations = async () => {
@@ -173,25 +204,36 @@ export const AppProvider = ({ children }) => {
           setMasterLocations(locations);
           console.log(`Loaded ${locations.length} master locations from IndexedDB`);
         } else {
-          // Check if user previously had data
+          // Try localStorage backup first
+          const backup = localStorage.getItem('audix_master_locations_backup');
+          if (backup) {
+            try {
+              const restoredLocations = JSON.parse(backup).map(l => ({ ...l, isMaster: true }));
+              if (restoredLocations.length > 0) {
+                setMasterLocations(restoredLocations);
+                await MasterLocationsDB.safeSave(restoredLocations);
+                console.log(`Restored ${restoredLocations.length} master locations from localStorage backup`);
+                return;
+              }
+            } catch (e) { /* backup corrupted */ }
+          }
+
           const meta = getMasterMeta();
           const prevCount = meta?.locations?.count || 0;
           
           if (prevCount > 0) {
-            console.error(`DATA LOSS: Previously had ${prevCount} locations, IndexedDB now empty!`);
+            console.error(`DATA LOSS: Previously had ${prevCount} locations, no backup available`);
             setMasterLocations([]);
           } else {
-            // First time - save mock data to IndexedDB
             await MasterLocationsDB.importAll(mockMasterLocations);
             setMasterLocations(mockMasterLocations);
-            console.log('Initialized IndexedDB with mock master locations');
           }
         }
       } catch (err) {
-        console.warn('IndexedDB master locations load failed, using localStorage fallback:', err);
-        const saved = localStorage.getItem('audix_master_locations');
-        if (saved) {
-          setMasterLocations(JSON.parse(saved));
+        console.warn('IndexedDB master locations load failed, trying backup:', err);
+        const backup = localStorage.getItem('audix_master_locations_backup');
+        if (backup) {
+          try { setMasterLocations(JSON.parse(backup)); } catch (e) { /* ignore */ }
         }
       }
     };
@@ -1151,10 +1193,15 @@ export const AppProvider = ({ children }) => {
   // DIRECT SET: Used by import to set all products at once (bypasses useEffect save)
   // Products are already saved to IndexedDB by the import function
   const setMasterProductsDirect = (products) => {
-    // Mark as already saved to prevent duplicate save
-    // The import function already saved to IndexedDB
-    console.log(`📥 Direct setting ${products.length} master products (already saved to IndexedDB)`);
+    console.log(`Setting ${products.length} master products directly`);
     setMasterProducts(products);
+    // IMMEDIATE SAVE to IndexedDB - don't rely on debounced auto-save
+    // This prevents data loss if app closes before auto-save triggers
+    MasterProductsDB.safeSave(products)
+      .then(() => console.log('Master products saved immediately to IndexedDB'))
+      .catch(err => console.warn('Immediate IndexedDB save failed:', err));
+    // BACKUP to localStorage for recovery
+    _backupMasterToLocalStorage('products', products);
   };
 
   // Import master products from CSV data - replaces old data
@@ -1166,12 +1213,13 @@ export const AppProvider = ({ children }) => {
     }));
     
     if (replaceExisting) {
-      // Replace all existing master products
       setMasterProducts(newProducts);
     } else {
-      // Append to existing
       setMasterProducts(prev => [...prev, ...newProducts]);
     }
+    // IMMEDIATE SAVE + BACKUP
+    MasterProductsDB.safeSave(newProducts).catch(() => {});
+    _backupMasterToLocalStorage('products', newProducts);
     return newProducts.length;
   };
 
@@ -1198,8 +1246,14 @@ export const AppProvider = ({ children }) => {
 
   // DIRECT SET: Used by import to set all locations at once
   const setMasterLocationsDirect = (locations) => {
-    console.log(`📥 Direct setting ${locations.length} master locations (already saved to IndexedDB)`);
+    console.log(`Setting ${locations.length} master locations directly`);
     setMasterLocations(locations);
+    // IMMEDIATE SAVE to IndexedDB
+    MasterLocationsDB.safeSave(locations)
+      .then(() => console.log('Master locations saved immediately to IndexedDB'))
+      .catch(err => console.warn('Immediate IndexedDB save failed:', err));
+    // BACKUP to localStorage for recovery
+    _backupMasterToLocalStorage('locations', locations);
   };
 
   // Import master locations from CSV data
@@ -1216,6 +1270,9 @@ export const AppProvider = ({ children }) => {
     } else {
       setMasterLocations(prev => [...prev, ...newLocations]);
     }
+    // IMMEDIATE SAVE + BACKUP
+    MasterLocationsDB.safeSave(newLocations).catch(() => {});
+    _backupMasterToLocalStorage('locations', newLocations);
     return newLocations.length;
   };
 
