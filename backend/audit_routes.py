@@ -3729,11 +3729,21 @@ async def get_consolidated_article_wise(client_id: str):
     extra_columns = await _get_extra_columns_for_client(client_id)
     
     # Pre-fetch active barcode edits (detailed/barcode-wise scope) for pre-aggregation remap
+    # Location-aware: detailed edits are location-specific, barcode-wise edits are global
     _early_edits = await db.barcode_edits.find({
         "client_id": client_id, "is_active": True,
         "report_type": {"$in": ["detailed", "barcode-wise"]}
     }, {"_id": 0}).to_list(10000)
-    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+    loc_remap = {}
+    global_remap = {}
+    for e in _early_edits:
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
 
     expected_by_barcode = {}
     expected_custom_fields = {}
@@ -3760,8 +3770,8 @@ async def get_consolidated_article_wise(client_id: str):
             loc = s["location_name"]
             for item in s.get("items", []):
                 raw_bc = item["barcode"]
-                # Apply barcode remap so scans aggregate under corrected barcode for article grouping
-                bc = barcode_remap.get(raw_bc, raw_bc)
+                # Location-aware remap so scans aggregate under corrected barcode
+                bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     # Use shared reco computation — single source of truth for all reports
@@ -4139,14 +4149,41 @@ async def get_barcode_wise_report(session_id: str):
     
     reco_maps = EMPTY_RECO_MAPS
     extra_columns = await _get_extra_columns_for_client(session.get("client_id", "")) if session else []
-    
-    # Process synced to determine scanned locations
+
+    # Pre-fetch active barcode edits → build location-aware remap so that
+    # scanned qty gets redirected to the edited barcode at aggregation time.
+    # A detailed-scoped edit is location-specific (only that scan moves); a
+    # barcode-wise-scoped edit applies globally (all scans of that barcode move).
+    s_client_id = session.get("client_id", "") if session else ""
+    _early_edits = await db.barcode_edits.find({
+        "client_id": s_client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    loc_remap = {}      # (location, original_barcode) → new_barcode
+    global_remap = {}   # original_barcode → new_barcode
+    edit_destinations = {}  # new_barcode → list of (original, edit_id) for annotation
+    for e in _early_edits:
+        orig = e.get("original_value")
+        new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
+        edit_destinations.setdefault(new_v, []).append({
+            "original": orig, "edit_id": e.get("id"), "location": e.get("location", "")
+        })
+
+    # Process synced — apply edit remap PER SCAN to correctly move qty
     physical_by_barcode = {}
     scanned_locations = set()
     for s in synced:
-        scanned_locations.add(s["location_name"])
+        loc = s["location_name"]
+        scanned_locations.add(loc)
         for item in s["items"]:
-            bc = item["barcode"]
+            raw_bc = item["barcode"]
+            bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
             if bc not in physical_by_barcode:
                 physical_by_barcode[bc] = {"barcode": bc, "product_name": item.get("product_name", ""), "quantity": 0}
             physical_by_barcode[bc]["quantity"] += item["quantity"]
@@ -4247,12 +4284,22 @@ async def get_article_wise_report(session_id: str):
     # Without this, a barcode edit made from the Detailed/Barcode-wise report would
     # not propagate to the Article-wise view (scanner's original barcode would still
     # aggregate into UNMAPPED, while its "corrected" master article would miss the qty).
+    # Location-aware: detailed edits are location-specific, barcode-wise edits are global.
     s_client_id = session_info.get("client_id", "") if session_info else ""
     _early_edits = await db.barcode_edits.find({
         "client_id": s_client_id, "is_active": True,
         "report_type": {"$in": ["detailed", "barcode-wise"]}
     }, {"_id": 0}).to_list(10000)
-    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+    loc_remap = {}
+    global_remap = {}
+    for e in _early_edits:
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
     
     barcode_to_article = {}
     
@@ -4273,10 +4320,11 @@ async def get_article_wise_report(session_id: str):
     
     for s in synced:
         scanned_locations.add(s["location_name"])
+        loc = s["location_name"]
         for item in s["items"]:
             raw_bc = item["barcode"]
-            # Apply active barcode edit remap so scans aggregate under the corrected barcode
-            bc = barcode_remap.get(raw_bc, raw_bc)
+            # Location-aware remap: detailed edits are location-specific
+            bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
             article_code = barcode_to_article.get(bc, None)
             if article_code is None:
                 in_prod_master = bc in master_by_barcode
@@ -4398,13 +4446,23 @@ async def get_category_summary(session_id: str):
     reco_maps = EMPTY_RECO_MAPS
     
     # Load session + active barcode edits so scanner barcodes get remapped before aggregation
+    # Location-aware: detailed edits are location-specific, barcode-wise edits are global
     session_doc = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0, "client_id": 1})
     client_id = session_doc.get("client_id", "") if session_doc else ""
     _early_edits = await db.barcode_edits.find({
         "client_id": client_id, "is_active": True,
         "report_type": {"$in": ["detailed", "barcode-wise"]}
     }, {"_id": 0}).to_list(10000)
-    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+    loc_remap = {}
+    global_remap = {}
+    for e in _early_edits:
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
 
     expected = await get_cached_expected(session_id)
     barcode_info = {}
@@ -4426,10 +4484,11 @@ async def get_category_summary(session_id: str):
     synced = await db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     physical_by_barcode = {}
     for s in synced:
+        loc = s["location_name"]
         for item in s["items"]:
             raw_bc = item["barcode"]
-            # Apply barcode edit remap → scanner barcode gets category of the edited master barcode
-            bc = barcode_remap.get(raw_bc, raw_bc)
+            # Location-aware barcode edit remap → scanner barcode gets category of the edited master barcode
+            bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
             if bc not in barcode_info:
                 master_info = master_by_barcode.get(bc, {})
                 barcode_info[bc] = {"category": master_info.get("category", "") or "Unmapped", "cost": master_info.get("cost", 0), "mrp": master_info.get("mrp", 0)}
