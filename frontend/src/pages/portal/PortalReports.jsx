@@ -114,125 +114,218 @@ function recalcTotals(rows, reportType) {
   return totals;
 }
 
-// ============ Column Filter Dropdown ============
+// ============ Column Filter Dropdown (Excel-like) ============
 function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose, triggerRef, sortConfig, onSort }) {
   const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
-  const [focusIdx, setFocusIdx] = useState(-1);
+  const listParentRef = useRef(null);
+  const searchInputRef = useRef(null);
   const isNumeric = NUMERIC_COLUMNS.has(column);
   const currentNumeric = numericFilters?.[column] || null;
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  
-  // INCLUSION MODEL:
+
+  // INCLUSION MODEL with DRAFT STATE (Excel-like: changes only commit on Apply)
   const currentChecked = activeFilters[column];
   const isDefaultState = currentChecked === undefined || currentChecked === null;
-  
-  const filteredValues = useMemo(() => {
-    if (!search) return allValues;
-    const lower = search.toLowerCase();
-    return allValues.filter(v => String(v).toLowerCase().includes(lower));
-  }, [allValues, search]);
 
+  // Draft state: Set of checked strVals. When draft is null => "select all" mode.
+  const [draftChecked, setDraftChecked] = useState(() => {
+    if (isDefaultState) return null; // null means all selected
+    return new Set(currentChecked);
+  });
+
+  // Draft range for numeric quick filter
+  const [draftNumeric, setDraftNumeric] = useState(currentNumeric);
+  // Draft custom numeric range (Excel: between min and max)
+  const initialRange = useMemo(() => {
+    const r = numericFilters?.[`${column}__range`];
+    return r || { min: '', max: '' };
+  }, [numericFilters, column]);
+  const [draftRange, setDraftRange] = useState(initialRange);
+
+  const allStrVals = useMemo(() => allValues.map(String), [allValues]);
+
+  const filteredValues = useMemo(() => {
+    if (!search) return allStrVals;
+    const lower = search.toLowerCase();
+    return allStrVals.filter(v => v.toLowerCase().includes(lower) || (v === '' && '(blanks)'.includes(lower)));
+  }, [allStrVals, search]);
+
+  // Virtual list (for large lists, e.g. barcode with thousands of values)
+  const rowVirtualizer = useVirtualizer({
+    count: filteredValues.length,
+    getScrollElement: () => listParentRef.current,
+    estimateSize: () => 26,
+    overscan: 10,
+  });
+
+  // Position the popover near trigger
   useEffect(() => {
-    // Calculate position from the trigger button
     const trigger = triggerRef?.current;
     if (trigger) {
       const rect = trigger.getBoundingClientRect();
-      const dropW = 256; // w-64 = 16rem = 256px
-      const dropH = 384; // max-h-96 = 24rem = 384px
+      const dropW = 320;
+      const dropH = 480;
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceRight = window.innerWidth - rect.left;
       setPosition({
         top: spaceBelow < dropH ? Math.max(8, rect.top - dropH) : rect.bottom + 4,
-        left: spaceRight < dropW ? Math.max(8, rect.right - dropW) : rect.left
+        left: spaceRight < dropW ? Math.max(8, rect.right - dropW) : rect.left,
       });
     }
   }, [triggerRef]);
 
+  // Close on outside click — DISCARDS draft (Excel convention)
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && triggerRef?.current && !triggerRef.current.contains(e.target)) onClose();
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) && triggerRef?.current && !triggerRef.current.contains(e.target)) {
+        onClose();
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [onClose, triggerRef]);
 
-  const isChecked = (strVal) => {
-    if (isDefaultState) return true;
-    return currentChecked.includes(strVal);
+  // Autofocus search on mount
+  useEffect(() => { searchInputRef.current?.focus(); }, []);
+
+  const isChecked = useCallback((strVal) => {
+    if (draftChecked === null) return true;
+    return draftChecked.has(strVal);
+  }, [draftChecked]);
+
+  const checkedCount = useMemo(() => {
+    if (draftChecked === null) return allStrVals.length;
+    return draftChecked.size;
+  }, [draftChecked, allStrVals]);
+
+  const toggleValue = (strVal) => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(allStrVals) : new Set(prev);
+      if (base.has(strVal)) base.delete(strVal);
+      else base.add(strVal);
+      return base;
+    });
   };
 
-  const toggleValue = (value) => {
-    const strVal = String(value);
-    if (isDefaultState) {
-      const newChecked = allValues.map(String).filter(v => v !== strVal);
-      onFilterChange(column, newChecked);
-    } else {
-      const current = new Set(currentChecked);
-      if (current.has(strVal)) {
-        current.delete(strVal);
-      } else {
-        current.add(strVal);
-      }
-      const arr = Array.from(current);
-      if (arr.length === allValues.length) {
-        onFilterChange(column, null);
-      } else {
-        onFilterChange(column, arr);
-      }
-    }
+  const selectAll = () => setDraftChecked(null);
+  const clearAll = () => setDraftChecked(new Set());
+  const selectAllInView = () => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(allStrVals) : new Set(prev);
+      filteredValues.forEach(v => base.add(v));
+      return base;
+    });
   };
-
-  const selectAll = () => onFilterChange(column, null);
-  const clearAll = () => onFilterChange(column, []);
+  const clearAllInView = () => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(allStrVals) : new Set(prev);
+      filteredValues.forEach(v => base.delete(v));
+      return base;
+    });
+  };
 
   const toggleNumericCondition = (condition) => {
-    if (currentNumeric === condition) {
-      onNumericFilterChange(column, null); // toggle off
-    } else {
-      onNumericFilterChange(column, condition);
-    }
+    setDraftNumeric(prev => (prev === condition ? null : condition));
   };
 
+  // Detect if draft differs from committed
+  const isDirty = useMemo(() => {
+    // numeric condition changes
+    if (draftNumeric !== currentNumeric) return true;
+    // numeric range changes
+    if ((draftRange.min || '') !== (initialRange.min || '')) return true;
+    if ((draftRange.max || '') !== (initialRange.max || '')) return true;
+    // checkbox changes
+    if (draftChecked === null) return !isDefaultState;
+    // draft is a Set
+    if (isDefaultState) return true; // committed was "all", draft is a specific set
+    if (draftChecked.size !== (currentChecked?.length || 0)) return true;
+    for (const v of draftChecked) {
+      if (!currentChecked.includes(v)) return true;
+    }
+    return false;
+  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState]);
+
+  const applyFilters = () => {
+    // Commit checkbox filter
+    if (draftChecked === null) {
+      onFilterChange(column, null);
+    } else if (draftChecked.size === allStrVals.length) {
+      onFilterChange(column, null);
+    } else {
+      onFilterChange(column, Array.from(draftChecked));
+    }
+    // Commit numeric condition
+    if (draftNumeric !== currentNumeric) {
+      onNumericFilterChange(column, draftNumeric);
+    }
+    // Commit numeric range
+    const hasRange = (draftRange.min !== '' || draftRange.max !== '');
+    if (hasRange) {
+      onNumericFilterChange(`${column}__range`, { ...draftRange });
+    } else if (initialRange.min !== '' || initialRange.max !== '') {
+      onNumericFilterChange(`${column}__range`, null);
+    }
+    onClose();
+  };
+
+  const cancel = () => onClose();
+
+  // Format display label for a value
+  const displayLabel = (v) => (v === '' ? '(Blanks)' : v);
+
+  // Sort action labels depend on column type
+  const sortAscLabel = isNumeric ? 'Sort Smallest → Largest' : 'Sort A → Z';
+  const sortDescLabel = isNumeric ? 'Sort Largest → Smallest' : 'Sort Z → A';
+
   return ReactDOM.createPortal(
-    <div ref={dropdownRef} className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-64 max-h-96 flex flex-col" style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+    <div
+      ref={dropdownRef}
+      className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] w-80 flex flex-col"
+      style={{ top: position.top, left: position.left, maxHeight: 480 }}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); cancel(); }
+        else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); applyFilters(); }
+      }}
+    >
       {/* Sort Options */}
       {onSort && (
         <div className="p-2 border-b border-gray-100">
           <div className="flex gap-1.5">
             <button
-              onClick={() => { onSort(column); onClose(); }}
-              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
+              onClick={() => { if (sortConfig?.key !== column || sortConfig?.direction !== 'asc') onSort(column, 'asc'); else onSort(column, 'asc'); onClose(); }}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[11px] font-medium border transition-all ${
                 sortConfig?.key === column && sortConfig?.direction === 'asc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <ArrowUp className="w-3 h-3" /> Sort A-Z
+              <ArrowUp className="w-3 h-3" /> {sortAscLabel}
             </button>
             <button
-              onClick={() => { onSort(column); if (sortConfig?.key !== column || sortConfig?.direction !== 'desc') onSort(column); onClose(); }}
-              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
+              onClick={() => { onSort(column, 'desc'); onClose(); }}
+              className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[11px] font-medium border transition-all ${
                 sortConfig?.key === column && sortConfig?.direction === 'desc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
               }`}
             >
-              <ArrowDown className="w-3 h-3" /> Sort Z-A
+              <ArrowDown className="w-3 h-3" /> {sortDescLabel}
             </button>
           </div>
         </div>
       )}
-      {/* Numeric Quick Filter (for number columns) */}
+
+      {/* Numeric quick filters */}
       {isNumeric && (
         <div className="p-2 border-b border-gray-100">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value Filter</p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 mb-2">
             {NUMERIC_CONDITIONS.map(cond => (
               <button
                 key={cond.value}
                 onClick={() => toggleNumericCondition(cond.value)}
                 title={cond.desc}
                 className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-all border ${
-                  currentNumeric === cond.value
+                  draftNumeric === cond.value
                     ? cond.value === 'lt0' ? 'bg-red-500 text-white border-red-500'
                       : cond.value === 'gt0' ? 'bg-emerald-500 text-white border-emerald-500'
                       : 'bg-blue-500 text-white border-blue-500'
@@ -243,56 +336,117 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              placeholder="Min"
+              value={draftRange.min}
+              onChange={(e) => setDraftRange(r => ({ ...r, min: e.target.value }))}
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+            />
+            <span className="text-[10px] text-gray-400">to</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={draftRange.max}
+              onChange={(e) => setDraftRange(r => ({ ...r, max: e.target.value }))}
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+            />
+          </div>
         </div>
       )}
-      {/* Checkbox Value Filter */}
+
+      {/* Search */}
       <div className="p-2 border-b border-gray-100">
-        {isNumeric && <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value List</p>}
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input type="text" placeholder="Search & press Enter..." value={search} onChange={(e) => { setSearch(e.target.value); setFocusIdx(-1); }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
-              if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(0); listRef.current?.querySelector('[data-filter-item="0"]')?.focus(); return; }
-              if (e.key === 'Enter' && search.trim()) {
-                const matchedValues = filteredValues.map(String);
-                if (matchedValues.length > 0) {
-                  onFilterChange(column, matchedValues);
-                  onClose();
-                }
-              }
-            }}
-            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" autoFocus />
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search values..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel(); } }}
+            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+          />
         </div>
-        <div className="flex gap-2 mt-1.5">
-          <button className="text-xs text-emerald-600 hover:underline" onClick={selectAll}>Select All</button>
-          <button className="text-xs text-red-500 hover:underline" onClick={clearAll}>Clear All</button>
+        <div className="flex items-center justify-between mt-1.5 text-[10px]">
+          <span className="text-gray-500">
+            Showing <strong className="text-gray-700">{filteredValues.length.toLocaleString()}</strong> of <strong className="text-gray-700">{allStrVals.length.toLocaleString()}</strong>
+          </span>
+          <div className="flex gap-2">
+            <button className="text-emerald-600 hover:underline font-medium" onClick={search ? selectAllInView : selectAll}>
+              {search ? 'Select shown' : 'Select all'}
+            </button>
+            <button className="text-red-500 hover:underline font-medium" onClick={search ? clearAllInView : clearAll}>
+              {search ? 'Clear shown' : 'Clear all'}
+            </button>
+          </div>
         </div>
       </div>
-      <div className="overflow-y-auto flex-1 p-1.5" ref={listRef} onKeyDown={(e) => {
-        if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
-        const max = filteredValues.length - 1;
-        if (e.key === 'ArrowDown') { e.preventDefault(); const next = Math.min(max, focusIdx + 1); setFocusIdx(next); listRef.current?.querySelector(`[data-filter-item="${next}"]`)?.focus(); }
-        if (e.key === 'ArrowUp') { e.preventDefault(); const prev = Math.max(0, focusIdx - 1); setFocusIdx(prev); listRef.current?.querySelector(`[data-filter-item="${prev}"]`)?.focus(); }
-        if ((e.key === 'Enter' || e.key === ' ') && focusIdx >= 0) { e.preventDefault(); toggleValue(filteredValues[focusIdx]); }
-      }}>
-        {filteredValues.map((val, i) => {
-          const strVal = String(val);
-          const checked = isChecked(strVal);
-          return (
-            <div key={i} data-filter-item={i} tabIndex={0}
-              className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs outline-none ${
-                focusIdx === i ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-gray-50'
-              }`}
-              onClick={() => toggleValue(strVal)}
-              onFocus={() => setFocusIdx(i)}
-            >
-              <input type="checkbox" checked={checked} readOnly className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5 pointer-events-none" />
-              <span className="truncate">{strVal || '(empty)'}</span>
-            </div>
-          );
-        })}
-        {filteredValues.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No values found</p>}
+
+      {/* Virtualized value list */}
+      <div ref={listParentRef} className="overflow-y-auto flex-1" style={{ minHeight: 120 }}>
+        {filteredValues.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-6">No matching values</p>
+        ) : (
+          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const strVal = filteredValues[virtualRow.index];
+              const checked = isChecked(strVal);
+              const isBlank = strVal === '';
+              return (
+                <div
+                  key={virtualRow.key}
+                  className={`flex items-center gap-2 px-3 text-xs cursor-pointer select-none hover:bg-gray-50 ${checked ? '' : 'opacity-60'}`}
+                  style={{
+                    position: 'absolute', top: 0, left: 0, right: 0,
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  onClick={() => toggleValue(strVal)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    readOnly
+                    className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-400 w-3.5 h-3.5 pointer-events-none shrink-0"
+                  />
+                  <span className={`truncate ${isBlank ? 'italic text-gray-500' : ''}`}>{displayLabel(strVal)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Footer: Apply / Cancel */}
+      <div className="p-2 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+        <span className="text-[10px] text-gray-600">
+          {checkedCount === allStrVals.length
+            ? <span className="text-emerald-600 font-semibold">All selected</span>
+            : <span><strong className="text-gray-800">{checkedCount.toLocaleString()}</strong> / {allStrVals.length.toLocaleString()} selected</span>}
+          {isDirty && <span className="ml-1.5 text-amber-600 font-semibold">• unsaved</span>}
+        </span>
+        <div className="flex gap-1.5">
+          <button
+            onClick={cancel}
+            className="px-3 py-1 text-xs font-medium rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={applyFilters}
+            disabled={!isDirty}
+            className={`px-3 py-1 text-xs font-semibold rounded border transition-all ${
+              isDirty
+                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+            }`}
+          >
+            Apply
+          </button>
+        </div>
       </div>
     </div>,
     document.body
@@ -484,10 +638,10 @@ export default function PortalReports() {
   }, [selectedSession, reportType]);
 
   // Sort handler
-  const handleSort = useCallback((column) => {
+  const handleSort = useCallback((column, direction) => {
     setSortConfig(prev => ({
       key: column,
-      direction: prev.key === column && prev.direction === 'asc' ? 'desc' : 'asc'
+      direction: direction || (prev.key === column && prev.direction === 'asc' ? 'desc' : 'asc')
     }));
   }, []);
 
@@ -507,12 +661,20 @@ export default function PortalReports() {
     });
   }, []);
 
-  // Numeric filter handler: 'lt0' | 'gt0' | 'eq0' | null
+  // Numeric filter handler: 'lt0' | 'gt0' | 'eq0' | {min, max} | null
+  // Supports both quick-conditions and custom range (via `${column}__range` keys)
   const handleNumericFilter = useCallback((column, condition) => {
     setNumericFilters(prev => {
       const next = { ...prev };
       if (condition === null || condition === undefined) {
         delete next[column];
+      } else if (typeof condition === 'object' && (condition.min !== undefined || condition.max !== undefined)) {
+        // Range filter: store only if there's an actual min or max
+        if (condition.min === '' && condition.max === '') {
+          delete next[column];
+        } else {
+          next[column] = condition;
+        }
       } else {
         next[column] = condition;
       }
@@ -544,39 +706,49 @@ export default function PortalReports() {
       // If checkedVals is null/undefined/[] → no filter → all data shown
     });
 
-    // Step 3: Numeric filters (< 0, > 0, = 0)
+    // Step 3: Numeric filters (< 0, > 0, = 0, custom range)
     Object.entries(numericFilters).forEach(([col, condition]) => {
-      if (condition) {
+      if (!condition) return;
+      // Range filter (key ends with __range)
+      if (col.endsWith('__range') && typeof condition === 'object') {
+        const realCol = col.replace(/__range$/, '');
+        const hasMin = condition.min !== '' && condition.min != null && !isNaN(Number(condition.min));
+        const hasMax = condition.max !== '' && condition.max != null && !isNaN(Number(condition.max));
+        if (!hasMin && !hasMax) return;
+        const min = hasMin ? Number(condition.min) : -Infinity;
+        const max = hasMax ? Number(condition.max) : Infinity;
         rows = rows.filter(row => {
-          const val = Number(row[col]) || 0;
-          switch (condition) {
-            case 'lt0': return val < 0;
-            case 'gt0': return val > 0;
-            case 'eq0': return val === 0;
-            default: return true;
-          }
+          const val = Number(row[realCol]) || 0;
+          return val >= min && val <= max;
         });
+        return;
       }
+      // Quick conditions
+      rows = rows.filter(row => {
+        const val = Number(row[col]) || 0;
+        switch (condition) {
+          case 'lt0': return val < 0;
+          case 'gt0': return val > 0;
+          case 'eq0': return val === 0;
+          default: return true;
+        }
+      });
     });
 
-    // Step 3: Sort
+    // Step 3: Sort (numeric or natural string)
     if (sortConfig.key) {
       rows.sort((a, b) => {
         let aVal = a[sortConfig.key];
         let bVal = b[sortConfig.key];
-        // Handle nulls
         if (aVal == null) aVal = '';
         if (bVal == null) bVal = '';
-        // Numeric sort
+        // Numeric sort when both are numbers
         if (typeof aVal === 'number' && typeof bVal === 'number') {
           return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
         }
-        // String sort
-        const aStr = String(aVal).toLowerCase();
-        const bStr = String(bVal).toLowerCase();
-        if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
+        // Natural sort (handles "A1, A2, A10" correctly)
+        const cmp = String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' });
+        return sortConfig.direction === 'asc' ? cmp : -cmp;
       });
     }
 
@@ -608,11 +780,31 @@ export default function PortalReports() {
   const getColumnValues = useCallback((column) => {
     if (!reportData || !reportData.report) return [];
     const vals = new Set();
+    let hasBlank = false;
     reportData.report.forEach(row => {
       const v = row[column];
-      vals.add(v !== undefined && v !== null ? String(v) : '');
+      if (v === undefined || v === null || v === '') {
+        hasBlank = true;
+      } else {
+        vals.add(String(v));
+      }
     });
-    return Array.from(vals).sort();
+    const arr = Array.from(vals);
+    // Smart natural/numeric-aware sort (Excel-like): "A1, A2, A10" or "1, 2, 10, 100, 1000"
+    const isNumericCol = NUMERIC_COLUMNS.has(column);
+    if (isNumericCol) {
+      arr.sort((a, b) => {
+        const na = parseFloat(a);
+        const nb = parseFloat(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+      });
+    } else {
+      arr.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }));
+    }
+    // Blanks always at top (Excel convention)
+    if (hasBlank) arr.unshift('');
+    return arr;
   }, [reportData]);
 
   const activeFilterCount = useMemo(() => {
@@ -622,8 +814,18 @@ export default function PortalReports() {
     Object.values(columnFilters).forEach(v => {
       if (v && v.length > 0) count++;
     });
-    // Count numeric filters
-    count += Object.keys(numericFilters).length;
+    // Count numeric filters (quick conditions + range)
+    Object.entries(numericFilters).forEach(([key, val]) => {
+      if (!val) return;
+      if (typeof val === 'object') {
+        // Range filter
+        const hasMin = val.min !== '' && val.min != null;
+        const hasMax = val.max !== '' && val.max != null;
+        if (hasMin || hasMax) count++;
+      } else {
+        count++;
+      }
+    });
     return count;
   }, [varianceCategory, columnFilters, numericFilters]);
 
