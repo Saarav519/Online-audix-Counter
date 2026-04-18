@@ -21,6 +21,24 @@ Scanner app should NOT be modified. Light theme (not dark).
 
 ## Implementation Timeline
 
+### Phase 3: Power Features (Apr 18, 2026) ✅
+**Session Progress Tracker (Option B):**
+- New backend endpoint `GET /api/audit/portal/sessions/{id}/progress`
+  — returns scanned_locations, total_expected_locations, progress_percent,
+  total_items, total_quantity, active_devices (last 10 min), last_sync_at
+- `SessionProgressBar.jsx` (auto-refresh 20s) — gradient progress bar + live pills
+- Integrated into every session card on PortalSessions page
+
+**PDF Branded Reports (Option A):**
+- Installed `jspdf` + `jspdf-autotable`
+- `utils/pdfGenerator.js` — branded generator (emerald header band, AudiX monogram,
+  meta box, KPI summary, paginated autotable, confidential footer)
+- "Export PDF" button next to "Export Excel" on Reports page
+
+**Keyboard Shortcuts (Option E):**
+- `KeyboardShortcuts.jsx` — `?` opens modal, `g+letter` navigates
+  (g+d/c/s/v/r/l/x/u), Esc closes, skips while typing in inputs
+
 ### Phase 1: GitHub Final branch sync (Apr 18, 2026) ✅
 - Refactored backend to `server.py + audit_routes.py` structure
 - Added `SafeJSONResponse` + global exception handlers + 35+ MongoDB indexes

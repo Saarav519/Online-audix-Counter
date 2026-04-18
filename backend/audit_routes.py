@@ -12,7 +12,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 
 ROOT_DIR = Path(__file__).parent
@@ -1361,6 +1361,87 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
 async def get_expected_stock(session_id: str):
     records = await db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     return records
+
+@portal_router.get("/sessions/{session_id}/progress")
+async def get_session_progress(session_id: str):
+    """Return real-time scan progress stats for an audit session.
+    Used by Portal Sessions page to show progress bars, device heartbeat etc."""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    variance_mode = session.get("variance_mode", "bin-wise")
+    client_id = session.get("client_id")
+
+    # Figure out total expected locations
+    total_expected_locations = 0
+    if variance_mode == "bin-wise":
+        locations = await db.expected_stock.distinct("location", {"session_id": session_id})
+        total_expected_locations = len([l for l in locations if l])
+        # Fallback to location_master when expected_stock is empty
+        if total_expected_locations == 0 and client_id:
+            total_expected_locations = await db.location_master.count_documents({"client_id": client_id})
+
+    # Count unique scanned locations
+    scanned_locations_set = set()
+    async for doc in db.synced_locations.find(
+        {"session_id": session_id},
+        {"_id": 0, "location_name": 1}
+    ):
+        if doc.get("location_name"):
+            scanned_locations_set.add(doc["location_name"])
+    scanned_locations = len(scanned_locations_set)
+
+    # Items/quantity totals
+    sync_stats_cursor = db.synced_locations.aggregate([
+        {"$match": {"session_id": session_id}},
+        {"$group": {
+            "_id": None,
+            "total_items": {"$sum": {"$ifNull": ["$total_items", 0]}},
+            "total_quantity": {"$sum": {"$ifNull": ["$total_quantity", 0]}},
+        }}
+    ])
+    total_items = 0
+    total_quantity = 0
+    async for row in sync_stats_cursor:
+        total_items = int(row.get("total_items") or 0)
+        total_quantity = int(row.get("total_quantity") or 0)
+
+    # Active devices in last 10 minutes
+    ten_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+    active_device_names = await db.synced_locations.distinct(
+        "device_name",
+        {"session_id": session_id, "synced_at": {"$gte": ten_min_ago}}
+    )
+
+    # Last sync time
+    last_sync_doc = await db.synced_locations.find_one(
+        {"session_id": session_id},
+        {"_id": 0, "synced_at": 1},
+        sort=[("synced_at", -1)]
+    )
+    last_sync_at = last_sync_doc.get("synced_at") if last_sync_doc else None
+
+    percent = 0.0
+    if total_expected_locations > 0:
+        percent = min(100.0, (scanned_locations / total_expected_locations) * 100.0)
+    elif scanned_locations > 0:
+        percent = 100.0  # any scan without expected counts as progress
+
+    return {
+        "session_id": session_id,
+        "variance_mode": variance_mode,
+        "total_expected_locations": total_expected_locations,
+        "scanned_locations": scanned_locations,
+        "progress_percent": round(percent, 1),
+        "total_items": total_items,
+        "total_quantity": total_quantity,
+        "active_devices": len(active_device_names),
+        "active_device_names": active_device_names,
+        "last_sync_at": last_sync_at,
+    }
+
+
 
 # ==================== DEVICE ROUTES ====================
 

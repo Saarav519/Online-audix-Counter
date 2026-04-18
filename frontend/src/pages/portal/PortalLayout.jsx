@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/button';
 import { useAudit } from '../AuditApp';
 import NotificationBell from '../../components/portal/NotificationBell';
 import GlobalSearch from '../../components/portal/GlobalSearch';
+import KeyboardShortcuts from '../../components/portal/KeyboardShortcuts';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -248,6 +249,8 @@ export default function PortalLayout({ children }) {
 
       {/* Global Cmd+K Search */}
       <GlobalSearch />
+      {/* Global Keyboard Shortcuts (? for help, g+letter for navigation) */}
+      <KeyboardShortcuts />
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import PageHeader from '../../components/portal/PageHeader';
 import EmptyState from '../../components/portal/EmptyState';
+import SessionProgressBar from '../../components/portal/SessionProgressBar';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -388,6 +389,11 @@ export default function PortalSessions() {
                       )}
                     </div>
                   </div>
+                </div>
+
+                {/* Progress tracker */}
+                <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                  <SessionProgressBar sessionId={session.id} varianceMode={session.variance_mode} />
                 </div>
 
                 {/* Action Buttons Row */}
