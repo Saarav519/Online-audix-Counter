@@ -210,12 +210,13 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
 
   const selectAll = () => setDraftChecked(null);
   const clearAll = () => setDraftChecked(new Set());
+  // When search is active: "Keep only shown" replaces selection with visible items
   const selectAllInView = () => {
-    setDraftChecked(prev => {
-      const base = prev === null ? new Set(allStrVals) : new Set(prev);
-      filteredValues.forEach(v => base.add(v));
-      return base;
-    });
+    if (search) {
+      setDraftChecked(new Set(filteredValues));
+    } else {
+      setDraftChecked(null);
+    }
   };
   const clearAllInView = () => {
     setDraftChecked(prev => {
@@ -236,6 +237,8 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
     // numeric range changes
     if ((draftRange.min || '') !== (initialRange.min || '')) return true;
     if ((draftRange.max || '') !== (initialRange.max || '')) return true;
+    // Search typed + default state → Apply will auto-narrow to shown
+    if (search && draftChecked === null && filteredValues.length !== allStrVals.length) return true;
     // checkbox changes
     if (draftChecked === null) return !isDefaultState;
     // draft is a Set
@@ -245,16 +248,22 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
       if (!currentChecked.includes(v)) return true;
     }
     return false;
-  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState]);
+  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState, search, filteredValues, allStrVals]);
 
   const applyFilters = () => {
-    // Commit checkbox filter
-    if (draftChecked === null) {
+    // Excel-like: if user typed in search but didn't manually check/uncheck,
+    // Apply auto-narrows to shown items (keep only visible matches)
+    let effectiveChecked = draftChecked;
+    if (search && draftChecked === null) {
+      effectiveChecked = new Set(filteredValues);
+    }
+
+    if (effectiveChecked === null) {
       onFilterChange(column, null);
-    } else if (draftChecked.size === allStrVals.length) {
+    } else if (effectiveChecked.size === allStrVals.length) {
       onFilterChange(column, null);
     } else {
-      onFilterChange(column, Array.from(draftChecked));
+      onFilterChange(column, Array.from(effectiveChecked));
     }
     // Commit numeric condition
     if (draftNumeric !== currentNumeric) {
@@ -376,7 +385,7 @@ function ColumnFilterDropdown({ column, allValues, activeFilters, onFilterChange
           </span>
           <div className="flex gap-2">
             <button className="text-emerald-600 hover:underline font-medium" onClick={search ? selectAllInView : selectAll}>
-              {search ? 'Select shown' : 'Select all'}
+              {search ? 'Keep only shown' : 'Select all'}
             </button>
             <button className="text-red-500 hover:underline font-medium" onClick={search ? clearAllInView : clearAll}>
               {search ? 'Clear shown' : 'Clear all'}

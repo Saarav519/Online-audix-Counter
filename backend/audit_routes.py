@@ -2870,7 +2870,11 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
 
 @portal_router.post("/reports/edit-barcode")
 async def edit_barcode(data: dict):
-    """Edit a barcode/article code for an extra scanned item (not in expected stock)."""
+    """Edit a barcode/article code for an extra scanned item (not in expected stock).
+    
+    If new_value equals the original_value, the edit is treated as an undo
+    (restoring the scanned barcode back to its original value).
+    """
     client_id = data.get("client_id")
     report_type = data.get("report_type")  # "barcode-wise", "article-wise", "detailed"
     original_value = data.get("original_value")
@@ -2880,8 +2884,21 @@ async def edit_barcode(data: dict):
     if not client_id or not report_type or not original_value or not new_value:
         raise HTTPException(400, "Missing required fields: client_id, report_type, original_value, new_value")
 
+    # If user types the original value, treat as "revert/undo" (deactivate existing edit)
     if original_value == new_value:
-        raise HTTPException(400, "New value must be different from original")
+        existing = await db.barcode_edits.find_one({
+            "client_id": client_id, "report_type": report_type,
+            "original_value": original_value, "is_active": True
+        }, {"_id": 0})
+        if existing:
+            await db.barcode_edits.update_one(
+                {"id": existing["id"]},
+                {"$set": {"is_active": False}}
+            )
+            _report_cache.invalidate_all()
+            return {"success": True, "reverted": True, "message": "Edit reverted — original value restored"}
+        # No existing edit and user didn't change anything → not really an error
+        return {"success": True, "no_change": True, "message": "No edit needed"}
 
     # Validate new barcode/article exists in master
     master_by_barcode = await _load_master_for_client(client_id)
@@ -2920,7 +2937,14 @@ async def edit_barcode(data: dict):
                 "cost": master_info.get("cost", 0) or 0,
             }, "edited_at": datetime.now(timezone.utc).isoformat()}}
         )
-        return {"success": True, "edit_id": existing["id"], "updated": True}
+        _report_cache.invalidate_all()
+        return {"success": True, "edit_id": existing["id"], "updated": True,
+                "master_info": {
+                    "description": master_info.get("description", ""),
+                    "category": master_info.get("category", ""),
+                    "mrp": master_info.get("mrp", 0) or 0,
+                    "cost": master_info.get("cost", 0) or 0,
+                }}
 
     edit = {
         "id": str(uuid.uuid4()),
@@ -2941,7 +2965,14 @@ async def edit_barcode(data: dict):
         "is_active": True
     }
     await db.barcode_edits.insert_one(edit)
-    return {"success": True, "edit_id": edit["id"]}
+    _report_cache.invalidate_all()
+    return {"success": True, "edit_id": edit["id"],
+            "master_info": {
+                "description": master_info.get("description", ""),
+                "category": master_info.get("category", ""),
+                "mrp": master_info.get("mrp", 0) or 0,
+                "cost": master_info.get("cost", 0) or 0,
+            }}
 
 @portal_router.post("/reports/undo-edit")
 async def undo_barcode_edit(data: dict):
@@ -2952,6 +2983,7 @@ async def undo_barcode_edit(data: dict):
     result = await db.barcode_edits.update_one({"id": edit_id}, {"$set": {"is_active": False}})
     if result.modified_count == 0:
         raise HTTPException(404, "Edit not found")
+    _report_cache.invalidate_all()
     return {"success": True}
 
 @portal_router.get("/reports/edits/{client_id}")

@@ -180,12 +180,14 @@ function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange
 
   const selectAll = () => setDraftChecked(null);
   const clearAll = () => setDraftChecked(new Set());
+  // When search is active: "Keep only shown" = replace draft with exactly the shown items
   const selectAllInView = () => {
-    setDraftChecked(prev => {
-      const base = prev === null ? new Set(sortedValues) : new Set(prev);
-      filteredValues.forEach(v => base.add(v));
-      return base;
-    });
+    if (search) {
+      // Excel-like: replace selection with shown items only
+      setDraftChecked(new Set(filteredValues));
+    } else {
+      setDraftChecked(null);
+    }
   };
   const clearAllInView = () => {
     setDraftChecked(prev => {
@@ -203,6 +205,8 @@ function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange
     if (draftNumeric !== currentNumeric) return true;
     if ((draftRange.min || '') !== (initialRange.min || '')) return true;
     if ((draftRange.max || '') !== (initialRange.max || '')) return true;
+    // Search typed + default state = will auto-narrow on Apply → dirty
+    if (search && draftChecked === null && filteredValues.length !== sortedValues.length) return true;
     if (draftChecked === null) return !isDefaultState;
     if (isDefaultState) return true;
     if (draftChecked.size !== (currentChecked?.length || 0)) return true;
@@ -210,13 +214,20 @@ function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange
       if (!currentChecked.includes(v)) return true;
     }
     return false;
-  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState]);
+  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState, search, filteredValues, sortedValues]);
 
   const applyFilters = () => {
-    if (draftChecked === null || draftChecked.size === sortedValues.length) {
+    // Excel-like: if user typed in search but didn't manually check/uncheck anything,
+    // treat Apply as "keep only shown" (auto-narrow to filtered values)
+    let effectiveChecked = draftChecked;
+    if (search && draftChecked === null) {
+      effectiveChecked = new Set(filteredValues);
+    }
+
+    if (effectiveChecked === null || effectiveChecked.size === sortedValues.length) {
       onFilterChange(column, null);
     } else {
-      onFilterChange(column, Array.from(draftChecked));
+      onFilterChange(column, Array.from(effectiveChecked));
     }
     if (draftNumeric !== currentNumeric) {
       onNumericFilterChange(column, draftNumeric);
@@ -334,7 +345,7 @@ function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange
           </span>
           <div className="flex gap-2">
             <button className="text-emerald-600 hover:underline font-medium" onClick={search ? selectAllInView : selectAll}>
-              {search ? 'Select shown' : 'Select all'}
+              {search ? 'Keep only shown' : 'Select all'}
             </button>
             <button className="text-red-500 hover:underline font-medium" onClick={search ? clearAllInView : clearAll}>
               {search ? 'Clear shown' : 'Clear all'}
