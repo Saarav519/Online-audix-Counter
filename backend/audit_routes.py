@@ -3027,8 +3027,19 @@ async def search_master_data(client_id: str, q: str = "", field: str = "barcode"
 
 
 def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
-    """Apply active barcode/article edits to a generated report. Modifies rows in-place."""
-    active = [e for e in edits if e.get("report_type") == report_type and e.get("is_active")]
+    """Apply active barcode/article edits to a generated report. Modifies rows in-place.
+
+    Edit scope rules:
+    • Barcode edits (saved from 'detailed' OR 'barcode-wise') apply to BOTH detailed
+      and barcode-wise reports, because the target (scanner barcode) is the same
+      logical entity in both views.
+    • Article edits (from 'article-wise') only apply to article-wise report.
+    """
+    if report_type == "article-wise":
+        active = [e for e in edits if e.get("report_type") == "article-wise" and e.get("is_active")]
+    else:  # detailed or barcode-wise → share barcode-level edits
+        active = [e for e in edits if e.get("report_type") in ("detailed", "barcode-wise") and e.get("is_active")]
+
     if not active:
         # Still need to mark editable rows
         for row in report:
@@ -3036,11 +3047,15 @@ def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
         return report, totals
 
     for edit in active:
+        edit_source_type = edit.get("report_type")
         for row in report:
             match = False
             if report_type in ["barcode-wise", "detailed"]:
                 match = row.get("barcode") == edit["original_value"] and row.get("stock_qty", 0) == 0
-                if report_type == "detailed" and edit.get("location") and row.get("location") != edit["location"]:
+                # Location constraint only applies when viewing 'detailed' AND the edit
+                # itself was created from a detailed context (has location).
+                # For barcode-wise view, we ignore location (aggregated view).
+                if report_type == "detailed" and edit_source_type == "detailed" and edit.get("location") and row.get("location") != edit["location"]:
                     match = False
             elif report_type == "article-wise":
                 ac = row.get("article_code", "")
@@ -3713,6 +3728,13 @@ async def get_consolidated_article_wise(client_id: str):
     reco_maps = await _build_reco_maps(client_id)
     extra_columns = await _get_extra_columns_for_client(client_id)
     
+    # Pre-fetch active barcode edits (detailed/barcode-wise scope) for pre-aggregation remap
+    _early_edits = await db.barcode_edits.find({
+        "client_id": client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+
     expected_by_barcode = {}
     expected_custom_fields = {}
     physical_by_barcode = {}
@@ -3737,7 +3759,9 @@ async def get_consolidated_article_wise(client_id: str):
         for s in synced:
             loc = s["location_name"]
             for item in s.get("items", []):
-                bc = item["barcode"]
+                raw_bc = item["barcode"]
+                # Apply barcode remap so scans aggregate under corrected barcode for article grouping
+                bc = barcode_remap.get(raw_bc, raw_bc)
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     # Use shared reco computation — single source of truth for all reports
@@ -3808,7 +3832,14 @@ async def get_consolidated_category_summary(client_id: str):
     session_ids = await _get_all_session_ids_for_client(client_id)
     master_by_barcode = await _load_master_for_client(client_id)
     reco_maps = await _build_reco_maps(client_id)
-    
+
+    # Pre-fetch active barcode edits for pre-aggregation remap
+    _early_edits = await db.barcode_edits.find({
+        "client_id": client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+
     expected_by_barcode = {}
     physical_by_barcode = {}
     
@@ -3829,7 +3860,9 @@ async def get_consolidated_category_summary(client_id: str):
     for synced in synced_results:
         for s in synced:
             for item in s.get("items", []):
-                bc = item["barcode"]
+                raw_bc = item["barcode"]
+                # Apply barcode edit remap so physical qty rolls up under corrected category
+                bc = barcode_remap.get(raw_bc, raw_bc)
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
@@ -4209,6 +4242,17 @@ async def get_article_wise_report(session_id: str):
     
     reco_maps = EMPTY_RECO_MAPS
     extra_columns = await _get_extra_columns_for_client(session_info.get("client_id", "")) if session_info else []
+
+    # Pre-fetch active barcode edits so we can remap scanner barcodes BEFORE aggregation.
+    # Without this, a barcode edit made from the Detailed/Barcode-wise report would
+    # not propagate to the Article-wise view (scanner's original barcode would still
+    # aggregate into UNMAPPED, while its "corrected" master article would miss the qty).
+    s_client_id = session_info.get("client_id", "") if session_info else ""
+    _early_edits = await db.barcode_edits.find({
+        "client_id": s_client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
     
     barcode_to_article = {}
     
@@ -4230,7 +4274,9 @@ async def get_article_wise_report(session_id: str):
     for s in synced:
         scanned_locations.add(s["location_name"])
         for item in s["items"]:
-            bc = item["barcode"]
+            raw_bc = item["barcode"]
+            # Apply active barcode edit remap so scans aggregate under the corrected barcode
+            bc = barcode_remap.get(raw_bc, raw_bc)
             article_code = barcode_to_article.get(bc, None)
             if article_code is None:
                 in_prod_master = bc in master_by_barcode
@@ -4338,7 +4384,8 @@ async def get_article_wise_report(session_id: str):
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     rounded_totals = {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}
-    s_client_id = session_info.get("client_id", "") if session_info else ""
+    # Fetch ALL active edits (article-wise + barcode-wise+detailed, because barcode edits already
+    # remapped physical qty above — post-hoc _apply_barcode_edits will just annotate matching rows)
     edits = await db.barcode_edits.find({"client_id": s_client_id, "is_active": True}, {"_id": 0}).to_list(10000)
     report, rounded_totals = _apply_barcode_edits(report, rounded_totals, edits, "article-wise", master_by_barcode)
     return {"report": report, "totals": rounded_totals, "extra_columns": extra_columns}
@@ -4350,6 +4397,15 @@ async def get_category_summary(session_id: str):
     master_by_barcode = await get_master_for_session(session_id)
     reco_maps = EMPTY_RECO_MAPS
     
+    # Load session + active barcode edits so scanner barcodes get remapped before aggregation
+    session_doc = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0, "client_id": 1})
+    client_id = session_doc.get("client_id", "") if session_doc else ""
+    _early_edits = await db.barcode_edits.find({
+        "client_id": client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+
     expected = await get_cached_expected(session_id)
     barcode_info = {}
     expected_by_category = {}
@@ -4371,7 +4427,9 @@ async def get_category_summary(session_id: str):
     physical_by_barcode = {}
     for s in synced:
         for item in s["items"]:
-            bc = item["barcode"]
+            raw_bc = item["barcode"]
+            # Apply barcode edit remap → scanner barcode gets category of the edited master barcode
+            bc = barcode_remap.get(raw_bc, raw_bc)
             if bc not in barcode_info:
                 master_info = master_by_barcode.get(bc, {})
                 barcode_info[bc] = {"category": master_info.get("category", "") or "Unmapped", "cost": master_info.get("cost", 0), "mrp": master_info.get("mrp", 0)}
