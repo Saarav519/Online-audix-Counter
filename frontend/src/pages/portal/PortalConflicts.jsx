@@ -163,51 +163,48 @@ export default function PortalConflicts() {
         }
       />
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">Filters</span>
+      {/* Compact Filter Bar */}
+      <div className="flex flex-wrap items-end gap-2 mb-3 pb-3 border-b border-slate-200">
+        <div className="flex items-end h-8 px-2 text-slate-500" title="Filters">
+          <Filter className="w-4 h-4" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Client</label>
-            <select
-              value={selectedClient}
-              onChange={(e) => { setSelectedClient(e.target.value); setSelectedSession(''); }}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="">All Clients</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Audit Session</label>
-            <select
-              value={selectedSession}
-              onChange={(e) => setSelectedSession(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="">All Sessions</option>
-              {sessions.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="pending">Pending</option>
-              <option value="resolved">Resolved</option>
-              <option value="">All</option>
-            </select>
-          </div>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Client</label>
+          <select
+            value={selectedClient}
+            onChange={(e) => { setSelectedClient(e.target.value); setSelectedSession(''); }}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors"
+          >
+            <option value="">All Clients</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Audit Session</label>
+          <select
+            value={selectedSession}
+            onChange={(e) => setSelectedSession(e.target.value)}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors"
+          >
+            <option value="">All Sessions</option>
+            {sessions.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors"
+          >
+            <option value="pending">Pending</option>
+            <option value="resolved">Resolved</option>
+            <option value="">All</option>
+          </select>
         </div>
       </div>
 

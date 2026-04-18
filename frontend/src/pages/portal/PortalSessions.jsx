@@ -291,27 +291,33 @@ export default function PortalSessions() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3 mb-5">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            placeholder="Search sessions..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white"
-          />
+      {/* Compact Filter Bar */}
+      <div className="flex flex-wrap items-end gap-2 mb-3 pb-3 border-b border-slate-200">
+        <div className="flex-1 min-w-[220px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Search</label>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              placeholder="Search sessions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-7 pr-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+            />
+          </div>
         </div>
-        <select
-          value={selectedClient}
-          onChange={(e) => setSelectedClient(e.target.value)}
-          className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white min-w-[180px]"
-        >
-          <option value="">All Clients</option>
-          {clients.map(client => (
-            <option key={client.id} value={client.id}>{client.name}</option>
-          ))}
-        </select>
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Client</label>
+          <select
+            value={selectedClient}
+            onChange={(e) => setSelectedClient(e.target.value)}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+          >
+            <option value="">All Clients</option>
+            {clients.map(client => (
+              <option key={client.id} value={client.id}>{client.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Sessions List */}
@@ -346,204 +352,195 @@ export default function PortalSessions() {
           />
         </div>
       ) : (
-        <div className="space-y-4">
-          {filteredSessions.map((session) => {
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          {filteredSessions.map((session, idx) => {
             const StatusIcon = getStatusIcon(session.status);
+            const isLast = idx === filteredSessions.length - 1;
             return (
               <div
                 key={session.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+                className={`${isLast && showStockViewer !== session.id ? '' : 'border-b border-slate-100'}`}
               >
-                {/* Header Row */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getStatusColor(session.status)}`}>
-                      <StatusIcon className="w-6 h-6" />
+                {/* Compact Row (~60px) */}
+                <div className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50/60 transition-colors">
+                  {/* Status icon + name + client */}
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${getStatusColor(session.status)}`}>
+                      <StatusIcon className="w-4 h-4" />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{session.name}</h3>
-                      <p className="text-sm text-gray-500">
-                        {getClientName(session.client_id)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(session.start_date).toLocaleDateString()}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(session.status)}`}>
-                        {session.status}
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
-                        {session.variance_mode === 'bin-wise' ? 'Bin-wise' : 
-                         session.variance_mode === 'barcode-wise' ? 'Barcode-wise' : 
-                         session.variance_mode === 'article-wise' ? 'Article-wise' : 'Bin-wise'}
-                      </span>
-                      {session.expected_stock_imported && (
-                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                          {session.client_type === 'warehouse' ? 'Stock: Snapshot' : 'Stock Imported'}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-semibold text-[13px] text-slate-900 truncate">{session.name}</h3>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${getStatusColor(session.status)}`}>
+                          {session.status}
                         </span>
-                      )}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">
+                          {session.variance_mode === 'bin-wise' ? 'Bin' :
+                           session.variance_mode === 'barcode-wise' ? 'Barcode' :
+                           session.variance_mode === 'article-wise' ? 'Article' : 'Bin'}
+                        </span>
+                        {session.expected_stock_imported && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">
+                            {session.client_type === 'warehouse' ? 'Snapshot' : 'Stock'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                        <span className="truncate">{getClientName(session.client_id)}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1 whitespace-nowrap">
+                          <Calendar className="w-3 h-3" />
+                          {new Date(session.start_date).toLocaleDateString('en-IN')}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Progress tracker */}
-                <div className="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                  <SessionProgressBar sessionId={session.id} varianceMode={session.variance_mode} />
-                </div>
+                  {/* Compact progress */}
+                  <div className="hidden md:block w-[200px] shrink-0">
+                    <SessionProgressBar sessionId={session.id} varianceMode={session.variance_mode} compact />
+                  </div>
 
-                {/* Action Buttons Row */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                  <div className="flex gap-2 flex-wrap">
+                  {/* Action buttons (h-7) */}
+                  <div className="flex items-center gap-1 shrink-0">
                     {session.client_type !== 'warehouse' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        title="Import Stock"
                         onClick={() => {
                           setImportingSession(session);
                           setShowImportDialog(true);
                           fetchSchemaForSession(session);
                         }}
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
                       >
-                        <Upload className="w-4 h-4 mr-1" />
-                        Import Stock
-                      </Button>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span className="hidden lg:inline">Import</span>
+                      </button>
                     )}
-                    
+
                     {session.client_type === 'warehouse' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        title="Refresh Stock"
                         onClick={() => handleRefreshStock(session)}
                         disabled={refreshingStock === session.id}
-                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                         data-testid={`refresh-stock-${session.id}`}
                       >
-                        <RefreshCw className={`w-4 h-4 mr-1 ${refreshingStock === session.id ? 'animate-spin' : ''}`} />
-                        {refreshingStock === session.id ? 'Refreshing...' : 'Refresh Stock'}
-                      </Button>
+                        <RefreshCw className={`w-3.5 h-3.5 ${refreshingStock === session.id ? 'animate-spin' : ''}`} />
+                        <span className="hidden lg:inline">{refreshingStock === session.id ? 'Refreshing' : 'Refresh'}</span>
+                      </button>
                     )}
-                    
+
                     {session.expected_stock_imported && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        title={showStockViewer === session.id ? 'Hide Stock' : 'View Stock'}
                         onClick={() => handleViewStock(session)}
-                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-blue-200 text-blue-700 hover:bg-blue-50"
                       >
-                        {showStockViewer === session.id ? (
-                          <><ChevronUp className="w-4 h-4 mr-1" /> Hide Stock</>
-                        ) : (
-                          <><Eye className="w-4 h-4 mr-1" /> View Stock</>
-                        )}
-                      </Button>
+                        {showStockViewer === session.id ? <ChevronUp className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        <span className="hidden lg:inline">Stock</span>
+                      </button>
                     )}
-                    
+
                     {session.status === 'active' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        title="Complete Session"
                         onClick={() => handleStatusChange(session.id, 'completed')}
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
                       >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Complete
-                      </Button>
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span className="hidden lg:inline">Complete</span>
+                      </button>
                     )}
-                    
+
                     {session.status === 'completed' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      <button
+                        title="Archive Session"
                         onClick={() => handleStatusChange(session.id, 'archived')}
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
                       >
-                        <Archive className="w-4 h-4 mr-1" />
-                        Archive
-                      </Button>
+                        <Archive className="w-3.5 h-3.5" />
+                        <span className="hidden lg:inline">Archive</span>
+                      </button>
+                    )}
+
+                    <button
+                      title="Delete Session"
+                      onClick={() => handleDeleteSession(session.id, session.name)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded border border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Imported Stock Viewer - expanded */}
+                {showStockViewer === session.id && (
+                  <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-semibold text-slate-700">
+                        Imported Stock Data
+                        <span className="ml-2 text-[11px] font-normal text-slate-500">
+                          ({stockData.length} records)
+                        </span>
+                      </h4>
+                    </div>
+                    {stockLoading ? (
+                      <div className="text-center py-6 text-slate-400 text-xs">Loading stock data...</div>
+                    ) : stockData.length === 0 ? (
+                      <div className="text-center py-6 text-slate-400 text-xs">No stock data found</div>
+                    ) : (
+                      <div className="overflow-x-auto max-h-80 border border-slate-200 rounded-md bg-white">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-50 sticky top-0 z-10">
+                            <tr>
+                              {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
+                                <th className="text-left py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Location</th>
+                              )}
+                              <th className="text-left py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Barcode</th>
+                              <th className="text-left py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Description</th>
+                              <th className="text-left py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Category</th>
+                              <th className="text-right py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">MRP</th>
+                              <th className="text-right py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Cost</th>
+                              <th className="text-right py-2 px-3 font-semibold text-slate-600 whitespace-nowrap">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stockData.map((item, i) => (
+                              <tr key={i} className="border-t border-slate-50 hover:bg-slate-50">
+                                {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
+                                  <td className="py-1.5 px-3 text-slate-700">{item.location || '-'}</td>
+                                )}
+                                <td className="py-1.5 px-3 font-mono text-slate-700">{item.barcode}</td>
+                                <td className={`py-1.5 px-3 ${item.description ? 'text-slate-700' : 'text-slate-300 italic'}`}>
+                                  {item.description || 'Not provided'}
+                                </td>
+                                <td className={`py-1.5 px-3 ${item.category ? 'text-slate-700' : 'text-slate-300 italic'}`}>
+                                  {item.category || 'Not provided'}
+                                </td>
+                                <td className={`py-1.5 px-3 text-right ${item.mrp > 0 ? 'text-slate-700' : 'text-slate-300 italic'}`}>
+                                  {item.mrp > 0 ? item.mrp.toFixed(2) : '-'}
+                                </td>
+                                <td className={`py-1.5 px-3 text-right ${item.cost > 0 ? 'text-slate-700' : 'text-slate-300 italic'}`}>
+                                  {item.cost > 0 ? item.cost.toFixed(2) : '-'}
+                                </td>
+                                <td className="py-1.5 px-3 text-right font-semibold text-slate-900">{item.qty}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {stockData.length > 0 && stockData.every(s => !s.description && !s.category && !s.mrp && !s.cost) && (
+                      <div className="mt-2 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                        <p className="text-xs text-amber-700">
+                          <strong>Missing fields:</strong> Description, Category, MRP, and Cost are empty.
+                          Re-import with these columns to include them in variance reports.
+                        </p>
+                      </div>
                     )}
                   </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteSession(session.id, session.name)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-
-              {/* Imported Stock Viewer - inside session card */}
-              {showStockViewer === session.id && (
-                <div className="border-t border-gray-100 pt-4 mt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-gray-900">
-                      Imported Stock Data
-                      <span className="ml-2 text-xs font-normal text-gray-500">
-                        ({stockData.length} records)
-                      </span>
-                    </h4>
-                  </div>
-                  {stockLoading ? (
-                    <div className="text-center py-6 text-gray-400 text-sm">Loading stock data...</div>
-                  ) : stockData.length === 0 ? (
-                    <div className="text-center py-6 text-gray-400 text-sm">No stock data found</div>
-                  ) : (
-                    <div className="overflow-x-auto max-h-80 border border-gray-200 rounded-lg">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
-                          <tr>
-                            {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
-                              <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Location</th>
-                            )}
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Barcode</th>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Description</th>
-                            <th className="text-left py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Category</th>
-                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">MRP</th>
-                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Cost</th>
-                            <th className="text-right py-2 px-3 font-semibold text-gray-600 whitespace-nowrap">Qty</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {stockData.map((item, idx) => (
-                            <tr key={idx} className="border-t border-gray-50 hover:bg-gray-50">
-                              {(!session.variance_mode || session.variance_mode === 'bin-wise') && (
-                                <td className="py-1.5 px-3 text-gray-700">{item.location || '-'}</td>
-                              )}
-                              <td className="py-1.5 px-3 font-mono text-gray-700">{item.barcode}</td>
-                              <td className={`py-1.5 px-3 ${item.description ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                {item.description || 'Not provided'}
-                              </td>
-                              <td className={`py-1.5 px-3 ${item.category ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                {item.category || 'Not provided'}
-                              </td>
-                              <td className={`py-1.5 px-3 text-right ${item.mrp > 0 ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                {item.mrp > 0 ? item.mrp.toFixed(2) : '-'}
-                              </td>
-                              <td className={`py-1.5 px-3 text-right ${item.cost > 0 ? 'text-gray-700' : 'text-gray-300 italic'}`}>
-                                {item.cost > 0 ? item.cost.toFixed(2) : '-'}
-                              </td>
-                              <td className="py-1.5 px-3 text-right font-semibold text-gray-900">{item.qty}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  {stockData.length > 0 && stockData.every(s => !s.description && !s.category && !s.mrp && !s.cost) && (
-                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                      <p className="text-xs text-amber-700">
-                        <strong>Missing fields:</strong> Description, Category, MRP, and Cost are empty. 
-                        Re-import with these columns to include them in variance reports.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
               </div>
             );
           })}

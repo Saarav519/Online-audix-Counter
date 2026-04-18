@@ -618,21 +618,28 @@ export default function PortalClients() {
         }
       />
 
-      {/* Search */}
-      <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Search clients by name or code..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 bg-white"
-        />
+      {/* Compact Filter Bar */}
+      <div className="flex flex-wrap items-end gap-2 mb-3 pb-3 border-b border-slate-200">
+        <div className="flex-1 min-w-[280px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Search</label>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              placeholder="Search clients by name or code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-7 pr-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Client Cards */}
+      {/* Client Compact List */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-[60px] rounded-md bg-white border border-slate-200 animate-pulse" />
+          ))}
         </div>
       ) : filteredClients.length === 0 ? (
         <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm">
@@ -657,186 +664,184 @@ export default function PortalClients() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.map((client) => (
-            <div
-              key={client.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-emerald-600" />
+        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          {/* Header Row (column labels, desktop only) */}
+          <div className="hidden lg:grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_auto] gap-3 px-3 py-2 bg-slate-50 border-b border-slate-200 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+            <span>Client</span>
+            <span>Type / Status</span>
+            <span>Contact</span>
+            <span>Master / Stock</span>
+            <span className="text-right">Actions</span>
+          </div>
+
+          {filteredClients.map((client, idx) => {
+            const isLast = idx === filteredClients.length - 1;
+            return (
+              <div
+                key={client.id}
+                className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.4fr)_auto] gap-3 items-center px-3 py-2 hover:bg-slate-50/60 transition-colors ${!isLast ? 'border-b border-slate-100' : ''}`}
+                data-testid={`client-row-${client.code}`}
+              >
+                {/* Col 1: Client (icon + name + code) */}
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 bg-emerald-100 rounded-md flex items-center justify-center shrink-0">
+                    <Building2 className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{client.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-gray-500">Code: {client.code}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        client.client_type === 'warehouse' 
-                          ? 'bg-orange-100 text-orange-700' 
-                          : 'bg-teal-100 text-teal-700'
-                      }`} data-testid={`client-type-badge-${client.code}`}>
-                        {client.client_type === 'warehouse' ? 'Warehouse' : 'Store'}
-                      </span>
-                    </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[13px] text-slate-900 truncate">{client.name}</div>
+                    <div className="text-[11px] text-slate-500 font-mono">{client.code}</div>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(client)}
+
+                {/* Col 2: Type / Status badges */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                      client.client_type === 'warehouse'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-teal-100 text-teal-700'
+                    }`}
+                    data-testid={`client-type-badge-${client.code}`}
                   >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(client.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {client.address && (
-                <p className="text-sm text-gray-600 mb-2">{client.address}</p>
-              )}
-
-              <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                {client.contact_person && (
-                  <div className="flex items-center gap-1">
-                    <User className="w-4 h-4" />
-                    {client.contact_person}
-                  </div>
-                )}
-                {client.contact_phone && (
-                  <div className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
-                    {client.contact_phone}
-                  </div>
-                )}
-              </div>
-
-              {/* Master Products Status */}
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="flex items-center flex-wrap gap-2 mb-3">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    client.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                    {client.client_type === 'warehouse' ? 'Warehouse' : 'Store'}
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                    client.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
                   }`}>
                     {client.is_active ? 'Active' : 'Inactive'}
                   </span>
+                </div>
+
+                {/* Col 3: Contact (person + phone) */}
+                <div className="min-w-0 text-[12px] text-slate-600">
+                  {client.contact_person && (
+                    <div className="flex items-center gap-1 truncate">
+                      <User className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="truncate">{client.contact_person}</span>
+                    </div>
+                  )}
+                  {client.contact_phone && (
+                    <div className="flex items-center gap-1 truncate text-[11px] text-slate-500">
+                      <Phone className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="truncate">{client.contact_phone}</span>
+                    </div>
+                  )}
+                  {!client.contact_person && !client.contact_phone && (
+                    <span className="text-[11px] text-slate-300 italic">No contact</span>
+                  )}
+                </div>
+
+                {/* Col 4: Master / Stock / Locations badges */}
+                <div className="flex items-center gap-1 flex-wrap">
                   {client.master_imported ? (
-                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Master: {client.master_product_count || 0} products
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+                      <CheckCircle className="w-3 h-3" /> M: {client.master_product_count || 0}
                     </span>
                   ) : (
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      No Master
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                      <AlertCircle className="w-3 h-3" /> No Master
                     </span>
                   )}
                   {client.client_type === 'warehouse' && (
                     client.stock_imported ? (
-                      <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" />
-                        Stock: {client.stock_record_count || 0} records
+                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">
+                        <CheckCircle className="w-3 h-3" /> S: {client.stock_record_count || 0}
                       </span>
                     ) : (
-                      <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
-                        No Stock
+                      <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+                        <AlertCircle className="w-3 h-3" /> No Stock
                       </span>
                     )
                   )}
+                  {client.location_master_imported && (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium">
+                      <MapPin className="w-3 h-3" /> L: {client.location_count || 0}
+                    </span>
+                  )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 text-xs"
+
+                {/* Col 5: Actions (compact h-7 buttons with tooltips) */}
+                <div className="flex items-center justify-end gap-1 shrink-0">
+                  <button
+                    title="Configure Schema"
                     onClick={() => openSchemaBuilder(client)}
                     data-testid={`schema-btn-${client.code}`}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-purple-200 text-purple-600 hover:bg-purple-50"
                   >
-                    <Settings className="w-3.5 h-3.5 mr-1" />
-                    Schema
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 text-xs"
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    title="Upload Master Data"
                     onClick={() => openMasterUpload(client)}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-blue-200 text-blue-600 hover:bg-blue-50"
                   >
-                    <Upload className="w-3.5 h-3.5 mr-1" />
-                    Upload Master
-                  </Button>
-                  {client.master_imported && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-gray-600 hover:text-gray-700 text-xs"
-                      onClick={() => openMasterView(client)}
-                    >
-                      <Package className="w-3.5 h-3.5 mr-1" />
-                      View Master
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 text-xs"
+                    <Upload className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    title="Upload Location Master"
                     onClick={() => openLocationUpload(client)}
                     data-testid={`upload-location-btn-${client.code}`}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-orange-200 text-orange-600 hover:bg-orange-50"
                   >
-                    <Upload className="w-3.5 h-3.5 mr-1" />
-                    Location Master
-                  </Button>
-                  {client.location_master_imported && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-gray-600 hover:text-gray-700 text-xs"
-                      onClick={() => openLocationView(client)}
-                      data-testid={`view-location-btn-${client.code}`}
-                    >
-                      <Eye className="w-3.5 h-3.5 mr-1" />
-                      View Locations ({client.location_count || 0})
-                    </Button>
-                  )}
-                </div>
-                {/* Warehouse: Stock Upload/View */}
-                {client.client_type === 'warehouse' && (
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 flex-1"
+                    <MapPin className="w-3.5 h-3.5" />
+                  </button>
+                  {client.client_type === 'warehouse' && (
+                    <button
+                      title="Upload Stock"
                       onClick={() => openStockUpload(client)}
                       data-testid={`upload-stock-btn-${client.code}`}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded border border-emerald-200 text-emerald-600 hover:bg-emerald-50"
                     >
-                      <Upload className="w-3.5 h-3.5 mr-1" />
-                      Upload Stock
-                    </Button>
-                    {client.stock_imported && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-gray-600 hover:text-gray-700 flex-1"
-                        onClick={() => openStockView(client)}
-                        data-testid={`view-stock-btn-${client.code}`}
-                      >
-                        <Eye className="w-3.5 h-3.5 mr-1" />
-                        View Stock
-                      </Button>
-                    )}
-                  </div>
-                )}
+                      <Package className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {client.master_imported && (
+                    <button
+                      title="View Master Data"
+                      onClick={() => openMasterView(client)}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {client.location_master_imported && (
+                    <button
+                      title={`View Locations (${client.location_count || 0})`}
+                      onClick={() => openLocationView(client)}
+                      data-testid={`view-location-btn-${client.code}`}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded border border-sky-200 text-sky-600 hover:bg-sky-50"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {client.client_type === 'warehouse' && client.stock_imported && (
+                    <button
+                      title="View Stock"
+                      onClick={() => openStockView(client)}
+                      data-testid={`view-stock-btn-${client.code}`}
+                      className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    title="Edit Client"
+                    onClick={() => handleEdit(client)}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    title="Delete Client"
+                    onClick={() => handleDelete(client.id)}
+                    className="h-7 w-7 inline-flex items-center justify-center rounded border border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

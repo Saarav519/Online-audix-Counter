@@ -535,47 +535,57 @@ export default function PortalSyncLogs() {
         }
       />
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Building2 className="w-3.5 h-3.5 inline mr-1" />Client
-            </label>
-            <select data-testid="sync-client-filter" value={selectedClient} onChange={(e) => { setSelectedClient(e.target.value); setSelectedSession(''); }}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm">
-              <option value="">Select Client</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              <Layers className="w-3.5 h-3.5 inline mr-1" />Session
-            </label>
-            <select data-testid="sync-session-filter" value={selectedSession} onChange={(e) => setSelectedSession(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" disabled={!selectedClient}>
-              <option value="">Select Session</option>
-              {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end gap-2">
-            {['inbox', 'logs', 'batches'].map(tab => (
-              <button key={tab} data-testid={`tab-${tab}`}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors relative ${
-                  activeTab === tab
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}>
-                {tab === 'inbox' ? 'Sync Inbox' : tab === 'logs' ? 'Raw Logs' : 'Batches'}
-                {tab === 'inbox' && inboxSummary && inboxSummary.total_pending > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {inboxSummary.total_pending > 99 ? '99+' : inboxSummary.total_pending}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+      {/* Compact Filter Bar */}
+      <div className="flex flex-wrap items-end gap-2 mb-3 pb-3 border-b border-slate-200">
+        <div className="flex-1 min-w-[180px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <Building2 className="w-3 h-3 inline mr-1" />Client
+          </label>
+          <select
+            data-testid="sync-client-filter"
+            value={selectedClient}
+            onChange={(e) => { setSelectedClient(e.target.value); setSelectedSession(''); }}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors"
+          >
+            <option value="">Select Client</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+            <Layers className="w-3 h-3 inline mr-1" />Session
+          </label>
+          <select
+            data-testid="sync-session-filter"
+            value={selectedSession}
+            onChange={(e) => setSelectedSession(e.target.value)}
+            className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors disabled:bg-slate-50 disabled:text-slate-400"
+            disabled={!selectedClient}
+          >
+            <option value="">Select Session</option>
+            {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div className="flex items-end gap-1">
+          {['inbox', 'logs', 'batches'].map(tab => (
+            <button
+              key={tab}
+              data-testid={`tab-${tab}`}
+              onClick={() => setActiveTab(tab)}
+              className={`relative h-8 px-3 rounded-md text-[13px] font-medium transition-colors border ${
+                activeTab === tab
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {tab === 'inbox' ? 'Sync Inbox' : tab === 'logs' ? 'Raw Logs' : 'Batches'}
+              {tab === 'inbox' && inboxSummary && inboxSummary.total_pending > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {inboxSummary.total_pending > 99 ? '99+' : inboxSummary.total_pending}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
