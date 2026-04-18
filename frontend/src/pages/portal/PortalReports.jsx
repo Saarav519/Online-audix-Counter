@@ -857,6 +857,14 @@ export default function PortalReports() {
       }
       return cols;
     };
+
+    // Per-unit price columns (from schema). Shown when schema has mrp/cost enabled.
+    const priceCols = () => {
+      const cols = [];
+      if (has_mrp) cols.push({ key: 'mrp', label: 'MRP' });
+      if (has_cost) cols.push({ key: 'cost', label: 'Cost' });
+      return cols;
+    };
     
     switch (reportType) {
       case 'bin-wise':
@@ -878,6 +886,7 @@ export default function PortalReports() {
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
           ...ec,
+          ...priceCols(),
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical Qty' },
@@ -898,6 +907,7 @@ export default function PortalReports() {
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
           ...ec,
+          ...priceCols(),
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
@@ -919,6 +929,7 @@ export default function PortalReports() {
           { key: 'article_name', label: 'Article Name' },
           { key: 'category', label: 'Category' },
           ...ec,
+          ...priceCols(),
           { key: 'barcode_count', label: 'Barcodes' },
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
@@ -1485,9 +1496,9 @@ export default function PortalReports() {
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
           {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
-          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} schemaValueFields={schemaValueFields} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} schemaValueFields={schemaValueFields} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} schemaValueFields={schemaValueFields} />}
           {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
           </div>
           {/* Load More button for large datasets */}
@@ -1730,7 +1741,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 }
 
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true } }) {
   const t = data.totals || {};
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
@@ -1755,6 +1766,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <th data-col="description" className="py-1.5 px-3"></th>
               <th data-col="category" className="py-1.5 px-3"></th>
               {extraColumns.map(col => <th key={col.name} data-col={col.name} className="py-1.5 px-3"></th>)}
+              {schemaValueFields.has_mrp && <th data-col="mrp" className="py-1.5 px-3"></th>}
+              {schemaValueFields.has_cost && <th data-col="cost" className="py-1.5 px-3"></th>}
               <SubtotalCell value={t.stock_qty} />
               <SubtotalCell value={t.stock_value_mrp || 0} />
               <SubtotalCell value={t.stock_value_cost || 0} />
@@ -1780,6 +1793,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               {extraColumns.map(col => (
                 <SortableHeader key={col.name} column={col.name} label={col.label} sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues(col.name)} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-purple-600" />
               ))}
+              {schemaValueFields.has_mrp && <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
+              {schemaValueFields.has_cost && <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value_mrp" label="Stock Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value_cost" label="Stock Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1814,6 +1829,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 {extraColumns.map(col => (
                   <td key={col.name} className="py-2 px-3 text-purple-700">{row[col.name] || '-'}</td>
                 ))}
+                {schemaValueFields.has_mrp && <td className="py-2 px-3 text-right text-gray-500">{(row.mrp || 0).toFixed(2)}</td>}
+                {schemaValueFields.has_cost && <td className="py-2 px-3 text-right text-gray-500">{(row.cost || 0).toFixed(2)}</td>}
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_mrp || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_cost || 0).toFixed(2)}</td>
@@ -1869,7 +1886,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true } }) {
   const t = data.totals || {};
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
@@ -1901,6 +1918,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <th data-col="description" className="py-1.5 px-3"></th>
               <th data-col="category" className="py-1.5 px-3"></th>
               {extraColumns.map(col => <th key={col.name} data-col={col.name} className="py-1.5 px-3"></th>)}
+              {schemaValueFields.has_mrp && <th data-col="mrp" className="py-1.5 px-3"></th>}
+              {schemaValueFields.has_cost && <th data-col="cost" className="py-1.5 px-3"></th>}
               <SubtotalCell value={t.stock_qty} />
               <SubtotalCell value={t.stock_value_mrp || 0} />
               <SubtotalCell value={t.stock_value_cost || 0} />
@@ -1925,6 +1944,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               {extraColumns.map(col => (
                 <SortableHeader key={col.name} column={col.name} label={col.label} sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues(col.name)} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-purple-600" />
               ))}
+              {schemaValueFields.has_mrp && <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
+              {schemaValueFields.has_cost && <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value_mrp" label="Stock Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value_cost" label="Stock Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -1962,6 +1983,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 {extraColumns.map(col => (
                   <td key={col.name} className="py-2 px-3 text-xs text-purple-700">{row[col.name] || '-'}</td>
                 ))}
+                {schemaValueFields.has_mrp && <td className="py-2 px-3 text-right text-gray-500">{(row.mrp || 0).toFixed(2)}</td>}
+                {schemaValueFields.has_cost && <td className="py-2 px-3 text-right text-gray-500">{(row.cost || 0).toFixed(2)}</td>}
                 <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_mrp || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_cost || 0).toFixed(2)}</td>
@@ -2018,7 +2041,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Article-wise Table ============
-function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh }) {
+function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true } }) {
   const [expandedRows, setExpandedRows] = React.useState(new Set());
 
   const toggleRow = (index) => {
@@ -2054,6 +2077,8 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <th data-col="article_name" className="py-1.5 px-3"></th>
               <th data-col="category" className="py-1.5 px-3"></th>
               {extraColumns.map(col => <th key={col.name} data-col={col.name} className="py-1.5 px-3"></th>)}
+              {schemaValueFields.has_mrp && <th data-col="mrp" className="py-1.5 px-3"></th>}
+              {schemaValueFields.has_cost && <th data-col="cost" className="py-1.5 px-3"></th>}
               <SubtotalCell value={data.totals?.barcode_count_total} />
               <SubtotalCell value={data.totals?.stock_qty} />
               <SubtotalCell value={data.totals?.stock_value_mrp || 0} />
@@ -2080,6 +2105,8 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               {extraColumns.map(col => (
                 <SortableHeader key={col.name} column={col.name} label={col.label} sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues(col.name)} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-purple-600" />
               ))}
+              {schemaValueFields.has_mrp && <SortableHeader column="mrp" label="MRP" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
+              {schemaValueFields.has_cost && <SortableHeader column="cost" label="Cost" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="barcode_count" label="Barcodes" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('barcode_count')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_value_mrp" label="Stock Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -2114,6 +2141,8 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   {extraColumns.map(col => (
                     <td key={col.name} className="py-2 px-3 text-xs text-purple-700">{row[col.name] || '-'}</td>
                   ))}
+                  {schemaValueFields.has_mrp && <td className="py-2 px-3 text-right text-gray-500">{(row.mrp || 0).toFixed(2)}</td>}
+                  {schemaValueFields.has_cost && <td className="py-2 px-3 text-right text-gray-500">{(row.cost || 0).toFixed(2)}</td>}
                   <td className="py-2 px-3 text-right"><span className="text-xs text-blue-600 font-medium underline">{row.barcode_count}</span></td>
                   <td className="py-2 px-3 text-right">{row.stock_qty}</td>
                   <td className="py-2 px-3 text-right text-gray-500">{(row.stock_value_mrp || 0).toFixed(2)}</td>
@@ -2158,7 +2187,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 </tr>
                 {expandedRows.has(i) && (
                   <tr className="bg-purple-50/50">
-                    <td colSpan={12 + extraColumns.length} className="py-2 px-6">
+                    <td colSpan={12 + extraColumns.length + (schemaValueFields.has_mrp ? 1 : 0) + (schemaValueFields.has_cost ? 1 : 0)} className="py-2 px-6">
                       <div className="flex flex-wrap gap-2 items-center">
                         <span className="text-xs font-medium text-purple-700 mr-1">Barcodes:</span>
                         {(row.barcodes || []).map((bc, j) => (
