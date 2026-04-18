@@ -73,6 +73,22 @@ _expected_cache = TTLCache(ttl_seconds=600)  # 10 min - expected stock doesn't c
 _reco_cache = TTLCache(ttl_seconds=120)      # 2 min - reco can be edited
 _report_cache = TTLCache(ttl_seconds=60)     # 1 min - report results
 
+
+def _invalidate_master_cache_for_client(client_id: str):
+    """Invalidate ALL master-cache entries for a client (both list and barcode-index).
+
+    NOTE: master cache uses TWO keys:
+      - "master_{client_id}"              (raw list)
+      - "master_by_barcode_{client_id}"   (barcode -> product dict)
+    A naive `invalidate_prefix("master_{client_id}")` does NOT match the second key
+    because it starts with "master_by_barcode_". Use this helper everywhere master
+    data changes so reports correctly pick up new master values as fallback.
+    """
+    _master_cache.invalidate(f"master_{client_id}")
+    _master_cache.invalidate(f"master_by_barcode_{client_id}")
+    # Also invalidate report cache — cached reports were built with stale master
+    _report_cache.invalidate_all()
+
 async def get_cached_master(client_id):
     """Load master products with cache."""
     key = f"master_{client_id}"
@@ -769,7 +785,7 @@ async def delete_client(client_id: str):
     
     # Invalidate any cached data for this client
     try:
-        _master_cache.invalidate_prefix(client_id)
+        _invalidate_master_cache_for_client(client_id)
         _expected_cache.invalidate_all()
         _reco_cache.invalidate_all()
         _report_cache.invalidate_all()
@@ -843,8 +859,8 @@ async def import_master_products(client_id: str, file: UploadFile = File(...)):
     if records:
         await db.master_products.insert_many(records)
     
-    # Invalidate master cache
-    _master_cache.invalidate_prefix(f"master_{client_id}")
+    # Invalidate master cache (both list + by_barcode) + report cache
+    _invalidate_master_cache_for_client(client_id)
     
     await db.clients.update_one(
         {"id": client_id},
@@ -899,7 +915,7 @@ async def get_master_product_stats(client_id: str):
 async def clear_master_products(client_id: str):
     """Clear all master products for a client"""
     result = await db.master_products.delete_many({"client_id": client_id})
-    _master_cache.invalidate_prefix(f"master_{client_id}")
+    _invalidate_master_cache_for_client(client_id)
     
     # Update client flag
     await db.clients.update_one(
