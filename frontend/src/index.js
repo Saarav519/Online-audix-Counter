@@ -21,7 +21,31 @@ if ('serviceWorker' in navigator && !isCapacitor) {
   window.addEventListener('load', () => {
     try {
       navigator.serviceWorker.register('/service-worker.js')
-        .then(() => console.log('[Audix] Service Worker registered'))
+        .then((registration) => {
+          console.log('[Audix] Service Worker registered');
+          // Check for updates on every page load
+          registration.update();
+          // Auto-reload when a new SW takes control (e.g. after cache version bump)
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            console.log('[Audix] New Service Worker activated, reloading...');
+            window.location.reload();
+          });
+          // If a new SW is waiting, activate it immediately
+          registration.addEventListener('updatefound', () => {
+            const newSW = registration.installing;
+            if (!newSW) return;
+            newSW.addEventListener('statechange', () => {
+              if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available; our SW already does skipWaiting(),
+                // but send message just in case:
+                try { newSW.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+              }
+            });
+          });
+        })
         .catch(() => console.log('[Audix] Service Worker skipped'));
     } catch (e) {
       // Ignore
