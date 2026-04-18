@@ -31,6 +31,9 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
+import EmptyState from '../../components/portal/EmptyState';
+import { SkeletonCard } from '../../components/portal/Skeleton';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -594,44 +597,64 @@ export default function PortalClients() {
   );
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-          <p className="text-gray-500">Manage your client companies</p>
-        </div>
-        <Button 
-          onClick={() => {
-            setEditingClient(null);
-            setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
-            setShowDialog(true);
-          }}
-          className="bg-emerald-500 hover:bg-emerald-600"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Client
-        </Button>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Clients"
+        subtitle="Manage your client companies"
+        breadcrumbs={[{ label: 'Clients' }]}
+        actions={
+          <Button 
+            onClick={() => {
+              setEditingClient(null);
+              setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
+              setShowDialog(true);
+            }}
+            className="bg-emerald-500 hover:bg-emerald-600 gap-1"
+            data-testid="add-client-btn"
+          >
+            <Plus className="w-4 h-4" />
+            Add Client
+          </Button>
+        }
+      />
 
       {/* Search */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+      <div className="relative mb-5">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <Input
-          placeholder="Search clients..."
+          placeholder="Search clients by name or code..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
+          className="pl-10 bg-white"
         />
       </div>
 
       {/* Client Cards */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
       ) : filteredClients.length === 0 ? (
-        <div className="text-center py-12">
-          <Building2 className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">No clients found</p>
+        <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+          <EmptyState
+            icon={Building2}
+            title={searchQuery ? 'No matching clients' : 'No clients yet'}
+            description={searchQuery ? 'Try a different search term.' : 'Add your first client to begin managing audits, master data and sessions.'}
+            color="emerald"
+            action={!searchQuery && (
+              <Button
+                onClick={() => {
+                  setEditingClient(null);
+                  setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
+                  setShowDialog(true);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 gap-1"
+              >
+                <Plus className="w-4 h-4" /> Add First Client
+              </Button>
+            )}
+            tip="💡 Tip: After adding a client, configure the master schema, then upload master data."
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -8,6 +8,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -515,24 +516,24 @@ export default function PortalSyncLogs() {
   );
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sync & Forward</h1>
-          <p className="text-gray-500">Manage scanner data — review, forward to variance, track batches</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionId: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', files: [] }); setBackupSessions([]); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
-            <Upload className="w-4 h-4 mr-2" />
-            Restore Backup
-          </Button>
-          <Button onClick={fetchData} variant="outline" size="sm" data-testid="refresh-sync-logs">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Sync & Forward"
+        subtitle="Manage scanner data — review, forward to variance, track batches"
+        breadcrumbs={[{ label: 'Sync Logs' }]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionId: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', files: [] }); setBackupSessions([]); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
+              <Upload className="w-4 h-4 mr-2" />
+              Restore Backup
+            </Button>
+            <Button onClick={fetchData} variant="outline" size="sm" data-testid="refresh-sync-logs">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">

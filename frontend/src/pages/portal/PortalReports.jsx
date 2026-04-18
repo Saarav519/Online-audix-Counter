@@ -34,6 +34,7 @@ import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { FullScreenButton, FullScreenReport } from '../../components/FullScreenReport';
 import { BarcodeEditCell } from '../../components/BarcodeEditCell';
+import PageHeader from '../../components/portal/PageHeader';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -1246,42 +1247,42 @@ export default function PortalReports() {
   const reportOptions = getReportTypeOptions();
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500">Variance analysis and audit reports</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeFilterCount > 0 && (
-            <Button onClick={clearAllFilters} variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
-              <X className="w-3.5 h-3.5 mr-1" />
-              Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
-            </Button>
-          )}
-          {filteredData && columnConfig.length > 0 && (
-            <ColumnSettingsPanel
-              columns={columnConfig}
-              hiddenColumns={hiddenColumns}
-              frozenColumns={frozenColumns}
-              onToggleVisibility={toggleColumnVisibility}
-              onToggleFreeze={toggleColumnFreeze}
-              onShowAll={showAllColumns}
-              onReset={resetColumnSettings}
-            />
-          )}
-          {filteredData && (
-            <Button onClick={exportReport} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export Excel
-            </Button>
-          )}
-          {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (
-            <FullScreenButton onClick={() => setIsFullScreen(true)} />
-          )}
-        </div>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Reports"
+        subtitle="Variance analysis and audit reports"
+        breadcrumbs={[{ label: 'Reports' }]}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            {activeFilterCount > 0 && (
+              <Button onClick={clearAllFilters} variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                <X className="w-3.5 h-3.5 mr-1" />
+                Clear {activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''}
+              </Button>
+            )}
+            {filteredData && columnConfig.length > 0 && (
+              <ColumnSettingsPanel
+                columns={columnConfig}
+                hiddenColumns={hiddenColumns}
+                frozenColumns={frozenColumns}
+                onToggleVisibility={toggleColumnVisibility}
+                onToggleFreeze={toggleColumnFreeze}
+                onShowAll={showAllColumns}
+                onReset={resetColumnSettings}
+              />
+            )}
+            {filteredData && (
+              <Button onClick={exportReport} variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export Excel
+              </Button>
+            )}
+            {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (
+              <FullScreenButton onClick={() => setIsFullScreen(true)} />
+            )}
+          </div>
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">

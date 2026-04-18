@@ -462,10 +462,10 @@ export default function PortalLogin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const initialTab = searchParams.get('tab') || 'audit';
-  const [activeProduct, setActiveProduct] = useState(
-    products.find(p => p.id === initialTab) ? initialTab : 'audit'
-  );
+  // In this deployment only the Audit Data Management product is active.
+  // Staff Attendance & Audix R&M are hosted on separate deployments.
+  const activeProduct = 'audit';
+  const visibleProducts = products.filter((p) => p.id === 'audit');
 
   const currentProduct = products.find(p => p.id === activeProduct);
   const colors = colorMap[currentProduct.color];
@@ -494,11 +494,11 @@ export default function PortalLogin() {
           <div className="flex items-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 min-w-max">
             <Layers className="w-4 h-4 text-gray-500 mr-1 hidden sm:block" />
             <span className="text-xs text-gray-500 mr-2 hidden sm:inline">Our Products:</span>
-            {products.map((p) => {
+            {visibleProducts.map((p) => {
               const isActive = activeProduct === p.id;
               const c = colorMap[p.color];
               return (
-                <button key={p.id} onClick={() => setActiveProduct(p.id)} data-testid={`product-tab-${p.id}`}
+                <button key={p.id} data-testid={`product-tab-${p.id}`}
                   className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${isActive ? `${c.activeBg} text-white shadow-lg ${c.shadow}` : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                   <p.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">{p.name}</span>

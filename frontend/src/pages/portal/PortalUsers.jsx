@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -159,7 +160,7 @@ export default function PortalUsers() {
   const disabledCount = users.filter(u => u.is_active === false).length;
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6 lg:p-8">
       {/* Auth Confirmation Dialog */}
       {authDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -237,12 +238,13 @@ export default function PortalUsers() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-500">Manage portal access and authorization</p>
-        </div>
-      </div>
+      <PageHeader
+        title="User Management"
+        subtitle="Manage portal access and authorization"
+        breadcrumbs={[{ label: 'Users' }]}
+        liveLabel={pendingCount > 0 ? `${pendingCount} pending approval` : null}
+        accentColor="blue"
+      />
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

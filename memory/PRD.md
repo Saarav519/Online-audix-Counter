@@ -3,48 +3,77 @@
 ## Original Problem Statement
 User (AudiX Solutions & Co. - Chartered Accountants) runs 3 products live:
 1. Audix Data Management (stock audit portal + scanner app) ← THIS PROJECT
-2. Staff Attendance & Payroll (separate)
-3. Audix R&M (separate)
+2. Staff Attendance & Payroll (separate deployment)
+3. Audix R&M (separate deployment)
 
-Initial task: Match portal code with GitHub `Audix-Attendance-Finalize` (branch `Final`)
-— it contains the updated Audit Data Management code user had been iterating on.
-Goal: Make the preview "look impressive to clients" and faster/better.
+User goal: Make the portal look IMPRESSIVE to clients. Must be fast, premium, polished.
+Scanner app should NOT be modified. Light theme (not dark).
 
 ## Architecture
 - Backend: FastAPI + MongoDB (server.py wrapper + audit_routes.py module)
-- Frontend: React + Capacitor (Android) + Tailwind + shadcn/ui
+- Frontend: React + Capacitor + Tailwind + shadcn/ui + recharts + cmdk
 - Scanner (mobile-only): `/scan`, `/master-data`, `/reports`, `/settings`, `/login`
 - Portal (admin): `/portal`, `/portal/dashboard`, `/portal/clients`, `/portal/sessions`,
   `/portal/devices`, `/portal/reports`, `/portal/sync-logs`, `/portal/conflicts`, `/portal/users`
 
 ## Default Admin Credentials
-- Username: `admin`  |  Password: `admin123` (auto-seeded on startup)
+- Username: `admin`  |  Password: `admin123` (auto-seeded)
 
-## What's Been Implemented
+## Implementation Timeline
 
-### Portal Sync with GitHub Final branch (Apr 2026) ✅
-Backend:
-- Refactored into `server.py` (wrapper) + `audit_routes.py` (all endpoints, 5836 lines)
-- Added `SafeJSONResponse` — handles NaN/Infinity in ALL responses (prevents 500 on dirty data)
-- Added global ValidationError + Exception handlers
-- Added 6 new endpoints:
-  - `GET/POST/DELETE /api/audit/portal/clients/{id}/location-master[+/stats]`
-  - `POST /api/audit/portal/clients/{id}/import-location-master`
-  - `GET /api/audit/portal/reports/consolidated/{id}/compare-totals`
-  - `GET /api/audit/portal/reports/consolidated/{id}/reco-diagnostic`
-- GZip middleware, startup index creation (35+ indexes), health endpoints
+### Phase 1: GitHub Final branch sync (Apr 18, 2026) ✅
+- Refactored backend to `server.py + audit_routes.py` structure
+- Added `SafeJSONResponse` + global exception handlers + 35+ MongoDB indexes
+- Pulled 6 new endpoints (Location Master + reco-diagnostic + compare-totals)
+- Copied all 12 portal pages from GitHub Final branch
+- Created `AuditApp.js` shim for `useAudit` context
+- Installed `@tanstack/react-virtual`
 
-Frontend portal pages (all 12 copied from GitHub Final branch):
-- `PortalLogin.jsx` — 218 → 622 lines: dark-themed 3-product marketing landing with tabs
-  (Audit active; Staff/R&M tabs shown but backends not present in this deployment)
-- `PortalClients.jsx` — 1368 → 1579 lines: Location Master UI added
-- `PortalReports.jsx` — 2529 → 2627 lines: compare-totals + reco-diagnostic views
-- `PortalLayout.jsx`, all others synced to GitHub Final.
-- Created `/app/frontend/src/pages/AuditApp.js` — minimal `useAudit()` context shim
-- Added `@tanstack/react-virtual` dependency
-- Route convention kept as `/portal/*` (mapped from REF's `/audit/*`)
+### Phase 2: Premium Light UI Makeover (Apr 18, 2026) ✅
+**New reusable components in `/app/frontend/src/components/portal/`:**
+- `CountUp.jsx` — animated number counter (easeOut)
+- `PageHeader.jsx` — unified header with breadcrumbs + title + accent + live pill + actions
+- `StatCard.jsx` — animated KPI card (hover lift, gradient accent, trend arrow, icon ring)
+- `EmptyState.jsx` — gorgeous branded empty states (icon halo, gradient bg, tip pill, action)
+- `Skeleton.jsx` — shimmer skeletons (Skeleton, SkeletonCard, SkeletonTable, SkeletonChart)
+- `NotificationBell.jsx` — polling bell with unread badge + dropdown + mark-all-read
+- `GlobalSearch.jsx` — Cmd+K / Ctrl+K global modal (clients, sessions, quick nav, actions)
 
-Scanner app files left untouched (current has newer code than GitHub Final).
+**Sidebar/Layout (PortalLayout.jsx) upgrade:**
+- Collapsible sidebar (persisted in localStorage)
+- Badges on nav items (auto-poll conflicts + pending users count)
+- Active-nav gradient accent bar with icon coloring
+- Sticky topbar with Cmd+K search trigger + notification bell
+- Mobile responsive drawer with hamburger menu
 
-## Next Tasks (user queue)
-- User will provide "new changes" now that portal is synced with GitHub.
+**Dashboard complete redesign (PortalDashboard.jsx):**
+- 6 animated KPI cards (Clients, Active Sessions, Devices, Empty Bins, Conflicts, Users)
+- Accuracy donut chart (Overall Audit Progress) with inner percentage
+- 7-day Scan Activity area chart (emerald gradient)
+- Smart Insights panel (auto-generated from live data — conflicts, pending users, top variance)
+- Live Device Status panel with animated pulse indicators (Live / Active / Recent / Stale)
+- Recent Syncs timeline with icons
+- Audit Summary cards (per-client) with accuracy %, gradient progress bar, mismatches expand
+
+**All portal pages unified:**
+- Applied `PageHeader` (breadcrumb + title + subtitle + accent + actions) to Clients, Sessions,
+  Devices, Reports, Sync Logs, Conflicts, Users, Dashboard.
+- Applied `EmptyState` with illustrations + tips to Clients, Sessions, Devices empty views.
+- Applied skeleton loaders to Clients, Sessions, Dashboard (replaces plain spinners).
+
+**Login Landing cleanup:**
+- Hidden Staff Attendance + Audix R&M tabs (those backends are on separate deployments)
+- Only Audix Data Management product shown — cleaner focus for clients.
+
+**Tailwind animations added:**
+- `shimmer`, `fade-in`, `fade-in-up`, `scale-in` keyframes for micro-interactions
+
+## Next Tasks
+- User to review & provide next batch of changes.
+
+## Future/Backlog
+- PDF branded report export (cover + summary + tables).
+- Real-time WebSocket push for instant device sync notifications (currently 30s poll).
+- Keyboard shortcuts help modal (`?` key) with full shortcut list.
+- Session progress bars on Sessions page (locations scanned / total).
+- Dark mode toggle (optional).

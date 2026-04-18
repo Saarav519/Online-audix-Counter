@@ -26,6 +26,8 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
+import EmptyState from '../../components/portal/EmptyState';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -270,38 +272,39 @@ export default function PortalSessions() {
   });
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Audit Sessions</h1>
-          <p className="text-gray-500">Manage audit sessions for your clients</p>
-        </div>
-        <Button 
-          onClick={() => setShowDialog(true)}
-          className="bg-emerald-500 hover:bg-emerald-600"
-          disabled={clients.length === 0}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Session
-        </Button>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Audit Sessions"
+        subtitle="Manage audit sessions for your clients"
+        breadcrumbs={[{ label: 'Sessions' }]}
+        actions={
+          <Button 
+            onClick={() => setShowDialog(true)}
+            className="bg-emerald-500 hover:bg-emerald-600 gap-1"
+            disabled={clients.length === 0}
+            data-testid="new-session-btn"
+          >
+            <Plus className="w-4 h-4" />
+            New Session
+          </Button>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
+      <div className="flex flex-col md:flex-row gap-3 mb-5">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Search sessions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white"
           />
         </div>
         <select
           value={selectedClient}
           onChange={(e) => setSelectedClient(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white min-w-[180px]"
         >
           <option value="">All Clients</option>
           {clients.map(client => (
@@ -312,16 +315,34 @@ export default function PortalSessions() {
 
       {/* Sessions List */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-32 rounded-xl bg-white border border-slate-200 animate-pulse" />
+          ))}
+        </div>
       ) : clients.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Create a client first to add sessions</p>
+        <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+          <EmptyState
+            icon={FolderOpen}
+            title="No clients yet"
+            description="Create a client first before adding audit sessions."
+            color="emerald"
+            tip="💡 Head to the Clients page to add your first client."
+          />
         </div>
       ) : filteredSessions.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderOpen className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">No sessions found</p>
+        <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+          <EmptyState
+            icon={FolderOpen}
+            title={searchQuery ? 'No matching sessions' : 'No sessions yet'}
+            description={searchQuery ? 'Try a different search term or client filter.' : 'Create your first audit session to begin scanning and variance tracking.'}
+            color="blue"
+            action={!searchQuery && clients.length > 0 && (
+              <Button onClick={() => setShowDialog(true)} className="bg-emerald-500 hover:bg-emerald-600 gap-1">
+                <Plus className="w-4 h-4" /> Create Session
+              </Button>
+            )}
+          />
         </div>
       ) : (
         <div className="space-y-4">

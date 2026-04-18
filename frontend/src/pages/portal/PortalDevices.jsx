@@ -8,6 +8,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
+import EmptyState from '../../components/portal/EmptyState';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -86,23 +88,30 @@ export default function PortalDevices() {
   };
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Devices</h1>
-        <p className="text-gray-500">Monitor connected scanner devices</p>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Devices"
+        subtitle="Monitor connected scanner devices in real time"
+        breadcrumbs={[{ label: 'Devices' }]}
+        liveLabel={devices.length > 0 ? `${devices.filter(d => isOnline(d.last_sync_at)).length} online` : null}
+      />
 
       {/* Device List */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-48 rounded-xl bg-white border border-slate-200 animate-pulse" />
+          ))}
+        </div>
       ) : devices.length === 0 ? (
-        <div className="text-center py-12">
-          <Smartphone className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500 mb-2">No devices registered yet</p>
-          <p className="text-sm text-gray-400">
-            Devices will appear here when they sync data from the scanner app
-          </p>
+        <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+          <EmptyState
+            icon={Smartphone}
+            title="No devices registered yet"
+            description="Devices will appear here automatically when they sync data from the scanner app."
+            color="violet"
+            tip="💡 Register a device from the mobile scanner app login screen."
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

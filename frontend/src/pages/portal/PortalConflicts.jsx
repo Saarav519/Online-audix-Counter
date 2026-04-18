@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import PageHeader from '../../components/portal/PageHeader';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -147,18 +148,20 @@ export default function PortalConflicts() {
   const resolvedCount = conflicts.filter(c => c.status === 'resolved').length;
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Conflict Resolution</h1>
-          <p className="text-gray-500">Resolve duplicate location scans from multiple devices</p>
-        </div>
-        <Button onClick={fetchConflicts} variant="outline" disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+    <div className="p-4 md:p-6 lg:p-8">
+      <PageHeader
+        title="Conflict Resolution"
+        subtitle="Resolve duplicate location scans from multiple devices"
+        breadcrumbs={[{ label: 'Conflicts' }]}
+        liveLabel={pendingCount > 0 ? `${pendingCount} pending` : null}
+        accentColor="amber"
+        actions={
+          <Button onClick={fetchConflicts} variant="outline" disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
