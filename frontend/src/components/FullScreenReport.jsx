@@ -91,139 +91,312 @@ export function FullScreenButton({ onClick }) {
   );
 }
 
-// ===== Inline Filter Dropdown (rendered via portal, prevents background scroll) =====
+// ===== Inline Filter Dropdown (Excel-like: draft state + Apply/Cancel + numeric sort + range) =====
 function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange, numericFilters, onNumericFilterChange, onClose, anchorRect, sortConfig, onSort }) {
   const [search, setSearch] = useState('');
-  const [focusIdx, setFocusIdx] = useState(-1);
   const dropdownRef = useRef(null);
-  const listRef = useRef(null);
+  const searchInputRef = useRef(null);
   const isNumeric = NUMERIC_KEYS.has(column);
   const currentNumeric = numericFilters?.[column] || null;
   const currentChecked = activeFilters[column];
   const isDefaultState = currentChecked === undefined || currentChecked === null;
 
-  const filteredValues = useMemo(() => {
-    if (!search) return allValues;
-    const lower = search.toLowerCase();
-    return allValues.filter(v => String(v).toLowerCase().includes(lower));
-  }, [allValues, search]);
+  // All values sorted (numeric-aware), blanks at top
+  const sortedValues = useMemo(() => {
+    const arr = (allValues || []).map(String).filter(v => v !== '');
+    const hasBlank = (allValues || []).some(v => v === '' || v === null || v === undefined);
+    if (isNumeric) {
+      arr.sort((a, b) => {
+        const na = parseFloat(a);
+        const nb = parseFloat(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+      });
+    } else {
+      arr.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' }));
+    }
+    if (hasBlank) arr.unshift('');
+    return arr;
+  }, [allValues, isNumeric]);
 
+  // DRAFT state (Excel: changes commit only on Apply)
+  const [draftChecked, setDraftChecked] = useState(() => {
+    if (isDefaultState) return null;
+    return new Set(currentChecked);
+  });
+  const [draftNumeric, setDraftNumeric] = useState(currentNumeric);
+  const initialRange = useMemo(() => {
+    const r = numericFilters?.[`${column}__range`];
+    return r || { min: '', max: '' };
+  }, [numericFilters, column]);
+  const [draftRange, setDraftRange] = useState(initialRange);
+
+  const filteredValues = useMemo(() => {
+    if (!search) return sortedValues;
+    const lower = search.toLowerCase();
+    return sortedValues.filter(v => v.toLowerCase().includes(lower) || (v === '' && '(blanks)'.includes(lower)));
+  }, [sortedValues, search]);
+
+  // Position popover
   const [pos, setPos] = useState({ top: 0, left: 0 });
   useEffect(() => {
     if (!anchorRect) return;
-    const dropW = 260, dropH = 400;
+    const dropW = 320, dropH = 480;
     const spaceBelow = window.innerHeight - anchorRect.bottom;
     const spaceRight = window.innerWidth - anchorRect.left;
     setPos({
       top: spaceBelow < dropH ? Math.max(8, anchorRect.top - dropH) : anchorRect.bottom + 4,
-      left: spaceRight < dropW ? Math.max(8, anchorRect.right - dropW) : anchorRect.left
+      left: spaceRight < dropW ? Math.max(8, anchorRect.right - dropW) : anchorRect.left,
     });
   }, [anchorRect]);
 
+  // Close on click outside (discard draft — Excel convention)
   useEffect(() => {
     const handler = (e) => { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) onClose(); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const isChecked = (strVal) => isDefaultState ? true : currentChecked.includes(strVal);
+  useEffect(() => { searchInputRef.current?.focus(); }, []);
 
-  const toggleValue = (value) => {
-    const strVal = String(value);
-    if (isDefaultState) {
-      const newChecked = allValues.map(String).filter(v => v !== strVal);
-      onFilterChange(column, newChecked);
-    } else {
-      const current = new Set(currentChecked);
-      if (current.has(strVal)) current.delete(strVal); else current.add(strVal);
-      const arr = Array.from(current);
-      onFilterChange(column, arr.length === allValues.length ? null : arr);
-    }
+  const isChecked = useCallback((strVal) => {
+    if (draftChecked === null) return true;
+    return draftChecked.has(strVal);
+  }, [draftChecked]);
+
+  const checkedCount = useMemo(() => {
+    if (draftChecked === null) return sortedValues.length;
+    return draftChecked.size;
+  }, [draftChecked, sortedValues]);
+
+  const toggleValue = (strVal) => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(sortedValues) : new Set(prev);
+      if (base.has(strVal)) base.delete(strVal);
+      else base.add(strVal);
+      return base;
+    });
   };
 
-  const selectAll = () => onFilterChange(column, null);
-  const clearAll = () => onFilterChange(column, []);
+  const selectAll = () => setDraftChecked(null);
+  const clearAll = () => setDraftChecked(new Set());
+  const selectAllInView = () => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(sortedValues) : new Set(prev);
+      filteredValues.forEach(v => base.add(v));
+      return base;
+    });
+  };
+  const clearAllInView = () => {
+    setDraftChecked(prev => {
+      const base = prev === null ? new Set(sortedValues) : new Set(prev);
+      filteredValues.forEach(v => base.delete(v));
+      return base;
+    });
+  };
+
+  const toggleNumericCondition = (condition) => {
+    setDraftNumeric(prev => (prev === condition ? null : condition));
+  };
+
+  const isDirty = useMemo(() => {
+    if (draftNumeric !== currentNumeric) return true;
+    if ((draftRange.min || '') !== (initialRange.min || '')) return true;
+    if ((draftRange.max || '') !== (initialRange.max || '')) return true;
+    if (draftChecked === null) return !isDefaultState;
+    if (isDefaultState) return true;
+    if (draftChecked.size !== (currentChecked?.length || 0)) return true;
+    for (const v of draftChecked) {
+      if (!currentChecked.includes(v)) return true;
+    }
+    return false;
+  }, [draftChecked, draftNumeric, draftRange, initialRange, currentChecked, currentNumeric, isDefaultState]);
+
+  const applyFilters = () => {
+    if (draftChecked === null || draftChecked.size === sortedValues.length) {
+      onFilterChange(column, null);
+    } else {
+      onFilterChange(column, Array.from(draftChecked));
+    }
+    if (draftNumeric !== currentNumeric) {
+      onNumericFilterChange(column, draftNumeric);
+    }
+    const hasRange = (draftRange.min !== '' || draftRange.max !== '');
+    if (hasRange) {
+      onNumericFilterChange(`${column}__range`, { ...draftRange });
+    } else if (initialRange.min !== '' || initialRange.max !== '') {
+      onNumericFilterChange(`${column}__range`, null);
+    }
+    onClose();
+  };
+
+  const displayLabel = (v) => (v === '' ? '(Blanks)' : v);
+  const sortAscLabel = isNumeric ? 'Sort Smallest → Largest' : 'Sort A → Z';
+  const sortDescLabel = isNumeric ? 'Sort Largest → Smallest' : 'Sort Z → A';
   const handleWheel = (e) => { e.stopPropagation(); };
 
   return ReactDOM.createPortal(
-    <div ref={dropdownRef} onWheel={handleWheel}
-      className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[10002] w-64 max-h-96 flex flex-col"
-      style={{ top: pos.top, left: pos.left, overscrollBehavior: 'contain' }}
+    <div
+      ref={dropdownRef}
+      onWheel={handleWheel}
+      className="fixed bg-white border border-gray-200 rounded-lg shadow-xl z-[10002] w-80 flex flex-col"
+      style={{ top: pos.top, left: pos.left, maxHeight: 480, overscrollBehavior: 'contain' }}
       onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+        else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); applyFilters(); }
+      }}
+    >
+      {/* Sort */}
       {onSort && (
         <div className="p-2 border-b border-gray-100 flex gap-1.5">
-          <button onClick={() => { onSort(column); onClose(); }}
-            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
-              sortConfig?.key === column && sortConfig?.direction === 'asc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-            <ArrowUp className="w-3 h-3" /> Sort A-Z
+          <button
+            onClick={() => { if (sortConfig?.key !== column || sortConfig?.direction !== 'asc') onSort(column, 'asc'); else onSort(column, 'asc'); onClose(); }}
+            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[11px] font-medium border transition-all ${
+              sortConfig?.key === column && sortConfig?.direction === 'asc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <ArrowUp className="w-3 h-3" /> {sortAscLabel}
           </button>
-          <button onClick={() => { if (sortConfig?.key !== column) { onSort(column); onSort(column); } else if (sortConfig?.direction === 'asc') { onSort(column); } onClose(); }}
-            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium border transition-all ${
-              sortConfig?.key === column && sortConfig?.direction === 'desc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
-            <ArrowDown className="w-3 h-3" /> Sort Z-A
+          <button
+            onClick={() => { onSort(column, 'desc'); onClose(); }}
+            className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[11px] font-medium border transition-all ${
+              sortConfig?.key === column && sortConfig?.direction === 'desc' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <ArrowDown className="w-3 h-3" /> {sortDescLabel}
           </button>
         </div>
       )}
+
+      {/* Numeric filters */}
       {isNumeric && (
         <div className="p-2 border-b border-gray-100">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Value Filter</p>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 mb-2">
             {NUMERIC_CONDITIONS.map(cond => (
               <button key={cond.value}
-                onClick={() => { if (currentNumeric === cond.value) onNumericFilterChange(column, null); else onNumericFilterChange(column, cond.value); }}
+                onClick={() => toggleNumericCondition(cond.value)}
                 className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold border transition-all ${
-                  currentNumeric === cond.value
-                    ? cond.value === 'lt0' ? 'bg-red-500 text-white border-red-500' : cond.value === 'gt0' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-blue-500 text-white border-blue-500'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                  draftNumeric === cond.value
+                    ? cond.value === 'lt0' ? 'bg-red-500 text-white border-red-500'
+                      : cond.value === 'gt0' ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
                 {cond.label}
               </button>
             ))}
           </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              placeholder="Min"
+              value={draftRange.min}
+              onChange={(e) => setDraftRange(r => ({ ...r, min: e.target.value }))}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+            />
+            <span className="text-[10px] text-gray-400">to</span>
+            <input
+              type="number"
+              placeholder="Max"
+              value={draftRange.max}
+              onChange={(e) => setDraftRange(r => ({ ...r, max: e.target.value }))}
+              onKeyDown={(e) => e.stopPropagation()}
+              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+            />
+          </div>
         </div>
       )}
+
+      {/* Search */}
       <div className="p-2 border-b border-gray-100">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input type="text" value={search}
-            onChange={(e) => { setSearch(e.target.value); setFocusIdx(-1); }}
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search values..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
               e.stopPropagation();
-              if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(0); listRef.current?.querySelector('[data-fi="0"]')?.focus(); }
-              if (e.key === 'Enter' && search.trim()) { onFilterChange(column, filteredValues.map(String)); onClose(); }
               if (e.key === 'Escape') { onClose(); }
             }}
-            placeholder="Search..." autoFocus
-            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300" />
+            className="w-full pl-7 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+          />
         </div>
-        <div className="flex gap-2 mt-1.5">
-          <button className="text-xs text-emerald-600 hover:underline" onClick={selectAll}>Select All</button>
-          <button className="text-xs text-red-500 hover:underline" onClick={clearAll}>Clear All</button>
+        <div className="flex items-center justify-between mt-1.5 text-[10px]">
+          <span className="text-gray-500">
+            Showing <strong className="text-gray-700">{filteredValues.length.toLocaleString()}</strong> of <strong className="text-gray-700">{sortedValues.length.toLocaleString()}</strong>
+          </span>
+          <div className="flex gap-2">
+            <button className="text-emerald-600 hover:underline font-medium" onClick={search ? selectAllInView : selectAll}>
+              {search ? 'Select shown' : 'Select all'}
+            </button>
+            <button className="text-red-500 hover:underline font-medium" onClick={search ? clearAllInView : clearAll}>
+              {search ? 'Clear shown' : 'Clear all'}
+            </button>
+          </div>
         </div>
       </div>
-      <div className="overflow-y-auto flex-1 p-1.5" ref={listRef}
-        style={{ overscrollBehavior: 'contain' }}
-        onWheel={handleWheel}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          const max = filteredValues.length - 1;
-          if (e.key === 'ArrowDown') { e.preventDefault(); const n = Math.min(max, focusIdx + 1); setFocusIdx(n); listRef.current?.querySelector(`[data-fi="${n}"]`)?.focus(); }
-          if (e.key === 'ArrowUp') { e.preventDefault(); const n = Math.max(0, focusIdx - 1); setFocusIdx(n); listRef.current?.querySelector(`[data-fi="${n}"]`)?.focus(); }
-          if ((e.key === 'Enter' || e.key === ' ') && focusIdx >= 0) { e.preventDefault(); toggleValue(filteredValues[focusIdx]); }
-          if (e.key === 'Escape') { onClose(); }
-        }}>
-        {filteredValues.map((val, i) => {
-          const strVal = String(val);
-          return (
-            <div key={i} data-fi={i} tabIndex={0}
-              className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs outline-none ${focusIdx === i ? 'bg-blue-50 ring-1 ring-blue-300' : 'hover:bg-gray-50'}`}
-              onClick={() => toggleValue(strVal)} onFocus={() => setFocusIdx(i)}>
-              <input type="checkbox" checked={isChecked(strVal)} readOnly className="rounded border-gray-300 text-emerald-500 w-3.5 h-3.5 pointer-events-none" />
-              <span className="truncate">{strVal || '(empty)'}</span>
-            </div>
-          );
-        })}
-        {filteredValues.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No values</p>}
+
+      {/* Values list */}
+      <div className="overflow-y-auto flex-1 p-1.5" style={{ overscrollBehavior: 'contain', minHeight: 120 }} onWheel={handleWheel}>
+        {filteredValues.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-6">No matching values</p>
+        ) : (
+          filteredValues.map((strVal, i) => {
+            const checked = isChecked(strVal);
+            const isBlank = strVal === '';
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs hover:bg-gray-50 ${checked ? '' : 'opacity-60'}`}
+                onClick={() => toggleValue(strVal)}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  readOnly
+                  className="rounded border-gray-300 text-emerald-500 w-3.5 h-3.5 pointer-events-none shrink-0"
+                />
+                <span className={`truncate ${isBlank ? 'italic text-gray-500' : ''}`}>{displayLabel(strVal)}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Footer: Apply / Cancel */}
+      <div className="p-2 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+        <span className="text-[10px] text-gray-600">
+          {checkedCount === sortedValues.length
+            ? <span className="text-emerald-600 font-semibold">All selected</span>
+            : <span><strong className="text-gray-800">{checkedCount.toLocaleString()}</strong> / {sortedValues.length.toLocaleString()} selected</span>}
+          {isDirty && <span className="ml-1.5 text-amber-600 font-semibold">• unsaved</span>}
+        </span>
+        <div className="flex gap-1.5">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 text-xs font-medium rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={applyFilters}
+            disabled={!isDirty}
+            className={`px-3 py-1 text-xs font-semibold rounded border transition-all ${
+              isDirty
+                ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+            }`}
+          >
+            Apply
+          </button>
+        </div>
       </div>
     </div>,
     document.body
