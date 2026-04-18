@@ -61,10 +61,10 @@ export default function NotificationBell() {
         type="button"
         onClick={() => setOpen(!open)}
         data-testid="notification-bell-btn"
-        className="relative w-9 h-9 rounded-lg bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-800 transition-all"
+        className="relative w-8 h-8 rounded-md bg-white border border-slate-200 hover:border-slate-300 hover:shadow-sm flex items-center justify-center text-slate-600 hover:text-slate-800 transition-all"
         aria-label="Notifications"
       >
-        <Bell className="w-4 h-4" strokeWidth={2} />
+        <Bell className="w-3.5 h-3.5" strokeWidth={2} />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-white">
             {unread > 9 ? '9+' : unread}
