@@ -289,23 +289,23 @@ function InlineFilterDropdown({ column, allValues, activeFilters, onFilterChange
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 w-full">
             <input
               type="number"
               placeholder="Min"
               value={draftRange.min}
               onChange={(e) => setDraftRange(r => ({ ...r, min: e.target.value }))}
               onKeyDown={(e) => e.stopPropagation()}
-              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+              className="flex-1 min-w-0 w-0 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
             />
-            <span className="text-[10px] text-gray-400">to</span>
+            <span className="text-[10px] text-gray-400 shrink-0">to</span>
             <input
               type="number"
               placeholder="Max"
               value={draftRange.max}
               onChange={(e) => setDraftRange(r => ({ ...r, max: e.target.value }))}
               onKeyDown={(e) => e.stopPropagation()}
-              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
+              className="flex-1 min-w-0 w-0 px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-300"
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 // Audix Stock Management - Offline-First Service Worker
 // Works completely offline without any internet connection
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `audix-app-${CACHE_VERSION}`;
 
 // Install event - just activate immediately
