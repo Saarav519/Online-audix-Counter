@@ -12,6 +12,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { useAudit } from '../AuditApp';
 
 const navItems = [
   { to: '/portal/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -24,13 +25,14 @@ const navItems = [
   { to: '/portal/users', icon: Users, label: 'Users' },
 ];
 
-export default function PortalLayout() {
+export default function PortalLayout({ children }) {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('portalUser') || '{}');
+  const user = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+
+  const { logout } = useAudit();
 
   const handleLogout = () => {
-    localStorage.removeItem('portalUser');
-    localStorage.removeItem('portalAuth');
+    logout();
     navigate('/portal');
   };
 
@@ -99,7 +101,7 @@ export default function PortalLayout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <Outlet />
+        {children || <Outlet />}
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import ReactDOM from 'react-dom';
-import * as XLSX from 'xlsx';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
   FileBarChart, 
   Download,
@@ -29,6 +29,7 @@ import {
   Smartphone,
   Send
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { FullScreenButton, FullScreenReport } from '../../components/FullScreenReport';
@@ -78,6 +79,9 @@ const NUMERIC_CONDITIONS = [
   { value: 'gt0', label: '> 0', desc: 'Greater than zero' },
 ];
 
+// Safely get numeric value (handles null, undefined, NaN without treating 0 as falsy)
+const n = (v) => (v != null && !isNaN(v)) ? Number(v) : 0;
+
 // Recalculate totals from filtered rows
 function recalcTotals(rows, reportType) {
   if (!rows || rows.length === 0) return null;
@@ -85,22 +89,23 @@ function recalcTotals(rows, reportType) {
     stock_value_mrp: 0, stock_value_cost: 0, physical_value_mrp: 0, physical_value_cost: 0,
     final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0, item_count: 0 };
   rows.forEach(row => {
-    totals.stock_qty += (row.stock_qty || 0);
-    totals.physical_qty += (row.physical_qty || 0);
-    totals.reco_qty += (row.reco_qty || 0);
-    totals.final_qty += (row.final_qty || row.physical_qty || 0);
-    const d = row.diff_qty !== undefined ? row.diff_qty : (row.difference_qty || 0);
+    totals.stock_qty += n(row.stock_qty);
+    totals.physical_qty += n(row.physical_qty);
+    totals.reco_qty += n(row.reco_qty);
+    // final_qty = physical_qty + reco_qty; use row value if present, else compute
+    totals.final_qty += (row.final_qty != null ? n(row.final_qty) : n(row.physical_qty) + n(row.reco_qty));
+    const d = row.diff_qty != null ? n(row.diff_qty) : n(row.difference_qty);
     totals.diff_qty += d;
     totals.difference_qty += d;
-    totals.stock_value_mrp += (row.stock_value_mrp || 0);
-    totals.stock_value_cost += (row.stock_value_cost || 0);
-    totals.physical_value_mrp += (row.physical_value_mrp || 0);
-    totals.physical_value_cost += (row.physical_value_cost || 0);
-    totals.final_value_mrp += (row.final_value_mrp || 0);
-    totals.final_value_cost += (row.final_value_cost || 0);
-    totals.diff_value_mrp += (row.diff_value_mrp || 0);
-    totals.diff_value_cost += (row.diff_value_cost || 0);
-    totals.item_count += (row.item_count || 0);
+    totals.stock_value_mrp += n(row.stock_value_mrp);
+    totals.stock_value_cost += n(row.stock_value_cost);
+    totals.physical_value_mrp += n(row.physical_value_mrp);
+    totals.physical_value_cost += n(row.physical_value_cost);
+    totals.final_value_mrp += n(row.final_value_mrp);
+    totals.final_value_cost += n(row.final_value_cost);
+    totals.diff_value_mrp += n(row.diff_value_mrp);
+    totals.diff_value_cost += n(row.diff_value_cost);
+    totals.item_count += n(row.item_count);
   });
   totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.final_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.final_qty === 0 ? 100 : 0);
   return totals;
@@ -401,6 +406,8 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
   );
 }
 
+const MAX_VISIBLE_ROWS = 500;
+
 export default function PortalReports() {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -418,7 +425,11 @@ export default function PortalReports() {
   const [hiddenColumns, setHiddenColumns] = useState(new Set());
   const [frozenColumns, setFrozenColumns] = useState(new Set());
   const tableContainerRef = useRef(null);
-  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true, has_article_code: false, has_article_name: false });
+  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true });
+  const [visibleRowCount, setVisibleRowCount] = useState(MAX_VISIBLE_ROWS);
+
+  // Report cache: stores fetched data keyed by `${sessionId}_${reportType}`
+  const reportCache = useRef({});
 
   useEffect(() => {
     fetchClients();
@@ -427,8 +438,9 @@ export default function PortalReports() {
   useEffect(() => {
     if (selectedClient) {
       fetchSessions(selectedClient);
-      // Fetch schema to determine MRP/Cost visibility
       fetchSchemaValueFields(selectedClient);
+      // Invalidate report cache when client changes
+      reportCache.current = {};
     }
   }, [selectedClient]);
 
@@ -465,12 +477,7 @@ export default function PortalReports() {
     setSortConfig({ key: null, direction: 'asc' });
     setColumnFilters({});
     setNumericFilters({});
-  }, [selectedSession, reportType]);
-
-  useEffect(() => {
-    if (selectedSession && reportType) {
-      fetchReport();
-    }
+    setVisibleRowCount(MAX_VISIBLE_ROWS);
   }, [selectedSession, reportType]);
 
   // Sort handler
@@ -576,6 +583,24 @@ export default function PortalReports() {
     return { report: rows, totals: totals || reportData.totals, summary: reportData.summary };
   }, [reportData, varianceCategory, columnFilters, numericFilters, sortConfig, reportType]);
 
+  // Display data with row limiting for performance (don't render 18k+ DOM rows)
+  const displayData = useMemo(() => {
+    if (!filteredData) return null;
+    if (reportType === 'pending-locations' || reportType === 'empty-bins') return filteredData;
+    if (!filteredData.report) return filteredData;
+    const totalRows = filteredData.report.length;
+    if (totalRows <= visibleRowCount) return filteredData;
+    return { ...filteredData, report: filteredData.report.slice(0, visibleRowCount), _totalFilteredRows: totalRows };
+  }, [filteredData, visibleRowCount, reportType]);
+
+  const hasMoreRows = filteredData?.report?.length > visibleRowCount;
+  const loadMoreRows = useCallback(() => {
+    setVisibleRowCount(prev => prev + MAX_VISIBLE_ROWS);
+  }, []);
+  const showAllRows = useCallback(() => {
+    if (filteredData?.report) setVisibleRowCount(filteredData.report.length);
+  }, [filteredData]);
+
   // Get unique values for a column (from unfiltered data, for column filter dropdowns)
   const getColumnValues = useCallback((column) => {
     if (!reportData || !reportData.report) return [];
@@ -634,37 +659,53 @@ export default function PortalReports() {
         fields.forEach(f => { fieldMap[f.name] = f; });
         setSchemaValueFields({
           has_mrp: fieldMap.mrp ? fieldMap.mrp.enabled : true,
-          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true,
-          has_article_code: fieldMap.article_code ? fieldMap.article_code.enabled : false,
-          has_article_name: fieldMap.article_name ? fieldMap.article_name.enabled : false
+          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true
         });
       }
     } catch (error) {
       console.error('Failed to fetch schema:', error);
-      setSchemaValueFields({ has_mrp: true, has_cost: true, has_article_code: false, has_article_name: false });
+      setSchemaValueFields({ has_mrp: true, has_cost: true });
     }
   };
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async (forceRefresh = false) => {
     if (!selectedSession || !reportType) return;
+    
+    const cacheKey = `${selectedSession}_${reportType}`;
+    
+    // Check cache first (unless forced refresh)
+    if (!forceRefresh && reportCache.current[cacheKey]) {
+      setReportData(reportCache.current[cacheKey]);
+      return;
+    }
+    
     setLoading(true);
     try {
       let response;
       if (selectedSession === '__consolidated__') {
-        // Consolidated: fetch from all sessions endpoint
         response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/consolidated/${selectedClient}/${reportType}`);
       } else {
         response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/${selectedSession}/${reportType}`);
       }
       if (response.ok) {
-        setReportData(await response.json());
+        const data = await response.json();
+        // Store in cache
+        reportCache.current[cacheKey] = data;
+        setReportData(data);
       }
     } catch (error) {
       console.error('Failed to fetch report:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSession, reportType, selectedClient]);
+
+  // Effect to fetch report when session or report type changes
+  useEffect(() => {
+    if (selectedSession && reportType) {
+      fetchReport();
+    }
+  }, [selectedSession, reportType, fetchReport]);
 
   const saveRecoAdjustment = async (params) => {
     try {
@@ -672,6 +713,10 @@ export default function PortalReports() {
       const body = { client_id: selectedClient, ...params };
       const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
+        // Invalidate all cached reports for this session (reco affects multiple report types)
+        Object.keys(reportCache.current).forEach(key => {
+          if (key.startsWith(`${selectedSession}_`)) delete reportCache.current[key];
+        });
         // Optimistic local state update - no full page refresh
         setReportData(prev => {
           if (!prev || !prev.report) return prev;
@@ -702,19 +747,19 @@ export default function PortalReports() {
             stock_value_mrp: 0, stock_value_cost: 0, physical_value_mrp: 0, physical_value_cost: 0,
             final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0 };
           updated.report.forEach(r => {
-            t.stock_qty += (r.stock_qty || 0);
-            t.physical_qty += (r.physical_qty || 0);
-            t.reco_qty += (r.reco_qty || 0);
-            t.final_qty += (r.final_qty || r.physical_qty || 0);
-            t.diff_qty += (r.diff_qty || 0);
-            t.stock_value_mrp += (r.stock_value_mrp || 0);
-            t.stock_value_cost += (r.stock_value_cost || 0);
-            t.physical_value_mrp += (r.physical_value_mrp || 0);
-            t.physical_value_cost += (r.physical_value_cost || 0);
-            t.final_value_mrp += (r.final_value_mrp || 0);
-            t.final_value_cost += (r.final_value_cost || 0);
-            t.diff_value_mrp += (r.diff_value_mrp || 0);
-            t.diff_value_cost += (r.diff_value_cost || 0);
+            t.stock_qty += n(r.stock_qty);
+            t.physical_qty += n(r.physical_qty);
+            t.reco_qty += n(r.reco_qty);
+            t.final_qty += (r.final_qty != null ? n(r.final_qty) : n(r.physical_qty) + n(r.reco_qty));
+            t.diff_qty += n(r.diff_qty);
+            t.stock_value_mrp += n(r.stock_value_mrp);
+            t.stock_value_cost += n(r.stock_value_cost);
+            t.physical_value_mrp += n(r.physical_value_mrp);
+            t.physical_value_cost += n(r.physical_value_cost);
+            t.final_value_mrp += n(r.final_value_mrp);
+            t.final_value_cost += n(r.final_value_cost);
+            t.diff_value_mrp += n(r.diff_value_mrp);
+            t.diff_value_cost += n(r.diff_value_cost);
           });
           t.accuracy_pct = t.stock_qty > 0 ? Math.round((Math.min(t.final_qty, t.stock_qty) / t.stock_qty) * 1000) / 10 : (t.final_qty === 0 ? 100 : 0);
           updated.totals = { ...prev.totals, ...t };
@@ -796,18 +841,7 @@ export default function PortalReports() {
 
   const columnConfig = useMemo(() => {
     const ec = extraColumns.map(c => ({ key: c.name, label: c.label }));
-    const { has_mrp, has_cost, has_article_code } = schemaValueFields;
-    
-    // Schema-based standard columns that are optionally shown
-    const articleCols = [];
-    if (has_article_code) {
-      articleCols.push({ key: 'article_code', label: 'Article Code' });
-    }
-    // Check article_name from schema too
-    const hasArticleName = schemaValueFields.has_article_name;
-    if (hasArticleName) {
-      articleCols.push({ key: 'article_name', label: 'Article Name' });
-    }
+    const { has_mrp, has_cost } = schemaValueFields;
     
     // Helper to conditionally include MRP/Cost value columns
     const valCols = (prefix, mrpLabel, costLabel) => {
@@ -840,13 +874,12 @@ export default function PortalReports() {
           { key: 'barcode', label: 'Barcode' },
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
-          ...articleCols,
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical Qty' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
-          ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -861,13 +894,12 @@ export default function PortalReports() {
           { key: 'barcode', label: 'Barcode' },
           { key: 'description', label: 'Description' },
           { key: 'category', label: 'Category' },
-          ...articleCols,
           ...ec,
           { key: 'stock_qty', label: 'Stock Qty' },
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
-          ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -889,7 +921,7 @@ export default function PortalReports() {
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
-          ...(isConsolidatedView ? [{ key: 'reco', label: 'Reco' }] : []),
+          ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -1003,7 +1035,7 @@ export default function PortalReports() {
     });
 
     setColumnStyleCSS(css);
-  }, [hiddenColumns, frozenColumns, reportType, filteredData, selectedSession]);
+  }, [hiddenColumns, frozenColumns, reportType, displayData, selectedSession]);
 
   const toggleColumnVisibility = useCallback((colKey) => {
     setHiddenColumns(prev => {
@@ -1038,131 +1070,147 @@ export default function PortalReports() {
     setFrozenColumns(new Set());
   }, []);
 
-  const exportCSV = () => {
+  const exportReport = () => {
     if (!filteredData) return;
 
     const rows = filteredData.report || [];
+    if (rows.length === 0) { toast.error('No data to export'); return; }
+
+    // Build export columns — include mrp/cost as data columns for formulas
     const visibleCols = columnConfig.filter(c => c.key !== '_expand' && !hiddenColumns.has(c.key));
     
-    // Helper: column index to Excel letter (0=A, 1=B, ..., 25=Z, 26=AA)
+    // Determine which extra "source" columns to add (mrp, cost) that formulas need
+    const visibleKeys = new Set(visibleCols.map(c => c.key));
+    const needsMrp = ['stock_value_mrp', 'physical_value_mrp', 'final_value_mrp', 'diff_value_mrp'].some(k => visibleKeys.has(k));
+    const needsCost = ['stock_value_cost', 'physical_value_cost', 'final_value_cost', 'diff_value_cost'].some(k => visibleKeys.has(k));
+    
+    const exportCols = [...visibleCols];
+    if (needsMrp && !visibleKeys.has('mrp')) exportCols.push({ key: 'mrp', label: 'MRP' });
+    if (needsCost && !visibleKeys.has('cost')) exportCols.push({ key: 'cost', label: 'Cost' });
+
+    // Map column key → Excel column letter
     const colLetter = (idx) => {
       let s = '';
       let n = idx;
-      while (n >= 0) {
-        s = String.fromCharCode(65 + (n % 26)) + s;
-        n = Math.floor(n / 26) - 1;
-      }
+      while (n >= 0) { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; }
       return s;
     };
+    const keyToCol = {};
+    exportCols.forEach((c, i) => { keyToCol[c.key] = colLetter(i); });
 
-    // Find column indices for formula references
-    const colIdx = {};
-    visibleCols.forEach((c, i) => { colIdx[c.key] = i; });
+    // Formula columns mapping
+    const formulaKeys = {
+      'stock_value_mrp':    (r) => keyToCol['stock_qty'] && keyToCol['mrp'] ? `${keyToCol['stock_qty']}${r}*${keyToCol['mrp']}${r}` : null,
+      'stock_value_cost':   (r) => keyToCol['stock_qty'] && keyToCol['cost'] ? `${keyToCol['stock_qty']}${r}*${keyToCol['cost']}${r}` : null,
+      'physical_value_mrp': (r) => keyToCol['physical_qty'] && keyToCol['mrp'] ? `${keyToCol['physical_qty']}${r}*${keyToCol['mrp']}${r}` : null,
+      'physical_value_cost':(r) => keyToCol['physical_qty'] && keyToCol['cost'] ? `${keyToCol['physical_qty']}${r}*${keyToCol['cost']}${r}` : null,
+      'final_qty':          (r) => keyToCol['physical_qty'] && keyToCol['reco_qty'] ? `${keyToCol['physical_qty']}${r}+${keyToCol['reco_qty']}${r}` : null,
+      'final_value_mrp':    (r) => keyToCol['final_qty'] && keyToCol['mrp'] ? `${keyToCol['final_qty']}${r}*${keyToCol['mrp']}${r}` : null,
+      'final_value_cost':   (r) => keyToCol['final_qty'] && keyToCol['cost'] ? `${keyToCol['final_qty']}${r}*${keyToCol['cost']}${r}` : null,
+      'diff_qty':           (r) => {
+        const physCol = keyToCol['final_qty'] || keyToCol['physical_qty'];
+        return physCol && keyToCol['stock_qty'] ? `${physCol}${r}-${keyToCol['stock_qty']}${r}` : null;
+      },
+      'difference_qty':     (r) => {
+        const physCol = keyToCol['final_qty'] || keyToCol['physical_qty'];
+        return physCol && keyToCol['stock_qty'] ? `${physCol}${r}-${keyToCol['stock_qty']}${r}` : null;
+      },
+      'diff_value_mrp':     (r) => {
+        const fvCol = keyToCol['final_value_mrp'] || keyToCol['physical_value_mrp'];
+        return fvCol && keyToCol['stock_value_mrp'] ? `${fvCol}${r}-${keyToCol['stock_value_mrp']}${r}` : null;
+      },
+      'diff_value_cost':    (r) => {
+        const fvCol = keyToCol['final_value_cost'] || keyToCol['physical_value_cost'];
+        return fvCol && keyToCol['stock_value_cost'] ? `${fvCol}${r}-${keyToCol['stock_value_cost']}${r}` : null;
+      },
+      'accuracy_pct':       (r) => {
+        const sqCol = keyToCol['stock_qty'];
+        const pqCol = keyToCol['final_qty'] || keyToCol['physical_qty'];
+        return sqCol && pqCol ? `IF(${sqCol}${r}=0,IF(${pqCol}${r}=0,100,0),MIN(${pqCol}${r}/${sqCol}${r}*100,100))` : null;
+      },
+    };
 
+    // Text/non-formula columns
+    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark']);
+
+    // Build worksheet
     const wb = XLSX.utils.book_new();
     const wsData = [];
 
     // Header row
-    wsData.push(visibleCols.map(c => c.label));
+    wsData.push(exportCols.map(c => c.label));
 
-    // Data rows with formulas
-    rows.forEach((row, ri) => {
-      const excelRow = ri + 2; // Excel row (1-indexed, +1 for header)
-      const rowData = visibleCols.map((col, ci) => {
+    // Data rows (with raw values — formulas will be overlaid)
+    rows.forEach(row => {
+      wsData.push(exportCols.map(col => {
         let val = row[col.key];
-        if (col.key === 'status') {
-          return val === 'empty_bin' ? 'Empty Bin' : val === 'pending' ? 'Pending' : val === 'conflict' ? 'Conflict' : 'Completed';
-        }
-        if (col.key === 'barcode_count') {
-          return row.barcodes ? row.barcodes.length : (val || 0);
-        }
-        if (val === undefined || val === null) return '';
+        if (col.key === 'status') val = val === 'empty_bin' ? 'Empty Bin' : val === 'pending' ? 'Pending' : val === 'conflict' ? 'Conflict' : 'Completed';
+        if (col.key === 'barcode_count') val = row.barcodes ? row.barcodes.length : (val || 0);
+        if (val === undefined || val === null) val = '';
         return val;
-      });
-      wsData.push(rowData);
+      }));
     });
 
-    // Total row placeholder
-    const totalRowIdx = rows.length + 1; // 0-indexed in wsData
-    if (rows.length > 0) {
-      const totalRow = visibleCols.map(() => '');
-      totalRow[0] = 'TOTAL';
-      wsData.push(totalRow);
-    }
+    // Totals row placeholder
+    wsData.push(exportCols.map(() => ''));
 
-    // Create worksheet from data
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-    // Now inject formulas into cells
-    const dataStartRow = 2; // Excel row where data starts
-    const dataEndRow = rows.length + 1; // Last data row in Excel
+    // Overlay formulas on data rows
+    const dataStartRow = 2; // row 1 = header (1-indexed in Excel)
+    const dataEndRow = dataStartRow + rows.length - 1;
+    const totalsRow = dataEndRow + 1;
 
-    // Determine formula columns based on what's available
-    const stockCol = colIdx['stock_qty'] !== undefined ? colLetter(colIdx['stock_qty']) : null;
-    const physCol = colIdx['physical_qty'] !== undefined ? colLetter(colIdx['physical_qty']) : null;
-    const finalCol = colIdx['final_qty'] !== undefined ? colLetter(colIdx['final_qty']) : null;
-    const recoCol = colIdx['reco_qty'] !== undefined ? colLetter(colIdx['reco_qty']) : (colIdx['reco'] !== undefined ? colLetter(colIdx['reco']) : null);
-    const effectivePhysCol = finalCol || physCol; // Use final_qty if available, else physical_qty
-
-    // Add formulas for each data row
     for (let ri = 0; ri < rows.length; ri++) {
-      const excelRow = ri + 2;
-
-      // Difference formula: = Final/Physical - Stock
-      const diffKey = colIdx['difference_qty'] !== undefined ? 'difference_qty' : (colIdx['diff_qty'] !== undefined ? 'diff_qty' : null);
-      if (diffKey && stockCol && effectivePhysCol) {
-        const cellRef = colLetter(colIdx[diffKey]) + excelRow;
-        ws[cellRef] = { f: `${effectivePhysCol}${excelRow}-${stockCol}${excelRow}` };
-      }
-
-      // Final Qty formula: = Physical + Reco (if both exist)
-      if (finalCol && physCol && recoCol) {
-        const cellRef = finalCol + excelRow;
-        ws[cellRef] = { f: `${physCol}${excelRow}+${recoCol}${excelRow}` };
-      }
-
-      // Accuracy formula: = IF(Stock>0, MIN(Effective,Stock)/Stock*100, IF(Effective=0,100,0))
-      if (colIdx['accuracy_pct'] !== undefined && stockCol && effectivePhysCol) {
-        const accCol = colLetter(colIdx['accuracy_pct']);
-        const cellRef = accCol + excelRow;
-        ws[cellRef] = { f: `IF(${stockCol}${excelRow}>0,ROUND(MIN(${effectivePhysCol}${excelRow},${stockCol}${excelRow})/${stockCol}${excelRow}*100,1),IF(${effectivePhysCol}${excelRow}=0,100,0))` };
-      }
-
-      // Value formulas: stock_value = stock_qty * mrp/cost etc.
-      // These depend on mrp/cost being in the data but NOT in columns, so we keep calculated values
-    }
-
-    // Total row formulas (SUM for numeric columns)
-    if (rows.length > 0) {
-      const totalExcelRow = dataEndRow + 1;
-      visibleCols.forEach((col, ci) => {
-        if (NUMERIC_COLUMNS.has(col.key) && col.key !== 'accuracy_pct') {
-          const cl = colLetter(ci);
-          const cellRef = cl + totalExcelRow;
-          ws[cellRef] = { f: `SUM(${cl}${dataStartRow}:${cl}${dataEndRow})` };
+      const excelRow = dataStartRow + ri;
+      exportCols.forEach((col, ci) => {
+        const cellRef = `${colLetter(ci)}${excelRow}`;
+        if (formulaKeys[col.key]) {
+          const formula = formulaKeys[col.key](excelRow);
+          if (formula) {
+            const currentVal = rows[ri][col.key];
+            ws[cellRef] = { t: 'n', f: formula, v: typeof currentVal === 'number' ? currentVal : 0 };
+          }
         }
       });
-      // Accuracy in total row
-      if (colIdx['accuracy_pct'] !== undefined && stockCol && effectivePhysCol) {
-        const accCol = colLetter(colIdx['accuracy_pct']);
-        const totalStockRef = `${stockCol}${totalExcelRow}`;
-        const totalEffRef = `${effectivePhysCol}${totalExcelRow}`;
-        ws[accCol + totalExcelRow] = { f: `IF(${totalStockRef}>0,ROUND(MIN(${totalEffRef},${totalStockRef})/${totalStockRef}*100,1),IF(${totalEffRef}=0,100,0))` };
-      }
     }
 
-    // Set column widths
-    ws['!cols'] = visibleCols.map(col => {
-      if (col.key === 'description' || col.key === 'remark' || col.key === 'article_name') return { wch: 30 };
-      if (col.key === 'barcode' || col.key === 'location') return { wch: 18 };
-      if (col.key === 'category' || col.key === 'article_code') return { wch: 15 };
-      return { wch: 12 };
+    // Totals row with SUM formulas
+    exportCols.forEach((col, ci) => {
+      const cellRef = `${colLetter(ci)}${totalsRow}`;
+      if (ci === 0) {
+        ws[cellRef] = { t: 's', v: 'TOTAL' };
+      } else if (textKeys.has(col.key) || col.key === 'barcode_count') {
+        ws[cellRef] = { t: 's', v: '' };
+      } else if (col.key === 'accuracy_pct') {
+        const sqCol = keyToCol['stock_qty'];
+        const pqCol = keyToCol['final_qty'] || keyToCol['physical_qty'];
+        if (sqCol && pqCol) {
+          const formula = `IF(${sqCol}${totalsRow}=0,IF(${pqCol}${totalsRow}=0,100,0),MIN(${pqCol}${totalsRow}/${sqCol}${totalsRow}*100,100))`;
+          ws[cellRef] = { t: 'n', f: formula, v: filteredData.totals?.accuracy_pct || 0 };
+        }
+      } else {
+        const sumFormula = `SUM(${colLetter(ci)}${dataStartRow}:${colLetter(ci)}${dataEndRow})`;
+        const fallbackVal = filteredData.totals?.[col.key] || 0;
+        ws[cellRef] = { t: 'n', f: sumFormula, v: typeof fallbackVal === 'number' ? fallbackVal : 0 };
+      }
     });
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    // Set column widths
+    ws['!cols'] = exportCols.map(col => {
+      if (textKeys.has(col.key)) return { wch: col.key === 'description' ? 30 : col.key === 'remark' ? 25 : 15 };
+      return { wch: 14 };
+    });
+
+    // Update sheet range
+    ws['!ref'] = `A1:${colLetter(exportCols.length - 1)}${totalsRow}`;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Variance Report');
+
     const suffix = varianceCategory !== 'all' ? `_${varianceCategory}` : '';
-    XLSX.writeFile(wb, `${reportType}_report${suffix}_${selectedSession}.xlsx`);
-    toast.success(`Report exported as Excel! (${rows.length} rows with formulas)`);
+    const filename = `${reportType}_report${suffix}_${selectedSession}.xlsx`;
+    XLSX.writeFile(wb, filename);
+    toast.success(`Report exported with formulas! (${rows.length} rows)`);
   };
 
   const getVarianceIcon = (value) => {
@@ -1224,7 +1272,7 @@ export default function PortalReports() {
             />
           )}
           {filteredData && (
-            <Button onClick={exportCSV} variant="outline">
+            <Button onClick={exportReport} variant="outline">
               <Download className="w-4 h-4 mr-2" />
               Export Excel
             </Button>
@@ -1354,12 +1402,28 @@ export default function PortalReports() {
           {/* Report Table — Reco editing only on the primary report type for the session's variance mode */}
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
-          {reportType === 'bin-wise' && <BinWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
-          {reportType === 'detailed' && <DetailedTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
-          {reportType === 'category-summary' && <CategorySummaryTable data={filteredData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
+          {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
+          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isConsolidatedView} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise'} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={fetchReport} />}
+          {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isConsolidatedView} />}
           </div>
+          {/* Load More button for large datasets */}
+          {hasMoreRows && reportType !== 'empty-bins' && reportType !== 'pending-locations' && (
+            <div className="mt-3 bg-white rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+              <span className="text-sm text-gray-500">
+                Showing {visibleRowCount} of {filteredData.report.length} rows
+              </span>
+              <div className="flex gap-2">
+                <Button onClick={loadMoreRows} variant="outline" size="sm">
+                  Load {Math.min(MAX_VISIBLE_ROWS, filteredData.report.length - visibleRowCount)} More
+                </Button>
+                <Button onClick={showAllRows} variant="outline" size="sm" className="text-emerald-600 border-emerald-300 hover:bg-emerald-50">
+                  Show All ({filteredData.report.length})
+                </Button>
+              </div>
+            </div>
+          )}
           {reportType === 'empty-bins' && <EmptyBinsView data={reportData} />}
           {reportType === 'pending-locations' && <PendingLocationsView data={reportData} clientId={selectedClient} />}
         </>
@@ -1370,7 +1434,7 @@ export default function PortalReports() {
         open={isFullScreen}
         onClose={() => setIsFullScreen(false)}
         title={`${reportOptions.find(o => o.value === reportType)?.label || reportType} — ${sessions.find(s => s.id === selectedSession)?.name || 'All Consolidated'}`}
-        onExport={exportCSV}
+        onExport={exportReport}
         gridData={filteredData?.report || []}
         gridTotals={filteredData?.totals || null}
         gridColumns={columnConfig}
@@ -1586,6 +1650,13 @@ function RecoInput({ value, onSave, dataTestId }) {
 // ============ Detailed Item-wise Table ============
 function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh }) {
   const t = data.totals || {};
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: data.report.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 36,
+    overscan: 20,
+  });
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1593,7 +1664,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
         {isRecoEditable && <p className="text-xs text-gray-500 mt-1">Click the Reco column to adjust quantities. Final Qty = Physical + Reco.</p>}
         {isConsolidated && !isRecoEditable && <p className="text-xs text-gray-500 mt-1">Reco Qty and Final Qty shown from consolidated adjustments (read-only).</p>}
       </div>
-      <div className="overflow-auto max-h-[70vh]">
+      <div ref={parentRef} className="overflow-auto max-h-[70vh]">
         <table className="min-w-full text-xs report-table">
           <thead className="bg-gray-50">
             <tr>
@@ -1633,7 +1704,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              {isRecoEditable && <th data-col="reco" className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              {isRecoEditable && <SortableHeader column="reco_qty" label="Reco" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-blue-700 bg-blue-50/50" />}
               {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_value_mrp" label="Final Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
@@ -1646,7 +1717,13 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
             </tr>
           </thead>
           <tbody>
-            {data.report.map((row, i) => (
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px` }} />
+            )}
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const row = data.report[virtualRow.index];
+              const i = virtualRow.index;
+              return (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-3">{row.location || '-'}</td>
                 <td className="py-2 px-3 font-mono"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="detailed" field="barcode" onEditComplete={onRefresh} /></td>
@@ -1697,7 +1774,11 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{ height: `${rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end ?? 0)}px` }} />
+            )}
           </tbody>
         </table>
       </div>
@@ -1708,6 +1789,13 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 // ============ Barcode-wise Table ============
 function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh }) {
   const t = data.totals || {};
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: data.report.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 36,
+    overscan: 20,
+  });
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -1723,7 +1811,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
           <p className="text-xs text-gray-500 mt-1">Variance report by barcode across all locations</p>
         )}
       </div>
-      <div className="overflow-auto max-h-[70vh]">
+      <div ref={parentRef} className="overflow-auto max-h-[70vh]">
         <table className="min-w-full text-sm report-table">
           <thead className="bg-gray-50">
             <tr>
@@ -1761,7 +1849,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              {isRecoEditable && <th data-col="reco" className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              {isRecoEditable && <SortableHeader column="reco_qty" label="Reco" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-blue-700 bg-blue-50/50" />}
               {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_value_mrp" label="Final Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
@@ -1774,7 +1862,13 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
             </tr>
           </thead>
           <tbody>
-            {data.report.map((row, i) => (
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{ height: `${rowVirtualizer.getVirtualItems()[0]?.start ?? 0}px` }} />
+            )}
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const row = data.report[virtualRow.index];
+              const i = virtualRow.index;
+              return (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-3 font-mono text-xs"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="barcode-wise" field="barcode" onEditComplete={onRefresh} compact /></td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
@@ -1829,7 +1923,11 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
+            {rowVirtualizer.getVirtualItems().length > 0 && (
+              <tr style={{ height: `${rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end ?? 0)}px` }} />
+            )}
           </tbody>
         </table>
       </div>
@@ -1907,7 +2005,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
-              {isRecoEditable && <th data-col="reco" className="py-3 px-3 text-right text-xs font-semibold text-blue-700 bg-blue-50/50">Reco</th>}
+              {isRecoEditable && <SortableHeader column="reco_qty" label="Reco" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-blue-700 bg-blue-50/50" />}
               {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_value_mrp" label="Final Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}

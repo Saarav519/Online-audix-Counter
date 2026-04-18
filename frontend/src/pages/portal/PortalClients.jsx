@@ -18,7 +18,8 @@ import {
   GripVertical,
   ToggleLeft,
   ToggleRight,
-  Eye
+  Eye,
+  MapPin
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -85,8 +86,18 @@ export default function PortalClients() {
   const [stockTotal, setStockTotal] = useState(0);
   const [stockViewLoading, setStockViewLoading] = useState(false);
   const [stockExtraColumns, setStockExtraColumns] = useState([]);
-  const [stockViewSchemaFields, setStockViewSchemaFields] = useState(null);
   const stockFileRef = useRef(null);
+
+  // Location Master state
+  const [showLocationDialog, setShowLocationDialog] = useState(false);
+  const [locationClient, setLocationClient] = useState(null);
+  const [locationStats, setLocationStats] = useState(null);
+  const [locationUploading, setLocationUploading] = useState(false);
+  const [showLocationViewDialog, setShowLocationViewDialog] = useState(false);
+  const [locationRecords, setLocationRecords] = useState([]);
+  const [locationTotal, setLocationTotal] = useState(0);
+  const [locationViewLoading, setLocationViewLoading] = useState(false);
+  const locationFileRef = useRef(null);
 
   const fetchClients = async () => {
     try {
@@ -314,23 +325,14 @@ export default function PortalClients() {
     setShowStockViewDialog(true);
     setStockRecords([]);
     setStockExtraColumns([]);
-    setStockViewSchemaFields(null);
 
     try {
-      const [res, schemaRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/stock?limit=200`),
-        fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/schema`)
-      ]);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/stock?limit=200`);
       if (res.ok) {
         const data = await res.json();
         setStockRecords(data.records);
         setStockTotal(data.total);
         setStockExtraColumns(data.extra_columns || []);
-      }
-      if (schemaRes.ok) {
-        const schemaData = await schemaRes.json();
-        const enabledFields = (schemaData.fields || []).filter(f => f.enabled);
-        setStockViewSchemaFields(enabledFields);
       }
     } catch (err) {
       console.error('Failed to fetch stock:', err);
@@ -506,6 +508,86 @@ export default function PortalClients() {
     }
   };
 
+  // ==================== LOCATION MASTER FUNCTIONS ====================
+  const openLocationUpload = async (client) => {
+    setLocationClient(client);
+    setShowLocationDialog(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/location-master/stats`);
+      if (res.ok) setLocationStats(await res.json());
+      else setLocationStats(null);
+    } catch { setLocationStats(null); }
+  };
+
+  const handleLocationUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file || !locationClient) return;
+    setLocationUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${locationClient.id}/import-location-master`, {
+        method: 'POST', body: formData
+      });
+      const text = await res.text();
+      const data = JSON.parse(text);
+      if (res.ok) {
+        toast.success(data.message);
+        fetchClients();
+        const statsRes = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${locationClient.id}/location-master/stats`);
+        if (statsRes.ok) setLocationStats(await statsRes.json());
+      } else {
+        toast.error(data.detail || 'Upload failed');
+      }
+    } catch (err) {
+      toast.error('Upload failed: ' + err.message);
+    } finally {
+      setLocationUploading(false);
+      if (locationFileRef.current) locationFileRef.current.value = '';
+    }
+  };
+
+  const handleClearLocations = async () => {
+    if (!locationClient || !window.confirm('Clear all locations for this client?')) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${locationClient.id}/location-master`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Locations cleared');
+        setLocationStats(null);
+        fetchClients();
+      }
+    } catch { toast.error('Failed to clear locations'); }
+  };
+
+  const openLocationView = async (client) => {
+    setLocationClient(client);
+    setShowLocationViewDialog(true);
+    setLocationViewLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/clients/${client.id}/location-master?limit=500`);
+      if (res.ok) {
+        const data = await res.json();
+        setLocationRecords(data.locations || []);
+        setLocationTotal(data.total || 0);
+      }
+    } catch { toast.error('Failed to load locations'); }
+    finally { setLocationViewLoading(false); }
+  };
+
+  const downloadLocationTemplate = () => {
+    const csv = 'Location Code,Location Name,Zone,Floor,Area,Type\nLOC-A1,Aisle A Rack 1,Zone-A,Ground,Front,Rack\nLOC-B2,Aisle B Rack 2,Zone-B,First,Back,Shelf';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `location_template_${locationClient?.code || 'client'}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Location template downloaded!');
+  };
+
   const filteredClients = clients.filter(client =>
     client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.code.toLowerCase().includes(searchQuery.toLowerCase())
@@ -677,6 +759,28 @@ export default function PortalClients() {
                     >
                       <Package className="w-3.5 h-3.5 mr-1" />
                       View Master
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 text-xs"
+                    onClick={() => openLocationUpload(client)}
+                    data-testid={`upload-location-btn-${client.code}`}
+                  >
+                    <Upload className="w-3.5 h-3.5 mr-1" />
+                    Location Master
+                  </Button>
+                  {client.location_master_imported && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-700 text-xs"
+                      onClick={() => openLocationView(client)}
+                      data-testid={`view-location-btn-${client.code}`}
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      View Locations ({client.location_count || 0})
                     </Button>
                   )}
                 </div>
@@ -1057,6 +1161,149 @@ export default function PortalClients() {
       </Dialog>
 
       {/* Schema Builder Dialog */}
+
+      {/* Location Master Upload Dialog */}
+      <Dialog open={showLocationDialog} onOpenChange={setShowLocationDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-orange-600" />
+                Location Master — {locationClient?.name}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {locationStats && locationStats.total_locations > 0 && (
+              <div className="bg-orange-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-orange-900 mb-2">Current Location Data</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-orange-700">{locationStats.total_locations}</p>
+                    <p className="text-xs text-orange-600">Locations</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-orange-700">{locationStats.unique_zones}</p>
+                    <p className="text-xs text-orange-600">Zones</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-orange-700">{locationStats.unique_floors}</p>
+                    <p className="text-xs text-orange-600">Floors</p>
+                  </div>
+                </div>
+                {locationStats.zones.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1 items-center">
+                    {locationStats.zones.slice(0, 8).map(z => (
+                      <span key={z} className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">{z}</span>
+                    ))}
+                    {locationStats.zones.length > 8 && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">+{locationStats.zones.length - 8} more</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-700">CSV Template:</p>
+                <Button type="button" variant="outline" size="sm" onClick={downloadLocationTemplate} className="text-orange-600 hover:text-orange-700" data-testid="download-location-template-btn">
+                  <Download className="w-4 h-4 mr-1" /> Download Template
+                </Button>
+              </div>
+              <div className="mt-2">
+                <p className="text-xs font-medium text-gray-600 mb-1.5">Expected Columns:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Location Code *', 'Location Name', 'Zone', 'Floor', 'Area', 'Type'].map(f => (
+                    <span key={f} className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.includes('*') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-700'}`}>{f}</span>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">* = required. Location Code must be unique per row.</p>
+              </div>
+            </div>
+
+            <div className="border-2 border-dashed border-orange-200 rounded-lg p-6 text-center bg-orange-50/30">
+              {locationUploading ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-orange-500 border-t-transparent"></div>
+                    <p className="text-sm font-medium text-orange-700">Uploading & Processing...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 text-orange-400" />
+                  <p className="text-sm text-gray-600 mb-3">Select your location master CSV</p>
+                  <input ref={locationFileRef} type="file" accept=".csv" onChange={handleLocationUpload} className="hidden" />
+                  <Button type="button" variant="outline" onClick={() => locationFileRef.current?.click()} className="border-orange-300 text-orange-600 hover:bg-orange-50" data-testid="select-location-csv-btn">
+                    <Upload className="w-4 h-4 mr-2" /> Select CSV File
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-between">
+              {locationStats && locationStats.total_locations > 0 && (
+                <Button type="button" variant="outline" size="sm" onClick={handleClearLocations} className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200">
+                  <Trash2 className="w-4 h-4 mr-1" /> Clear Locations
+                </Button>
+              )}
+              <div className="flex-1" />
+              <Button type="button" variant="outline" onClick={() => setShowLocationDialog(false)}>Close</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Locations Dialog */}
+      <Dialog open={showLocationViewDialog} onOpenChange={setShowLocationViewDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-orange-600" />
+                Location Master — {locationClient?.name}
+                <span className="text-sm font-normal text-gray-500">({locationTotal} total)</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[60vh] border rounded-lg">
+            {locationViewLoading ? (
+              <div className="text-center py-8 text-gray-500">Loading locations...</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">#</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Location Code</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Location Name</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Zone</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Floor</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Area</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locationRecords.map((loc, i) => (
+                    <tr key={loc.id || i} className="border-t hover:bg-gray-50">
+                      <td className="px-3 py-1.5 text-gray-400">{i + 1}</td>
+                      <td className="px-3 py-1.5 font-mono font-medium">{loc.location_code}</td>
+                      <td className="px-3 py-1.5">{loc.location_name}</td>
+                      <td className="px-3 py-1.5">{loc.zone || '-'}</td>
+                      <td className="px-3 py-1.5">{loc.floor || '-'}</td>
+                      <td className="px-3 py-1.5">{loc.area || '-'}</td>
+                      <td className="px-3 py-1.5">{loc.location_type || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          {locationTotal > 500 && <p className="text-xs text-gray-400 mt-2">Showing first 500 of {locationTotal} locations</p>}
+        </DialogContent>
+      </Dialog>
+
+      {/* Schema Builder Dialog (existing) */}
       <Dialog open={showSchemaDialog} onOpenChange={setShowSchemaDialog}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col" data-testid="schema-builder-dialog">
           <DialogHeader className="pb-3 border-b">
@@ -1272,7 +1519,7 @@ export default function PortalClients() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                  Imported Stock Data — {stockClient?.name}
+                  Warehouse Stock — {stockClient?.name}
                 </div>
                 <span className="text-sm font-normal text-gray-500">
                   {stockTotal} total records
@@ -1291,30 +1538,12 @@ export default function PortalClients() {
                 <thead className="sticky top-0 bg-gray-50 border-b">
                   <tr>
                     <th className="text-left p-2 font-medium text-gray-600">#</th>
-                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'location')) && (
-                      <th className="text-left p-2 font-medium text-gray-600">Location</th>
-                    )}
-                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'barcode')) && (
-                      <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
-                    )}
-                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'description')) && (
-                      <th className="text-left p-2 font-medium text-gray-600">Description</th>
-                    )}
-                    {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'category')) && (
-                      <th className="text-left p-2 font-medium text-gray-600">Category</th>
-                    )}
-                    {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'mrp') : true) && (
-                      <th className="text-right p-2 font-medium text-gray-600">MRP</th>
-                    )}
-                    {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'cost') : true) && (
-                      <th className="text-right p-2 font-medium text-gray-600">Cost</th>
-                    )}
-                    {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_code') && (
-                      <th className="text-left p-2 font-medium text-gray-600">Article Code</th>
-                    )}
-                    {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_name') && (
-                      <th className="text-left p-2 font-medium text-gray-600">Article Name</th>
-                    )}
+                    <th className="text-left p-2 font-medium text-gray-600">Location</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Barcode</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Description</th>
+                    <th className="text-left p-2 font-medium text-gray-600">Category</th>
+                    <th className="text-right p-2 font-medium text-gray-600">MRP</th>
+                    <th className="text-right p-2 font-medium text-gray-600">Cost</th>
                     <th className="text-right p-2 font-medium text-gray-600">Qty</th>
                     {stockExtraColumns.map(col => (
                       <th key={col.name} className="text-left p-2 font-medium text-purple-600">{col.label}</th>
@@ -1325,32 +1554,14 @@ export default function PortalClients() {
                   {stockRecords.map((rec, idx) => (
                     <tr key={idx} className="hover:bg-gray-50">
                       <td className="p-2 text-gray-400">{idx + 1}</td>
-                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'location')) && (
-                        <td className="p-2">{rec.location || '-'}</td>
-                      )}
-                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'barcode')) && (
-                        <td className="p-2 font-mono text-xs">{rec.barcode}</td>
-                      )}
-                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'description')) && (
-                        <td className="p-2">{rec.description || '-'}</td>
-                      )}
-                      {(!stockViewSchemaFields || stockViewSchemaFields.some(f => f.name === 'category')) && (
-                        <td className="p-2">
-                          {rec.category ? <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{rec.category}</span> : '-'}
-                        </td>
-                      )}
-                      {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'mrp') : true) && (
-                        <td className="p-2 text-right">{rec.mrp > 0 ? rec.mrp.toFixed(2) : '-'}</td>
-                      )}
-                      {(stockViewSchemaFields ? stockViewSchemaFields.some(f => f.name === 'cost') : true) && (
-                        <td className="p-2 text-right">{rec.cost > 0 ? rec.cost.toFixed(2) : '-'}</td>
-                      )}
-                      {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_code') && (
-                        <td className="p-2 text-xs">{rec.article_code || '-'}</td>
-                      )}
-                      {stockViewSchemaFields && stockViewSchemaFields.some(f => f.name === 'article_name') && (
-                        <td className="p-2 text-xs">{rec.article_name || '-'}</td>
-                      )}
+                      <td className="p-2">{rec.location || '-'}</td>
+                      <td className="p-2 font-mono text-xs">{rec.barcode}</td>
+                      <td className="p-2">{rec.description || '-'}</td>
+                      <td className="p-2">
+                        {rec.category ? <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{rec.category}</span> : '-'}
+                      </td>
+                      <td className="p-2 text-right">{rec.mrp > 0 ? rec.mrp.toFixed(2) : '-'}</td>
+                      <td className="p-2 text-right">{rec.cost > 0 ? rec.cost.toFixed(2) : '-'}</td>
                       <td className="p-2 text-right font-semibold">{rec.qty}</td>
                       {stockExtraColumns.map(col => (
                         <td key={col.name} className="p-2 text-xs text-purple-700">{rec.custom_fields?.[col.name] || '-'}</td>

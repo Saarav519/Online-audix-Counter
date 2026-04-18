@@ -1,84 +1,50 @@
-# Audix Online Counter - PRD
+# Audix Data Management - PRD
 
 ## Original Problem Statement
-User reported that in the Audix scanner mobile app, during scanning the master data (products/locations) disappears from the app. They have to re-import master data but scanned data remains safe.
+User (AudiX Solutions & Co. - Chartered Accountants) runs 3 products live:
+1. Audix Data Management (stock audit portal + scanner app) ← THIS PROJECT
+2. Staff Attendance & Payroll (separate)
+3. Audix R&M (separate)
+
+Initial task: Match portal code with GitHub `Audix-Attendance-Finalize` (branch `Final`)
+— it contains the updated Audit Data Management code user had been iterating on.
+Goal: Make the preview "look impressive to clients" and faster/better.
 
 ## Architecture
-- **Backend**: FastAPI + MongoDB
-- **Frontend**: React + Tailwind CSS + shadcn/ui + Capacitor (Android)
-- **Portal**: Admin dashboard for managing audits
-- **Scanner**: Mobile PWA for barcode scanning
-- **Storage**: IndexedDB for master data and scanned items (100MB+ support)
+- Backend: FastAPI + MongoDB (server.py wrapper + audit_routes.py module)
+- Frontend: React + Capacitor (Android) + Tailwind + shadcn/ui
+- Scanner (mobile-only): `/scan`, `/master-data`, `/reports`, `/settings`, `/login`
+- Portal (admin): `/portal`, `/portal/dashboard`, `/portal/clients`, `/portal/sessions`,
+  `/portal/devices`, `/portal/reports`, `/portal/sync-logs`, `/portal/conflicts`, `/portal/users`
 
-## Core Features (Existing)
-- Multi-client audit management
-- Audit sessions with variance tracking
-- Barcode scanning with device sync
-- Reports with XLSX export
-- User management with approval workflow
-- Master data import (products, locations, users)
-- Dynamic and Pre-assigned location scanning modes
+## Default Admin Credentials
+- Username: `admin`  |  Password: `admin123` (auto-seeded on startup)
 
 ## What's Been Implemented
 
-### Bug Fix: Master Data Disappearing During Scanning (Jan 2026)
-**Root Causes Identified:**
-1. No `navigator.storage.persist()` - Mobile browser could evict IndexedDB data under memory pressure
-2. Auto-save used destructive `importAll()` (clear + insert) - If interrupted, data was lost
-3. Stale IndexedDB connection not handled - After browser closes connection, operations fail silently
-4. No data loss detection - When IndexedDB was cleared, mock data silently replaced real data
-5. No metadata tracking - App couldn't distinguish fresh install vs data loss
+### Portal Sync with GitHub Final branch (Apr 2026) ✅
+Backend:
+- Refactored into `server.py` (wrapper) + `audit_routes.py` (all endpoints, 5836 lines)
+- Added `SafeJSONResponse` — handles NaN/Infinity in ALL responses (prevents 500 on dirty data)
+- Added global ValidationError + Exception handlers
+- Added 6 new endpoints:
+  - `GET/POST/DELETE /api/audit/portal/clients/{id}/location-master[+/stats]`
+  - `POST /api/audit/portal/clients/{id}/import-location-master`
+  - `GET /api/audit/portal/reports/consolidated/{id}/compare-totals`
+  - `GET /api/audit/portal/reports/consolidated/{id}/reco-diagnostic`
+- GZip middleware, startup index creation (35+ indexes), health endpoints
 
-**Files Modified:**
-- `/app/frontend/src/utils/indexedDB.js` - Persistent storage, connection health, safe save, metadata tracking
-- `/app/frontend/src/context/AppContext.js` - Safe auto-save, data loss detection, improved loading
-- `/app/frontend/src/components/Layout.jsx` - Data loss warning banner
+Frontend portal pages (all 12 copied from GitHub Final branch):
+- `PortalLogin.jsx` — 218 → 622 lines: dark-themed 3-product marketing landing with tabs
+  (Audit active; Staff/R&M tabs shown but backends not present in this deployment)
+- `PortalClients.jsx` — 1368 → 1579 lines: Location Master UI added
+- `PortalReports.jsx` — 2529 → 2627 lines: compare-totals + reco-diagnostic views
+- `PortalLayout.jsx`, all others synced to GitHub Final.
+- Created `/app/frontend/src/pages/AuditApp.js` — minimal `useAudit()` context shim
+- Added `@tanstack/react-virtual` dependency
+- Route convention kept as `/portal/*` (mapped from REF's `/audit/*`)
 
-**Fixes Applied:**
-1. Added `navigator.storage.persist()` to prevent browser from evicting IndexedDB
-2. Added `safeSave()` method (upsert without clearing) for auto-save operations
-3. Added stale connection detection with automatic reconnection and retry
-4. Added `onclose` and `onversionchange` handlers for IndexedDB connection
-5. Added metadata tracking in localStorage to detect if user had imported data
-6. Added data loss warning banner showing "Master Data Lost - please re-import"
-7. Added safety check: don't auto-save empty data (prevents overwriting with nothing)
-8. Added localStorage backup fallback when IndexedDB save fails
+Scanner app files left untouched (current has newer code than GitHub Final).
 
-### Previous Changes (March 2026)
-- Selective location sync (only selected locations sync)
-- Location name display enhancement (26 chars visible)
-
-### Bug Fix 2: Reports Total Quantity Showing Wrong Initially (Jan 2026)
-**Root Causes Identified:**
-1. `scannedItems` loads mock/empty data synchronously from localStorage (which was already migrated to IndexedDB)
-2. Real data loads asynchronously from IndexedDB, causing a delay where Reports shows wrong counts
-3. Orphan cleanup effect runs before IndexedDB load completes, potentially interfering with data
-4. Auto-save effect could save stale/mock data over real IndexedDB data
-
-**Files Modified:**
-- `/app/frontend/src/context/AppContext.js` - Added isLoadingScannedData flag, guarded orphan cleanup and auto-save
-- `/app/frontend/src/pages/Reports.jsx` - Added loading indicator, consumes isLoadingScannedData flag
-
-**Fixes Applied:**
-1. Added `isLoadingScannedData` state flag to track when IndexedDB scanned data is ready
-2. Orphan cleanup now waits for `isLoadingScannedData === false` before running
-3. Auto-save for scanned items waits for IndexedDB load to complete
-4. Reports page shows "Loading scanned data..." spinner until data is ready
-5. Exposed `isLoadingScannedData` through AppContext for any component to use
-- P0: None (core fix complete)
-- P1: Auto-backup master data to localStorage for smaller datasets (<5MB)
-- P2: Add explicit "Export master data backup" button in Settings
-- P2: Add periodic IndexedDB health check during scanning sessions
-
-### Bug Fix 3: Master Data Persistence - Triple Safety Layer (Jan 2026)
-**User Request:** "Jab master sync ho jaaye, toh kabhi gayab na ho"
-
-**Additional Fixes Applied:**
-1. **Immediate IndexedDB save on import** - No more 500ms delay, saves instantly
-2. **localStorage backup** - Backup copy saved on every import/sync
-3. **Auto-recovery** - If IndexedDB empty, restores from localStorage backup automatically
-4. **Recovery chain**: IndexedDB → localStorage backup → Data loss warning
-
-## Next Tasks
-- User testing on actual mobile scanner device to verify fix
-- Monitor if data loss issue recurs
+## Next Tasks (user queue)
+- User will provide "new changes" now that portal is synced with GitHub.
