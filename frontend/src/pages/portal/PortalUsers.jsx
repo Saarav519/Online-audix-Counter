@@ -160,7 +160,7 @@ export default function PortalUsers() {
   const disabledCount = users.filter(u => u.is_active === false).length;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="p-3 md:p-4 lg:p-5">
       {/* Auth Confirmation Dialog */}
       {authDialog && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

@@ -273,7 +273,7 @@ export default function PortalSessions() {
   });
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="p-3 md:p-4 lg:p-5">
       <PageHeader
         title="Audit Sessions"
         subtitle="Manage audit sessions for your clients"

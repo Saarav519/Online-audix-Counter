@@ -3,14 +3,8 @@ import { NavLink } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
 
 /**
- * Unified page header with breadcrumbs, title, subtitle, live status and right-side actions.
- *
- *   <PageHeader
- *     title="Clients"
- *     subtitle="Manage your client companies"
- *     breadcrumbs={[{label: 'Clients'}]}
- *     actions={<Button>Add Client</Button>}
- *   />
+ * Compact unified page header with breadcrumbs, title and right-side actions.
+ * Designed to take MINIMUM vertical space so content area has room to breathe.
  */
 export default function PageHeader({
   title,
@@ -21,59 +15,61 @@ export default function PageHeader({
   accentColor = 'emerald',
 }) {
   const accent = {
-    emerald: 'from-emerald-500 to-teal-500',
-    blue: 'from-blue-500 to-indigo-500',
-    amber: 'from-amber-500 to-orange-500',
-    violet: 'from-violet-500 to-fuchsia-500',
-  }[accentColor] || 'from-emerald-500 to-teal-500';
+    emerald: 'bg-emerald-500',
+    blue: 'bg-blue-500',
+    amber: 'bg-amber-500',
+    violet: 'bg-violet-500',
+    rose: 'bg-rose-500',
+  }[accentColor] || 'bg-emerald-500';
 
   return (
-    <div className="relative pb-4 mb-5 border-b border-slate-200/70" data-testid="page-header">
-      {/* Breadcrumbs */}
-      {(breadcrumbs.length > 0) && (
-        <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-2" aria-label="Breadcrumb">
-          <NavLink to="/portal/dashboard" className="flex items-center gap-1 hover:text-emerald-600 transition-colors">
-            <Home className="w-3 h-3" />
-            <span>Portal</span>
-          </NavLink>
-          {breadcrumbs.map((b, i) => (
-            <React.Fragment key={i}>
-              <ChevronRight className="w-3 h-3 text-slate-300" />
-              {b.to ? (
-                <NavLink to={b.to} className="hover:text-emerald-600 transition-colors">{b.label}</NavLink>
-              ) : (
-                <span className="text-slate-700 font-medium">{b.label}</span>
-              )}
-            </React.Fragment>
-          ))}
-        </nav>
-      )}
+    <div className="flex items-start justify-between gap-3 mb-3" data-testid="page-header">
+      <div className="min-w-0 flex-1">
+        {/* Breadcrumbs */}
+        {breadcrumbs.length > 0 && (
+          <nav className="flex items-center gap-1 text-[11px] text-slate-500 mb-0.5" aria-label="Breadcrumb">
+            <NavLink to="/portal/dashboard" className="flex items-center gap-1 hover:text-emerald-600 transition-colors">
+              <Home className="w-2.5 h-2.5" />
+              <span>Portal</span>
+            </NavLink>
+            {breadcrumbs.map((b, i) => (
+              <React.Fragment key={i}>
+                <ChevronRight className="w-2.5 h-2.5 text-slate-300" />
+                {b.to ? (
+                  <NavLink to={b.to} className="hover:text-emerald-600 transition-colors">{b.label}</NavLink>
+                ) : (
+                  <span className="text-slate-700 font-medium">{b.label}</span>
+                )}
+              </React.Fragment>
+            ))}
+          </nav>
+        )}
 
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-        <div className="relative">
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight" data-testid="page-title">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-lg md:text-xl font-bold text-slate-900 tracking-tight leading-tight flex items-center gap-2" data-testid="page-title">
+            <span className={`inline-block w-1 h-5 rounded-full ${accent}`} />
             {title}
           </h1>
-          {/* Subtle accent bar under title */}
-          <div className={`absolute -bottom-1 left-0 h-1 w-12 rounded-full bg-gradient-to-r ${accent} opacity-80`} />
           {subtitle && (
-            <p className="text-sm text-slate-500 mt-2">{subtitle}</p>
+            <p className="text-xs text-slate-500 truncate">{subtitle}</p>
           )}
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
           {liveLabel && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-xs font-medium">
-              <span className="relative flex h-2 w-2">
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/70 text-emerald-700 text-[10px] font-medium">
+              <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
               {liveLabel}
             </div>
           )}
-          {actions}
         </div>
       </div>
+
+      {actions && (
+        <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

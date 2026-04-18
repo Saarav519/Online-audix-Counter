@@ -148,7 +148,7 @@ export default function PortalConflicts() {
   const resolvedCount = conflicts.filter(c => c.status === 'resolved').length;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="p-3 md:p-4 lg:p-5">
       <PageHeader
         title="Conflict Resolution"
         subtitle="Resolve duplicate location scans from multiple devices"

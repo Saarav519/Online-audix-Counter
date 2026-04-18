@@ -132,7 +132,7 @@ export default function PortalDashboard() {
   }, [stats, auditSummaries]);
 
   return (
-    <div className="p-4 md:p-6 lg:p-8" data-testid="portal-dashboard">
+    <div className="p-3 md:p-4 lg:p-5" data-testid="portal-dashboard">
       <PageHeader
         title="Dashboard"
         subtitle="Real-time pulse of your entire audit operation"
