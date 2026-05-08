@@ -163,7 +163,7 @@ class Client(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     code: str  # Short code for client
-    client_type: str = "store"  # "warehouse" or "store"
+    client_type: str = "store"  # "warehouse", "store", or "cycle_count"
     address: Optional[str] = None
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
@@ -1145,10 +1145,16 @@ async def get_sessions(client_id: Optional[str] = None, include_cycle_count: boo
     query = {}
     if client_id:
         query["client_id"] = client_id
-    # By default hide cycle-count-backing sessions from the regular Sessions page
-    # — they are managed via the dedicated Cycle Count UI. Set ?include_cycle_count=true
-    # to retrieve them (e.g. for Reports session selector).
-    if not include_cycle_count:
+    # Auto-show cycle-count sessions for clients of type cycle_count so that
+    # scanners can see and sync against them. For other client types we keep
+    # the cycle-count backing sessions hidden by default (managed via the
+    # dedicated Cycle Count UI). Pass ?include_cycle_count=true to force-show.
+    auto_include = include_cycle_count
+    if client_id and not auto_include:
+        c = await db.clients.find_one({"id": client_id}, {"_id": 0, "client_type": 1})
+        if c and c.get("client_type") == "cycle_count":
+            auto_include = True
+    if not auto_include:
         query["variance_mode"] = {"$ne": "cycle-count"}
     sessions = await db.audit_sessions.find(query, {"_id": 0}).to_list(1000)
     

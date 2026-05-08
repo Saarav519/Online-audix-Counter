@@ -57,7 +57,9 @@ export default function PortalSessions() {
   const fetchData = async () => {
     try {
       const [sessionsRes, clientsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/audit/portal/sessions`),
+        // include_cycle_count=true → show cycle-count projects (audit_session backed)
+        // alongside regular sessions so scanners can sync against any of them.
+        fetch(`${BACKEND_URL}/api/audit/portal/sessions?include_cycle_count=true`),
         fetch(`${BACKEND_URL}/api/audit/portal/clients`)
       ]);
       
@@ -374,8 +376,9 @@ export default function PortalSessions() {
                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide ${getStatusColor(session.status)}`}>
                           {session.status}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-100 text-purple-700">
-                          {session.variance_mode === 'bin-wise' ? 'Bin' :
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${session.variance_mode === 'cycle-count' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-purple-100 text-purple-700'}`}>
+                          {session.variance_mode === 'cycle-count' ? 'Cycle Count' :
+                           session.variance_mode === 'bin-wise' ? 'Bin' :
                            session.variance_mode === 'barcode-wise' ? 'Barcode' :
                            session.variance_mode === 'article-wise' ? 'Article' : 'Bin'}
                         </span>
@@ -403,7 +406,7 @@ export default function PortalSessions() {
 
                   {/* Action buttons (h-7) */}
                   <div className="flex items-center gap-1 shrink-0">
-                    {session.client_type !== 'warehouse' && (
+                    {session.variance_mode !== 'cycle-count' && session.client_type !== 'warehouse' && (
                       <button
                         title="Import Stock"
                         onClick={() => {
@@ -418,7 +421,18 @@ export default function PortalSessions() {
                       </button>
                     )}
 
-                    {session.client_type === 'warehouse' && (
+                    {session.variance_mode === 'cycle-count' && (
+                      <a
+                        href="/portal/cycle-count"
+                        title="Manage in Cycle Count"
+                        className="h-7 px-2 inline-flex items-center gap-1 text-[11px] rounded border border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span className="hidden lg:inline">Manage</span>
+                      </a>
+                    )}
+
+                    {session.variance_mode !== 'cycle-count' && session.client_type === 'warehouse' && (
                       <button
                         title="Refresh Stock"
                         onClick={() => handleRefreshStock(session)}
@@ -563,10 +577,11 @@ export default function PortalSessions() {
                 className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
               >
                 <option value="">Select Client</option>
-                {clients.map(client => (
+                {clients.filter(c => c.client_type !== 'cycle_count').map(client => (
                   <option key={client.id} value={client.id}>{client.name}</option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">Cycle Count clients are managed via the Cycle Count module — projects there auto-appear here as sessions.</p>
             </div>
             <div>
               <Label htmlFor="name">Session Name *</Label>

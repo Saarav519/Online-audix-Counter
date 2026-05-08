@@ -43,7 +43,11 @@ export default function PortalCycleCount() {
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
   useEffect(() => {
-    fetch(CLIENT_API).then(r => r.ok && r.json()).then(d => d && setClients(d || []));
+    fetch(CLIENT_API).then(r => r.ok && r.json()).then(d => {
+      if (!d) return;
+      // Cycle Count module only operates on clients of type 'cycle_count'
+      setClients((d || []).filter(c => c.client_type === 'cycle_count'));
+    });
   }, []);
 
   const handleCreate = async () => {

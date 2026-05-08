@@ -581,6 +581,7 @@ export default function PortalReports() {
   const [sessions, setSessions] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedSession, setSelectedSession] = useState('');
+  const [selectedDay, setSelectedDay] = useState(''); // For cycle_count clients: '' | 'consolidated' | <day_id>
   const [sessionInfo, setSessionInfo] = useState(null);
   const [reportType, setReportType] = useState('');
   const [reportData, setReportData] = useState(null);
@@ -697,11 +698,17 @@ export default function PortalReports() {
         else if (mode === 'barcode-wise') setReportType('barcode-wise');
         else if (mode === 'article-wise') setReportType('article-wise');
       }
+      // For cycle_count clients reset day selection when project changes
+      const _client = clients.find(c => c.id === selectedClient);
+      if (_client?.client_type === 'cycle_count') {
+        setSelectedDay('');
+      }
     } else {
       setSessionInfo(null);
       setReportData(null);
+      setSelectedDay('');
     }
-  }, [selectedSession, sessions]);
+  }, [selectedSession, sessions, clients, selectedClient]);
 
   // Reset filters when session or report type changes
   useEffect(() => {
@@ -922,17 +929,42 @@ export default function PortalReports() {
 
   const fetchSessions = async (clientId) => {
     try {
+      const client = clients.find(c => c.id === clientId);
+      const isCC = client?.client_type === 'cycle_count';
+
+      if (isCC) {
+        // Cycle Count client → "Sessions" dropdown shows PROJECTS only.
+        // The Day dropdown (rendered below) cascades to per-day or consolidated.
+        const r = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects?client_id=${clientId}`);
+        const projects = r.ok ? ((await r.json()).projects || []) : [];
+        const detailFetches = await Promise.all(
+          projects.map(p => fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${p.id}`).then(rr => rr.ok ? rr.json() : null))
+        );
+        const projectSessions = projects.map((p, i) => ({
+          id: `cc_proj_${p.id}`,
+          name: p.name,
+          client_id: p.client_id,
+          variance_mode: 'cycle-count-consolidated',
+          status: p.status === 'completed' ? 'closed' : 'active',
+          start_date: p.created_at?.slice(0, 10),
+          _isCycleCount: true,
+          _ccProjectId: p.id,
+          _days: (detailFetches[i]?.days || []).map(d => ({
+            id: d.id, day_no: d.day_no, date: d.date, status: d.status,
+          })),
+        }));
+        setSessions(projectSessions);
+        return;
+      }
+
       const [sRes, ccRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`),
         fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects?client_id=${clientId}`)
       ]);
       const regular = sRes.ok ? await sRes.json() : [];
 
-      // Virtual sessions for cycle-count projects:
-      //   • one per day  → id = "cc_day_<dayId>"
-      //   • one consolidated per project → id = "cc_proj_<projectId>"
-      // Selecting any of these in the dropdown jumps the user to the dedicated
-      // full-screen variance report (which already handles the picking math).
+      // Virtual sessions for cycle-count projects (legacy support — only shown
+      // for non-cycle_count clients that still own legacy projects):
       const ccVirtual = [];
       if (ccRes.ok) {
         const ccPayload = await ccRes.json();
@@ -999,7 +1031,12 @@ export default function PortalReports() {
   const fetchReport = useCallback(async (forceRefresh = false) => {
     if (!selectedSession || !reportType) return;
     
-    const cacheKey = `${selectedSession}_${reportType}`;
+    // For cycle_count clients we also need a Day picked (or consolidated)
+    const _client = clients.find(c => c.id === selectedClient);
+    const _isCC = _client?.client_type === 'cycle_count';
+    if (_isCC && !selectedDay) return;
+
+    const cacheKey = `${selectedSession}_${selectedDay || 'na'}_${reportType}`;
     
     // Check cache first (unless forced refresh)
     if (!forceRefresh && reportCache.current[cacheKey]) {
@@ -1018,7 +1055,14 @@ export default function PortalReports() {
       // The backend reshapes day/project data into the same field names (stock_qty,
       // physical_qty, diff_qty, final_qty, …) so the existing rendering pipeline
       // drops it in unchanged — only the picking-specific extra columns are extra.
-      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_day_')) {
+      if (_isCC && selectedDay && selectedDay !== 'consolidated') {
+        // Cycle Count + specific Day → days/{day_id}/report/{type}
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/days/${selectedDay}/report/${reportType}`);
+      } else if (_isCC && (selectedDay === 'consolidated')) {
+        // Cycle Count + Full Consolidated → projects/{pid}/report/{type}
+        const projId = selectedSession.startsWith('cc_proj_') ? selectedSession.slice(8) : selectedSession;
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${projId}/report/${reportType}`);
+      } else if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_day_')) {
         const dayId = selectedSession.slice(7);
         response = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/days/${dayId}/report/${reportType}`);
       } else if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_proj_')) {
@@ -1040,7 +1084,7 @@ export default function PortalReports() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSession, reportType, selectedClient]);
+  }, [selectedSession, selectedDay, reportType, selectedClient, clients]);
 
   // Force-refresh variant — always hits the backend AND clears every cached report
   // for the current session so when the user switches to a sibling report
@@ -1055,12 +1099,12 @@ export default function PortalReports() {
     return fetchReport(true);
   }, [fetchReport, selectedSession]);
 
-  // Effect to fetch report when session or report type changes
+  // Effect to fetch report when session, day, or report type changes
   useEffect(() => {
     if (selectedSession && reportType) {
       fetchReport();
     }
-  }, [selectedSession, reportType, fetchReport]);
+  }, [selectedSession, selectedDay, reportType, fetchReport]);
 
   const saveRecoAdjustment = async (params) => {
     try {
@@ -1159,6 +1203,22 @@ export default function PortalReports() {
       }
       return Array.from(optMap.values());
     }
+    // Cycle Count clients use selectedDay to decide between day-only reports
+    // and the Full Consolidated set (which adds empty-bins + pending-locations).
+    if (isCycleCountClient && selectedSession) {
+      const opts = [
+        { value: 'bin-wise', label: 'Bin-wise Summary' },
+        { value: 'detailed', label: 'Detailed Item-wise' },
+        { value: 'barcode-wise', label: 'Barcode-wise Variance' },
+        { value: 'category-summary', label: 'Category-wise Summary' },
+      ];
+      if (selectedDay === 'consolidated') {
+        opts.push({ value: 'empty-bins', label: 'Empty Bins' });
+        opts.push({ value: 'pending-locations', label: 'Pending Locations' });
+      }
+      return opts;
+    }
+
     const mode = sessionInfo?.variance_mode || 'bin-wise';
     const options = [];
     
@@ -1202,6 +1262,17 @@ export default function PortalReports() {
   };
 
   const isConsolidatedView = selectedSession === '__consolidated__';
+
+  // Cycle-count client detection: project-based cascading (Client → Project → Day → Report Type)
+  const selectedClientObj = useMemo(() => clients.find(c => c.id === selectedClient), [clients, selectedClient]);
+  const isCycleCountClient = selectedClientObj?.client_type === 'cycle_count';
+  const selectedProjectObj = useMemo(() => {
+    if (!isCycleCountClient || !selectedSession) return null;
+    return sessions.find(s => s.id === selectedSession) || null;
+  }, [isCycleCountClient, selectedSession, sessions]);
+  // For cycle_count consolidated view (selectedDay === 'consolidated') we expose
+  // empty-bins + pending-locations report types in addition to the daily ones.
+  const isCcConsolidatedView = isCycleCountClient && selectedDay === 'consolidated';
 
   // ============ Column Settings Logic ============
   const isRecoEditable = useMemo(() => {
@@ -1777,9 +1848,11 @@ export default function PortalReports() {
             onChange={(e) => {
               setSelectedClient(e.target.value);
               setSelectedSession('');
+              setSelectedDay('');
               setReportData(null);
             }}
             className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors"
+            data-testid="report-client-select"
           >
             <option value="">Select Client</option>
             {clients.map(client => (
@@ -1788,31 +1861,54 @@ export default function PortalReports() {
           </select>
         </div>
         <div className="flex-1 min-w-[220px]">
-          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Audit Session</label>
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">{isCycleCountClient ? 'Project' : 'Audit Session'}</label>
           <select
             value={selectedSession}
             onChange={(e) => setSelectedSession(e.target.value)}
             className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors disabled:bg-slate-50 disabled:text-slate-400"
             disabled={!selectedClient}
+            data-testid="report-session-select"
           >
-            <option value="">Select Session</option>
-            {selectedClient && (
+            <option value="">{isCycleCountClient ? 'Select Project' : 'Select Session'}</option>
+            {selectedClient && !isCycleCountClient && (
               <option value="__consolidated__">All Sessions (Consolidated)</option>
             )}
             {sessions.map(session => (
               <option key={session.id} value={session.id}>
-                {session.name} ({session.variance_mode === 'bin-wise' ? 'Bin' : session.variance_mode === 'barcode-wise' ? 'Barcode' : session.variance_mode === 'article-wise' ? 'Article' : 'Bin'})
+                {isCycleCountClient
+                  ? session.name
+                  : `${session.name} (${session.variance_mode === 'bin-wise' ? 'Bin' : session.variance_mode === 'barcode-wise' ? 'Barcode' : session.variance_mode === 'article-wise' ? 'Article' : 'Bin'})`}
               </option>
             ))}
           </select>
         </div>
+        {isCycleCountClient && selectedSession && (
+          <div className="flex-1 min-w-[180px]">
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Day</label>
+            <select
+              value={selectedDay}
+              onChange={(e) => setSelectedDay(e.target.value)}
+              className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors disabled:bg-slate-50 disabled:text-slate-400"
+              data-testid="report-day-select"
+            >
+              <option value="">Select Day</option>
+              <option value="consolidated">Full Consolidated (all locked days)</option>
+              {(selectedProjectObj?._days || []).map(d => (
+                <option key={d.id} value={d.id}>
+                  Day {d.day_no} · {d.date}{d.status === 'closed' ? ' (Locked)' : ' (Open)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex-1 min-w-[180px]">
           <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Report Type</label>
           <select
             value={reportType}
             onChange={(e) => setReportType(e.target.value)}
             className="w-full h-8 px-2 border border-slate-200 rounded-md text-[13px] bg-white hover:border-slate-300 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/30 transition-colors disabled:bg-slate-50 disabled:text-slate-400"
-            disabled={!selectedSession}
+            disabled={!selectedSession || (isCycleCountClient && !selectedDay)}
+            data-testid="report-type-select"
           >
             {reportOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1858,10 +1954,12 @@ export default function PortalReports() {
       )}
 
       {/* Report Content */}
-      {!selectedSession ? (
+      {!selectedSession || (isCycleCountClient && !selectedDay) ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
           <FileBarChart className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-          <p className="text-gray-500">Select a client and session to view reports</p>
+          <p className="text-gray-500">{isCycleCountClient
+            ? (!selectedSession ? 'Select a project to view its cycle count reports' : 'Select a day or "Full Consolidated" to view the report')
+            : 'Select a client and session to view reports'}</p>
         </div>
       ) : loading ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
@@ -1992,6 +2090,7 @@ function SubtotalCell({ value, isVariance, isAccuracy, className = '' }) {
 function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
   const summary = data.summary || {};
   const t = data.totals || {};
+  const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -2025,6 +2124,8 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <th data-col="location" className="py-1.5 px-4"></th>
               <SubtotalCell value={t.stock_qty} />
               <SubtotalCell value={t.physical_qty} />
+              {isCC && <SubtotalCell value={t.pre_pick_qty || 0} />}
+              {isCC && <SubtotalCell value={t.post_pick_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.reco_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
               <SubtotalCell value={t.difference_qty} isVariance />
@@ -2036,6 +2137,8 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isCC && <SortableHeader column="pre_pick_qty" label="Pre-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('pre_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
+              {isCC && <SortableHeader column="post_pick_qty" label="Post-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('post_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
               {isConsolidated && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               <SortableHeader column="difference_qty" label="Difference" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('difference_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -2073,6 +2176,8 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
                   <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
                   <td className="py-3 px-4 text-right">{row.stock_qty}</td>
                   <td className="py-3 px-4 text-right">{row.physical_qty}</td>
+                  {isCC && <td className="py-3 px-4 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.pre_pick_qty || 0}</td>}
+                  {isCC && <td className="py-3 px-4 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                   {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{row.reco_qty || 0}</td>}
                   {isConsolidated && <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
                   <td className="py-3 px-4 text-right">
@@ -2134,6 +2239,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 // ============ Detailed Item-wise Table ============
 function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true } }) {
   const t = data.totals || {};
+  const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
     count: data.report.length,
@@ -2165,6 +2271,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SubtotalCell value={t.physical_qty} />
               <SubtotalCell value={t.physical_value_mrp || 0} />
               <SubtotalCell value={t.physical_value_cost || 0} />
+              {isCC && <SubtotalCell value={t.pre_pick_qty || 0} />}
+              {isCC && <SubtotalCell value={t.post_pick_qty || 0} />}
               {isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
               {isConsolidated && !isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
@@ -2192,6 +2300,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SortableHeader column="physical_qty" label="Physical Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isCC && <SortableHeader column="pre_pick_qty" label="Pre-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('pre_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
+              {isCC && <SortableHeader column="post_pick_qty" label="Post-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('post_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
               {isRecoEditable && <SortableHeader column="reco_qty" label="Reco" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-blue-700 bg-blue-50/50" />}
               {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
@@ -2228,6 +2338,8 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_mrp || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
+                {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.pre_pick_qty || 0}</td>}
+                {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
                     <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row.barcode, location: row.location, reco_qty: val })} />
@@ -2279,6 +2391,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 // ============ Barcode-wise Table ============
 function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true } }) {
   const t = data.totals || {};
+  const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   const parentRef = useRef(null);
   const rowVirtualizer = useVirtualizer({
     count: data.report.length,
@@ -2318,6 +2431,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SubtotalCell value={t.physical_value_mrp || 0} />
               <SubtotalCell value={t.physical_value_cost || 0} />
               {isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
+              {isCC && <SubtotalCell value={t.pre_pick_qty || 0} />}
+              {isCC && <SubtotalCell value={t.post_pick_qty || 0} />}
               {isConsolidated && !isRecoEditable && <SubtotalCell value={t.reco_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
               {isConsolidated && <SubtotalCell value={t.final_value_mrp || 0} />}
@@ -2343,6 +2458,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isCC && <SortableHeader column="pre_pick_qty" label="Pre-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('pre_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
+              {isCC && <SortableHeader column="post_pick_qty" label="Post-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('post_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
               {isRecoEditable && <SortableHeader column="reco_qty" label="Reco" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-blue-700 bg-blue-50/50" />}
               {isConsolidated && !isRecoEditable && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
@@ -2382,6 +2499,8 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 <td className="py-2 px-3 text-right">{row.physical_qty}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_mrp || 0).toFixed(2)}</td>
                 <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
+                {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.pre_pick_qty || 0}</td>}
+                {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
                     <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row.barcode, reco_qty: val })} />
@@ -2601,6 +2720,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 // ============ Category Summary Table ============
 function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
   const t = data.totals || {};
+  const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 border-b border-gray-200">
@@ -2622,6 +2742,8 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <SubtotalCell value={t.physical_qty} />
               <SubtotalCell value={t.physical_value_mrp || 0} />
               <SubtotalCell value={t.physical_value_cost || 0} />
+              {isCC && <SubtotalCell value={t.pre_pick_qty || 0} />}
+              {isCC && <SubtotalCell value={t.post_pick_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.reco_qty || 0} />}
               {isConsolidated && <SubtotalCell value={t.final_qty ?? t.physical_qty} />}
               {isConsolidated && <SubtotalCell value={t.final_value_mrp || 0} />}
@@ -2641,6 +2763,8 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_mrp" label="Phys Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_value_cost" label="Phys Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isCC && <SortableHeader column="pre_pick_qty" label="Pre-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('pre_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
+              {isCC && <SortableHeader column="post_pick_qty" label="Post-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('post_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
               {isConsolidated && <SortableHeader column="reco_qty" label="Reco Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_qty" label="Final Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
               {isConsolidated && <SortableHeader column="final_value_mrp" label="Final Val(MRP)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('final_value_mrp')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />}
@@ -2665,6 +2789,8 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 <td className="py-3 px-4 text-right">{row.physical_qty}</td>
                 <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td className="py-3 px-4 text-right text-gray-500">{(row.physical_value_cost || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                {isCC && <td className="py-3 px-4 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.pre_pick_qty || 0}</td>}
+                {isCC && <td className="py-3 px-4 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isConsolidated && <td className="py-3 px-4 text-right text-blue-600">{row.reco_qty || 0}</td>}
                 {isConsolidated && <td className="py-3 px-4 text-right font-semibold">{row.final_qty ?? row.physical_qty}</td>}
                 {isConsolidated && <td className="py-3 px-4 text-right text-gray-500">{(row.final_value_mrp || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>}

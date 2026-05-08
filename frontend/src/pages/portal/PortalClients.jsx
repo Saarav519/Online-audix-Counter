@@ -699,11 +699,13 @@ export default function PortalClients() {
                     className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                       client.client_type === 'warehouse'
                         ? 'bg-orange-100 text-orange-700'
+                        : client.client_type === 'cycle_count'
+                        ? 'bg-purple-100 text-purple-700'
                         : 'bg-teal-100 text-teal-700'
                     }`}
                     data-testid={`client-type-badge-${client.code}`}
                   >
-                    {client.client_type === 'warehouse' ? 'Warehouse' : 'Store'}
+                    {client.client_type === 'warehouse' ? 'Warehouse' : client.client_type === 'cycle_count' ? 'Cycle Count' : 'Store'}
                   </span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                     client.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
@@ -885,10 +887,13 @@ export default function PortalClients() {
               >
                 <option value="store">Store — Stock uploaded per session</option>
                 <option value="warehouse">Warehouse — Stock uploaded once, shared across sessions</option>
+                <option value="cycle_count">Cycle Count — Multi-day rolling audits with picking reconciliation</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 {formData.client_type === 'warehouse' 
                   ? 'Stock is uploaded at client level. Sessions auto-import a snapshot on creation.'
+                  : formData.client_type === 'cycle_count'
+                  ? 'Projects (treated as Sessions internally) are managed from the Cycle Count module. Each project supports daily morning stock + pre/post pick uploads.'
                   : 'Stock is uploaded individually inside each session.'}
               </p>
             </div>

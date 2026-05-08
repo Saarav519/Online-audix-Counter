@@ -937,33 +937,118 @@ async def cycle_day_report(day_id: str, report_type: str):
 
 @cycle_router.get("/projects/{pid}/report/{report_type}")
 async def cycle_project_report(pid: str, report_type: str):
-    """Reports-UI compatible consolidated variance report (all days)."""
+    """Reports-UI compatible consolidated variance report.
+
+    Consolidation rules (per user spec):
+      • Only LOCKED days contribute to consolidated data.
+      • For each (location, barcode) the LATEST locked day's row wins (overwrite
+        — not sum). That way the consolidated view always reflects the most
+        recent locked count for any bin.
+      • Bins/barcodes only counted on earlier locked days remain in the report
+        (cumulative across days).
+
+    Special report_types only available in consolidated view:
+      • pending-locations → bins that had stock uploaded across locked days but
+        were NEVER scanned in any locked day.
+      • empty-bins        → bins scanned in any locked day where the latest
+        locked counted qty rolls up to zero.
+    """
     project = await db.cycle_projects.find_one({"id": pid}, {"_id": 0})
     if not project:
         raise HTTPException(404, "Project not found")
-    days = await db.cycle_days.find({"project_id": pid}, {"_id": 0}).sort("day_no", 1).to_list(1000)
+    # Only locked days feed the consolidated view
+    days = await db.cycle_days.find({"project_id": pid, "status": "closed"}, {"_id": 0}).sort("day_no", 1).to_list(1000)
     master = await _load_master_for_client(project["client_id"])
     stock_meta = await _stock_meta_map(project["id"])
 
-    # Aggregate every day's report rows by (location, barcode) — sum qtys; if a
-    # bin is recounted across days we keep the cumulative numbers (latest day's
-    # picking + scans contribute fully).
+    # Latest-locked-day wins per (loc, barcode)
     bin_agg: Dict[str, Dict[str, Any]] = {}
+    expected_bins_all_days: set = set()
+    scanned_bins_all_days: set = set()
     for d in days:
         v = await _compute_day_variance(project, d)
         for r in v["report"]:
             key = f"{r['location']}|{r['barcode']}"
-            existing = bin_agg.get(key)
-            if existing:
-                existing["expected_qty"] += r["expected_qty"]
-                existing["scanned_qty"] += r["scanned_qty"]
-                existing["pre_pick_qty"] += r["pre_pick_qty"]
-                existing["post_pick_qty"] += r["post_pick_qty"]
-                existing["effective_qty"] += r["effective_qty"]
-                existing["variance_qty"] += r["variance_qty"]
-                existing["ending_stock"] += r["ending_stock"]
-            else:
-                bin_agg[key] = dict(r)
+            row = dict(r)
+            row["day_no"] = d["day_no"]
+            row["day_date"] = d["date"]
+            if key in bin_agg:
+                row["is_recount"] = True
+                row["previous_day_no"] = bin_agg[key].get("day_no")
+            bin_agg[key] = row  # latest day overwrites
+            scanned_bins_all_days.add(r["location"])
+        # Track expected bins (any locked day)
+        stock_rows = await db.cycle_day_stock.find(
+            {"project_id": pid, "day_id": d["id"]}, {"_id": 0, "location": 1}
+        ).to_list(100000)
+        expected_bins_all_days.update(s["location"] for s in stock_rows if s.get("location"))
+
+    # Special report types — pending and empty-bins
+    if report_type == "pending-locations":
+        pending_bins = sorted(expected_bins_all_days - scanned_bins_all_days)
+        # Build rows shaped like the regular pending-locations endpoint
+        rows = []
+        for bin_loc in pending_bins:
+            stock_rows = await db.cycle_day_stock.find(
+                {"project_id": pid, "location": bin_loc}, {"_id": 0}
+            ).sort("day_id", 1).to_list(10000)
+            total_qty = sum(_to_float(s.get("qty")) for s in stock_rows)
+            barcode_count = len({s.get("barcode") for s in stock_rows if s.get("barcode")})
+            rows.append({
+                "location": bin_loc,
+                "expected_qty": total_qty,
+                "stock_qty": total_qty,
+                "barcode_count": barcode_count,
+                "status": "pending",
+                "_is_cycle_count": True,
+            })
+        return {
+            "report": rows,
+            "totals": {"stock_qty": sum(r["stock_qty"] for r in rows), "barcode_count": sum(r["barcode_count"] for r in rows)},
+            "summary": {"total_pending_bins": len(rows)},
+            "session_info": {
+                "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
+                "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",
+                "is_cycle_count": True, "status": project.get("status", "active"),
+            },
+        }
+
+    if report_type == "empty-bins":
+        # Bins scanned in any locked day where latest-locked rolls up final_qty == 0
+        per_bin_final: Dict[str, float] = {}
+        per_bin_expected: Dict[str, float] = {}
+        for r in bin_agg.values():
+            per_bin_final[r["location"]] = per_bin_final.get(r["location"], 0) + _to_float(r.get("effective_qty", 0))
+            per_bin_expected[r["location"]] = per_bin_expected.get(r["location"], 0) + _to_float(r.get("expected_qty", 0))
+        rows = [
+            {
+                "location": loc,
+                "expected_qty": per_bin_expected.get(loc, 0),
+                "stock_qty": per_bin_expected.get(loc, 0),
+                "physical_qty": 0,
+                "final_qty": 0,
+                "diff_qty": -per_bin_expected.get(loc, 0),
+                "difference_qty": -per_bin_expected.get(loc, 0),
+                "status": "empty_bin",
+                "is_empty": True,
+                "_is_cycle_count": True,
+            }
+            for loc, final in per_bin_final.items() if final == 0
+        ]
+        return {
+            "report": rows,
+            "totals": {
+                "stock_qty": sum(r["stock_qty"] for r in rows),
+                "physical_qty": 0, "final_qty": 0,
+                "difference_qty": sum(r["difference_qty"] for r in rows),
+            },
+            "summary": {"total_empty_bins": len(rows)},
+            "session_info": {
+                "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
+                "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",
+                "is_cycle_count": True, "status": project.get("status", "active"),
+            },
+        }
 
     base_rows = list(bin_agg.values())
     _enrich_with_master(base_rows, master, stock_meta)
@@ -972,5 +1057,6 @@ async def cycle_project_report(pid: str, report_type: str):
         "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
         "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",
         "is_cycle_count": True, "status": project.get("status", "active"),
+        "locked_days_count": len(days),
     }
     return shaped
