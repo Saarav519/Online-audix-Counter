@@ -33,6 +33,18 @@ Frontend: React (CRA + Tailwind + shadcn/ui) · Backend: FastAPI · DB: MongoDB.
 - Live consolidated report: aggregates totals, day-wise summaries, bin-wise rows with recount flag
 - Frontend: `/portal/cycle-count` (list view + detail view + day tabs + 3-card upload + variance table + consolidated)
 
+## NEW: Cycle Count as Client Type (Phase 2 — Feb 2026)
+- `client_type='cycle_count'` is now a 3rd client type alongside warehouse/store
+- Sessions endpoint auto-includes cycle-count audit_sessions for cycle_count clients (scanner can sync against them transparently)
+- PortalSessions: New Session dialog filters out cycle_count clients; cycle-count sessions surface with fuchsia "Cycle Count" badge + "Manage" link to /portal/cycle-count
+- PortalCycleCount: clients filtered to only `client_type==cycle_count`
+- Reports cascading navigation for cycle_count clients: Client → Project → Day (Day 1/Day 2/.../Full Consolidated) → Report Type
+  - Day-specific Report Types: Bin-wise, Detailed, Barcode-wise, Category-wise
+  - Full Consolidated additionally: Pending Locations + Empty Bins
+- All variance tables (BinWise/Detailed/BarcodeWise/CategorySummary) show **Pre-Audit Picks** + **Post-Audit Picks** columns when data is from cycle count (fuchsia-tinted columns)
+- Consolidated semantics: ONLY locked days contribute, latest locked day's row wins per (bin, barcode), cumulative for unique bins. Open days excluded.
+- Backend test coverage: /app/backend/tests/test_cycle_count_flow.py — 15/15 passing
+
 ## Backlog (deferred Phase 2+)
 - P10 — Cycle Count PDF/Excel export per-day + final project report
 - P11 — Re-audit comparison view (Day N vs Day M side-by-side)
