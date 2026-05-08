@@ -898,19 +898,31 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
     for row in report:
         loc = row.get("location", "")
         bc = row.get("barcode", "")
-        # Reco is anchored to the ORIGINAL barcode when a row is edited
-        # (frontend sends `_original_value` to keep reco resilient to
-        # barcode rename + undo cycles). For non-edited rows the original
-        # equals the current barcode, so the same lookup works for both.
+        is_edited = bool(row.get("_is_edited") or row.get("is_edited"))
+        # Reco anchored to the ORIGINAL barcode for edited rows (frontend
+        # convention since the original-anchor fix). Non-edited rows look up
+        # strictly by their own barcode — NO fallback — so an edit that
+        # collides with an existing barcode at the same bin doesn't apply
+        # the same Reco to both rows. (Merge-on-collision in
+        # `_merge_cc_base_collisions` normally prevents duplicates outright;
+        # the strict lookup is a defence-in-depth safety net.)
         orig_bc = row.get("_original_value") or bc
 
         if report_type == "detailed":
-            reco_qty = (
-                reco_maps["detailed"].get(f"{loc}|{orig_bc}", 0)
-                or reco_maps["detailed"].get(f"{loc}|{bc}", 0)
-            )
+            if is_edited:
+                # Try original first, fall back to current barcode for
+                # backward-compat with pre-anchoring legacy reco rows.
+                reco_qty = (
+                    reco_maps["detailed"].get(f"{loc}|{orig_bc}", 0)
+                    or reco_maps["detailed"].get(f"{loc}|{bc}", 0)
+                )
+            else:
+                reco_qty = reco_maps["detailed"].get(f"{loc}|{bc}", 0)
         elif report_type == "barcode-wise":
-            reco_qty = reco_maps["barcode"].get(orig_bc, 0) or reco_maps["barcode"].get(bc, 0)
+            if is_edited:
+                reco_qty = reco_maps["barcode"].get(orig_bc, 0) or reco_maps["barcode"].get(bc, 0)
+            else:
+                reco_qty = reco_maps["barcode"].get(bc, 0)
         elif report_type == "bin-wise":
             # Sum reco across all barcodes at this location
             reco_qty = sum(v for k, v in reco_maps["detailed"].items() if k.startswith(f"{loc}|"))
@@ -1043,6 +1055,65 @@ def _apply_cc_barcode_edits_to_base(base_rows: List[Dict[str, Any]],
             r["_is_edited"] = True
             edited_new_barcodes.add(new_v)
     return edited_new_barcodes
+
+
+def _merge_cc_base_collisions(base_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Collapse duplicate `(location, barcode)` rows that arise when a
+    barcode edit renames an extra-scan into a barcode that already exists at
+    the same bin (e.g. correcting a mis-scan into its real counterpart).
+
+    Both rows describe the same physical item, so we consolidate them:
+      • sum scanned_qty / pre_pick_qty / post_pick_qty / ending_stock
+      • take expected_qty from the planned row (the edited row had 0)
+      • recompute effective_qty + variance_qty + classification
+      • preserve _is_edited / _original_value / _edit_id so Reco still
+        anchors to the original barcode
+
+    Without this merge, the detailed report would show two rows for the same
+    (loc, barcode) and Reco/variance/final qty would double-count.
+    """
+    by_key: Dict[tuple, Dict[str, Any]] = {}
+    merged: List[Dict[str, Any]] = []
+    for r in base_rows:
+        key = (r.get("location", "") or "", r.get("barcode", "") or "")
+        target = by_key.get(key)
+        if target is None:
+            by_key[key] = r
+            merged.append(r)
+            continue
+        # Collision — fold r into target. Sum picking-aware quantities.
+        for fld in ("scanned_qty", "pre_pick_qty", "post_pick_qty",
+                    "ending_stock", "expected_qty"):
+            target[fld] = _to_float(target.get(fld, 0)) + _to_float(r.get(fld, 0))
+        target["effective_qty"] = (
+            _to_float(target.get("scanned_qty", 0))
+            + _to_float(target.get("pre_pick_qty", 0))
+        )
+        target["variance_qty"] = (
+            _to_float(target["effective_qty"])
+            - _to_float(target.get("expected_qty", 0))
+        )
+        v = target["variance_qty"]
+        if abs(v) < 1e-9:
+            target["classification"] = "match"; target["reason"] = "match"
+        elif v > 0:
+            target["classification"] = "extra"; target["reason"] = "surplus"
+        else:
+            target["classification"] = "shortage"; target["reason"] = "shortage"
+        # Either row carrying edit metadata wins — keeps Reco anchor + UI flags
+        if r.get("_is_edited") and not target.get("_is_edited"):
+            target["_is_edited"] = True
+            target["_edit_id"] = r.get("_edit_id")
+            target["_original_value"] = r.get("_original_value")
+        # Master-info fields: prefer non-empty values
+        for fld in ("description", "category", "article_code", "article_name"):
+            if not target.get(fld) and r.get(fld):
+                target[fld] = r[fld]
+        if not _to_float(target.get("mrp", 0)) and _to_float(r.get("mrp", 0)):
+            target["mrp"] = _to_float(r["mrp"])
+        if not _to_float(target.get("cost", 0)) and _to_float(r.get("cost", 0)):
+            target["cost"] = _to_float(r["cost"])
+    return merged
 
 
 def _mark_edits_on_shaped(shaped: Dict[str, Any], report_type: str,
@@ -1276,6 +1347,10 @@ async def cycle_day_report(day_id: str, report_type: str):
     # warehouse approach where scanner barcodes are remapped before bucketing.
     edits = await _load_active_barcode_edits(project["client_id"])
     edited_new_barcodes = _apply_cc_barcode_edits_to_base(base["report"], edits)
+    # Merge any (loc, barcode) collisions caused by editing into a barcode
+    # that already exists at the same bin — prevents duplicate rows and
+    # double Reco/variance application.
+    base["report"] = _merge_cc_base_collisions(base["report"])
     shaped = _shape_report(report_type, base["report"])
     # Mark shaped detailed/barcode-wise rows as edited for the UI's
     # pencil/undo affordances and the "Barcode Edited (was: …)" remark.
@@ -1486,6 +1561,8 @@ async def cycle_project_report(pid: str, report_type: str):
     # Apply barcode/article edits at the BASE-row level (warehouse parity)
     edits = await _load_active_barcode_edits(project["client_id"])
     edited_new_barcodes = _apply_cc_barcode_edits_to_base(base_rows, edits)
+    # Merge collisions before shaping (warehouse parity) — see helper docstring
+    base_rows = _merge_cc_base_collisions(base_rows)
     shaped = _shape_report(report_type, base_rows)
     _mark_edits_on_shaped(shaped, report_type, base_rows, edited_new_barcodes)
     # Apply Reco adjustments → fills in `reco_qty` & `final_qty` columns + value math

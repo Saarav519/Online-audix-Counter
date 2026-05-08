@@ -3162,6 +3162,72 @@ def _mirror_reco_to_remapped(validated_reco: Dict[str, Any],
             barcode_reco[new] = barcode_reco[orig]
 
 
+def _merge_detailed_collisions(report: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Collapse warehouse detailed-report rows that share the same
+    `(location, barcode)` after a barcode edit renames an extra-scan into a
+    barcode that already exists at the same bin (e.g. user scans a mistyped
+    code and later corrects it to the real one).
+
+    Without this, the detailed report shows two rows for the same
+    `(loc, barcode)` and Reco/variance/final qty are double-counted across
+    the two visible rows. Aggregated views (barcode-wise / article-wise /
+    category) already merge correctly via `loc_remap` BEFORE aggregation, so
+    only the detailed pathway needs this post-processing step.
+
+    Quantities sum; values sum; accuracy is recomputed from merged stock vs
+    final qty. The edit metadata (is_edited / _original_value / _edit_id /
+    remark) is preserved on the merged row so the UI's pencil/undo
+    affordances still work.
+    """
+    by_key: Dict[tuple, Dict[str, Any]] = {}
+    merged: List[Dict[str, Any]] = []
+    for r in report:
+        key = (r.get("location", "") or "", r.get("barcode", "") or "")
+        target = by_key.get(key)
+        if target is None:
+            by_key[key] = r
+            merged.append(r)
+            continue
+        # Sum qty + value columns
+        for fld in ("stock_qty", "physical_qty", "reco_qty", "final_qty",
+                    "diff_qty", "difference_qty",
+                    "stock_value_mrp", "stock_value_cost",
+                    "physical_value_mrp", "physical_value_cost",
+                    "final_value_mrp", "final_value_cost",
+                    "diff_value_mrp", "diff_value_cost",
+                    "pre_pick_qty", "post_pick_qty",
+                    "effective_qty", "ending_stock"):
+            if fld in target or fld in r:
+                target[fld] = round(_to_float(target.get(fld, 0)) + _to_float(r.get(fld, 0)), 2)
+        # Accuracy recomputed from merged totals
+        if "accuracy_pct" in target or "accuracy_pct" in r:
+            target["accuracy_pct"] = calc_accuracy(
+                _to_float(target.get("stock_qty", 0)),
+                _to_float(target.get("final_qty", 0))
+            )
+        # Edit metadata: edited row's flags win (so UI keeps pencil/undo)
+        if r.get("is_edited") and not target.get("is_edited"):
+            target["is_edited"] = True
+            target["is_editable"] = True
+            target["_edit_id"] = r.get("_edit_id")
+            target["_original_value"] = r.get("_original_value")
+            target["remark"] = r.get("remark", target.get("remark", ""))
+        # Master-info: prefer non-empty
+        for fld in ("description", "category", "article_code", "article_name"):
+            if not target.get(fld) and r.get(fld):
+                target[fld] = r[fld]
+    return merged
+
+
+def _to_float(v) -> float:
+    """Local helper — kept tiny so the merge utility above can be parsed
+    even if cycle_count_routes' copy isn't imported."""
+    try:
+        return float(v) if v is not None and v != "" else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
     """Apply active barcode/article edits to a generated report. Modifies rows in-place.
 
@@ -3752,6 +3818,10 @@ async def get_consolidated_detailed(client_id: str):
     rounded_totals = {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}
     edits = await db.barcode_edits.find({"client_id": client_id, "is_active": True}, {"_id": 0}).to_list(10000)
     report, rounded_totals = _apply_barcode_edits(report, rounded_totals, edits, "detailed", master_by_barcode)
+    # Merge any (loc, barcode) collisions where an edit renamed an extra-scan
+    # into a barcode that already existed at the same bin — prevents
+    # duplicate detailed rows + double Reco/variance.
+    report = _merge_detailed_collisions(report)
     return {"report": report, "totals": rounded_totals, "extra_columns": extra_columns}
 
 @portal_router.get("/reports/consolidated/{client_id}/barcode-wise")
@@ -4324,6 +4394,8 @@ async def get_detailed_report(session_id: str):
     s_client_id = session.get("client_id", "") if session else ""
     edits = await db.barcode_edits.find({"client_id": s_client_id, "is_active": True}, {"_id": 0}).to_list(10000)
     report, totals = _apply_barcode_edits(report, totals, edits, "detailed", master_by_barcode)
+    # Merge collisions caused by edits — see helper docstring
+    report = _merge_detailed_collisions(report)
     return {"report": report, "totals": totals, "extra_columns": extra_columns}
 
 
