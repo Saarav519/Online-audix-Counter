@@ -807,6 +807,236 @@ def _calc_accuracy(stock_qty: float, final_qty: float) -> float:
     return min(100.0, (min(stock_qty, final_qty) / stock_qty) * 100.0)
 
 
+async def _build_cc_reco_maps(client_id: str) -> Dict[str, Dict[str, float]]:
+    """Mirror of warehouse `_build_reco_maps` — Reco adjustments live at the
+    client level, so the same `reco_adjustments` collection feeds Cycle Count
+    consolidated reports."""
+    adjs = await db.reco_adjustments.find({"client_id": client_id}, {"_id": 0}).to_list(100000)
+    detailed_map: Dict[str, float] = {}
+    barcode_map: Dict[str, float] = {}
+    article_map: Dict[str, float] = {}
+    for a in adjs:
+        rt = a.get("reco_type", "")
+        if rt == "detailed":
+            key = f"{a.get('location', '')}|{a.get('barcode', '')}"
+            detailed_map[key] = detailed_map.get(key, 0) + _to_float(a.get("reco_qty"))
+            bc = a.get("barcode", "")
+            barcode_map[bc] = barcode_map.get(bc, 0) + _to_float(a.get("reco_qty"))
+        elif rt == "barcode":
+            bc = a.get("barcode", "")
+            barcode_map[bc] = barcode_map.get(bc, 0) + _to_float(a.get("reco_qty"))
+        elif rt == "article":
+            ac = a.get("article_code", "")
+            article_map[ac] = article_map.get(ac, 0) + _to_float(a.get("reco_qty"))
+    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+
+
+async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
+                         client_id: str, report_type: str) -> tuple:
+    """Apply saved Reco adjustments to cycle-count consolidated rows + totals.
+
+    Mirrors warehouse semantics:
+      • final_qty   = physical_qty + pre_pick_qty (effective) + reco_qty
+      • final_value = final_qty * (mrp/cost)
+      • diff_qty    = final_qty - stock_qty
+      • diff_value  = final_value - stock_value
+      • accuracy    = min(stock, final)/stock * 100  (capped at 100)
+
+    Bin-wise + category-summary roll the per-(loc,barcode) reco up via the
+    detailed map; barcode-wise uses the barcode map directly.
+    """
+    reco_maps = await _build_cc_reco_maps(client_id)
+    if not (reco_maps["detailed"] or reco_maps["barcode"] or reco_maps["article"]):
+        return report, totals
+
+    # Reset reco-affected totals — we'll recompute from scratch
+    reco_total_keys = ["reco_qty", "final_qty", "diff_qty", "difference_qty",
+                        "final_value_mrp", "final_value_cost",
+                        "diff_value_mrp", "diff_value_cost"]
+    for k in reco_total_keys:
+        totals[k] = 0.0
+
+    for row in report:
+        loc = row.get("location", "")
+        bc = row.get("barcode", "")
+
+        if report_type == "detailed":
+            reco_qty = reco_maps["detailed"].get(f"{loc}|{bc}", 0)
+        elif report_type == "barcode-wise":
+            reco_qty = reco_maps["barcode"].get(bc, 0)
+        elif report_type == "bin-wise":
+            # Sum reco across all barcodes at this location
+            reco_qty = sum(v for k, v in reco_maps["detailed"].items() if k.startswith(f"{loc}|"))
+        elif report_type == "category-summary":
+            # Reco doesn't roll up cleanly to category — leave at 0
+            reco_qty = 0
+        else:
+            reco_qty = 0
+
+        row["reco_qty"] = reco_qty
+        # effective_qty already reflects physical + pre-pick. Add reco on top.
+        physical_qty = _to_float(row.get("physical_qty"))
+        effective = _to_float(row.get("effective_qty", physical_qty))
+        final_qty = effective + reco_qty
+        row["final_qty"] = final_qty
+        row["diff_qty"] = final_qty - _to_float(row.get("stock_qty"))
+        row["difference_qty"] = row["diff_qty"]
+
+        mrp = _to_float(row.get("mrp"))
+        cost = _to_float(row.get("cost"))
+        # Bin-wise / category-summary rows don't carry mrp/cost; leave value
+        # columns alone if we can't recompute them per-row.
+        if mrp or cost:
+            fv = _calc_values(final_qty, mrp, cost)
+            row["final_value_mrp"] = fv["mrp"]
+            row["final_value_cost"] = fv["cost"]
+            row["diff_value_mrp"] = round(fv["mrp"] - _to_float(row.get("stock_value_mrp")), 2)
+            row["diff_value_cost"] = round(fv["cost"] - _to_float(row.get("stock_value_cost")), 2)
+        else:
+            # Aggregate rows: derive value totals proportionally from existing values
+            # final_value = stock_value + (final - stock) * avg_unit_value
+            row["final_value_mrp"] = round(_to_float(row.get("final_value_mrp")) + reco_qty * _avg_unit_value(row, "mrp"), 2)
+            row["final_value_cost"] = round(_to_float(row.get("final_value_cost")) + reco_qty * _avg_unit_value(row, "cost"), 2)
+            row["diff_value_mrp"] = round(_to_float(row.get("final_value_mrp")) - _to_float(row.get("stock_value_mrp")), 2)
+            row["diff_value_cost"] = round(_to_float(row.get("final_value_cost")) - _to_float(row.get("stock_value_cost")), 2)
+
+        row["accuracy_pct"] = _calc_accuracy(_to_float(row.get("stock_qty")), final_qty)
+
+        # Roll into totals
+        totals["reco_qty"] += reco_qty
+        totals["final_qty"] += final_qty
+        totals["diff_qty"] += row["diff_qty"]
+        totals["difference_qty"] += row["diff_qty"]
+        totals["final_value_mrp"] += _to_float(row.get("final_value_mrp"))
+        totals["final_value_cost"] += _to_float(row.get("final_value_cost"))
+        totals["diff_value_mrp"] += _to_float(row.get("diff_value_mrp"))
+        totals["diff_value_cost"] += _to_float(row.get("diff_value_cost"))
+
+    # Round value totals
+    for k in reco_total_keys:
+        if "value" in k:
+            totals[k] = round(totals[k], 2)
+    totals["accuracy_pct"] = _calc_accuracy(
+        _to_float(totals.get("stock_qty")), _to_float(totals.get("final_qty"))
+    )
+    return report, totals
+
+
+def _avg_unit_value(row: Dict[str, Any], kind: str) -> float:
+    """For aggregate rows (bin/category) compute avg unit MRP or Cost from
+    existing stock_value / stock_qty, falling back to physical_value/qty."""
+    qty = _to_float(row.get("stock_qty")) or _to_float(row.get("physical_qty"))
+    if qty <= 0:
+        return 0.0
+    if kind == "mrp":
+        val = _to_float(row.get("stock_value_mrp")) or _to_float(row.get("physical_value_mrp"))
+    else:
+        val = _to_float(row.get("stock_value_cost")) or _to_float(row.get("physical_value_cost"))
+    return val / qty if qty else 0.0
+
+
+async def _apply_cc_barcode_edits(report: List[Dict[str, Any]], totals: Dict[str, Any],
+                                   client_id: str, report_type: str) -> tuple:
+    """Apply saved barcode/article edits to cycle-count rows + totals — same
+    semantics as warehouse `_apply_barcode_edits`. Pulls from the shared
+    `barcode_edits` collection so an edit made on a warehouse session for the
+    same client also applies here (and vice versa).
+
+    Bin-wise + category-summary aren't barcode-grain views, so they're skipped.
+    """
+    if report_type not in ("detailed", "barcode-wise"):
+        return report, totals
+
+    edits = await db.barcode_edits.find(
+        {"client_id": client_id, "report_type": {"$in": ["detailed", "barcode-wise"]}, "is_active": True},
+        {"_id": 0}
+    ).to_list(5000)
+
+    if not edits:
+        return report, totals
+
+    for edit in edits:
+        for row in report:
+            match = (
+                row.get("barcode") == edit["original_value"]
+                and _to_float(row.get("stock_qty")) == 0
+            )
+            # Detailed view honours location scoping when edit was created from detailed
+            if (
+                report_type == "detailed"
+                and edit.get("report_type") == "detailed"
+                and edit.get("location")
+                and row.get("location") != edit["location"]
+            ):
+                match = False
+            if not match:
+                continue
+
+            # Subtract old contribution from totals
+            for k in [
+                "physical_value_mrp", "physical_value_cost",
+                "final_value_mrp", "final_value_cost",
+                "diff_value_mrp", "diff_value_cost",
+            ]:
+                totals[k] = round(_to_float(totals.get(k, 0)) - _to_float(row.get(k, 0)), 2)
+
+            mi = edit.get("master_info", {}) or {}
+            row["barcode"] = edit["new_value"]
+            row["description"] = mi.get("description", row.get("description", ""))
+            row["category"] = mi.get("category", row.get("category", ""))
+            row["article_code"] = mi.get("article_code", "")
+            row["article_name"] = mi.get("article_name", "")
+            new_mrp = _to_float(mi.get("mrp", 0))
+            new_cost = _to_float(mi.get("cost", 0))
+            row["mrp"] = new_mrp
+            row["cost"] = new_cost
+
+            pq = _to_float(row.get("physical_qty"))
+            rq = _to_float(row.get("reco_qty"))
+            fq = pq + rq
+            sv = _calc_values(_to_float(row.get("stock_qty")), new_mrp, new_cost)
+            pv = _calc_values(pq, new_mrp, new_cost)
+            fv = _calc_values(fq, new_mrp, new_cost)
+            row["stock_value_mrp"] = sv["mrp"]
+            row["stock_value_cost"] = sv["cost"]
+            row["physical_value_mrp"] = pv["mrp"]
+            row["physical_value_cost"] = pv["cost"]
+            row["final_qty"] = fq
+            row["final_value_mrp"] = fv["mrp"]
+            row["final_value_cost"] = fv["cost"]
+            row["diff_value_mrp"] = round(fv["mrp"] - sv["mrp"], 2)
+            row["diff_value_cost"] = round(fv["cost"] - sv["cost"], 2)
+            row["accuracy_pct"] = _calc_accuracy(_to_float(row.get("stock_qty")), fq)
+
+            row["remark"] = f"Barcode Edited (was: {edit['original_value']})"
+            row["_edit_id"] = edit["id"]
+            row["_original_value"] = edit["original_value"]
+            row["is_edited"] = True
+
+            # Re-add new contribution to totals
+            for k in [
+                "physical_value_mrp", "physical_value_cost",
+                "final_value_mrp", "final_value_cost",
+                "diff_value_mrp", "diff_value_cost",
+            ]:
+                totals[k] = round(_to_float(totals.get(k, 0)) + _to_float(row.get(k, 0)), 2)
+            break
+
+    # Re-mark editable rows so edited rows can be re-edited
+    for row in report:
+        if row.get("is_edited"):
+            row["is_editable"] = True
+        else:
+            row["is_editable"] = (
+                _to_float(row.get("stock_qty")) == 0 and _to_float(row.get("physical_qty")) > 0
+            )
+
+    totals["accuracy_pct"] = _calc_accuracy(
+        _to_float(totals.get("stock_qty")), _to_float(totals.get("final_qty"))
+    )
+    return report, totals
+
+
 def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Re-shape cycle-count base rows (per-(loc, barcode)) into the format the
     Reports UI expects for each report_type. Adds full MRP/Cost value columns
@@ -972,6 +1202,16 @@ def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str
         if "value" in k:
             totals[k] = round(totals[k], 2)
     totals["accuracy_pct"] = _calc_accuracy(totals["stock_qty"], totals["final_qty"])
+
+    # Mark rows editable when barcode/article wasn't in uploaded stock but was
+    # scanned (mirrors warehouse `is_editable` rule). Bin-wise + category-summary
+    # don't expose barcode edits, so we skip those report types.
+    if report_type in ("detailed", "barcode-wise"):
+        for row in rows:
+            row["is_editable"] = (
+                _to_float(row.get("stock_qty")) == 0 and _to_float(row.get("physical_qty")) > 0
+            )
+
     return {"report": rows, "totals": totals}
 
 
@@ -989,6 +1229,13 @@ async def cycle_day_report(day_id: str, report_type: str):
     stock_meta = await _stock_meta_map(project["id"], day_id)
     _enrich_with_master(base["report"], master, stock_meta)
     shaped = _shape_report(report_type, base["report"])
+    # Apply any saved barcode/article edits (warehouse parity: shared
+    # `barcode_edits` collection, scoped per client, picks up master
+    # description/category/mrp/cost when an extra-scanned barcode is
+    # corrected by the user).
+    shaped["report"], shaped["totals"] = await _apply_cc_barcode_edits(
+        shaped["report"], shaped["totals"], project["client_id"], report_type
+    )
     shaped["session_info"] = {
         "id": f"cc_day_{day_id}", "name": f"{project['name']} · Day {day['day_no']}",
         "client_id": project["client_id"], "variance_mode": "cycle-count-day",
@@ -1185,6 +1432,14 @@ async def cycle_project_report(pid: str, report_type: str):
     base_rows = list(bin_agg.values())
     _enrich_with_master(base_rows, master, stock_meta)
     shaped = _shape_report(report_type, base_rows)
+    # Apply saved barcode/article edits (warehouse parity)
+    shaped["report"], shaped["totals"] = await _apply_cc_barcode_edits(
+        shaped["report"], shaped["totals"], project["client_id"], report_type
+    )
+    # Apply Reco adjustments → fills in `reco_qty` & `final_qty` columns + value math
+    shaped["report"], shaped["totals"] = await _apply_cc_reco(
+        shaped["report"], shaped["totals"], project["client_id"], report_type
+    )
     shaped["session_info"] = {
         "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
         "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",
