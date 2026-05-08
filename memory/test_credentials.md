@@ -1,7 +1,7 @@
 # Portal Test Credentials
 
 ## Audit Admin Portal
-- URL: https://online-audit-1.preview.emergentagent.com/portal
+- URL: https://audix-test.preview.emergentagent.com/portal
 - **Username**: admin
 - **Password**: admin123
 - Role: admin (auto-seeded on startup)
