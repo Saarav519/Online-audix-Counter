@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://audix-test.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://audio-tracker-8.preview.emergentagent.com").rstrip("/")
 PORTAL = f"{BASE_URL}/api/audit/portal"
 CC = f"{PORTAL}/cycle-count"
 
