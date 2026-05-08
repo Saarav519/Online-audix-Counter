@@ -516,7 +516,7 @@ function GridRenderer({
   scrollRef,
   onSaveReco, isConsolidated, isRecoEditable, recoType,
   handleScroll, setSelStart, setSelEnd,
-  clientId, reportType, onRefresh
+  clientId, reportType, onRefresh, barcodeReadOnly = false
 }) {
   const frozenCols = useMemo(() => visibleColumns.filter(c => frozenColumns.has(c.key)), [visibleColumns, frozenColumns]);
   const scrollableCols = useMemo(() => visibleColumns.filter(c => !frozenColumns.has(c.key)), [visibleColumns, frozenColumns]);
@@ -682,7 +682,7 @@ function GridRenderer({
                   // Barcode/Article edit for extra scanned items
                   const isBarcodeCol = col.key === 'barcode' && reportType !== 'article-wise';
                   const isArticleCol = col.key === 'article_code' && reportType === 'article-wise';
-                  if ((isBarcodeCol || isArticleCol) && (row.is_editable || row.is_edited) && clientId) {
+                  if ((isBarcodeCol || isArticleCol) && (row.is_editable || row.is_edited) && clientId && !barcodeReadOnly) {
                     const editField = isArticleCol ? 'article_code' : 'barcode';
                     const editReportType = reportType === 'article-wise' ? 'article-wise' : (reportType === 'detailed' ? 'detailed' : 'barcode-wise');
                     return (
@@ -753,7 +753,7 @@ export function FullScreenReport({
   frozenColumns = new Set(), hiddenColumns = new Set(),
   onToggleFreeze, onToggleVisibility, onShowAllColumns, onResetColumns,
   onSaveReco, isConsolidated, isRecoEditable, reportType,
-  children, totalRows = 0, clientId, onRefresh
+  children, totalRows = 0, clientId, onRefresh, barcodeReadOnly = false
 }) {
   const scrollRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -1238,6 +1238,7 @@ export function FullScreenReport({
           clientId={clientId}
           reportType={reportType}
           onRefresh={onRefresh}
+          barcodeReadOnly={barcodeReadOnly}
         />
       </div>
 
