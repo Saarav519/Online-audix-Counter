@@ -832,7 +832,8 @@ async def _build_cc_reco_maps(client_id: str) -> Dict[str, Dict[str, float]]:
 
 
 async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
-                         client_id: str, report_type: str) -> tuple:
+                         client_id: str, report_type: str,
+                         base_rows: Optional[List[Dict[str, Any]]] = None) -> tuple:
     """Apply saved Reco adjustments to cycle-count consolidated rows + totals.
 
     Mirrors warehouse semantics:
@@ -844,10 +845,28 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
 
     Bin-wise + category-summary roll the per-(loc,barcode) reco up via the
     detailed map; barcode-wise uses the barcode map directly.
+    Category-summary builds a barcode→category index from `base_rows`
+    (post-edit) so reco moves into the correct edited category.
     """
     reco_maps = await _build_cc_reco_maps(client_id)
     if not (reco_maps["detailed"] or reco_maps["barcode"] or reco_maps["article"]):
         return report, totals
+
+    # Build barcode→category index (post-edit) for category-summary roll-up.
+    # Mirrors warehouse `get_category_summary` which buckets reco by category
+    # via a barcode→category lookup so Reco shows up in the right bucket.
+    bc_to_cat: Dict[str, str] = {}
+    if report_type == "category-summary" and base_rows:
+        for r in base_rows:
+            bc = r.get("barcode") or ""
+            cat = r.get("category") or "Unmapped"
+            if bc and bc not in bc_to_cat:
+                bc_to_cat[bc] = cat
+    reco_by_category: Dict[str, float] = {}
+    if report_type == "category-summary":
+        for bc, q in reco_maps["barcode"].items():
+            cat = bc_to_cat.get(bc, "Unmapped")
+            reco_by_category[cat] = reco_by_category.get(cat, 0) + q
 
     # Reset reco-affected totals — we'll recompute from scratch
     reco_total_keys = ["reco_qty", "final_qty", "diff_qty", "difference_qty",
@@ -868,8 +887,7 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
             # Sum reco across all barcodes at this location
             reco_qty = sum(v for k, v in reco_maps["detailed"].items() if k.startswith(f"{loc}|"))
         elif report_type == "category-summary":
-            # Reco doesn't roll up cleanly to category — leave at 0
-            reco_qty = 0
+            reco_qty = reco_by_category.get(row.get("category", "") or "Unmapped", 0)
         else:
             reco_qty = 0
 
@@ -935,106 +953,102 @@ def _avg_unit_value(row: Dict[str, Any], kind: str) -> float:
     return val / qty if qty else 0.0
 
 
-async def _apply_cc_barcode_edits(report: List[Dict[str, Any]], totals: Dict[str, Any],
-                                   client_id: str, report_type: str) -> tuple:
-    """Apply saved barcode/article edits to cycle-count rows + totals — same
-    semantics as warehouse `_apply_barcode_edits`. Pulls from the shared
-    `barcode_edits` collection so an edit made on a warehouse session for the
-    same client also applies here (and vice versa).
-
-    Bin-wise + category-summary aren't barcode-grain views, so they're skipped.
-    """
-    if report_type not in ("detailed", "barcode-wise"):
-        return report, totals
-
-    edits = await db.barcode_edits.find(
+async def _load_active_barcode_edits(client_id: str) -> List[Dict[str, Any]]:
+    """Pull every active barcode edit for this client (shared with warehouse).
+    Cycle Count uses these at the BASE-row level so edits propagate to every
+    shaped report (detailed / barcode-wise / category-summary)."""
+    return await db.barcode_edits.find(
         {"client_id": client_id, "report_type": {"$in": ["detailed", "barcode-wise"]}, "is_active": True},
         {"_id": 0}
     ).to_list(5000)
 
+
+def _apply_cc_barcode_edits_to_base(base_rows: List[Dict[str, Any]],
+                                     edits: List[Dict[str, Any]]) -> set:
+    """Mutate per-(loc, barcode) cycle-count rows IN-PLACE: rename barcode +
+    pull description/category/mrp/cost from the edit's saved master_info.
+
+    Operating at the base level (BEFORE `_shape_report`) is what guarantees
+    that a barcode edit propagates correctly into every aggregated view —
+    barcode-wise re-buckets under the new barcode, and category-summary
+    re-buckets under the (possibly different) new category. This mirrors the
+    warehouse approach (`audit_routes.get_category_summary` line ~4601 where
+    scanner barcodes are remapped before bucketing into categories).
+
+    Only "extra-scanned" rows (expected_qty == 0) are eligible — same rule as
+    warehouse `_apply_barcode_edits`. Detailed-scoped edits additionally
+    require the location to match.
+
+    Returns a set of NEW barcode values (post-edit) so the shape stage can
+    flag matching shaped rows as `is_edited` for the UI's pencil/undo affordances.
+    """
+    edited_new_barcodes: set = set()
     if not edits:
-        return report, totals
-
+        return edited_new_barcodes
     for edit in edits:
-        for row in report:
-            match = (
-                row.get("barcode") == edit["original_value"]
-                and _to_float(row.get("stock_qty")) == 0
-            )
-            # Detailed view honours location scoping when edit was created from detailed
-            if (
-                report_type == "detailed"
-                and edit.get("report_type") == "detailed"
-                and edit.get("location")
-                and row.get("location") != edit["location"]
-            ):
-                match = False
-            if not match:
+        orig = edit.get("original_value")
+        new_v = edit.get("new_value")
+        if not orig or not new_v:
+            continue
+        edit_loc = edit.get("location") or ""
+        edit_source = edit.get("report_type")
+        mi = edit.get("master_info", {}) or {}
+        new_mrp = _to_float(mi.get("mrp", 0))
+        new_cost = _to_float(mi.get("cost", 0))
+        for r in base_rows:
+            if r.get("barcode") != orig:
                 continue
+            if _to_float(r.get("expected_qty")) != 0:
+                continue
+            # Detailed-scoped edits are location-specific; barcode-wise edits are global
+            if edit_source == "detailed" and edit_loc and r.get("location") != edit_loc:
+                continue
+            r["barcode"] = new_v
+            r["description"] = mi.get("description", "") or r.get("description", "")
+            r["category"] = mi.get("category", "") or r.get("category", "") or "Unmapped"
+            r["article_code"] = mi.get("article_code", "") or r.get("article_code", "")
+            r["article_name"] = mi.get("article_name", "") or r.get("article_name", "")
+            r["mrp"] = new_mrp
+            r["cost"] = new_cost
+            r["_edit_id"] = edit["id"]
+            r["_original_value"] = orig
+            r["_is_edited"] = True
+            edited_new_barcodes.add(new_v)
+    return edited_new_barcodes
 
-            # Subtract old contribution from totals
-            for k in [
-                "physical_value_mrp", "physical_value_cost",
-                "final_value_mrp", "final_value_cost",
-                "diff_value_mrp", "diff_value_cost",
-            ]:
-                totals[k] = round(_to_float(totals.get(k, 0)) - _to_float(row.get(k, 0)), 2)
 
-            mi = edit.get("master_info", {}) or {}
-            row["barcode"] = edit["new_value"]
-            row["description"] = mi.get("description", row.get("description", ""))
-            row["category"] = mi.get("category", row.get("category", ""))
-            row["article_code"] = mi.get("article_code", "")
-            row["article_name"] = mi.get("article_name", "")
-            new_mrp = _to_float(mi.get("mrp", 0))
-            new_cost = _to_float(mi.get("cost", 0))
-            row["mrp"] = new_mrp
-            row["cost"] = new_cost
-
-            pq = _to_float(row.get("physical_qty"))
-            rq = _to_float(row.get("reco_qty"))
-            fq = pq + rq
-            sv = _calc_values(_to_float(row.get("stock_qty")), new_mrp, new_cost)
-            pv = _calc_values(pq, new_mrp, new_cost)
-            fv = _calc_values(fq, new_mrp, new_cost)
-            row["stock_value_mrp"] = sv["mrp"]
-            row["stock_value_cost"] = sv["cost"]
-            row["physical_value_mrp"] = pv["mrp"]
-            row["physical_value_cost"] = pv["cost"]
-            row["final_qty"] = fq
-            row["final_value_mrp"] = fv["mrp"]
-            row["final_value_cost"] = fv["cost"]
-            row["diff_value_mrp"] = round(fv["mrp"] - sv["mrp"], 2)
-            row["diff_value_cost"] = round(fv["cost"] - sv["cost"], 2)
-            row["accuracy_pct"] = _calc_accuracy(_to_float(row.get("stock_qty")), fq)
-
-            row["remark"] = f"Barcode Edited (was: {edit['original_value']})"
-            row["_edit_id"] = edit["id"]
-            row["_original_value"] = edit["original_value"]
-            row["is_edited"] = True
-
-            # Re-add new contribution to totals
-            for k in [
-                "physical_value_mrp", "physical_value_cost",
-                "final_value_mrp", "final_value_cost",
-                "diff_value_mrp", "diff_value_cost",
-            ]:
-                totals[k] = round(_to_float(totals.get(k, 0)) + _to_float(row.get(k, 0)), 2)
-            break
-
-    # Re-mark editable rows so edited rows can be re-edited
-    for row in report:
-        if row.get("is_edited"):
-            row["is_editable"] = True
+def _mark_edits_on_shaped(shaped: Dict[str, Any], report_type: str,
+                          base_rows: List[Dict[str, Any]],
+                          edited_new_barcodes: set) -> None:
+    """After `_shape_report`, flag the matching shaped rows as `is_edited`
+    so the UI shows the pencil/undo indicators. Only meaningful for
+    detailed and barcode-wise (the only views where the user can edit)."""
+    if report_type not in ("detailed", "barcode-wise"):
+        return
+    if not edited_new_barcodes:
+        return
+    # Build lookup: new_barcode -> {edit_id, original_value, location?}
+    edit_lookup: Dict[Any, Dict[str, Any]] = {}
+    for r in base_rows:
+        if r.get("_is_edited") and r.get("barcode") in edited_new_barcodes:
+            key = (r.get("location"), r.get("barcode")) if report_type == "detailed" else r.get("barcode")
+            edit_lookup[key] = {
+                "edit_id": r.get("_edit_id"),
+                "original_value": r.get("_original_value"),
+            }
+    for row in shaped.get("report", []):
+        if report_type == "detailed":
+            key = (row.get("location"), row.get("barcode"))
         else:
-            row["is_editable"] = (
-                _to_float(row.get("stock_qty")) == 0 and _to_float(row.get("physical_qty")) > 0
-            )
-
-    totals["accuracy_pct"] = _calc_accuracy(
-        _to_float(totals.get("stock_qty")), _to_float(totals.get("final_qty"))
-    )
-    return report, totals
+            key = row.get("barcode")
+        info = edit_lookup.get(key)
+        if not info:
+            continue
+        row["is_edited"] = True
+        row["is_editable"] = True
+        row["_edit_id"] = info["edit_id"]
+        row["_original_value"] = info["original_value"]
+        row["remark"] = f"Barcode Edited (was: {info['original_value']})"
 
 
 def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1228,20 +1242,23 @@ async def cycle_day_report(day_id: str, report_type: str):
     master = await _load_master_for_client(project["client_id"])
     stock_meta = await _stock_meta_map(project["id"], day_id)
     _enrich_with_master(base["report"], master, stock_meta)
+    # Apply barcode/article edits at the BASE-row level so the rename + new
+    # description/category/mrp/cost flow into every shaped report (detailed,
+    # barcode-wise, category-summary, bin-wise) consistently. Mirrors the
+    # warehouse approach where scanner barcodes are remapped before bucketing.
+    edits = await _load_active_barcode_edits(project["client_id"])
+    edited_new_barcodes = _apply_cc_barcode_edits_to_base(base["report"], edits)
     shaped = _shape_report(report_type, base["report"])
-    # Apply any saved barcode/article edits (warehouse parity: shared
-    # `barcode_edits` collection, scoped per client, picks up master
-    # description/category/mrp/cost when an extra-scanned barcode is
-    # corrected by the user).
-    shaped["report"], shaped["totals"] = await _apply_cc_barcode_edits(
-        shaped["report"], shaped["totals"], project["client_id"], report_type
-    )
+    # Mark shaped detailed/barcode-wise rows as edited for the UI's
+    # pencil/undo affordances and the "Barcode Edited (was: …)" remark.
+    _mark_edits_on_shaped(shaped, report_type, base["report"], edited_new_barcodes)
     # Apply Reco adjustments here too — Cycle Count Reco is editable only in
     # Day-wise Detailed Report but the resulting Reco/Final Qty must be
     # visible (read-only) across every cycle-count report. Pulling the same
     # `reco_adjustments` collection guarantees real-time propagation.
     shaped["report"], shaped["totals"] = await _apply_cc_reco(
-        shaped["report"], shaped["totals"], project["client_id"], report_type
+        shaped["report"], shaped["totals"], project["client_id"], report_type,
+        base_rows=base["report"],
     )
     shaped["session_info"] = {
         "id": f"cc_day_{day_id}", "name": f"{project['name']} · Day {day['day_no']}",
@@ -1438,14 +1455,15 @@ async def cycle_project_report(pid: str, report_type: str):
 
     base_rows = list(bin_agg.values())
     _enrich_with_master(base_rows, master, stock_meta)
+    # Apply barcode/article edits at the BASE-row level (warehouse parity)
+    edits = await _load_active_barcode_edits(project["client_id"])
+    edited_new_barcodes = _apply_cc_barcode_edits_to_base(base_rows, edits)
     shaped = _shape_report(report_type, base_rows)
-    # Apply saved barcode/article edits (warehouse parity)
-    shaped["report"], shaped["totals"] = await _apply_cc_barcode_edits(
-        shaped["report"], shaped["totals"], project["client_id"], report_type
-    )
+    _mark_edits_on_shaped(shaped, report_type, base_rows, edited_new_barcodes)
     # Apply Reco adjustments → fills in `reco_qty` & `final_qty` columns + value math
     shaped["report"], shaped["totals"] = await _apply_cc_reco(
-        shaped["report"], shaped["totals"], project["client_id"], report_type
+        shaped["report"], shaped["totals"], project["client_id"], report_type,
+        base_rows=base_rows,
     )
     shaped["session_info"] = {
         "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
