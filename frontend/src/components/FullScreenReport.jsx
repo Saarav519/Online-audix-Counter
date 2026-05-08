@@ -488,9 +488,11 @@ function RecoCell({ value, onSave, rowData, recoType }) {
         e.stopPropagation();
         if (e.key === 'Enter') {
           const params = { reco_type: recoType, reco_qty: Number(val) };
-          if (recoType === 'barcode') { params.barcode = rowData.barcode; params.article_code = rowData.article_code; }
-          else if (recoType === 'article') { params.article_code = rowData.article_code; }
-          else if (recoType === 'detailed') { params.location = rowData.location; params.barcode = rowData.barcode; }
+          // Anchor reco to the ORIGINAL value when row is edited so the
+          // adjustment survives barcode/article renames + undo cycles.
+          if (recoType === 'barcode') { params.barcode = rowData._original_value || rowData.barcode; params.article_code = rowData.article_code; }
+          else if (recoType === 'article') { params.article_code = rowData._original_value || rowData.article_code; }
+          else if (recoType === 'detailed') { params.location = rowData.location; params.barcode = rowData._original_value || rowData.barcode; }
           onSave(params);
           setEditing(false);
         }

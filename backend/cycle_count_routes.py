@@ -855,13 +855,33 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
     # Build barcode→category index (post-edit) for category-summary roll-up.
     # Mirrors warehouse `get_category_summary` which buckets reco by category
     # via a barcode→category lookup so Reco shows up in the right bucket.
+    # Index by BOTH the current barcode AND the original (pre-edit) barcode
+    # so reco saved against either value (frontend now saves with original
+    # to keep reco resilient to undo) lands in the correct category.
+    # IMPORTANT: edited rows take precedence — the auditor's intent when
+    # editing a barcode is that the reco should follow the NEW category.
     bc_to_cat: Dict[str, str] = {}
     if report_type == "category-summary" and base_rows:
+        # Pass 1: edited rows define authoritative category for both
+        # original and new barcode (auditor's edit reflects intent).
         for r in base_rows:
-            bc = r.get("barcode") or ""
+            if not r.get("_is_edited"):
+                continue
             cat = r.get("category") or "Unmapped"
-            if bc and bc not in bc_to_cat:
-                bc_to_cat[bc] = cat
+            bc_now = r.get("barcode") or ""
+            bc_orig = r.get("_original_value") or ""
+            if bc_now:
+                bc_to_cat[bc_now] = cat
+            if bc_orig:
+                bc_to_cat[bc_orig] = cat
+        # Pass 2: non-edited rows only fill gaps (don't overwrite edits)
+        for r in base_rows:
+            if r.get("_is_edited"):
+                continue
+            cat = r.get("category") or "Unmapped"
+            bc_now = r.get("barcode") or ""
+            if bc_now and bc_now not in bc_to_cat:
+                bc_to_cat[bc_now] = cat
     reco_by_category: Dict[str, float] = {}
     if report_type == "category-summary":
         for bc, q in reco_maps["barcode"].items():
@@ -878,11 +898,19 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
     for row in report:
         loc = row.get("location", "")
         bc = row.get("barcode", "")
+        # Reco is anchored to the ORIGINAL barcode when a row is edited
+        # (frontend sends `_original_value` to keep reco resilient to
+        # barcode rename + undo cycles). For non-edited rows the original
+        # equals the current barcode, so the same lookup works for both.
+        orig_bc = row.get("_original_value") or bc
 
         if report_type == "detailed":
-            reco_qty = reco_maps["detailed"].get(f"{loc}|{bc}", 0)
+            reco_qty = (
+                reco_maps["detailed"].get(f"{loc}|{orig_bc}", 0)
+                or reco_maps["detailed"].get(f"{loc}|{bc}", 0)
+            )
         elif report_type == "barcode-wise":
-            reco_qty = reco_maps["barcode"].get(bc, 0)
+            reco_qty = reco_maps["barcode"].get(orig_bc, 0) or reco_maps["barcode"].get(bc, 0)
         elif report_type == "bin-wise":
             # Sum reco across all barcodes at this location
             reco_qty = sum(v for k, v in reco_maps["detailed"].items() if k.startswith(f"{loc}|"))

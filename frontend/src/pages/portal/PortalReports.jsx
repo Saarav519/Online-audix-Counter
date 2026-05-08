@@ -1599,13 +1599,32 @@ export default function PortalReports() {
     const keyToCol = {};
     exportCols.forEach((c, i) => { keyToCol[c.key] = colLetter(i); });
 
+    // Cycle-count rows carry pre-/post-audit picks that affect the variance
+    // baseline. Detect via `_is_cycle_count` flag (set by backend) so the
+    // exported Excel formula matches the backend math:
+    //   Final Qty (cycle count) = Physical + Pre-Audit + Reco
+    //   Final Qty (warehouse)   = Physical + Reco
+    //   Ending Stock            = Physical − Post-Audit          (cycle count only)
+    const isCycleCountRows = rows.some(r => r._is_cycle_count === true);
+
     // Formula columns mapping
     const formulaKeys = {
       'stock_value_mrp':    (r) => keyToCol['stock_qty'] && keyToCol['mrp'] ? `${keyToCol['stock_qty']}${r}*${keyToCol['mrp']}${r}` : null,
       'stock_value_cost':   (r) => keyToCol['stock_qty'] && keyToCol['cost'] ? `${keyToCol['stock_qty']}${r}*${keyToCol['cost']}${r}` : null,
       'physical_value_mrp': (r) => keyToCol['physical_qty'] && keyToCol['mrp'] ? `${keyToCol['physical_qty']}${r}*${keyToCol['mrp']}${r}` : null,
       'physical_value_cost':(r) => keyToCol['physical_qty'] && keyToCol['cost'] ? `${keyToCol['physical_qty']}${r}*${keyToCol['cost']}${r}` : null,
-      'final_qty':          (r) => keyToCol['physical_qty'] && keyToCol['reco_qty'] ? `${keyToCol['physical_qty']}${r}+${keyToCol['reco_qty']}${r}` : null,
+      'final_qty':          (r) => {
+        if (!keyToCol['physical_qty']) return null;
+        const parts = [`${keyToCol['physical_qty']}${r}`];
+        if (isCycleCountRows && keyToCol['pre_pick_qty']) parts.push(`${keyToCol['pre_pick_qty']}${r}`);
+        if (keyToCol['reco_qty']) parts.push(`${keyToCol['reco_qty']}${r}`);
+        return parts.length > 1 ? parts.join('+') : null;
+      },
+      'ending_stock':       (r) => {
+        if (!isCycleCountRows) return null;
+        if (!keyToCol['physical_qty'] || !keyToCol['post_pick_qty']) return null;
+        return `${keyToCol['physical_qty']}${r}-${keyToCol['post_pick_qty']}${r}`;
+      },
       'final_value_mrp':    (r) => keyToCol['final_qty'] && keyToCol['mrp'] ? `${keyToCol['final_qty']}${r}*${keyToCol['mrp']}${r}` : null,
       'final_value_cost':   (r) => keyToCol['final_qty'] && keyToCol['cost'] ? `${keyToCol['final_qty']}${r}*${keyToCol['cost']}${r}` : null,
       'diff_qty':           (r) => {
@@ -1707,6 +1726,35 @@ export default function PortalReports() {
     ws['!ref'] = `A1:${colLetter(exportCols.length - 1)}${totalsRow}`;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Variance Report');
+
+    // Cycle Count clients get a "Formula Legend" sheet so the auditor can
+    // verify the convention used for Final Qty / Ending Stock / Variance.
+    if (isCycleCountRows) {
+      const legend = [
+        ['Cycle Count — Final Qty Formula Legend'],
+        [],
+        ['Stock Qty', 'Morning baseline (book qty before any picking)'],
+        ['Pre-Audit Qty', 'Items picked from bin BEFORE auditor counted'],
+        ['Physical Qty', 'What auditor actually counted on shelf'],
+        ['Post-Audit Qty', 'Items picked from bin AFTER auditor counted'],
+        ['Reco Qty', 'Manual reconciliation adjustment (signed +/−)'],
+        [],
+        ['Final Qty', '= Physical + Pre-Audit + Reco'],
+        ['Ending Stock', '= Physical − Post-Audit'],
+        ['Diff Qty (Variance)', '= Final Qty − Stock Qty'],
+        ['Final Value (MRP)', '= Final Qty × MRP'],
+        ['Final Value (Cost)', '= Final Qty × Cost'],
+        ['Accuracy %', '= MIN(Final Qty / Stock Qty × 100, 100)'],
+        [],
+        ['Sign rules', ''],
+        ['Pre-Audit', 'Always INCREASES Final Qty (items would have been on shelf at audit time)'],
+        ['Post-Audit', 'Does NOT affect Final Qty (already counted in Physical) — only Ending Stock'],
+        ['Reco', 'Signed: + adds, − subtracts (auditor judgement)'],
+      ];
+      const legendWs = XLSX.utils.aoa_to_sheet(legend);
+      legendWs['!cols'] = [{ wch: 22 }, { wch: 70 }];
+      XLSX.utils.book_append_sheet(wb, legendWs, 'Formula Legend');
+    }
 
     const suffix = varianceCategory !== 'all' ? `_${varianceCategory}` : '';
     const filename = `${reportType}_report${suffix}_${selectedSession}.xlsx`;
@@ -2392,7 +2440,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row.barcode, location: row.location, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row._original_value || row.barcode, location: row.location, reco_qty: val })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -2553,7 +2601,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row.barcode, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row._original_value || row.barcode, reco_qty: val })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -2712,7 +2760,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
                   {isRecoEditable && (
                     <td className="py-1 px-2 bg-blue-50/30" onClick={e => e.stopPropagation()}>
-                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row.article_code, reco_qty: val })} />
+                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row._original_value || row.article_code, reco_qty: val })} />
                     </td>
                   )}
                   {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
