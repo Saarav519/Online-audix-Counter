@@ -17,9 +17,10 @@ Variance math (the killer feature):
   variance      = effective_cnt - expected
 
 Variance scope:
-  Only bins that were actually scanned today appear in the day's variance.
-  Unscanned-but-uploaded bins are silently ignored (next day's upload picks
-  things up fresh).
+  Day-level variance includes every bin that has uploaded stock, picks, or
+  scans (mirrors warehouse consolidated semantics so an unscanned bin with
+  uploaded stock still surfaces as "Pending — not yet counted").
+  Project consolidated rolls up across all days (open + closed).
 
 Duplicate-bin detection:
   When viewing/closing a day, any bin that was already closed in an earlier
@@ -231,7 +232,13 @@ async def _scanned_data_for_day(day: Dict[str, Any], session_id: str) -> Dict[st
 
 
 async def _compute_day_variance(project: Dict[str, Any], day: Dict[str, Any]) -> Dict[str, Any]:
-    """Build the variance report for a given day with picking math applied."""
+    """Build the variance report for a given day with picking math applied.
+
+    Mirrors the warehouse consolidated semantics: every bin that has *any* of
+    {uploaded stock, pre/post pick, scan} for the day appears in the report.
+    Unscanned-but-stocked bins surface as ``classification: planned`` with
+    ``scanned_qty = 0`` (so the Reports UI can flag them as "Pending").
+    """
     project_id = project["id"]
     day_id = day["id"]
     session_id = await _ensure_audit_session(project)
@@ -269,22 +276,23 @@ async def _compute_day_variance(project: Dict[str, Any], day: Dict[str, Any]) ->
     for cb in closed_bin_docs:
         closed_lookup.setdefault(cb["location"], []).append(cb)
 
-    # Build report — ONLY for bins actually scanned today
+    # Build report for bins that have stock, picks, OR scans (warehouse-consolidated parity)
     report_rows: List[Dict[str, Any]] = []
     totals = {"expected": 0.0, "scanned": 0.0, "pre_pick": 0.0, "post_pick": 0.0,
               "effective": 0.0, "variance": 0.0, "ending": 0.0}
 
-    for loc, scans in scan_map.items():
+    all_locations = set(scan_map.keys()) | set(stock_map.keys()) | set(pre_map.keys()) | set(post_map.keys())
+    for loc in all_locations:
+        scans = scan_map.get(loc, {})
         loc_stock = stock_map.get(loc, {})
         loc_pre = pre_map.get(loc, {})
         loc_post = post_map.get(loc, {})
         all_bcs = set(scans.keys()) | set(loc_stock.keys()) | set(loc_pre.keys()) | set(loc_post.keys())
-        # Only show barcodes scanned at this loc OR present in stock for it.
-        # If neither, skip (e.g. picks-only with no scan and no stock — just data noise)
+        # Show every barcode tied to this location (scanned, stocked, or picked).
+        # We no longer skip unscanned-but-stocked rows so the Reports UI can
+        # render the pre-audit baseline immediately after upload.
         for bc in sorted(all_bcs):
             scanned = scans.get(bc, 0)
-            if scanned == 0 and bc not in loc_stock:
-                continue
             expected = loc_stock.get(bc, 0)
             pre_pick = loc_pre.get(bc, 0)
             post_pick = loc_post.get(bc, 0)
@@ -940,24 +948,27 @@ async def cycle_project_report(pid: str, report_type: str):
     """Reports-UI compatible consolidated variance report.
 
     Consolidation rules (per user spec):
-      • Only LOCKED days contribute to consolidated data.
-      • For each (location, barcode) the LATEST locked day's row wins (overwrite
-        — not sum). That way the consolidated view always reflects the most
-        recent locked count for any bin.
-      • Bins/barcodes only counted on earlier locked days remain in the report
+      • All days (open + closed) contribute to the consolidated view — same as
+        the warehouse consolidated flow where in-progress sessions still
+        contribute to client-level totals.
+      • For each (location, barcode) the LATEST day's row wins (overwrite —
+        not sum). That way the consolidated view always reflects the most
+        recent count for any bin.
+      • Bins/barcodes only counted on earlier days remain in the report
         (cumulative across days).
 
     Special report_types only available in consolidated view:
-      • pending-locations → bins that had stock uploaded across locked days but
-        were NEVER scanned in any locked day.
-      • empty-bins        → bins scanned in any locked day where the latest
-        locked counted qty rolls up to zero.
+      • pending-locations → bins that had stock uploaded across all days but
+        were NEVER scanned in any day.
+      • empty-bins        → bins scanned in any day where the latest counted
+        qty rolls up to zero.
     """
     project = await db.cycle_projects.find_one({"id": pid}, {"_id": 0})
     if not project:
         raise HTTPException(404, "Project not found")
-    # Only locked days feed the consolidated view
-    days = await db.cycle_days.find({"project_id": pid, "status": "closed"}, {"_id": 0}).sort("day_no", 1).to_list(1000)
+    # Every day (open + closed) feeds the consolidated view — matches the
+    # warehouse consolidated flow where in-progress sessions still contribute.
+    days = await db.cycle_days.find({"project_id": pid}, {"_id": 0}).sort("day_no", 1).to_list(1000)
     master = await _load_master_for_client(project["client_id"])
     stock_meta = await _stock_meta_map(project["id"])
 
@@ -965,6 +976,17 @@ async def cycle_project_report(pid: str, report_type: str):
     bin_agg: Dict[str, Dict[str, Any]] = {}
     expected_bins_all_days: set = set()
     scanned_bins_all_days: set = set()
+    # Source the truly-scanned bins from synced_locations directly so that
+    # the pending-locations roll-up stays accurate even though the per-day
+    # variance now also surfaces unscanned-but-stocked bins.
+    session_id = project.get("audit_session_id")
+    if session_id:
+        async for s in db.synced_locations.find(
+            {"session_id": session_id}, {"_id": 0, "location_name": 1}
+        ):
+            loc = s.get("location_name")
+            if loc:
+                scanned_bins_all_days.add(loc)
     for d in days:
         v = await _compute_day_variance(project, d)
         for r in v["report"]:
@@ -976,8 +998,7 @@ async def cycle_project_report(pid: str, report_type: str):
                 row["is_recount"] = True
                 row["previous_day_no"] = bin_agg[key].get("day_no")
             bin_agg[key] = row  # latest day overwrites
-            scanned_bins_all_days.add(r["location"])
-        # Track expected bins (any locked day)
+        # Track expected bins (any day, regardless of status)
         stock_rows = await db.cycle_day_stock.find(
             {"project_id": pid, "day_id": d["id"]}, {"_id": 0, "location": 1}
         ).to_list(100000)
