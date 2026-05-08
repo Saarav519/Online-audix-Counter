@@ -1141,10 +1141,15 @@ async def clear_client_stock(client_id: str):
 # ==================== AUDIT SESSION ROUTES ====================
 
 @portal_router.get("/sessions")
-async def get_sessions(client_id: Optional[str] = None):
+async def get_sessions(client_id: Optional[str] = None, include_cycle_count: bool = False):
     query = {}
     if client_id:
         query["client_id"] = client_id
+    # By default hide cycle-count-backing sessions from the regular Sessions page
+    # — they are managed via the dedicated Cycle Count UI. Set ?include_cycle_count=true
+    # to retrieve them (e.g. for Reports session selector).
+    if not include_cycle_count:
+        query["variance_mode"] = {"$ne": "cycle-count"}
     sessions = await db.audit_sessions.find(query, {"_id": 0}).to_list(1000)
     
     # Enrich sessions with client_type in parallel

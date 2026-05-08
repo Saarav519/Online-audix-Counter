@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   ArrowLeft, RefreshCw, Search, Download, Lock, Unlock,
@@ -12,12 +12,15 @@ const CLIENTS_API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal/clien
 
 /**
  * Full-screen variance report for a single cycle-count day.
- * Designed to be opened in a new tab from the project detail page so the user
- * gets the entire viewport for the data table — no cramped half-page view.
+ * Opens from the project detail page OR from the Reports session selector
+ * (?from=reports — Back button then returns to Reports instead).
  */
 export default function CycleDayFullReport() {
   const { dayId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const cameFromReports = new URLSearchParams(location.search).get('from') === 'reports';
+  const backTarget = cameFromReports ? '/portal/reports' : '/portal/cycle-count';
 
   const [variance, setVariance] = useState(null);
   const [day, setDay] = useState(null);
@@ -88,7 +91,7 @@ export default function CycleDayFullReport() {
   };
 
   if (loading) return <FullScreenLoader />;
-  if (!variance) return <FullScreenError onBack={() => navigate('/portal/cycle-count')} />;
+  if (!variance) return <FullScreenError onBack={() => navigate(backTarget)} />;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -98,11 +101,11 @@ export default function CycleDayFullReport() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={() => navigate(`/portal/cycle-count`)}
+                onClick={() => navigate(backTarget)}
                 className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100"
                 data-testid="cc-fullreport-back-btn"
               >
-                <ArrowLeft className="w-4 h-4" /> Back
+                <ArrowLeft className="w-4 h-4" /> Back to {cameFromReports ? 'Reports' : 'Cycle Count'}
               </button>
               <div className="min-w-0">
                 <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">

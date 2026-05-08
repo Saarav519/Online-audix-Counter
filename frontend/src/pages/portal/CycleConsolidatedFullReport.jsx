@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, RefreshCw, Search, Download, Layers, Building2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -10,10 +10,14 @@ const CLIENTS_API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal/clien
 /**
  * Full-screen consolidated cycle-count report. Auto-aggregates every day
  * (open + closed) for the project so any mid-day edit is reflected on refresh.
+ * Honours ?from=reports so the Back button returns the user to wherever they came from.
  */
 export default function CycleConsolidatedFullReport() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const cameFromReports = new URLSearchParams(location.search).get('from') === 'reports';
+  const backTarget = cameFromReports ? '/portal/reports' : '/portal/cycle-count';
 
   const [data, setData] = useState(null);
   const [client, setClient] = useState(null);
@@ -86,11 +90,11 @@ export default function CycleConsolidatedFullReport() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 min-w-0">
               <button
-                onClick={() => navigate(`/portal/cycle-count`)}
+                onClick={() => navigate(backTarget)}
                 className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100"
                 data-testid="cc-cons-back"
               >
-                <ArrowLeft className="w-4 h-4" /> Back
+                <ArrowLeft className="w-4 h-4" /> Back to {cameFromReports ? 'Reports' : 'Cycle Count'}
               </button>
               <div className="min-w-0">
                 <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">

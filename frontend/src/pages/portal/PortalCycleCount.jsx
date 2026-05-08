@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import {
   Plus, Trash2, Calendar, Upload, Lock, Unlock, RefreshCw, FileSpreadsheet,
   CheckCircle2, ArrowLeft, Package, TrendingUp, TrendingDown,
-  Repeat, Layers, ExternalLink, Eye
+  Repeat, Layers, ExternalLink, Eye, Download
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -450,6 +450,7 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
             description="Today's planned bins + qty (Excel/CSV)"
             onComplete={() => { onChange(); loadVariance(); }}
             testid="upload-stock"
+            sampleKind="stock"
           />
           <UploadCard title="Pre-Audit Picking" icon={TrendingDown} accent="amber"
             endpoint={`${API}/days/${day.id}/upload-picks`}
@@ -459,6 +460,7 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
             description="Stock picked BEFORE auditor counted"
             onComplete={() => { onChange(); loadVariance(); }}
             testid="upload-pre-pick"
+            sampleKind="pre"
           />
           <UploadCard title="Post-Audit Picking" icon={TrendingUp} accent="rose"
             endpoint={`${API}/days/${day.id}/upload-picks`}
@@ -468,6 +470,7 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
             description="Stock picked AFTER auditor counted"
             onComplete={() => { onChange(); loadVariance(); }}
             testid="upload-post-pick"
+            sampleKind="post"
           />
         </div>
       )}
@@ -646,7 +649,37 @@ function Badge({ classification, reason }) {
 }
 
 // ───────────────────────────────────────────────────── Upload Card
-function UploadCard({ title, icon: Icon, accent, endpoint, extraField, uploadedAt, filename, rowsCount, description, onComplete, testid }) {
+// Sample CSV templates so the user always knows the exact column format.
+const SAMPLE_CSV = {
+  stock: `location,barcode,qty,description,category,mrp,cost
+A1,NBI001234,50,Cotton Pillow Cover,House & Home,599,280
+A1,NBI001235,30,Bedsheet Queen,House & Home,1299,650
+A2,NBI001236,20,Towel Set,House & Home,449,200
+B5,NBI002500,100,Phone Cover,Accessories,299,120
+`,
+  pre: `location,barcode,qty
+A1,NBI001234,2
+B5,NBI002500,5
+`,
+  post: `location,barcode,qty
+A2,NBI001236,1
+`,
+};
+
+function downloadSample(kind) {
+  const csv = SAMPLE_CSV[kind];
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = kind === 'stock' ? 'morning_stock_sample.csv'
+              : kind === 'pre' ? 'pre_audit_picking_sample.csv'
+              : 'post_audit_picking_sample.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function UploadCard({ title, icon: Icon, accent, endpoint, extraField, uploadedAt, filename, rowsCount, description, onComplete, testid, sampleKind }) {
   const [uploading, setUploading] = useState(false);
   const accentCls = accent === 'emerald' ? 'border-emerald-200 bg-emerald-50/40'
                   : accent === 'amber' ? 'border-amber-200 bg-amber-50/40'
@@ -679,15 +712,25 @@ function UploadCard({ title, icon: Icon, accent, endpoint, extraField, uploadedA
   return (
     <div className={`rounded-xl border p-3 ${accentCls}`}>
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconCls}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${iconCls}`}>
             <Icon className="w-4 h-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h4 className="font-semibold text-sm text-gray-900">{title}</h4>
-            <p className="text-[10px] text-gray-500">{description}</p>
+            <p className="text-[10px] text-gray-500 truncate">{description}</p>
           </div>
         </div>
+        {sampleKind && (
+          <button
+            onClick={() => downloadSample(sampleKind)}
+            title="Download sample CSV format"
+            data-testid={`cc-${testid}-sample`}
+            className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-gray-600 hover:text-emerald-700 bg-white border border-gray-200 hover:border-emerald-300 rounded-md px-1.5 py-1"
+          >
+            <Download className="w-3 h-3" /> Sample
+          </button>
+        )}
       </div>
       {rowsCount > 0 ? (
         <div className="text-xs text-gray-700 mb-2">

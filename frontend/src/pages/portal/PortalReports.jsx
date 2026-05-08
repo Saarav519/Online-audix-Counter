@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import ReactDOM from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { 
   FileBarChart, 
@@ -575,6 +576,7 @@ function SortableHeader({ column, label, align, sortConfig, onSort, allValues, a
 const MAX_VISIBLE_ROWS = 500;
 
 export default function PortalReports() {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
@@ -612,6 +614,20 @@ export default function PortalReports() {
 
   useEffect(() => {
     if (selectedSession) {
+      // Cycle-count virtual sessions → jump straight to the dedicated full-screen
+      // variance report. This way the Reports page acts as a unified launcher
+      // for ALL audit types (regular sessions render inline; cycle-count opens
+      // its purpose-built picking-aware view).
+      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_day_')) {
+        const dayId = selectedSession.slice(7);
+        navigate(`/portal/cycle-count/days/${dayId}/full?from=reports`);
+        return;
+      }
+      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_proj_')) {
+        const projId = selectedSession.slice(8);
+        navigate(`/portal/cycle-count/projects/${projId}/consolidated?from=reports`);
+        return;
+      }
       if (selectedSession === '__consolidated__') {
         // Consolidated mode: determine primary variance mode from client's sessions
         const modes = sessions.map(s => s.variance_mode || 'bin-wise');
@@ -856,8 +872,55 @@ export default function PortalReports() {
 
   const fetchSessions = async (clientId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
-      if (response.ok) setSessions(await response.json());
+      const [sRes, ccRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`),
+        fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects?client_id=${clientId}`)
+      ]);
+      const regular = sRes.ok ? await sRes.json() : [];
+
+      // Virtual sessions for cycle-count projects:
+      //   • one per day  → id = "cc_day_<dayId>"
+      //   • one consolidated per project → id = "cc_proj_<projectId>"
+      // Selecting any of these in the dropdown jumps the user to the dedicated
+      // full-screen variance report (which already handles the picking math).
+      const ccVirtual = [];
+      if (ccRes.ok) {
+        const ccPayload = await ccRes.json();
+        const projects = ccPayload.projects || [];
+        const detailFetches = await Promise.all(
+          projects.map(p => fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${p.id}`).then(r => r.ok ? r.json() : null))
+        );
+        detailFetches.forEach((pd, idx) => {
+          if (!pd) return;
+          const proj = projects[idx];
+          for (const day of (pd.days || [])) {
+            ccVirtual.push({
+              id: `cc_day_${day.id}`,
+              name: `${proj.name} · Day ${day.day_no} (${day.date})`,
+              client_id: proj.client_id,
+              variance_mode: 'cycle-count-day',
+              status: day.status,
+              start_date: day.date,
+              _isCycleCount: true,
+              _ccDayId: day.id,
+              _ccProjectId: proj.id,
+            });
+          }
+          if ((pd.days || []).length > 0) {
+            ccVirtual.push({
+              id: `cc_proj_${proj.id}`,
+              name: `${proj.name} · Consolidated (all days)`,
+              client_id: proj.client_id,
+              variance_mode: 'cycle-count-consolidated',
+              status: proj.status === 'completed' ? 'closed' : 'active',
+              start_date: proj.created_at?.slice(0, 10),
+              _isCycleCount: true,
+              _ccProjectId: proj.id,
+            });
+          }
+        });
+      }
+      setSessions([...regular, ...ccVirtual]);
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
     }
