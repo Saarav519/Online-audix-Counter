@@ -1,97 +1,47 @@
-# Audix Data Management - PRD
+# AudiX — Online Audit Data Management
 
-## Original Problem Statement
-User (AudiX Solutions & Co. - Chartered Accountants) runs 3 products live:
-1. Audix Data Management (stock audit portal + scanner app) ← THIS PROJECT
-2. Staff Attendance & Payroll (separate deployment)
-3. Audix R&M (separate deployment)
+## Overview
+Full-stack stock-audit platform for warehouse cycle counting and one-time stock audits.
+Frontend: React (CRA + Tailwind + shadcn/ui) · Backend: FastAPI · DB: MongoDB.
 
-User goal: Make the portal look IMPRESSIVE to clients. Must be fast, premium, polished.
-Scanner app should NOT be modified. Light theme (not dark).
+## Modules (live)
+- Clients & Schema management (article_code optional)
+- Audit Sessions (variance modes: bin-wise / barcode-wise / legacy article-wise)
+- Devices & Master Data
+- **Reports** — Detailed, Bin-wise, Barcode-wise, Article-wise (gated by schema), Category-wise, Empty Bins, Pending Locations
+- Sync Logs / Conflicts / Users
+- **Cycle Count Projects** (NEW) — rolling daily warehouse audits with picking reconciliation
 
-## Architecture
-- Backend: FastAPI + MongoDB (server.py wrapper + audit_routes.py module)
-- Frontend: React + Capacitor + Tailwind + shadcn/ui + recharts + cmdk
-- Scanner (mobile-only): `/scan`, `/master-data`, `/reports`, `/settings`, `/login`
-- Portal (admin): `/portal`, `/portal/dashboard`, `/portal/clients`, `/portal/sessions`,
-  `/portal/devices`, `/portal/reports`, `/portal/sync-logs`, `/portal/conflicts`, `/portal/users`
+## Key Recent Fixes
+- Article-wise: now appears under barcode-wise in reports only when schema has article_code
+- Barcode-wise & Category-wise: location-aware barcode-edit remap (no duplicate rows, correct rollups)
+- Frontend report cache invalidation across sibling reports after edit
+- Per-session barcode-wise: no longer empty for barcode-wise sessions (location filter scoped to bin-wise only)
+- delete_session: full cascade (sync_inbox, sync_raw_logs, conflict_locations, forward_batches, devices, alerts)
+- search-synced-location: scoped by session_id / client_id, auto-prunes orphan entries
+- Startup task `purge_orphan_session_data()` for legacy orphan cleanup
+- PDF generator: bin-wise variance fixed (reads `difference_qty`), column-aware alignment, numeric right-align, wrapped text
 
-## Default Admin Credentials
-- Username: `admin`  |  Password: `admin123` (auto-seeded)
+## NEW: Cycle Count Module (Phase 1 — MVP shipped)
+- New routes: `/api/audit/portal/cycle-count/*` (cycle_count_routes.py)
+- Collections: `cycle_projects`, `cycle_days`, `cycle_day_stock`, `cycle_day_picks`, `cycle_closed_bins`
+- Project lifecycle: create → days (open/close/reopen) → complete/reopen project → delete (full cascade)
+- Daily 3-file Excel/CSV upload: Morning Stock + Pre-Audit Picks + Post-Audit Picks
+- Picking math: effective = scanned + pre_pick; variance = effective - expected; ending = scanned - post_pick
+- Variance scoping: ONLY scanned bins appear (no carry-forward; next day's upload picks fresh)
+- Cross-day duplicate-bin detection: each row carries closed_in_day warning
+- Live consolidated report: aggregates totals, day-wise summaries, bin-wise rows with recount flag
+- Frontend: `/portal/cycle-count` (list view + detail view + day tabs + 3-card upload + variance table + consolidated)
 
-## Implementation Timeline
+## Backlog (deferred Phase 2+)
+- P10 — Cycle Count PDF/Excel export per-day + final project report
+- P11 — Re-audit comparison view (Day N vs Day M side-by-side)
+- Smart Excel column auto-detection across vendor formats (basic detection in place)
+- Project Dashboard with progress ring + heatmap + velocity chart
+- "Bins to plan tomorrow" suggestion engine
+- Master bin list (optional) for unmapped vs known-extra classification
+- Negative variance alerts above threshold
+- Auto-classify pre/post by timestamp (single file upload)
 
-### Phase 3: Power Features (Apr 18, 2026) ✅
-**Session Progress Tracker (Option B):**
-- New backend endpoint `GET /api/audit/portal/sessions/{id}/progress`
-  — returns scanned_locations, total_expected_locations, progress_percent,
-  total_items, total_quantity, active_devices (last 10 min), last_sync_at
-- `SessionProgressBar.jsx` (auto-refresh 20s) — gradient progress bar + live pills
-- Integrated into every session card on PortalSessions page
-
-**PDF Branded Reports (Option A):**
-- Installed `jspdf` + `jspdf-autotable`
-- `utils/pdfGenerator.js` — branded generator (emerald header band, AudiX monogram,
-  meta box, KPI summary, paginated autotable, confidential footer)
-- "Export PDF" button next to "Export Excel" on Reports page
-
-**Keyboard Shortcuts (Option E):**
-- `KeyboardShortcuts.jsx` — `?` opens modal, `g+letter` navigates
-  (g+d/c/s/v/r/l/x/u), Esc closes, skips while typing in inputs
-
-### Phase 1: GitHub Final branch sync (Apr 18, 2026) ✅
-- Refactored backend to `server.py + audit_routes.py` structure
-- Added `SafeJSONResponse` + global exception handlers + 35+ MongoDB indexes
-- Pulled 6 new endpoints (Location Master + reco-diagnostic + compare-totals)
-- Copied all 12 portal pages from GitHub Final branch
-- Created `AuditApp.js` shim for `useAudit` context
-- Installed `@tanstack/react-virtual`
-
-### Phase 2: Premium Light UI Makeover (Apr 18, 2026) ✅
-**New reusable components in `/app/frontend/src/components/portal/`:**
-- `CountUp.jsx` — animated number counter (easeOut)
-- `PageHeader.jsx` — unified header with breadcrumbs + title + accent + live pill + actions
-- `StatCard.jsx` — animated KPI card (hover lift, gradient accent, trend arrow, icon ring)
-- `EmptyState.jsx` — gorgeous branded empty states (icon halo, gradient bg, tip pill, action)
-- `Skeleton.jsx` — shimmer skeletons (Skeleton, SkeletonCard, SkeletonTable, SkeletonChart)
-- `NotificationBell.jsx` — polling bell with unread badge + dropdown + mark-all-read
-- `GlobalSearch.jsx` — Cmd+K / Ctrl+K global modal (clients, sessions, quick nav, actions)
-
-**Sidebar/Layout (PortalLayout.jsx) upgrade:**
-- Collapsible sidebar (persisted in localStorage)
-- Badges on nav items (auto-poll conflicts + pending users count)
-- Active-nav gradient accent bar with icon coloring
-- Sticky topbar with Cmd+K search trigger + notification bell
-- Mobile responsive drawer with hamburger menu
-
-**Dashboard complete redesign (PortalDashboard.jsx):**
-- 6 animated KPI cards (Clients, Active Sessions, Devices, Empty Bins, Conflicts, Users)
-- Accuracy donut chart (Overall Audit Progress) with inner percentage
-- 7-day Scan Activity area chart (emerald gradient)
-- Smart Insights panel (auto-generated from live data — conflicts, pending users, top variance)
-- Live Device Status panel with animated pulse indicators (Live / Active / Recent / Stale)
-- Recent Syncs timeline with icons
-- Audit Summary cards (per-client) with accuracy %, gradient progress bar, mismatches expand
-
-**All portal pages unified:**
-- Applied `PageHeader` (breadcrumb + title + subtitle + accent + actions) to Clients, Sessions,
-  Devices, Reports, Sync Logs, Conflicts, Users, Dashboard.
-- Applied `EmptyState` with illustrations + tips to Clients, Sessions, Devices empty views.
-- Applied skeleton loaders to Clients, Sessions, Dashboard (replaces plain spinners).
-
-**Login Landing cleanup:**
-- Hidden Staff Attendance + Audix R&M tabs (those backends are on separate deployments)
-- Only Audix Data Management product shown — cleaner focus for clients.
-
-**Tailwind animations added:**
-- `shimmer`, `fade-in`, `fade-in-up`, `scale-in` keyframes for micro-interactions
-
-## Next Tasks
-- User to review & provide next batch of changes.
-
-## Future/Backlog
-- PDF branded report export (cover + summary + tables).
-- Real-time WebSocket push for instant device sync notifications (currently 30s poll).
-- Keyboard shortcuts help modal (`?` key) with full shortcut list.
-- Session progress bars on Sessions page (locations scanned / total).
-- Dark mode toggle (optional).
+## Test Credentials
+admin / admin123

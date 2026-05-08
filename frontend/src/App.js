@@ -21,6 +21,7 @@ const PortalLayout = React.lazy(() => import("./pages/portal/PortalLayout"));
 const PortalDashboard = React.lazy(() => import("./pages/portal/PortalDashboard"));
 const PortalClients = React.lazy(() => import("./pages/portal/PortalClients"));
 const PortalSessions = React.lazy(() => import("./pages/portal/PortalSessions"));
+const PortalCycleCount = React.lazy(() => import("./pages/portal/PortalCycleCount"));
 const PortalDevices = React.lazy(() => import("./pages/portal/PortalDevices"));
 const PortalReports = React.lazy(() => import("./pages/portal/PortalReports"));
 const PortalSyncLogs = React.lazy(() => import("./pages/portal/PortalSyncLogs"));
@@ -165,6 +166,18 @@ function AppRoutes() {
           }
         >
           <Route index element={<Suspense fallback={<PageLoader />}><PortalSessions /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/cycle-count"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalCycleCount /></Suspense>} />
         </Route>
         <Route
           path="/portal/devices"

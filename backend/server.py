@@ -96,11 +96,13 @@ async def health_check():
 
 # Import and include Audit Management routes
 from audit_routes import audit_api_router, audit_portal_router, audit_sync_router
+from cycle_count_routes import cycle_router
 
 # Include Audit Management routers
 app.include_router(audit_api_router, prefix="/api", tags=["Audit - General"])
 app.include_router(audit_portal_router, prefix="/api/audit/portal", tags=["Audit - Portal"])
 app.include_router(audit_sync_router, prefix="/api/audit/sync", tags=["Audit - Sync"])
+app.include_router(cycle_router, prefix="/api/audit/portal/cycle-count", tags=["Audit - Cycle Count"])
 
 
 # Serve uploaded files
@@ -225,6 +227,16 @@ async def create_indexes():
         await db.location_master.create_index([("client_id", 1)])
         await db.location_master.create_index([("client_id", 1), ("location_code", 1)])
         await db.file_uploads.create_index("file_id", unique=True)
+        # Cycle Count collections
+        await db.cycle_projects.create_index("client_id")
+        await db.cycle_projects.create_index("id")
+        await db.cycle_days.create_index([("project_id", 1), ("day_no", 1)])
+        await db.cycle_days.create_index("status")
+        await db.cycle_day_stock.create_index([("project_id", 1), ("day_id", 1)])
+        await db.cycle_day_stock.create_index([("day_id", 1), ("location", 1), ("barcode", 1)])
+        await db.cycle_day_picks.create_index([("project_id", 1), ("day_id", 1), ("type", 1)])
+        await db.cycle_closed_bins.create_index([("project_id", 1), ("location", 1)])
+        await db.cycle_closed_bins.create_index("day_id")
         logger.info("MongoDB indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
