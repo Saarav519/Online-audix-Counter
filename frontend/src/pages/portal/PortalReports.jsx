@@ -91,7 +91,11 @@ function recalcTotals(rows, reportType) {
   if (!rows || rows.length === 0) return null;
   const totals = { stock_qty: 0, physical_qty: 0, reco_qty: 0, final_qty: 0, diff_qty: 0, difference_qty: 0, accuracy_pct: 0,
     stock_value_mrp: 0, stock_value_cost: 0, physical_value_mrp: 0, physical_value_cost: 0,
-    final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0, item_count: 0 };
+    final_value_mrp: 0, final_value_cost: 0, diff_value_mrp: 0, diff_value_cost: 0, item_count: 0,
+    // Cycle-count picking columns — included so FullView/regular totals rows
+    // render subtotals above Pre-Audit / Post-Audit / Effective / Ending Stock.
+    pre_pick_qty: 0, post_pick_qty: 0, effective_qty: 0, ending_stock: 0 };
+  let sawCycleCount = false;
   rows.forEach(row => {
     totals.stock_qty += n(row.stock_qty);
     totals.physical_qty += n(row.physical_qty);
@@ -110,8 +114,19 @@ function recalcTotals(rows, reportType) {
     totals.diff_value_mrp += n(row.diff_value_mrp);
     totals.diff_value_cost += n(row.diff_value_cost);
     totals.item_count += n(row.item_count);
+    if (row._is_cycle_count) sawCycleCount = true;
+    totals.pre_pick_qty += n(row.pre_pick_qty);
+    totals.post_pick_qty += n(row.post_pick_qty);
+    totals.effective_qty += n(row.effective_qty);
+    totals.ending_stock += n(row.ending_stock);
   });
   totals.accuracy_pct = totals.stock_qty > 0 ? Math.round((Math.min(totals.final_qty, totals.stock_qty) / totals.stock_qty) * 1000) / 10 : (totals.final_qty === 0 ? 100 : 0);
+  // Strip picking subtotals for non-cycle-count datasets so warehouse FullView
+  // doesn't render zero-padded columns it never had.
+  if (!sawCycleCount) {
+    delete totals.pre_pick_qty; delete totals.post_pick_qty;
+    delete totals.effective_qty; delete totals.ending_stock;
+  }
   return totals;
 }
 
