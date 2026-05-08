@@ -4282,11 +4282,16 @@ async def get_barcode_wise_report(session_id: str):
                 physical_by_barcode[bc] = {"barcode": bc, "product_name": item.get("product_name", ""), "quantity": 0}
             physical_by_barcode[bc]["quantity"] += item["quantity"]
     
-    # Build expected aggregation ONLY from scanned locations (matches bin-wise stock totals)
+    # Build expected aggregation
+    # For BIN-wise sessions we restrict to scanned-locations only (so we don't
+    # surface 18k barcodes when only 100 bins were counted).
+    # For BARCODE-wise sessions there is no location concept on the scanner side
+    # — expected stock has no meaningful location filter, so include ALL rows.
+    is_barcode_mode = (session.get("variance_mode") == "barcode-wise") if session else False
     expected_by_barcode = {}
     expected_custom_fields = {}
     for e in expected:
-        if e.get("location", "") not in scanned_locations:
+        if not is_barcode_mode and e.get("location", "") not in scanned_locations:
             continue
         bc = e["barcode"]
         key = bc if bc else f"_NOBC_{e.get('article_code', '')}"
