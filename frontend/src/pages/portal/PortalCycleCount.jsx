@@ -346,6 +346,23 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
   }, [day]);
   useEffect(() => { loadVariance(); }, [loadVariance]);
 
+  // NOTE: All hooks must run on every render — keep useMemo above early returns
+  // to avoid React's "rendered more hooks than during the previous render" error.
+  const rows = useMemo(() => {
+    const all = variance?.report || [];
+    const term = filter.trim().toLowerCase();
+    return all.filter(r => {
+      if (classFilter === 'planned' && r.classification !== 'planned') return false;
+      if (classFilter === 'extra' && r.classification !== 'extra') return false;
+      if (classFilter === 'duplicate' && !r.duplicate_warning) return false;
+      if (classFilter === 'shortage' && r.variance_qty >= 0) return false;
+      if (classFilter === 'surplus' && r.variance_qty <= 0) return false;
+      if (!term) return true;
+      return (r.location || '').toLowerCase().includes(term) ||
+             (r.barcode || '').toLowerCase().includes(term);
+    });
+  }, [variance, filter, classFilter]);
+
   if (loading && !day) return <div className="text-center py-12 text-gray-400">Loading…</div>;
   if (!day) return (
     <EmptyState
@@ -381,21 +398,6 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
     const r = await fetch(`${API}/days/${day.id}`, { method: 'DELETE' });
     if (r.ok) { toast.success('Day deleted'); setActiveDay(null); onChange(); }
   };
-
-  const rows = useMemo(() => {
-    const all = variance?.report || [];
-    const term = filter.trim().toLowerCase();
-    return all.filter(r => {
-      if (classFilter === 'planned' && r.classification !== 'planned') return false;
-      if (classFilter === 'extra' && r.classification !== 'extra') return false;
-      if (classFilter === 'duplicate' && !r.duplicate_warning) return false;
-      if (classFilter === 'shortage' && r.variance_qty >= 0) return false;
-      if (classFilter === 'surplus' && r.variance_qty <= 0) return false;
-      if (!term) return true;
-      return (r.location || '').toLowerCase().includes(term) ||
-             (r.barcode || '').toLowerCase().includes(term);
-    });
-  }, [variance, filter, classFilter]);
 
   return (
     <div>
