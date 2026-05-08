@@ -40,12 +40,12 @@ async def main():
     # Setup client + session
     await db.clients.insert_one({
         "id": client_id, "code": client_id, "name": "Test", "is_active": True,
-        "module": "warehouse", "audit_type": "warehouse",
+        "client_type": "store",
         "created_at": "2025-01-01T00:00:00Z"
     })
     await db.audit_sessions.insert_one({
         "id": session_id, "client_id": client_id, "name": "S1",
-        "status": "active", "audit_type": "warehouse",
+        "status": "active", "variance_mode": "barcode-wise",
         "created_at": "2025-01-01T00:00:00Z"
     })
 
@@ -62,6 +62,15 @@ async def main():
         "location_name": LOC,
         "items": [{"barcode": OLD, "quantity": 5}],
         "total_quantity": 5,
+        "is_empty": False,
+        "synced_at": "2025-01-02T00:00:00Z",
+    })
+    # Same OLD scanned at a 2nd location (un-edited) — repro the multi-loc bug
+    await db.synced_locations.insert_one({
+        "session_id": session_id, "client_id": client_id,
+        "location_name": "BIN-B2",
+        "items": [{"barcode": OLD, "quantity": 3}],
+        "total_quantity": 3,
         "is_empty": False,
         "synced_at": "2025-01-02T00:00:00Z",
     })
