@@ -792,9 +792,27 @@ async def _stock_meta_map(project_id: str, day_id: Optional[str] = None) -> Dict
     return out
 
 
+def _calc_values(qty: float, mrp: float, cost: float) -> Dict[str, float]:
+    """Match warehouse `calc_values` semantics — keeps Cycle Count value math
+    in lock-step with Warehouse / Store reports."""
+    return {
+        "mrp": round(qty * mrp, 2) if mrp else 0.0,
+        "cost": round(qty * cost, 2) if cost else 0.0,
+    }
+
+
+def _calc_accuracy(stock_qty: float, final_qty: float) -> float:
+    if stock_qty <= 0:
+        return 0.0
+    return min(100.0, (min(stock_qty, final_qty) / stock_qty) * 100.0)
+
+
 def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Re-shape cycle-count base rows (per-(loc, barcode)) into the format the
-    Reports UI expects for each report_type."""
+    Reports UI expects for each report_type. Adds full MRP/Cost value columns
+    + per-row & subtotal aggregation so Cycle Count reports match the
+    Warehouse calculation contract exactly."""
+
     # Common per-row mapper
     def detailed_row(r: Dict[str, Any]) -> Dict[str, Any]:
         # Build a friendly remark string used by the existing Reports UI icons.
@@ -809,25 +827,87 @@ def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str
         remark_bits.append(reason_map.get(r.get("reason"), "Match"))
         if r.get("duplicate_warning"):
             remark_bits.append(f"Duplicate (D{r['duplicate_warning'].get('closed_on_day')})")
+        mrp = _to_float(r.get("mrp"))
+        cost = _to_float(r.get("cost"))
+        stock_qty = _to_float(r.get("expected_qty"))
+        physical_qty = _to_float(r.get("scanned_qty"))
+        final_qty = _to_float(r.get("effective_qty"))
+        diff_qty = _to_float(r.get("variance_qty"))
+        sv = _calc_values(stock_qty, mrp, cost)
+        pv = _calc_values(physical_qty, mrp, cost)
+        fv = _calc_values(final_qty, mrp, cost)
+        dv_mrp = round(fv["mrp"] - sv["mrp"], 2)
+        dv_cost = round(fv["cost"] - sv["cost"], 2)
         return {
             "location": r["location"], "barcode": r["barcode"],
             "description": r.get("description", ""), "category": r.get("category", "Unmapped"),
-            "mrp": r.get("mrp", 0), "cost": r.get("cost", 0),
+            "mrp": mrp, "cost": cost,
             "article_code": r.get("article_code", ""), "article_name": r.get("article_name", ""),
-            "stock_qty": r["expected_qty"],
-            "physical_qty": r["scanned_qty"],
+            "stock_qty": stock_qty,
+            "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
+            "physical_qty": physical_qty,
+            "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
             "reco_qty": 0,
-            "final_qty": r["effective_qty"],
-            "diff_qty": r["variance_qty"],
-            "difference_qty": r["variance_qty"],
+            "final_qty": final_qty,
+            "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "diff_qty": diff_qty,
+            "difference_qty": diff_qty,
+            "diff_value_mrp": dv_mrp, "diff_value_cost": dv_cost,
+            "accuracy_pct": _calc_accuracy(stock_qty, final_qty),
             "remark": " · ".join(remark_bits),
             # cycle-count specific
-            "pre_pick_qty": r.get("pre_pick_qty", 0),
-            "post_pick_qty": r.get("post_pick_qty", 0),
-            "effective_qty": r.get("effective_qty", 0),
-            "ending_stock": r.get("ending_stock", 0),
+            "pre_pick_qty": _to_float(r.get("pre_pick_qty", 0)),
+            "post_pick_qty": _to_float(r.get("post_pick_qty", 0)),
+            "effective_qty": final_qty,
+            "ending_stock": _to_float(r.get("ending_stock", 0)),
             "classification": r.get("classification", "planned"),
             "duplicate_warning": r.get("duplicate_warning"),
+            "_is_cycle_count": True,
+        }
+
+    def _accumulate_qty_and_values(row: Dict[str, Any], r: Dict[str, Any]) -> None:
+        """Add a base row's qty + value contribution onto an aggregate row."""
+        mrp = _to_float(r.get("mrp"))
+        cost = _to_float(r.get("cost"))
+        stock_qty = _to_float(r.get("expected_qty"))
+        physical_qty = _to_float(r.get("scanned_qty"))
+        final_qty = _to_float(r.get("effective_qty"))
+        diff_qty = _to_float(r.get("variance_qty"))
+        sv = _calc_values(stock_qty, mrp, cost)
+        pv = _calc_values(physical_qty, mrp, cost)
+        fv = _calc_values(final_qty, mrp, cost)
+
+        row["stock_qty"] += stock_qty
+        row["physical_qty"] += physical_qty
+        row["pre_pick_qty"] += _to_float(r.get("pre_pick_qty", 0))
+        row["post_pick_qty"] += _to_float(r.get("post_pick_qty", 0))
+        row["final_qty"] += final_qty
+        row["effective_qty"] += final_qty
+        row["ending_stock"] += _to_float(r.get("ending_stock", 0))
+        row["diff_qty"] += diff_qty
+        row["difference_qty"] += diff_qty
+        # Value columns (MRP + Cost)
+        row["stock_value_mrp"] += sv["mrp"]
+        row["stock_value_cost"] += sv["cost"]
+        row["physical_value_mrp"] += pv["mrp"]
+        row["physical_value_cost"] += pv["cost"]
+        row["final_value_mrp"] += fv["mrp"]
+        row["final_value_cost"] += fv["cost"]
+        row["diff_value_mrp"] = round(row["final_value_mrp"] - row["stock_value_mrp"], 2)
+        row["diff_value_cost"] = round(row["final_value_cost"] - row["stock_value_cost"], 2)
+
+    def _agg_row_template(extra_fields: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            **extra_fields,
+            "stock_qty": 0.0, "physical_qty": 0.0, "reco_qty": 0.0,
+            "final_qty": 0.0, "diff_qty": 0.0, "difference_qty": 0.0,
+            "pre_pick_qty": 0.0, "post_pick_qty": 0.0,
+            "effective_qty": 0.0, "ending_stock": 0.0,
+            # value columns
+            "stock_value_mrp": 0.0, "stock_value_cost": 0.0,
+            "physical_value_mrp": 0.0, "physical_value_cost": 0.0,
+            "final_value_mrp": 0.0, "final_value_cost": 0.0,
+            "diff_value_mrp": 0.0, "diff_value_cost": 0.0,
             "_is_cycle_count": True,
         }
 
@@ -838,85 +918,60 @@ def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str
         agg: Dict[str, Dict[str, Any]] = {}
         for r in base_rows:
             loc = r["location"]
-            row = agg.setdefault(loc, {
-                "location": loc, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
-                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
-                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
-                "barcode_count": 0, "_is_cycle_count": True,
-            })
-            row["stock_qty"] += r["expected_qty"]
-            row["physical_qty"] += r["scanned_qty"]
-            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
-            row["post_pick_qty"] += r.get("post_pick_qty", 0)
-            row["final_qty"] += r["effective_qty"]
-            row["effective_qty"] += r["effective_qty"]
-            row["ending_stock"] += r.get("ending_stock", 0)
-            row["diff_qty"] += r["variance_qty"]
-            row["difference_qty"] += r["variance_qty"]
+            row = agg.setdefault(loc, _agg_row_template({"location": loc, "barcode_count": 0}))
+            _accumulate_qty_and_values(row, r)
             row["barcode_count"] += 1
+        # Compute accuracy per row
+        for row in agg.values():
+            row["accuracy_pct"] = _calc_accuracy(row["stock_qty"], row["final_qty"])
         rows = list(agg.values())
     elif report_type == "barcode-wise":
         # Group by barcode (across locations)
         agg = {}
         for r in base_rows:
             bc = r["barcode"]
-            row = agg.setdefault(bc, {
-                "barcode": bc, "description": r.get("description", ""), "category": r.get("category", "Unmapped"),
-                "mrp": r.get("mrp", 0), "cost": r.get("cost", 0),
+            row = agg.setdefault(bc, _agg_row_template({
+                "barcode": bc, "description": r.get("description", ""),
+                "category": r.get("category", "Unmapped"),
+                "mrp": _to_float(r.get("mrp")), "cost": _to_float(r.get("cost")),
                 "article_code": r.get("article_code", ""), "article_name": r.get("article_name", ""),
-                "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
-                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
-                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
-                "_is_cycle_count": True,
-            })
-            row["stock_qty"] += r["expected_qty"]
-            row["physical_qty"] += r["scanned_qty"]
-            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
-            row["post_pick_qty"] += r.get("post_pick_qty", 0)
-            row["final_qty"] += r["effective_qty"]
-            row["effective_qty"] += r["effective_qty"]
-            row["ending_stock"] += r.get("ending_stock", 0)
-            row["diff_qty"] += r["variance_qty"]
-            row["difference_qty"] += r["variance_qty"]
+            }))
+            _accumulate_qty_and_values(row, r)
+        for row in agg.values():
+            row["accuracy_pct"] = _calc_accuracy(row["stock_qty"], row["final_qty"])
         rows = list(agg.values())
     elif report_type == "category-summary":
         agg = {}
         for r in base_rows:
             cat = r.get("category", "") or "Unmapped"
-            row = agg.setdefault(cat, {
-                "category": cat, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
-                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
-                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
-                "item_count": 0, "_is_cycle_count": True,
-            })
-            row["stock_qty"] += r["expected_qty"]
-            row["physical_qty"] += r["scanned_qty"]
-            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
-            row["post_pick_qty"] += r.get("post_pick_qty", 0)
-            row["final_qty"] += r["effective_qty"]
-            row["effective_qty"] += r["effective_qty"]
-            row["ending_stock"] += r.get("ending_stock", 0)
-            row["diff_qty"] += r["variance_qty"]
-            row["difference_qty"] += r["variance_qty"]
+            row = agg.setdefault(cat, _agg_row_template({"category": cat, "item_count": 0}))
+            _accumulate_qty_and_values(row, r)
             row["item_count"] += 1
+        for row in agg.values():
+            row["accuracy_pct"] = _calc_accuracy(row["stock_qty"], row["final_qty"])
         rows = list(agg.values())
     else:
         rows = [detailed_row(r) for r in base_rows]
 
-    # Totals
-    totals = {
-        "stock_qty": 0.0, "physical_qty": 0.0, "reco_qty": 0.0,
-        "final_qty": 0.0, "diff_qty": 0.0, "difference_qty": 0.0,
-        "pre_pick_qty": 0.0, "post_pick_qty": 0.0,
-        "effective_qty": 0.0, "ending_stock": 0.0,
-    }
+    # Totals (subtotals row used by Normal View, Full View, Excel & PDF exports)
+    totals_keys = [
+        "stock_qty", "physical_qty", "reco_qty", "final_qty",
+        "diff_qty", "difference_qty",
+        "pre_pick_qty", "post_pick_qty", "effective_qty", "ending_stock",
+        "stock_value_mrp", "stock_value_cost",
+        "physical_value_mrp", "physical_value_cost",
+        "final_value_mrp", "final_value_cost",
+        "diff_value_mrp", "diff_value_cost",
+    ]
+    totals = {k: 0.0 for k in totals_keys}
     for r in rows:
-        for k in totals:
+        for k in totals_keys:
             totals[k] += _to_float(r.get(k, 0))
-    if totals["stock_qty"] > 0:
-        totals["accuracy_pct"] = min(100.0, (min(totals["stock_qty"], totals["final_qty"]) / totals["stock_qty"]) * 100)
-    else:
-        totals["accuracy_pct"] = 0.0
+    # Round value totals to 2dp for clean display
+    for k in totals_keys:
+        if "value" in k:
+            totals[k] = round(totals[k], 2)
+    totals["accuracy_pct"] = _calc_accuracy(totals["stock_qty"], totals["final_qty"])
     return {"report": rows, "totals": totals}
 
 
