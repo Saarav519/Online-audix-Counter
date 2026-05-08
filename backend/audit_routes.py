@@ -3249,6 +3249,66 @@ def _to_float(v) -> float:
         return 0.0
 
 
+def _merge_barcode_wise_collisions(report: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Collapse barcode-wise rows that share the same `barcode` after
+    `_apply_barcode_edits` renamed an extra-scan into a barcode that already
+    has its own row in the aggregate.
+
+    Pre-aggregation `loc_remap`/`global_remap` already prevents this in
+    most cases (physical qty merges into the target before the report is
+    built). This post-hoc merge is a defence-in-depth safety net for
+    Store Wise (per-session reports) where a `report_type='barcode-wise'`
+    edit may rename rows after aggregation — guarantees no duplicate
+    barcode rows + no double Reco/variance.
+
+    Quantities and value columns sum; accuracy is recomputed from merged
+    stock vs final qty. Edit metadata (is_edited / _original_value /
+    _edit_id / remark) is preserved on the merged row so the UI's
+    pencil/undo affordances still work.
+    """
+    by_key: Dict[str, Dict[str, Any]] = {}
+    merged: List[Dict[str, Any]] = []
+    for r in report:
+        key = r.get("barcode", "") or ""
+        # Empty-barcode rows (NOBC) stay unique per article_code
+        if not key:
+            merged.append(r)
+            continue
+        target = by_key.get(key)
+        if target is None:
+            by_key[key] = r
+            merged.append(r)
+            continue
+        # Sum qty + value columns
+        for fld in ("stock_qty", "physical_qty", "reco_qty", "final_qty",
+                    "diff_qty", "difference_qty",
+                    "stock_value_mrp", "stock_value_cost",
+                    "physical_value_mrp", "physical_value_cost",
+                    "final_value_mrp", "final_value_cost",
+                    "diff_value_mrp", "diff_value_cost",
+                    "pre_pick_qty", "post_pick_qty",
+                    "effective_qty", "ending_stock"):
+            if fld in target or fld in r:
+                target[fld] = round(_to_float(target.get(fld, 0)) + _to_float(r.get(fld, 0)), 2)
+        if "accuracy_pct" in target or "accuracy_pct" in r:
+            target["accuracy_pct"] = calc_accuracy(
+                _to_float(target.get("stock_qty", 0)),
+                _to_float(target.get("final_qty", 0))
+            )
+        # Edit metadata: edited row's flags win
+        if r.get("is_edited") and not target.get("is_edited"):
+            target["is_edited"] = True
+            target["is_editable"] = True
+            target["_edit_id"] = r.get("_edit_id")
+            target["_original_value"] = r.get("_original_value")
+            target["remark"] = r.get("remark", target.get("remark", ""))
+        # Master-info: prefer non-empty
+        for fld in ("description", "category", "article_code", "article_name"):
+            if not target.get(fld) and r.get(fld):
+                target[fld] = r[fld]
+    return merged
+
+
 def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
     """Apply active barcode/article edits to a generated report. Modifies rows in-place.
 
@@ -4044,6 +4104,9 @@ async def get_consolidated_barcode_wise(client_id: str):
             row["is_editable"] = True
         else:
             row["is_editable"] = (row.get("stock_qty", 0) == 0 and row.get("physical_qty", 0) > 0)
+    # Defensive merge for any duplicate-barcode rows that survived (e.g.
+    # when expected_stock had both ORIGINAL and NEW barcodes prior to edit).
+    report = _merge_barcode_wise_collisions(report)
     return {"report": report, "totals": rounded_totals, "extra_columns": extra_columns}
 
 @portal_router.get("/reports/consolidated/{client_id}/article-wise")
@@ -4610,6 +4673,10 @@ async def get_barcode_wise_report(session_id: str):
     s_client_id = session.get("client_id", "") if session else ""
     edits = await db.barcode_edits.find({"client_id": s_client_id, "is_active": True}, {"_id": 0}).to_list(10000)
     report, totals = _apply_barcode_edits(report, totals, edits, "barcode-wise", master_by_barcode)
+    # Defensive merge: collapse any duplicate-barcode rows that arise when
+    # an edit renamed an extra-scan into a barcode that already exists in
+    # the aggregate (Store Wise relies on this for Barcode Variance reports).
+    report = _merge_barcode_wise_collisions(report)
     return {"report": report, "totals": totals, "extra_columns": extra_columns}
 
 

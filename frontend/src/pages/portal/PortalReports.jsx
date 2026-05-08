@@ -2001,7 +2001,7 @@ export default function PortalReports() {
             data-testid="report-session-select"
           >
             <option value="">{isCycleCountClient ? 'Select Project' : 'Select Session'}</option>
-            {selectedClient && !isCycleCountClient && (
+            {selectedClient && !isCycleCountClient && !isStoreClient && (
               <option value="__consolidated__">All Sessions (Consolidated)</option>
             )}
             {sessions.map(session => (
