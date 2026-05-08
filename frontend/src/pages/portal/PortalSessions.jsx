@@ -269,7 +269,11 @@ export default function PortalSessions() {
   };
 
   const filteredSessions = sessions.filter(session => {
-    const matchesSearch = session.name.toLowerCase().includes(searchQuery.toLowerCase());
+    // Sessions may surface from older schemas (`session_name`) or future
+    // ones with a missing/blank `name`. Coerce to string defensively so the
+    // search filter can't crash the whole sessions screen.
+    const sessionLabel = (session.name ?? session.session_name ?? '').toString();
+    const matchesSearch = sessionLabel.toLowerCase().includes((searchQuery || '').toLowerCase());
     const matchesClient = !selectedClient || session.client_id === selectedClient;
     return matchesSearch && matchesClient;
   });

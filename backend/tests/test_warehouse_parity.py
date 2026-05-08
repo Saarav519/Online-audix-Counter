@@ -29,6 +29,15 @@ async def main():
     sid = f"test-sess-{uuid.uuid4().hex[:8]}"
     edit_id = str(uuid.uuid4())
 
+    async def cleanup():
+        await db.audit_clients.delete_many({"id": client_id})
+        await db.audit_sessions.delete_many({"id": sid})
+        await db.expected_stock.delete_many({"session_id": sid})
+        await db.synced_locations.delete_many({"session_id": sid})
+        await db.master_products.delete_many({"client_id": client_id})
+        await db.barcode_edits.delete_many({"client_id": client_id})
+        await db.reco_adjustments.delete_many({"client_id": client_id})
+
     # 1. Seed warehouse client + session + expected stock + scans
     await db.audit_clients.insert_one({
         "id": client_id, "name": "WHTest", "code": "WH",
@@ -125,16 +134,31 @@ async def main():
     assert edit_after["is_active"] is False
     print("  ✓ DB state: edit deactivated, reco purged")
 
-    # Cleanup
-    await db.audit_clients.delete_many({"id": client_id})
-    await db.audit_sessions.delete_many({"id": sid})
-    await db.expected_stock.delete_many({"session_id": sid})
-    await db.synced_locations.delete_many({"session_id": sid})
-    await db.master_products.delete_many({"client_id": client_id})
-    await db.barcode_edits.delete_many({"client_id": client_id})
-    await db.reco_adjustments.delete_many({"client_id": client_id})
     print("\nOK — Warehouse parity verified: undo cascade + reco propagation + formula consistency")
 
 
+async def _runner():
+    """Wraps `main` so cleanup runs even when assertions fail mid-run.
+    Otherwise an interrupted run would orphan a session in the DB and crash
+    the live PortalSessions screen on null/blank `name` (see fix in
+    `pages/portal/PortalSessions.jsx`).
+    """
+    db = AsyncIOMotorClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+    try:
+        await main()
+    finally:
+        # Best-effort sweep of any leftover test data this file may have
+        # inserted with the `test-wh-` / `test-sess-` prefixes.
+        for col in ["audit_clients", "audit_sessions", "expected_stock",
+                    "synced_locations", "master_products", "barcode_edits",
+                    "reco_adjustments"]:
+            await db[col].delete_many({"$or": [
+                {"id": {"$regex": "^test-wh-"}},
+                {"id": {"$regex": "^test-sess-"}},
+                {"client_id": {"$regex": "^test-wh-"}},
+                {"session_id": {"$regex": "^test-sess-"}},
+            ]})
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(_runner())

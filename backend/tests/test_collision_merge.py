@@ -28,62 +28,67 @@ async def warehouse_test():
     sid = f"test-sess-{uuid.uuid4().hex[:8]}"
     eid = str(uuid.uuid4())
 
-    await db.audit_clients.insert_one({"id": cid, "name": "WH", "code": "WH",
-        "client_type": "warehouse", "is_active": True,
-        "created_at": datetime.now(timezone.utc).isoformat()})
-    await db.audit_sessions.insert_one({"id": sid, "client_id": cid,
-        "session_name": "S", "status": "active", "variance_mode": "bin-wise",
-        "created_at": datetime.now(timezone.utc).isoformat()})
-    await db.expected_stock.insert_one(
-        {"session_id": sid, "barcode": "KNOWN", "location": "BIN-X", "qty": 10,
-         "description": "Item K", "category": "C", "mrp": 100, "cost": 50})
-    await db.synced_locations.insert_one({"session_id": sid, "location_name": "BIN-X",
-        "items": [
-            {"barcode": "KNOWN", "quantity": 10, "product_name": "Item K"},
-            {"barcode": "WRONG", "quantity": 5, "product_name": "Item K"},
-        ], "total_quantity": 15, "is_empty": False,
-        "synced_at": datetime.now(timezone.utc).isoformat()})
-    await db.master_products.insert_one({"client_id": cid, "barcode": "KNOWN",
-        "description": "Item K", "category": "C", "mrp": 100, "cost": 50,
-        "article_code": "ART-K", "article_name": "K"})
-    await db.barcode_edits.insert_one({"id": eid, "client_id": cid,
-        "report_type": "detailed", "original_value": "WRONG", "new_value": "KNOWN",
-        "location": "BIN-X",
-        "master_info": {"description": "Item K", "category": "C",
-                        "mrp": 100, "cost": 50, "article_code": "ART-K", "article_name": "K"},
-        "edited_at": datetime.now(timezone.utc).isoformat(), "is_active": True})
-    # Reco anchored to ORIGINAL (frontend convention)
-    await db.reco_adjustments.insert_one({"client_id": cid, "reco_type": "detailed",
-        "barcode": "WRONG", "location": "BIN-X", "reco_qty": 100,
-        "updated_at": datetime.now(timezone.utc).isoformat()})
+    async def cleanup():
+        for col in ["audit_clients", "audit_sessions", "expected_stock", "synced_locations",
+                    "master_products", "barcode_edits", "reco_adjustments"]:
+            await db[col].delete_many({"$or": [{"id": cid}, {"id": sid}, {"client_id": cid},
+                                                {"session_id": sid}]})
 
-    async with httpx.AsyncClient(timeout=30) as h:
-        # Consolidated detailed: must show ONE merged row at (BIN-X, KNOWN)
-        r = await h.get(BACKEND + f"/api/audit/portal/reports/consolidated/{cid}/detailed")
-        rows = [x for x in r.json().get("report", [])
-                if x.get("location") == "BIN-X" and x.get("barcode") == "KNOWN"]
-        assert len(rows) == 1, f"expected 1 merged row, got {len(rows)}: {rows}"
-        row = rows[0]
-        assert row["stock_qty"] == 10, f"stock={row['stock_qty']}"
-        assert row["physical_qty"] == 15, f"physical={row['physical_qty']}"
-        assert row["reco_qty"] == 100, f"reco={row['reco_qty']} (must be 100, NOT 200)"
-        assert row["final_qty"] == 115, f"final={row['final_qty']}"
-        assert row.get("is_edited"), "merged row must keep is_edited flag"
-        print(f"  ✓ Warehouse Detailed merged: {row['stock_qty']}/{row['physical_qty']}/{row['reco_qty']}/{row['final_qty']}")
+    try:
+        await db.audit_clients.insert_one({"id": cid, "name": "WH", "code": "WH",
+            "client_type": "warehouse", "is_active": True,
+            "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.audit_sessions.insert_one({"id": sid, "client_id": cid,
+            "session_name": "S", "status": "active", "variance_mode": "bin-wise",
+            "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.expected_stock.insert_one(
+            {"session_id": sid, "barcode": "KNOWN", "location": "BIN-X", "qty": 10,
+             "description": "Item K", "category": "C", "mrp": 100, "cost": 50})
+        await db.synced_locations.insert_one({"session_id": sid, "location_name": "BIN-X",
+            "items": [
+                {"barcode": "KNOWN", "quantity": 10, "product_name": "Item K"},
+                {"barcode": "WRONG", "quantity": 5, "product_name": "Item K"},
+            ], "total_quantity": 15, "is_empty": False,
+            "synced_at": datetime.now(timezone.utc).isoformat()})
+        await db.master_products.insert_one({"client_id": cid, "barcode": "KNOWN",
+            "description": "Item K", "category": "C", "mrp": 100, "cost": 50,
+            "article_code": "ART-K", "article_name": "K"})
+        await db.barcode_edits.insert_one({"id": eid, "client_id": cid,
+            "report_type": "detailed", "original_value": "WRONG", "new_value": "KNOWN",
+            "location": "BIN-X",
+            "master_info": {"description": "Item K", "category": "C",
+                            "mrp": 100, "cost": 50, "article_code": "ART-K", "article_name": "K"},
+            "edited_at": datetime.now(timezone.utc).isoformat(), "is_active": True})
+        # Reco anchored to ORIGINAL (frontend convention)
+        await db.reco_adjustments.insert_one({"client_id": cid, "reco_type": "detailed",
+            "barcode": "WRONG", "location": "BIN-X", "reco_qty": 100,
+            "updated_at": datetime.now(timezone.utc).isoformat()})
 
-        # Barcode-wise: same totals, single row
-        r = await h.get(BACKEND + f"/api/audit/portal/reports/consolidated/{cid}/barcode-wise")
-        rows = [x for x in r.json().get("report", []) if x.get("barcode") == "KNOWN"]
-        assert len(rows) == 1
-        assert rows[0]["reco_qty"] == 100, f"barcode-wise reco={rows[0]['reco_qty']}"
-        print(f"  ✓ Warehouse Barcode-wise reco={rows[0]['reco_qty']}")
+        async with httpx.AsyncClient(timeout=30) as h:
+            # Consolidated detailed: must show ONE merged row at (BIN-X, KNOWN)
+            r = await h.get(BACKEND + f"/api/audit/portal/reports/consolidated/{cid}/detailed")
+            rows = [x for x in r.json().get("report", [])
+                    if x.get("location") == "BIN-X" and x.get("barcode") == "KNOWN"]
+            assert len(rows) == 1, f"expected 1 merged row, got {len(rows)}: {rows}"
+            row = rows[0]
+            assert row["stock_qty"] == 10, f"stock={row['stock_qty']}"
+            assert row["physical_qty"] == 15, f"physical={row['physical_qty']}"
+            assert row["reco_qty"] == 100, f"reco={row['reco_qty']} (must be 100, NOT 200)"
+            assert row["final_qty"] == 115, f"final={row['final_qty']}"
+            assert row.get("is_edited"), "merged row must keep is_edited flag"
+            print(f"  ✓ Warehouse Detailed merged: {row['stock_qty']}/{row['physical_qty']}/{row['reco_qty']}/{row['final_qty']}")
 
-    # Cleanup
-    for col in ["audit_clients", "audit_sessions", "expected_stock", "synced_locations",
-                 "master_products", "barcode_edits", "reco_adjustments"]:
-        await db[col].delete_many({"$or": [{"id": cid}, {"id": sid}, {"client_id": cid},
-                                            {"session_id": sid}]})
-    print("OK — Warehouse collision-merge verified")
+            # Barcode-wise: same totals, single row
+            r = await h.get(BACKEND + f"/api/audit/portal/reports/consolidated/{cid}/barcode-wise")
+            rows = [x for x in r.json().get("report", []) if x.get("barcode") == "KNOWN"]
+            assert len(rows) == 1
+            assert rows[0]["reco_qty"] == 100, f"barcode-wise reco={rows[0]['reco_qty']}"
+            print(f"  ✓ Warehouse Barcode-wise reco={rows[0]['reco_qty']}")
+        print("OK — Warehouse collision-merge verified")
+    finally:
+        # Always clean up — even on assertion failures — so the sessions
+        # screen never gets polluted with orphan test data.
+        await cleanup()
 
 
 async def cycle_count_test():
