@@ -2949,8 +2949,12 @@ async def edit_barcode(data: dict):
                 {"id": existing["id"]},
                 {"$set": {"is_active": False}}
             )
+            # Cascade-delete any reco adjustments tied to this edit so the
+            # row's totals don't carry a lingering +N after the revert.
+            purged = await _purge_recos_for_edit(existing)
             _report_cache.invalidate_all()
-            return {"success": True, "reverted": True, "message": "Edit reverted — original value restored"}
+            return {"success": True, "reverted": True, "reco_adjustments_removed": purged,
+                    "message": "Edit reverted — original value restored"}
         # No existing edit and user didn't change anything → not really an error
         return {"success": True, "no_change": True, "message": "No edit needed"}
 
@@ -3028,17 +3032,70 @@ async def edit_barcode(data: dict):
                 "cost": master_info.get("cost", 0) or 0,
             }}
 
+async def _purge_recos_for_edit(edit: Dict[str, Any]) -> int:
+    """Delete every reco_adjustment that semantically belonged to this edit.
+
+    When a barcode/article edit is reverted, any Reco Qty the auditor saved
+    while the edit was active was tied to that edited row. Leaving the reco
+    in place after revert produces misleading totals (the row reverts but
+    the +N adjustment lingers). We delete by both the original AND the new
+    value so we cover recos saved either pre- or post-edit (and stay
+    backward-compatible with reco rows from before the original-anchoring
+    fix).
+    """
+    client_id = edit.get("client_id")
+    if not client_id:
+        return 0
+    rt = edit.get("report_type")
+    orig = edit.get("original_value")
+    new_v = edit.get("new_value")
+    loc = edit.get("location") or ""
+    candidates = [v for v in (orig, new_v) if v]
+    if not candidates:
+        return 0
+    deleted = 0
+    if rt == "detailed":
+        # Detailed-scoped edit → kill detailed reco at (location, barcode).
+        # Also kill the legacy barcode-wise reco at the same barcode in case
+        # the auditor saved a barcode-wise reco for the same item.
+        q1 = {"client_id": client_id, "reco_type": "detailed",
+              "location": loc or "", "barcode": {"$in": candidates}}
+        r1 = await db.reco_adjustments.delete_many(q1)
+        deleted += r1.deleted_count
+    elif rt == "barcode-wise":
+        q1 = {"client_id": client_id, "reco_type": "barcode",
+              "barcode": {"$in": candidates}}
+        r1 = await db.reco_adjustments.delete_many(q1)
+        deleted += r1.deleted_count
+    elif rt == "article-wise":
+        q1 = {"client_id": client_id, "reco_type": "article",
+              "article_code": {"$in": candidates}}
+        r1 = await db.reco_adjustments.delete_many(q1)
+        deleted += r1.deleted_count
+    if deleted:
+        # Reset reco cache for this client so reports recompute immediately
+        _reco_cache.invalidate(f"reco_{client_id}")
+    return deleted
+
+
 @portal_router.post("/reports/undo-edit")
 async def undo_barcode_edit(data: dict):
-    """Undo a barcode/article edit — reverts to original value."""
+    """Undo a barcode/article edit — reverts to original value AND removes
+    any Reco adjustments that were tied to this edit (so the row's totals
+    don't carry a lingering +N after the rename is reverted)."""
     edit_id = data.get("edit_id")
     if not edit_id:
         raise HTTPException(400, "Missing edit_id")
+    edit = await db.barcode_edits.find_one({"id": edit_id}, {"_id": 0})
+    if not edit:
+        raise HTTPException(404, "Edit not found")
     result = await db.barcode_edits.update_one({"id": edit_id}, {"$set": {"is_active": False}})
     if result.modified_count == 0:
-        raise HTTPException(404, "Edit not found")
+        # Already inactive — still purge any orphaned recos for safety
+        pass
+    purged = await _purge_recos_for_edit(edit)
     _report_cache.invalidate_all()
-    return {"success": True}
+    return {"success": True, "reco_adjustments_removed": purged}
 
 @portal_router.get("/reports/edits/{client_id}")
 async def get_active_edits(client_id: str):
