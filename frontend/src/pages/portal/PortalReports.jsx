@@ -1152,18 +1152,30 @@ export default function PortalReports() {
         setReportData(prev => {
           if (!prev || !prev.report) return prev;
           const updated = { ...prev, report: prev.report.map(row => {
+            // Match against the SAME anchor used on save: a row's
+            // `_original_value` (when it was edited) takes precedence over
+            // its current displayed barcode/article. Without this, an edit
+            // → reco save → optimistic-update would miss the row (because
+            // `params.barcode` is the original while `row.barcode` is new),
+            // and the new Reco value wouldn't appear until the next refresh.
+            const rowBarcodeAnchor = row._original_value || row.barcode;
+            const rowArticleAnchor = row._original_value || row.article_code;
             let match = false;
             if (params.reco_type === 'detailed') {
-              match = row.location === params.location && row.barcode === params.barcode;
+              match = row.location === params.location && rowBarcodeAnchor === params.barcode;
             } else if (params.reco_type === 'barcode') {
-              match = row.barcode === params.barcode;
+              match = rowBarcodeAnchor === params.barcode;
             } else if (params.reco_type === 'article') {
-              match = row.article_code === params.article_code;
+              match = rowArticleAnchor === params.article_code;
             }
             if (!match) return row;
             const newReco = params.reco_qty;
             const physQty = row.physical_qty || 0;
-            const finalQty = physQty + newReco;
+            // Cycle-count Final = Physical + Pre-Audit + Reco (pre_pick_qty
+            // is already on the row when the backend tagged `_is_cycle_count`).
+            // Warehouse Final = Physical + Reco.
+            const prePick = row._is_cycle_count ? (row.pre_pick_qty || 0) : 0;
+            const finalQty = physQty + prePick + newReco;
             const stockQty = row.stock_qty || 0;
             const diffQty = finalQty - stockQty;
             const cost = row.cost || 0;

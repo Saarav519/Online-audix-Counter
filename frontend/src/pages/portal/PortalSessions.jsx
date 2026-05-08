@@ -576,16 +576,34 @@ export default function PortalSessions() {
               <Label htmlFor="client">Client *</Label>
               <select
                 id="client"
+                data-testid="new-session-client-select"
                 value={formData.client_id}
                 onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
                 className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
               >
                 <option value="">Select Client</option>
-                {clients.filter(c => c.client_type !== 'cycle_count').map(client => (
-                  <option key={client.id} value={client.id}>{client.name}</option>
-                ))}
+                {/* Show ALL clients — disable cycle-count ones so the user sees
+                    every client they have, with a clear reason why some are
+                    locked. Hiding them entirely (the previous behaviour) made
+                    cycle-count-only setups look like the dropdown was broken. */}
+                {clients.map(client => {
+                  const isCycle = client.client_type === 'cycle_count';
+                  return (
+                    <option
+                      key={client.id}
+                      value={client.id}
+                      disabled={isCycle}
+                    >
+                      {client.name}{isCycle ? ' — managed in Cycle Count module' : ''}
+                    </option>
+                  );
+                })}
               </select>
-              <p className="text-xs text-gray-500 mt-1">Cycle Count clients are managed via the Cycle Count module — projects there auto-appear here as sessions.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {clients.every(c => c.client_type === 'cycle_count')
+                  ? 'All your clients are Cycle Count. Open the Cycle Count module to create projects — they auto-appear here as sessions.'
+                  : 'Cycle Count clients are managed via the Cycle Count module — projects there auto-appear here as sessions.'}
+              </p>
             </div>
             <div>
               <Label htmlFor="name">Session Name *</Label>
