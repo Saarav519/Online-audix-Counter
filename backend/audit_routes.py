@@ -3033,15 +3033,30 @@ async def edit_barcode(data: dict):
             }}
 
 async def _purge_recos_for_edit(edit: Dict[str, Any]) -> int:
-    """Delete every reco_adjustment that semantically belonged to this edit.
+    """Delete reco_adjustments that semantically belong to this edit.
 
-    When a barcode/article edit is reverted, any Reco Qty the auditor saved
-    while the edit was active was tied to that edited row. Leaving the reco
-    in place after revert produces misleading totals (the row reverts but
-    the +N adjustment lingers). We delete by both the original AND the new
-    value so we cover recos saved either pre- or post-edit (and stay
-    backward-compatible with reco rows from before the original-anchoring
-    fix).
+    OPTION-A SEMANTICS (step-by-step undo):
+    -----------------------------------------
+    Pre-existing Reco values that lived on the NEW (target) barcode BEFORE
+    this edit was applied must SURVIVE the undo — only recos created or
+    modified during the edit's active lifetime are wiped. Concretely:
+
+      • Reco at `(loc, ORIGINAL)` — these only exist because the auditor
+        saved Reco on a row while the edit was active (frontend anchors
+        Reco to ORIGINAL for an edited row). Always purge on undo — this
+        Reco is, by construction, tied to this edit.
+
+      • Reco at `(loc, NEW)` — could be either (i) a legitimate Reco that
+        existed BEFORE the edit, or (ii) a legacy Reco saved against NEW
+        directly while the edit was active. We purge only if
+        `reco.updated_at >= edit.edited_at` — i.e. the Reco was created
+        OR modified after the edit was activated. Older recos are
+        preserved. This solves the user-reported step-by-step undo bug.
+
+    Same rule for `barcode-wise` (global) and `article-wise` edits using
+    the appropriate key field. Works uniformly for Warehouse + Store +
+    Cycle Count because all three modules go through this single helper
+    via the shared `/reports/undo-edit` endpoint.
     """
     client_id = edit.get("client_id")
     if not client_id:
@@ -3050,30 +3065,55 @@ async def _purge_recos_for_edit(edit: Dict[str, Any]) -> int:
     orig = edit.get("original_value")
     new_v = edit.get("new_value")
     loc = edit.get("location") or ""
-    candidates = [v for v in (orig, new_v) if v]
-    if not candidates:
-        return 0
+    edit_ts = edit.get("edited_at") or edit.get("created_at") or ""
     deleted = 0
+
     if rt == "detailed":
-        # Detailed-scoped edit → kill detailed reco at (location, barcode).
-        # Also kill the legacy barcode-wise reco at the same barcode in case
-        # the auditor saved a barcode-wise reco for the same item.
-        q1 = {"client_id": client_id, "reco_type": "detailed",
-              "location": loc or "", "barcode": {"$in": candidates}}
-        r1 = await db.reco_adjustments.delete_many(q1)
-        deleted += r1.deleted_count
+        if orig:
+            r1 = await db.reco_adjustments.delete_many({
+                "client_id": client_id, "reco_type": "detailed",
+                "location": loc, "barcode": orig,
+            })
+            deleted += r1.deleted_count
+        if new_v and new_v != orig:
+            # Only purge reco at NEW if it was created/modified during this
+            # edit's active lifetime. Pre-existing recos on NEW survive.
+            q = {
+                "client_id": client_id, "reco_type": "detailed",
+                "location": loc, "barcode": new_v,
+            }
+            if edit_ts:
+                q["updated_at"] = {"$gte": edit_ts}
+            r2 = await db.reco_adjustments.delete_many(q)
+            deleted += r2.deleted_count
     elif rt == "barcode-wise":
-        q1 = {"client_id": client_id, "reco_type": "barcode",
-              "barcode": {"$in": candidates}}
-        r1 = await db.reco_adjustments.delete_many(q1)
-        deleted += r1.deleted_count
+        if orig:
+            r1 = await db.reco_adjustments.delete_many({
+                "client_id": client_id, "reco_type": "barcode",
+                "barcode": orig,
+            })
+            deleted += r1.deleted_count
+        if new_v and new_v != orig:
+            q = {"client_id": client_id, "reco_type": "barcode", "barcode": new_v}
+            if edit_ts:
+                q["updated_at"] = {"$gte": edit_ts}
+            r2 = await db.reco_adjustments.delete_many(q)
+            deleted += r2.deleted_count
     elif rt == "article-wise":
-        q1 = {"client_id": client_id, "reco_type": "article",
-              "article_code": {"$in": candidates}}
-        r1 = await db.reco_adjustments.delete_many(q1)
-        deleted += r1.deleted_count
+        if orig:
+            r1 = await db.reco_adjustments.delete_many({
+                "client_id": client_id, "reco_type": "article",
+                "article_code": orig,
+            })
+            deleted += r1.deleted_count
+        if new_v and new_v != orig:
+            q = {"client_id": client_id, "reco_type": "article", "article_code": new_v}
+            if edit_ts:
+                q["updated_at"] = {"$gte": edit_ts}
+            r2 = await db.reco_adjustments.delete_many(q)
+            deleted += r2.deleted_count
+
     if deleted:
-        # Reset reco cache for this client so reports recompute immediately
         _reco_cache.invalidate(f"reco_{client_id}")
     return deleted
 
