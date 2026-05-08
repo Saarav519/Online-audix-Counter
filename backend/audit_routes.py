@@ -3628,11 +3628,34 @@ async def get_consolidated_barcode_wise(client_id: str):
     reco_task = _build_reco_maps(client_id)
     extra_task = _get_extra_columns_for_client(client_id)
     master_by_barcode, reco_maps, extra_columns = await asyncio.gather(master_task, reco_task, extra_task)
-    
+
+    # Pre-fetch active barcode edits to remap scanner barcodes BEFORE aggregation.
+    # Without this, a detailed/barcode-wise edit (e.g. NBI049181 → NBI046589) would
+    # leave duplicate rows in the consolidated barcode-wise view and the category
+    # rollup would be wrong. Location-aware: 'detailed' edits are location-specific,
+    # 'barcode-wise' edits are global.
+    _early_edits = await db.barcode_edits.find({
+        "client_id": client_id, "is_active": True,
+        "report_type": {"$in": ["detailed", "barcode-wise"]}
+    }, {"_id": 0}).to_list(10000)
+    loc_remap = {}
+    global_remap = {}
+    edit_meta_by_new = {}   # new_value -> edit doc (for marking edited rows)
+    for e in _early_edits:
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
+        edit_meta_by_new[new_v] = e
+
     expected_by_barcode = {}
     physical_by_barcode = {}
     expected_custom_fields = {}
-    
+    remap_targets = set()  # barcodes that received remapped qty (mark these as is_edited)
+
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
@@ -3653,8 +3676,13 @@ async def get_consolidated_barcode_wise(client_id: str):
     
     for synced in synced_results:
         for s in synced:
+            loc = s["location_name"]
             for item in s.get("items", []):
-                bc = item["barcode"]
+                raw_bc = item["barcode"]
+                # Apply location-aware edit remap so qty rolls up under the corrected barcode
+                bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
+                if bc != raw_bc:
+                    remap_targets.add(bc)
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
@@ -3716,8 +3744,20 @@ async def get_consolidated_barcode_wise(client_id: str):
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     rounded_totals = {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}
-    edits = await db.barcode_edits.find({"client_id": client_id, "is_active": True}, {"_id": 0}).to_list(10000)
-    report, rounded_totals = _apply_barcode_edits(report, rounded_totals, edits, "barcode-wise", master_by_barcode)
+    # NOTE: Edits are already pre-applied via location-aware remap before aggregation
+    # (so rows merge correctly into the new barcode). Here we only mark `is_edited` /
+    # `is_editable` flags for the UI without re-applying any rename logic.
+    for row in report:
+        bc = row.get("barcode", "")
+        if bc and bc in remap_targets and bc in edit_meta_by_new:
+            ed = edit_meta_by_new[bc]
+            row["is_edited"] = True
+            row["_edit_id"] = ed.get("id")
+            row["_original_value"] = ed.get("original_value")
+            row["remark"] = f"Barcode Edited (was: {ed.get('original_value')})"
+            row["is_editable"] = True
+        else:
+            row["is_editable"] = (row.get("stock_qty", 0) == 0 and row.get("physical_qty", 0) > 0)
     return {"report": report, "totals": rounded_totals, "extra_columns": extra_columns}
 
 @portal_router.get("/reports/consolidated/{client_id}/article-wise")
@@ -3843,12 +3883,22 @@ async def get_consolidated_category_summary(client_id: str):
     master_by_barcode = await _load_master_for_client(client_id)
     reco_maps = await _build_reco_maps(client_id)
 
-    # Pre-fetch active barcode edits for pre-aggregation remap
+    # Pre-fetch active barcode edits for pre-aggregation remap (location-aware:
+    # 'detailed' edits apply only at the edit's location; 'barcode-wise' edits are global).
     _early_edits = await db.barcode_edits.find({
         "client_id": client_id, "is_active": True,
         "report_type": {"$in": ["detailed", "barcode-wise"]}
     }, {"_id": 0}).to_list(10000)
-    barcode_remap = {e["original_value"]: e["new_value"] for e in _early_edits if e.get("original_value") and e.get("new_value")}
+    loc_remap = {}
+    global_remap = {}
+    for e in _early_edits:
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        else:
+            global_remap[orig] = new_v
 
     expected_by_barcode = {}
     physical_by_barcode = {}
@@ -3869,10 +3919,11 @@ async def get_consolidated_category_summary(client_id: str):
     
     for synced in synced_results:
         for s in synced:
+            loc = s["location_name"]
             for item in s.get("items", []):
                 raw_bc = item["barcode"]
-                # Apply barcode edit remap so physical qty rolls up under corrected category
-                bc = barcode_remap.get(raw_bc, raw_bc)
+                # Location-aware remap: detailed edits are scoped to one location only
+                bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
                 physical_by_barcode[bc] = physical_by_barcode.get(bc, 0) + item.get("quantity", 0)
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())

@@ -919,9 +919,18 @@ export default function PortalReports() {
     }
   }, [selectedSession, reportType, selectedClient]);
 
-  // Force-refresh variant — always hits the backend (used after edits/undo/reco so
-  // UI reflects changes instantly instead of showing stale client-side cache)
-  const refreshReport = useCallback(() => fetchReport(true), [fetchReport]);
+  // Force-refresh variant — always hits the backend AND clears every cached report
+  // for the current session so when the user switches to a sibling report
+  // (e.g. detailed → category-summary or barcode-wise after a barcode edit) it
+  // pulls fresh data instead of showing stale cached results.
+  const refreshReport = useCallback(() => {
+    if (selectedSession) {
+      Object.keys(reportCache.current).forEach(key => {
+        if (key.startsWith(`${selectedSession}_`)) delete reportCache.current[key];
+      });
+    }
+    return fetchReport(true);
+  }, [fetchReport, selectedSession]);
 
   // Effect to fetch report when session or report type changes
   useEffect(() => {
