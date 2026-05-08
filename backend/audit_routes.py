@@ -3137,6 +3137,31 @@ async def search_master_data(client_id: str, q: str = "", field: str = "barcode"
     return {"results": results}
 
 
+def _mirror_reco_to_remapped(validated_reco: Dict[str, Any],
+                              loc_remap: Dict, global_remap: Dict) -> None:
+    """Make ``validated_reco['barcode']`` also addressable by post-remap
+    barcode values.
+
+    Aggregated warehouse reports (consolidated barcode-wise / article-wise,
+    single-session barcode-wise) roll qty up under the remapped (NEW) barcode
+    after a barcode edit, but ``validated_reco['barcode']`` is keyed by the
+    SCANNED/SAVED barcode (the ORIGINAL — which is also where Reco is now
+    anchored after the frontend fix). Without this mirror, the row at NEW
+    misses its reco. We additively expose entries under the new key so the
+    existing ``valid_barcode_reco.get(bc, 0)`` lookup keeps working —
+    backward-compatible with any reco still keyed under the new barcode
+    (legacy data from before the original-anchoring fix).
+    """
+    barcode_reco = validated_reco.get("barcode", {})
+    if not barcode_reco:
+        return
+    pairs = list(global_remap.items())
+    pairs += [(orig, new) for (loc, orig), new in loc_remap.items()]
+    for orig, new in pairs:
+        if orig in barcode_reco and new not in barcode_reco:
+            barcode_reco[new] = barcode_reco[orig]
+
+
 def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
     """Apply active barcode/article edits to a generated report. Modifies rows in-place.
 
@@ -3800,6 +3825,9 @@ async def get_consolidated_barcode_wise(client_id: str):
     
     # Use shared reco computation — single source of truth for all reports
     validated_reco = _compute_validated_reco(reco_maps, expected_results, synced_results)
+    # Mirror reco entries to remapped (post-edit) barcodes so rows aggregated
+    # under the NEW value still find their reco (anchored to the ORIGINAL).
+    _mirror_reco_to_remapped(validated_reco, loc_remap, global_remap)
     valid_barcode_reco = validated_reco["barcode"]
     
     report = []
@@ -3927,6 +3955,7 @@ async def get_consolidated_article_wise(client_id: str):
     
     # Use shared reco computation — single source of truth for all reports
     validated_reco = _compute_validated_reco(reco_maps, expected_results, synced_results)
+    _mirror_reco_to_remapped(validated_reco, loc_remap, global_remap)
     validated_barcode_reco = validated_reco["barcode"]
     
     all_barcodes = set(expected_by_barcode.keys()) | set(physical_by_barcode.keys())
@@ -4041,6 +4070,7 @@ async def get_consolidated_category_summary(client_id: str):
     
     # Use shared reco computation — single source of truth for all reports
     validated_reco = _compute_validated_reco(reco_maps, expected_results, synced_results)
+    _mirror_reco_to_remapped(validated_reco, loc_remap, global_remap)
     validated_barcode_reco = validated_reco["barcode"]
     
     cat_groups = {}
