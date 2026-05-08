@@ -55,5 +55,28 @@ Frontend: React (CRA + Tailwind + shadcn/ui) · Backend: FastAPI · DB: MongoDB.
 - Negative variance alerts above threshold
 - Auto-classify pre/post by timestamp (single file upload)
 
+## Hardening Pass — May 2026 (Performance + Security)
+**Fix #4 — reco_adjustments indexes added** (`server.py::create_indexes`)
+- `(client_id, updated_at desc)` for get_cached_reco / report loads
+- `(client_id, reco_type)` for _build_reco_maps
+- `(client_id, reco_type, location, barcode, article_code)` UNIQUE — guards upsert natural key
+
+**Fix #5 — Time-window indexes added**
+- `barcode_edits (client_id, is_active, report_type)` — kills RAM-side report_type filter
+- `reco_adjustments (client_id, reco_type, barcode, updated_at)` — Option-A undo stays <50ms at 1L+ recos
+
+**Fix #6 — Cascade delete for client-level audit state** (`audit_routes.py::delete_session` + new `DELETE /clients/{id}/audit-state`)
+- Last-session-of-client delete now cascades to `barcode_edits` + `reco_adjustments` (prevents phantom edits/recos surviving re-import)
+- Mid-session delete still preserves edits/recos (auditor's working state)
+- New explicit `DELETE /api/audit/portal/clients/{client_id}/audit-state` endpoint for "Reset all corrections" UX (TODO: surface on Client Settings page)
+
+**Fix #7 — Brute-force protection on auth** (`server.py` + `audit_routes.py`)
+- slowapi per-IP rate limit: `/login` = 5/15min, `/reset-password` = 3/hour (honors X-Forwarded-For)
+- MongoDB-backed account lockout: 10 failures on same username in 30 min → 429 with descriptive message
+- Failed attempts logged to `failed_login_attempts` (TTL: auto-purge after 24h via `ts_dt` index)
+- Successful login + password reset both clear the user's failed-attempt history
+- Indexes: `(username, ts desc)`, `(ip, ts desc)`, TTL on `ts_dt`
+- New deps: `slowapi==0.1.9`, `limits==5.8.0`
+
 ## Test Credentials
 admin / admin123

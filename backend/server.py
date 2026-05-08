@@ -5,6 +5,10 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import ValidationError
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from rate_limit import limiter
 import os
 import logging
 import uuid
@@ -69,6 +73,18 @@ logger = logging.getLogger(__name__)
 
 # Create the main app with SafeJSONResponse (handles NaN/Infinity in ALL responses)
 app = FastAPI(title="Audix Data Management API", default_response_class=SafeJSONResponse)
+
+
+# ==================== RATE LIMITING (Fix #7) ====================
+# Per-IP rate limiting via slowapi (instance imported from rate_limit.py so it
+# can be shared with audit_routes.py without circular imports). Used to
+# throttle brute-force attacks on /auth/login (5/15min) and
+# /auth/reset-password (3/hour). Behind k8s ingress, the real client IP
+# arrives in X-Forwarded-For; the key_func in rate_limit.py honors that.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+# ================================================================
 
 
 # Global exception handler for Pydantic validation errors (prevents 500 on old data)
@@ -224,6 +240,37 @@ async def create_indexes():
         await db.conflict_locations.create_index("status")
         await db.sync_raw_logs.create_index([("client_id", 1), ("synced_at", -1)])
         await db.barcode_edits.create_index([("client_id", 1), ("is_active", 1)])
+        # Fix #5: Optimize barcode_edits queries that ALSO filter by report_type
+        # (used in _load_active_barcode_edits across detailed/barcode-wise/category reports)
+        await db.barcode_edits.create_index([("client_id", 1), ("is_active", 1), ("report_type", 1)])
+
+        # Fix #4: reco_adjustments — currently zero indexes besides default _id.
+        # Without these, every report load / undo / build_reco_maps does a full COLLSCAN.
+        await db.reco_adjustments.create_index([("client_id", 1), ("updated_at", -1)])
+        await db.reco_adjustments.create_index([("client_id", 1), ("reco_type", 1)])
+        # Fix #5: time-window index to keep Option-A undo (delete by client+type+barcode+updated_at>=edited_at) at <50ms even with 1L+ recos
+        await db.reco_adjustments.create_index([("client_id", 1), ("reco_type", 1), ("barcode", 1), ("updated_at", 1)])
+        # Fix #4 — unique constraint on the natural key used by save_reco_adjustment's upsert.
+        # Wrapped in its own try/except so legacy duplicates (if any) don't break startup;
+        # the rest of the index creation continues normally.
+        try:
+            await db.reco_adjustments.create_index(
+                [("client_id", 1), ("reco_type", 1), ("location", 1), ("barcode", 1), ("article_code", 1)],
+                unique=True,
+                name="reco_adjustments_natural_key_unique"
+            )
+        except Exception as e:
+            logger.warning(f"reco_adjustments unique index skipped (likely legacy duplicates): {e}")
+
+        # Fix #7: failed_login_attempts — for brute-force lockout queries
+        await db.failed_login_attempts.create_index([("username", 1), ("ts", -1)])
+        await db.failed_login_attempts.create_index([("ip", 1), ("ts", -1)])
+        # Auto-expire failed login attempts after 24h to keep the collection small
+        try:
+            await db.failed_login_attempts.create_index("ts_dt", expireAfterSeconds=86400)
+        except Exception as e:
+            logger.warning(f"failed_login_attempts TTL index skipped: {e}")
+
         await db.location_master.create_index([("client_id", 1)])
         await db.location_master.create_index([("client_id", 1), ("location_code", 1)])
         await db.file_uploads.create_index("file_id", unique=True)

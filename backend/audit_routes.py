@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from rate_limit import limiter
 import os
 import logging
 import hashlib
@@ -417,12 +418,29 @@ async def register_portal_user(user: PortalUserCreate):
     return {"message": "Registration successful! Your account is pending admin approval.", "user_id": portal_user.id}
 
 @portal_router.post("/login")
-async def login_portal_user(credentials: PortalUserLogin):
+@limiter.limit("5/15minutes")
+async def login_portal_user(request: Request, credentials: PortalUserLogin):
+    # Fix #7: Account-level lockout — 10 failed attempts on the SAME username in
+    # the last 30 minutes triggers a 30-min lockout (defends against distributed
+    # IP-rotation attacks that bypass per-IP rate limit).
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    recent_fails = await db.failed_login_attempts.count_documents({
+        "username": credentials.username,
+        "ts": {"$gte": cutoff_iso}
+    })
+    if recent_fails >= 10:
+        raise HTTPException(
+            status_code=429,
+            detail="Account temporarily locked due to too many failed attempts. Try again in 30 minutes."
+        )
+
     user = await db.portal_users.find_one({"username": credentials.username}, {"_id": 0})
     if not user:
+        await _record_failed_login(credentials.username, request)
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not verify_password(credentials.password, user.get("password_hash", "")):
+        await _record_failed_login(credentials.username, request)
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Check if user is active
@@ -433,12 +451,13 @@ async def login_portal_user(credentials: PortalUserLogin):
     if not user.get("is_approved", True):
         raise HTTPException(status_code=403, detail="Your account is pending admin approval.")
     
-    # Update last_login
+    # Update last_login + clear that user's failed-login history (clean slate on success)
     now = datetime.now(timezone.utc).isoformat()
     await db.portal_users.update_one(
         {"id": user["id"]},
         {"$set": {"last_login": now}}
     )
+    await db.failed_login_attempts.delete_many({"username": credentials.username})
     
     return {
         "message": "Login successful",
@@ -449,6 +468,27 @@ async def login_portal_user(credentials: PortalUserLogin):
         }
     }
 
+
+async def _record_failed_login(username: str, request: Request):
+    """Fix #7: Log a failed login attempt for audit + lockout calculation."""
+    try:
+        now = datetime.now(timezone.utc)
+        ip = "unknown"
+        xff = request.headers.get("x-forwarded-for") if request else None
+        if xff:
+            ip = xff.split(",")[0].strip()
+        elif request and request.client and request.client.host:
+            ip = request.client.host
+        await db.failed_login_attempts.insert_one({
+            "username": username,
+            "ip": ip,
+            "ts": now.isoformat(),
+            "ts_dt": now,  # for TTL index (auto-purge after 24h)
+        })
+    except Exception as e:
+        # Never let audit logging break the request flow
+        logging.getLogger(__name__).warning(f"failed_login_attempts insert failed: {e}")
+
 # ==================== PASSWORD RESET ====================
 
 class PasswordResetRequest(BaseModel):
@@ -456,19 +496,22 @@ class PasswordResetRequest(BaseModel):
     new_password: str
 
 @portal_router.post("/reset-password")
-async def reset_password(request: PasswordResetRequest):
+@limiter.limit("3/hour")
+async def reset_password(request: Request, body: PasswordResetRequest):
     """Public endpoint - reset password by username"""
-    user = await db.portal_users.find_one({"username": request.username}, {"_id": 0})
+    user = await db.portal_users.find_one({"username": body.username}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="Username not found")
     
-    if len(request.new_password) < 4:
+    if len(body.new_password) < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
     
     await db.portal_users.update_one(
-        {"username": request.username},
-        {"$set": {"password_hash": hash_password(request.new_password)}}
+        {"username": body.username},
+        {"$set": {"password_hash": hash_password(body.new_password)}}
     )
+    # Successful reset clears any pending lockout state for that user
+    await db.failed_login_attempts.delete_many({"username": body.username})
     
     return {"message": "Password reset successful. You can now login with your new password."}
 
@@ -1305,6 +1348,9 @@ async def update_session_status(session_id: str, status: str):
 async def delete_session(session_id: str):
     # Full cascading delete — purge ALL data tied to this session so no orphan
     # references remain in batches/sync logs/conflicts after deletion.
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0, "client_id": 1})
+    client_id = (session or {}).get("client_id")
+
     deleted = {}
     deleted["expected_stock"] = (await db.expected_stock.delete_many({"session_id": session_id})).deleted_count
     deleted["synced_locations"] = (await db.synced_locations.delete_many({"session_id": session_id})).deleted_count
@@ -1319,7 +1365,43 @@ async def delete_session(session_id: str):
     result = await db.audit_sessions.delete_one({"id": session_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Fix #6: cascade client-level audit state ONLY when this was the LAST session
+    # for the client. Prevents phantom edits/recos surviving across re-imports
+    # while still preserving cross-session edits during an active multi-session audit.
+    if client_id:
+        remaining = await db.audit_sessions.count_documents({"client_id": client_id})
+        if remaining == 0:
+            be = await db.barcode_edits.delete_many({"client_id": client_id})
+            ra = await db.reco_adjustments.delete_many({"client_id": client_id})
+            deleted["barcode_edits"] = be.deleted_count
+            deleted["reco_adjustments"] = ra.deleted_count
+            # Invalidate any cached recos for this client
+            try:
+                _reco_cache.invalidate(f"reco_{client_id}")
+            except Exception:
+                pass
+
     return {"message": "Session and all related data permanently deleted", "deleted": deleted}
+
+
+@portal_router.delete("/clients/{client_id}/audit-state")
+async def reset_client_audit_state(client_id: str):
+    """Fix #6 (Approach B): Clear ALL barcode edits and reco adjustments for a
+    client. Used when an auditor wants a fresh recount mid-audit without
+    deleting/recreating sessions. Surface this on the Client Settings page as a
+    "Reset all corrections" action behind a confirm dialog."""
+    edits_del = (await db.barcode_edits.delete_many({"client_id": client_id})).deleted_count
+    recos_del = (await db.reco_adjustments.delete_many({"client_id": client_id})).deleted_count
+    try:
+        _reco_cache.invalidate(f"reco_{client_id}")
+    except Exception:
+        pass
+    return {
+        "message": "Audit corrections cleared",
+        "edits_removed": edits_del,
+        "recos_removed": recos_del,
+    }
 
 @portal_router.post("/sessions/{session_id}/import-expected")
 async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
