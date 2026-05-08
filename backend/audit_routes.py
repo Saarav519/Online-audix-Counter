@@ -3347,28 +3347,82 @@ def _apply_barcode_edits(report, totals, edits, report_type, master_by_barcode):
 
 # ==================== RECONCILIATION (RECO) ENDPOINTS ====================
 
-async def _build_reco_maps(client_id: str):
+async def _build_reco_maps(client_id: str,
+                           edits: Optional[List[Dict[str, Any]]] = None):
     """Build lookup maps for reco adjustments for a client (used in consolidated reports).
     Returns: { "detailed": {loc|barcode: reco_qty}, "barcode": {barcode: reco_qty}, "article": {article_code: reco_qty} }
+
+    When ``edits`` (active barcode_edits docs) is provided, ``barcode_map`` is
+    built REMAP-AWARE: a Reco anchored to ``(loc, ORIGINAL)`` is attributed
+    to the post-edit barcode in the aggregated map. This prevents
+    double-counting when the same ORIGINAL barcode is also scanned at
+    OTHER (un-edited) locations — symmetric to the Cycle Count fix.
+
+    Consolidated reports DON'T need this (they go through
+    ``_compute_validated_reco`` + ``_mirror_reco_to_remapped`` separately
+    which already MOVES reco to the remapped target). The remap-aware
+    behaviour here is targeted at SINGLE-SESSION reports for Store-type
+    clients (Option B Reco column rollout).
     """
     adjs = await get_cached_reco(client_id)
+
+    loc_remap: Dict[tuple, str] = {}
+    global_remap: Dict[str, str] = {}
+    for e in (edits or []):
+        if not e.get("is_active", True):
+            continue
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v:
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        elif e.get("report_type") in ("detailed", "barcode-wise"):
+            global_remap[orig] = new_v
+
     detailed_map = {}
     barcode_map = {}
     article_map = {}
     for a in adjs:
         rt = a.get("reco_type", "")
+        qty = a["reco_qty"]
         if rt == "detailed":
-            key = f"{a.get('location', '')}|{a.get('barcode', '')}"
-            detailed_map[key] = detailed_map.get(key, 0) + a["reco_qty"]
-            bc = a.get("barcode", "")
-            barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
+            loc = a.get("location", "") or ""
+            bc = a.get("barcode", "") or ""
+            key = f"{loc}|{bc}"
+            detailed_map[key] = detailed_map.get(key, 0) + qty
+            target = loc_remap.get((loc, bc)) or global_remap.get(bc) or bc
+            barcode_map[target] = barcode_map.get(target, 0) + qty
         elif rt == "barcode":
-            bc = a.get("barcode", "")
-            barcode_map[bc] = barcode_map.get(bc, 0) + a["reco_qty"]
+            bc = a.get("barcode", "") or ""
+            target = global_remap.get(bc) or bc
+            barcode_map[target] = barcode_map.get(target, 0) + qty
         elif rt == "article":
-            ac = a.get("article_code", "")
-            article_map[ac] = article_map.get(ac, 0) + a["reco_qty"]
+            ac = a.get("article_code", "") or ""
+            article_map[ac] = article_map.get(ac, 0) + qty
     return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+
+
+async def _get_session_reco_maps(session_doc: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+    """Single-session Reco gate (Option B).
+
+    Reco is exposed in single-session reports ONLY for Store-type clients —
+    Warehouse single-session reports remain Reco-free (Reco editable only
+    in their Consolidated view). Cycle Count uses its own pipeline.
+    """
+    if not session_doc:
+        return EMPTY_RECO_MAPS
+    client_id = session_doc.get("client_id")
+    if not client_id:
+        return EMPTY_RECO_MAPS
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "client_type": 1})
+    if not client or client.get("client_type") != "store":
+        return EMPTY_RECO_MAPS
+    edits = await db.barcode_edits.find(
+        {"client_id": client_id, "is_active": True,
+         "report_type": {"$in": ["detailed", "barcode-wise"]}},
+        {"_id": 0}
+    ).to_list(10000)
+    return await _build_reco_maps(client_id, edits=edits)
 
 EMPTY_RECO_MAPS = {"detailed": {}, "barcode": {}, "article": {}}
 
@@ -3416,6 +3470,7 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate):
         filter_key["article_code"] = adj.article_code
     if adj.reco_qty == 0:
         await db.reco_adjustments.delete_one(filter_key)
+        _reco_cache.invalidate(f"reco_{adj.client_id}")
         return {"status": "deleted"}
     doc = {**filter_key, "reco_qty": adj.reco_qty, "updated_at": datetime.now(timezone.utc).isoformat()}
     await db.reco_adjustments.update_one(filter_key, {"$set": doc}, upsert=True)
@@ -3432,6 +3487,7 @@ async def get_reco_adjustments(client_id: str):
 async def clear_reco_adjustments(client_id: str):
     """Clear all reco adjustments for a client."""
     result = await db.reco_adjustments.delete_many({"client_id": client_id})
+    _reco_cache.invalidate(f"reco_{client_id}")
     return {"deleted": result.deleted_count}
 
 # ==================== REPORTS ROUTES ====================
@@ -4227,12 +4283,13 @@ async def get_consolidated_category_summary(client_id: str):
 async def get_bin_wise_report(session_id: str):
     """Bin-wise summary report with reco integration."""
     # Parallel DB queries for performance
+    session_task = db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
     expected_task = db.expected_stock.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     synced_task = db.synced_locations.find({"session_id": session_id}, {"_id": 0}).to_list(100000)
     conflict_task = db.conflict_locations.find({"session_id": session_id, "status": "pending"}, {"_id": 0}).to_list(10000)
     
 
-    expected, synced, conflict_locs = await asyncio.gather(expected_task, synced_task, conflict_task)
+    session, expected, synced, conflict_locs = await asyncio.gather(session_task, expected_task, synced_task, conflict_task)
 
     expected_by_location = {}
     for e in expected:
@@ -4252,7 +4309,8 @@ async def get_bin_wise_report(session_id: str):
         conflict_map[c["location_name"]] = {"conflict_id": c["id"], "entry_count": len(c.get("entries", [])), "devices": [e.get("device_name", "Unknown") for e in c.get("entries", [])]}
     
     # Build reco aggregated by location from detailed-level adjustments
-    reco_maps = EMPTY_RECO_MAPS
+    # (Store-type clients only — Option B; Warehouse single-session stays Reco-free)
+    reco_maps = await _get_session_reco_maps(session)
     location_reco = {}
     for key, reco in reco_maps["detailed"].items():
         loc = key.split("|")[0]
@@ -4330,7 +4388,7 @@ async def get_detailed_report(session_id: str):
     
     session, expected, synced, master_by_barcode = await asyncio.gather(session_task, expected_task, synced_task, master_task)
     
-    reco_maps = EMPTY_RECO_MAPS
+    reco_maps = await _get_session_reco_maps(session)
     extra_columns = await _get_extra_columns_for_client(session.get("client_id", "")) if session else []
     expected_map = {}
     for e in expected:
@@ -4432,7 +4490,7 @@ async def get_barcode_wise_report(session_id: str):
     
     session, expected, synced, master_by_barcode = await asyncio.gather(session_task, expected_task, synced_task, master_task)
     
-    reco_maps = EMPTY_RECO_MAPS
+    reco_maps = await _get_session_reco_maps(session)
     extra_columns = await _get_extra_columns_for_client(session.get("client_id", "")) if session else []
 
     # Pre-fetch active barcode edits → build location-aware remap so that
@@ -4567,7 +4625,7 @@ async def get_article_wise_report(session_id: str):
     
     session_info, expected, synced, master_by_barcode = await asyncio.gather(session_task, expected_task, synced_task, master_task)
     
-    reco_maps = EMPTY_RECO_MAPS
+    reco_maps = await _get_session_reco_maps(session_info)
     extra_columns = await _get_extra_columns_for_client(session_info.get("client_id", "")) if session_info else []
 
     # Pre-fetch active barcode edits so we can remap scanner barcodes BEFORE aggregation.
@@ -4733,11 +4791,11 @@ async def get_article_wise_report(session_id: str):
 async def get_category_summary(session_id: str):
     """Category-wise summary: Groups all data by category. Uses master products for category info."""
     master_by_barcode = await get_master_for_session(session_id)
-    reco_maps = EMPTY_RECO_MAPS
     
     # Load session + active barcode edits so scanner barcodes get remapped before aggregation
     # Location-aware: detailed edits are location-specific, barcode-wise edits are global
     session_doc = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0, "client_id": 1})
+    reco_maps = await _get_session_reco_maps(session_doc)
     client_id = session_doc.get("client_id", "") if session_doc else ""
     _early_edits = await db.barcode_edits.find({
         "client_id": client_id, "is_active": True,
