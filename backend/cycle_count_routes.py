@@ -1006,27 +1006,83 @@ async def cycle_project_report(pid: str, report_type: str):
 
     # Special report types — pending and empty-bins
     if report_type == "pending-locations":
-        pending_bins = sorted(expected_bins_all_days - scanned_bins_all_days)
-        # Build rows shaped like the regular pending-locations endpoint
-        rows = []
-        for bin_loc in pending_bins:
-            stock_rows = await db.cycle_day_stock.find(
-                {"project_id": pid, "location": bin_loc}, {"_id": 0}
-            ).sort("day_id", 1).to_list(10000)
-            total_qty = sum(_to_float(s.get("qty")) for s in stock_rows)
-            barcode_count = len({s.get("barcode") for s in stock_rows if s.get("barcode")})
-            rows.append({
-                "location": bin_loc,
-                "expected_qty": total_qty,
-                "stock_qty": total_qty,
-                "barcode_count": barcode_count,
-                "status": "pending",
-                "_is_cycle_count": True,
-            })
+        # Source pending bins from the client's Location Master (warehouse parity).
+        # Any bin in the master that has NOT been scanned in this project yet
+        # is "pending". Bins with stock uploaded but not yet on the master
+        # still surface as pending so day-1 uploads aren't lost.
+        loc_master_cur = db.location_master.find(
+            {"client_id": project["client_id"]}, {"_id": 0, "location_code": 1, "zone": 1, "floor": 1, "location_type": 1}
+        )
+        master_locs: Dict[str, Dict[str, Any]] = {}
+        async for lm in loc_master_cur:
+            code = (lm.get("location_code") or "").strip()
+            if code:
+                master_locs[code] = lm
+        # Union with stock-uploaded bins (so freshly-uploaded bins not yet in
+        # the master file still show as pending instead of disappearing).
+        for bin_loc in expected_bins_all_days:
+            if bin_loc and bin_loc not in master_locs:
+                master_locs[bin_loc] = {"location_code": bin_loc}
+
+        # Build synced map (mirrors warehouse pending-locations response shape)
+        synced_map: Dict[str, Dict[str, Any]] = {}
+        if session_id:
+            async for s in db.synced_locations.find(
+                {"session_id": session_id}, {"_id": 0}
+            ):
+                name = s.get("location_name", "")
+                if not name:
+                    continue
+                # Last-write-wins per location (latest sync overwrites)
+                synced_map[name] = {
+                    "location_name": name,
+                    "total_items": s.get("total_items", 0),
+                    "total_quantity": s.get("total_quantity", 0),
+                    "is_empty": s.get("is_empty", False),
+                    "empty_remarks": s.get("empty_remarks", ""),
+                    "device_name": s.get("device_name", ""),
+                    "synced_at": s.get("synced_at", ""),
+                    "sync_date": s.get("sync_date", ""),
+                    "status": "empty" if s.get("is_empty", False) else "completed",
+                }
+
+        all_locs = sorted(set(master_locs.keys()) | set(synced_map.keys()))
+        completed: List[Dict[str, Any]] = []
+        empty_bins: List[Dict[str, Any]] = []
+        pending: List[Dict[str, Any]] = []
+        for loc_name in all_locs:
+            in_expected = loc_name in master_locs
+            if loc_name in synced_map:
+                info = synced_map[loc_name]
+                if info["is_empty"]:
+                    empty_bins.append({"location_name": loc_name, "status": "empty",
+                                        "in_expected": in_expected, **info})
+                else:
+                    completed.append({"location_name": loc_name, "status": "completed",
+                                      "in_expected": in_expected, **info})
+            elif in_expected:
+                pending.append({"location_name": loc_name, "status": "pending",
+                                "in_expected": True, "total_items": 0, "total_quantity": 0,
+                                "is_empty": False, "empty_remarks": "", "device_name": "",
+                                "synced_at": "", "sync_date": ""})
+
+        total_expected = len(master_locs)
+        synced_in_expected = len(set(synced_map.keys()) & set(master_locs.keys()))
+        completion_pct = round((synced_in_expected / total_expected * 100), 1) if total_expected > 0 else 0
         return {
-            "report": rows,
-            "totals": {"stock_qty": sum(r["stock_qty"] for r in rows), "barcode_count": sum(r["barcode_count"] for r in rows)},
-            "summary": {"total_pending_bins": len(rows)},
+            "session_id": f"cc_proj_{pid}",
+            "session_name": f"{project['name']} · Consolidated",
+            "summary": {
+                "total_expected": total_expected,
+                "total_completed": len(completed),
+                "total_empty": len(empty_bins),
+                "total_pending": len(pending),
+                "total_synced": synced_in_expected,
+                "completion_pct": completion_pct,
+            },
+            "completed": completed,
+            "empty_bins": empty_bins,
+            "pending": pending,
             "session_info": {
                 "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
                 "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",

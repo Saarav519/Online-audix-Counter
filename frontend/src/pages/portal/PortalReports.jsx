@@ -1288,6 +1288,13 @@ export default function PortalReports() {
   const columnConfig = useMemo(() => {
     const ec = extraColumns.map(c => ({ key: c.name, label: c.label }));
     const { has_mrp, has_cost } = schemaValueFields;
+    // Cycle-count reports include picking-aware columns (Pre-Audit / Post-Audit)
+    const ccCols = isCycleCountClient
+      ? [
+          { key: 'pre_pick_qty', label: 'Pre-Audit Picks' },
+          { key: 'post_pick_qty', label: 'Post-Audit Picks' },
+        ]
+      : [];
     
     // Helper to conditionally include MRP/Cost value columns
     const valCols = (prefix, mrpLabel, costLabel) => {
@@ -1316,6 +1323,7 @@ export default function PortalReports() {
           { key: 'location', label: 'Location' },
           { key: 'stock_qty', label: 'Stock Qty' },
           { key: 'physical_qty', label: 'Physical' },
+          ...ccCols,
           ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
           { key: 'difference_qty', label: 'Difference' },
@@ -1334,6 +1342,7 @@ export default function PortalReports() {
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical Qty' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
+          ...ccCols,
           ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
@@ -1355,6 +1364,7 @@ export default function PortalReports() {
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
+          ...ccCols,
           ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
@@ -1396,6 +1406,7 @@ export default function PortalReports() {
           ...valCols('stock_value', 'Stock Val(MRP)', 'Stock Val(Cost)'),
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
+          ...ccCols,
           ...(isConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
           ...(isConsolidatedView ? [
             { key: 'final_qty', label: 'Final Qty' },
@@ -1409,7 +1420,7 @@ export default function PortalReports() {
       default:
         return [];
     }
-  }, [reportType, isConsolidatedView, extraColumns, schemaValueFields]);
+  }, [reportType, isConsolidatedView, extraColumns, schemaValueFields, isCycleCountClient]);
 
   // Reset column settings when report type changes
   useEffect(() => {

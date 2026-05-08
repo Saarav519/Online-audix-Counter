@@ -14,7 +14,9 @@ const NUMERIC_KEYS = new Set([
   'mrp', 'cost', 'stock_value_mrp', 'stock_value_cost', 'physical_value_mrp', 'physical_value_cost',
   'diff_value_mrp', 'diff_value_cost', 'final_value_mrp', 'final_value_cost',
   'phys_value_mrp', 'phys_value_cost',
-  'item_count', 'barcode_count', 'reco_qty', 'final_qty', 'total_qty', 'session_count'
+  'item_count', 'barcode_count', 'reco_qty', 'final_qty', 'total_qty', 'session_count',
+  // Cycle-count picking-aware columns
+  'pre_pick_qty', 'post_pick_qty', 'effective_qty', 'ending_stock'
 ]);
 
 const VALUE_KEYS = new Set([
