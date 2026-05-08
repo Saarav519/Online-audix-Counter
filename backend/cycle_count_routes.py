@@ -1236,6 +1236,13 @@ async def cycle_day_report(day_id: str, report_type: str):
     shaped["report"], shaped["totals"] = await _apply_cc_barcode_edits(
         shaped["report"], shaped["totals"], project["client_id"], report_type
     )
+    # Apply Reco adjustments here too — Cycle Count Reco is editable only in
+    # Day-wise Detailed Report but the resulting Reco/Final Qty must be
+    # visible (read-only) across every cycle-count report. Pulling the same
+    # `reco_adjustments` collection guarantees real-time propagation.
+    shaped["report"], shaped["totals"] = await _apply_cc_reco(
+        shaped["report"], shaped["totals"], project["client_id"], report_type
+    )
     shaped["session_info"] = {
         "id": f"cc_day_{day_id}", "name": f"{project['name']} · Day {day['day_no']}",
         "client_id": project["client_id"], "variance_mode": "cycle-count-day",

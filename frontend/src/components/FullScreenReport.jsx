@@ -514,7 +514,7 @@ function GridRenderer({
   data, visibleRows, visibleStartIdx,
   topSpacerHeight, bottomSpacerHeight,
   scrollRef,
-  onSaveReco, isConsolidated, recoType,
+  onSaveReco, isConsolidated, isRecoEditable, recoType,
   handleScroll, setSelStart, setSelEnd,
   clientId, reportType, onRefresh
 }) {
@@ -665,8 +665,10 @@ function GridRenderer({
                   else if (isSelected) cellClass = 'vg-selected';
                   else if (isMatch) cellClass = 'vg-search-match';
 
-                  // Reco column
-                  if ((col.key === 'reco' || col.key === 'reco_qty') && onSaveReco && isConsolidated) {
+                  // Reco column — column visibility uses `isConsolidated`,
+                  // editing is gated by `isRecoEditable`. Read-only Reco
+                  // still shows the value (formatted as numeric below).
+                  if ((col.key === 'reco' || col.key === 'reco_qty') && onSaveReco && isConsolidated && isRecoEditable) {
                     return (
                       <td key={col.key} data-fsrow={rowIdx} data-fscol={globalIdx}
                         style={{ width: getColWidth(col.key), minWidth: getColWidth(col.key) }}
@@ -750,7 +752,7 @@ export function FullScreenReport({
   activeFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues,
   frozenColumns = new Set(), hiddenColumns = new Set(),
   onToggleFreeze, onToggleVisibility, onShowAllColumns, onResetColumns,
-  onSaveReco, isConsolidated, reportType,
+  onSaveReco, isConsolidated, isRecoEditable, reportType,
   children, totalRows = 0, clientId, onRefresh
 }) {
   const scrollRef = useRef(null);
@@ -1027,7 +1029,7 @@ export function FullScreenReport({
         case 'Enter':
           e.preventDefault();
           const col = visibleColumns[activeCell.col];
-          if (col && (col.key === 'reco' || col.key === 'reco_qty') && onSaveReco) {
+          if (col && (col.key === 'reco' || col.key === 'reco_qty') && onSaveReco && isRecoEditable) {
             const td = document.querySelector(`[data-fsrow="${activeCell.row}"][data-fscol="${activeCell.col}"] button`);
             if (td) td.click();
           }
@@ -1228,6 +1230,7 @@ export function FullScreenReport({
           scrollRef={scrollRef}
           onSaveReco={onSaveReco}
           isConsolidated={isConsolidated}
+          isRecoEditable={isRecoEditable}
           recoType={recoType}
           handleScroll={handleScroll}
           setSelStart={setSelStart}

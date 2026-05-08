@@ -1108,14 +1108,31 @@ export default function PortalReports() {
 
   const saveRecoAdjustment = async (params) => {
     try {
-      if (selectedSession !== '__consolidated__' || !selectedClient) { toast.error('Reco is only available in consolidated view'); return; }
+      // Reco is allowed in:
+      //  • Warehouse/Store: only consolidated view
+      //  • Cycle Count:    only Day-wise Detailed view (per spec)
+      const allowed = isCycleCountClient
+        ? (isCcDayView && reportType === 'detailed')
+        : (selectedSession === '__consolidated__');
+      if (!allowed || !selectedClient) {
+        toast.error(isCycleCountClient
+          ? 'Reco can only be edited from Day-wise Detailed Report'
+          : 'Reco is only available in consolidated view');
+        return;
+      }
       const body = { client_id: selectedClient, ...params };
       const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
-        // Invalidate all cached reports for this session (reco affects multiple report types)
-        Object.keys(reportCache.current).forEach(key => {
-          if (key.startsWith(`${selectedSession}_`)) delete reportCache.current[key];
-        });
+        // Invalidate all cached reports for this client — reco propagates
+        // across every day-wise + consolidated cycle-count report and across
+        // every report type in the warehouse/store flow.
+        if (isCycleCountClient) {
+          reportCache.current = {};
+        } else {
+          Object.keys(reportCache.current).forEach(key => {
+            if (key.startsWith(`${selectedSession}_`)) delete reportCache.current[key];
+          });
+        }
         // Optimistic local state update - no full page refresh
         setReportData(prev => {
           if (!prev || !prev.report) return prev;
@@ -1273,10 +1290,16 @@ export default function PortalReports() {
   // For cycle_count consolidated view (selectedDay === 'consolidated') we expose
   // empty-bins + pending-locations report types in addition to the daily ones.
   const isCcConsolidatedView = isCycleCountClient && selectedDay === 'consolidated';
+  // Cycle-count Day-wise view (a specific day selected) — Reco is editable
+  // only here AND only in the Detailed report. Every other cycle-count
+  // surface shows Reco/Final Qty as read-only but still visible.
+  const isCcDayView = isCycleCountClient && !!selectedDay && selectedDay !== 'consolidated';
   // Unified flag — used to decide whether Reco/Final Qty columns + reco
-  // editing UI should be shown. Cycle-count "Full Consolidated" mirrors the
-  // warehouse consolidated view in this regard.
-  const isAnyConsolidatedView = isConsolidatedView || isCcConsolidatedView;
+  // editing UI should be shown. For Cycle Count we always show these
+  // columns (day or consolidated) so subtotals & values stay consistent
+  // across every view; for Warehouse/Store the original "consolidated only"
+  // gate is preserved.
+  const showRecoFinalCols = isConsolidatedView || isCycleCountClient;
 
   // ============ Column Settings Logic ============
   const isRecoEditable = useMemo(() => {
@@ -1328,8 +1351,8 @@ export default function PortalReports() {
           { key: 'stock_qty', label: 'Stock Qty' },
           { key: 'physical_qty', label: 'Physical' },
           ...ccCols,
-          ...(isAnyConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(isAnyConsolidatedView ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
+          ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
+          ...(showRecoFinalCols ? [{ key: 'final_qty', label: 'Final Qty' }] : []),
           { key: 'difference_qty', label: 'Difference' },
           { key: 'accuracy_pct', label: 'Accuracy %' },
           { key: 'remark', label: 'Remarks' },
@@ -1347,8 +1370,8 @@ export default function PortalReports() {
           { key: 'physical_qty', label: 'Physical Qty' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...ccCols,
-          ...(isAnyConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(isAnyConsolidatedView ? [
+          ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
+          ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
@@ -1369,8 +1392,8 @@ export default function PortalReports() {
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...ccCols,
-          ...(isAnyConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(isAnyConsolidatedView ? [
+          ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
+          ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
@@ -1411,8 +1434,8 @@ export default function PortalReports() {
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...ccCols,
-          ...(isAnyConsolidatedView ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(isAnyConsolidatedView ? [
+          ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
+          ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
           ] : []),
@@ -1424,7 +1447,7 @@ export default function PortalReports() {
       default:
         return [];
     }
-  }, [reportType, isAnyConsolidatedView, extraColumns, schemaValueFields, isCycleCountClient]);
+  }, [reportType, showRecoFinalCols, extraColumns, schemaValueFields, isCycleCountClient]);
 
   // Reset column settings when report type changes
   useEffect(() => {
@@ -1999,11 +2022,11 @@ export default function PortalReports() {
           {/* Report Table — Reco editing only on the primary report type for the session's variance mode */}
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
-          {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isAnyConsolidatedView} />}
-          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={isAnyConsolidatedView} isRecoEditable={isAnyConsolidatedView && (sessionInfo?.variance_mode === 'bin-wise' || sessionInfo?.variance_mode === 'cycle-count-consolidated')} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isAnyConsolidatedView && (sessionInfo?.variance_mode === 'barcode-wise' || sessionInfo?.variance_mode === 'cycle-count-consolidated')} isConsolidated={isAnyConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} />}
+          {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
+          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={isCycleCountClient ? isCcDayView : (isConsolidatedView && sessionInfo?.variance_mode === 'bin-wise')} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isCycleCountClient ? false : (isConsolidatedView && sessionInfo?.variance_mode === 'barcode-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} />}
           {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isConsolidatedView && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={isConsolidatedView} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} />}
-          {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={isAnyConsolidatedView} />}
+          {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
           </div>
           {/* Load More button for large datasets */}
           {hasMoreRows && reportType !== 'empty-bins' && reportType !== 'pending-locations' && (
@@ -2049,7 +2072,12 @@ export default function PortalReports() {
         onShowAllColumns={showAllColumns}
         onResetColumns={resetColumnSettings}
         onSaveReco={saveRecoAdjustment}
-        isConsolidated={isAnyConsolidatedView}
+        isConsolidated={showRecoFinalCols}
+        isRecoEditable={isCycleCountClient ? (isCcDayView && reportType === 'detailed') : (isConsolidatedView && (
+          (reportType === 'detailed' && sessionInfo?.variance_mode === 'bin-wise') ||
+          (reportType === 'barcode-wise' && sessionInfo?.variance_mode === 'barcode-wise') ||
+          (reportType === 'article-wise' && sessionInfo?.variance_mode === 'article-wise')
+        ))}
         reportType={reportType}
         totalRows={filteredData?.report?.length || 0}
         clientId={selectedClient}
