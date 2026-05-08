@@ -807,27 +807,57 @@ def _calc_accuracy(stock_qty: float, final_qty: float) -> float:
     return min(100.0, (min(stock_qty, final_qty) / stock_qty) * 100.0)
 
 
-async def _build_cc_reco_maps(client_id: str) -> Dict[str, Dict[str, float]]:
+async def _build_cc_reco_maps(client_id: str,
+                              edits: Optional[List[Dict[str, Any]]] = None
+                              ) -> Dict[str, Dict[str, float]]:
     """Mirror of warehouse `_build_reco_maps` — Reco adjustments live at the
     client level, so the same `reco_adjustments` collection feeds Cycle Count
-    consolidated reports."""
+    consolidated reports.
+
+    BUG-FIX: ``barcode_map`` is built REMAP-AWARE. When a Reco was saved at
+    `(loc, ORIG)` (frontend anchors Reco to the ORIGINAL barcode after a
+    barcode edit) and `(loc, ORIG)` was remapped to `NEW` by an active edit,
+    we attribute the Reco to `NEW` in ``barcode_map`` — not `ORIG`. This
+    prevents the Barcode Variance report from double-counting the Reco when
+    the same `ORIG` was also scanned at OTHER (un-edited) locations.
+    """
     adjs = await db.reco_adjustments.find({"client_id": client_id}, {"_id": 0}).to_list(100000)
     detailed_map: Dict[str, float] = {}
     barcode_map: Dict[str, float] = {}
     article_map: Dict[str, float] = {}
+
+    # Build remap tables from active barcode edits
+    loc_remap: Dict[tuple, str] = {}
+    global_remap: Dict[str, str] = {}
+    for e in (edits or []):
+        orig = e.get("original_value"); new_v = e.get("new_value")
+        if not orig or not new_v or not e.get("is_active", True):
+            continue
+        if e.get("report_type") == "detailed" and e.get("location"):
+            loc_remap[(e["location"], orig)] = new_v
+        elif e.get("report_type") in ("detailed", "barcode-wise"):
+            global_remap[orig] = new_v
+
     for a in adjs:
         rt = a.get("reco_type", "")
+        qty = _to_float(a.get("reco_qty"))
         if rt == "detailed":
-            key = f"{a.get('location', '')}|{a.get('barcode', '')}"
-            detailed_map[key] = detailed_map.get(key, 0) + _to_float(a.get("reco_qty"))
-            bc = a.get("barcode", "")
-            barcode_map[bc] = barcode_map.get(bc, 0) + _to_float(a.get("reco_qty"))
+            loc = a.get("location", "") or ""
+            bc = a.get("barcode", "") or ""
+            key = f"{loc}|{bc}"
+            detailed_map[key] = detailed_map.get(key, 0) + qty
+            # Attribute to post-edit barcode in the aggregated map so the
+            # edited row receives the Reco — and un-edited rows for the
+            # same ORIGINAL barcode at OTHER locations don't pick it up.
+            target = loc_remap.get((loc, bc)) or global_remap.get(bc) or bc
+            barcode_map[target] = barcode_map.get(target, 0) + qty
         elif rt == "barcode":
-            bc = a.get("barcode", "")
-            barcode_map[bc] = barcode_map.get(bc, 0) + _to_float(a.get("reco_qty"))
+            bc = a.get("barcode", "") or ""
+            target = global_remap.get(bc) or bc
+            barcode_map[target] = barcode_map.get(target, 0) + qty
         elif rt == "article":
-            ac = a.get("article_code", "")
-            article_map[ac] = article_map.get(ac, 0) + _to_float(a.get("reco_qty"))
+            ac = a.get("article_code", "") or ""
+            article_map[ac] = article_map.get(ac, 0) + qty
     return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
 
 
@@ -848,7 +878,10 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
     Category-summary builds a barcode→category index from `base_rows`
     (post-edit) so reco moves into the correct edited category.
     """
-    reco_maps = await _build_cc_reco_maps(client_id)
+    reco_maps = await _build_cc_reco_maps(
+        client_id,
+        edits=await _load_active_barcode_edits(client_id),
+    )
     if not (reco_maps["detailed"] or reco_maps["barcode"] or reco_maps["article"]):
         return report, totals
 
