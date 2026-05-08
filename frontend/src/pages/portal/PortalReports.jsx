@@ -603,6 +603,66 @@ export default function PortalReports() {
     fetchClients();
   }, []);
 
+  // Auto-select client + session from URL (?session_id=cc_day_xxx or normal id)
+  // when the user deep-links from the Cycle Count page or another module.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlSessionId = params.get('session_id');
+    const urlClientId = params.get('client_id');
+    if (urlClientId && clients.length) {
+      setSelectedClient(urlClientId);
+    } else if (urlSessionId && !urlClientId && clients.length && !selectedClient) {
+      // Fetch the session/cycle-count to discover its client_id
+      (async () => {
+        try {
+          if (urlSessionId.startsWith('cc_day_')) {
+            const did = urlSessionId.slice(7);
+            const r = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/days/${did}/variance`);
+            if (r.ok) {
+              const v = await r.json();
+              const pr = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${v.project_id}`);
+              if (pr.ok) {
+                const pd = await pr.json();
+                setSelectedClient(pd.project.client_id);
+              }
+            }
+          } else if (urlSessionId.startsWith('cc_proj_')) {
+            const pid = urlSessionId.slice(8);
+            const pr = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${pid}`);
+            if (pr.ok) {
+              const pd = await pr.json();
+              setSelectedClient(pd.project.client_id);
+            }
+          } else {
+            // Regular session — try sessions API for any client (best-effort)
+            for (const c of clients) {
+              const r = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${c.id}&include_cycle_count=true`);
+              if (r.ok) {
+                const arr = await r.json();
+                if (arr.find(s => s.id === urlSessionId)) {
+                  setSelectedClient(c.id);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) { console.error(e); }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients]);
+
+  // Once sessions for the chosen client are loaded, apply the URL session_id
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlSessionId = params.get('session_id');
+    if (urlSessionId && sessions.length && !selectedSession) {
+      const found = sessions.find(s => s.id === urlSessionId);
+      if (found) setSelectedSession(urlSessionId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions]);
+
   useEffect(() => {
     if (selectedClient) {
       fetchSessions(selectedClient);
@@ -614,20 +674,6 @@ export default function PortalReports() {
 
   useEffect(() => {
     if (selectedSession) {
-      // Cycle-count virtual sessions → jump straight to the dedicated full-screen
-      // variance report. This way the Reports page acts as a unified launcher
-      // for ALL audit types (regular sessions render inline; cycle-count opens
-      // its purpose-built picking-aware view).
-      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_day_')) {
-        const dayId = selectedSession.slice(7);
-        navigate(`/portal/cycle-count/days/${dayId}/full?from=reports`);
-        return;
-      }
-      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_proj_')) {
-        const projId = selectedSession.slice(8);
-        navigate(`/portal/cycle-count/projects/${projId}/consolidated?from=reports`);
-        return;
-      }
       if (selectedSession === '__consolidated__') {
         // Consolidated mode: determine primary variance mode from client's sessions
         const modes = sessions.map(s => s.variance_mode || 'bin-wise');
@@ -643,7 +689,11 @@ export default function PortalReports() {
         setSessionInfo(session);
         // Set default report type based on variance mode
         const mode = session?.variance_mode || 'bin-wise';
-        if (mode === 'bin-wise') setReportType('bin-wise');
+        if (mode === 'cycle-count-day' || mode === 'cycle-count-consolidated') {
+          // Cycle-count sessions support the same report types as bin-wise; default
+          // to bin-wise summary so the user lands on a useful aggregated view.
+          setReportType('bin-wise');
+        } else if (mode === 'bin-wise') setReportType('bin-wise');
         else if (mode === 'barcode-wise') setReportType('barcode-wise');
         else if (mode === 'article-wise') setReportType('article-wise');
       }
@@ -964,7 +1014,17 @@ export default function PortalReports() {
     setLoading(true);
     try {
       let response;
-      if (selectedSession === '__consolidated__') {
+      // Cycle-count virtual sessions → call the cycle-count Reports-shape endpoint.
+      // The backend reshapes day/project data into the same field names (stock_qty,
+      // physical_qty, diff_qty, final_qty, …) so the existing rendering pipeline
+      // drops it in unchanged — only the picking-specific extra columns are extra.
+      if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_day_')) {
+        const dayId = selectedSession.slice(7);
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/days/${dayId}/report/${reportType}`);
+      } else if (typeof selectedSession === 'string' && selectedSession.startsWith('cc_proj_')) {
+        const projId = selectedSession.slice(8);
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/cycle-count/projects/${projId}/report/${reportType}`);
+      } else if (selectedSession === '__consolidated__') {
         response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/consolidated/${selectedClient}/${reportType}`);
       } else {
         response = await fetch(`${BACKEND_URL}/api/audit/portal/reports/${selectedSession}/${reportType}`);
@@ -1102,6 +1162,16 @@ export default function PortalReports() {
     const mode = sessionInfo?.variance_mode || 'bin-wise';
     const options = [];
     
+    if (mode === 'cycle-count-day' || mode === 'cycle-count-consolidated') {
+      // Cycle-count sessions get the full bin-wise-style suite. Backend reshapes
+      // variance for each report_type with picking-aware columns.
+      options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
+      options.push({ value: 'detailed', label: 'Detailed Item-wise' });
+      options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
+      options.push({ value: 'category-summary', label: 'Category-wise Summary' });
+      return options;
+    }
+
     if (mode === 'bin-wise') {
       options.push({ value: 'bin-wise', label: 'Bin-wise Summary' });
       options.push({ value: 'detailed', label: 'Detailed Item-wise' });
@@ -1549,6 +1619,7 @@ export default function PortalReports() {
   };
 
   const getRemarkIcon = (remark) => {
+    if (!remark) return null;
     if (remark.includes('Conflict')) return <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />;
     if (remark.includes('Empty Bin')) return <PackageX className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />;
     if (remark.includes('Pending')) return <Clock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />;

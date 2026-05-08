@@ -137,22 +137,46 @@ async def _parse_upload_to_rows(file: UploadFile) -> List[Dict[str, Any]]:
     LOC_KEYS = {"location", "bin", "bin_code", "loccode", "loc", "binname", "bin name", "location_code"}
     BC_KEYS = {"barcode", "sku", "item_code", "ean", "code", "barcode_no", "barcodeno"}
     QTY_KEYS = {"qty", "quantity", "units", "count", "scan_qty", "stock_qty", "qty_picked"}
+    DESC_KEYS = {"description", "desc", "product_name", "productname", "name", "item_name", "itemname"}
+    CAT_KEYS = {"category", "cat", "category_name", "categoryname"}
+    MRP_KEYS = {"mrp", "price", "selling_price", "sellingprice"}
+    COST_KEYS = {"cost", "cost_price", "costprice", "purchase_price"}
+    ACODE_KEYS = {"article_code", "articlecode", "article", "art_code", "artcode"}
+    ANAME_KEYS = {"article_name", "articlename"}
+
+    def _match(k_norm, keys_set):
+        return k_norm in keys_set
 
     canon: List[Dict[str, Any]] = []
     for row in rows:
-        loc = ""
-        bc = ""
-        qty = 0.0
+        loc = ""; bc = ""; qty = 0.0
+        desc = ""; cat = ""; mrp = 0.0; cost = 0.0; acode = ""; aname = ""
         for k, v in row.items():
             kk = k.replace(" ", "").replace("_", "")
-            if not loc and (k in LOC_KEYS or kk in LOC_KEYS or kk == "location"):
+            if not loc and (k in LOC_KEYS or _match(kk, LOC_KEYS)):
                 loc = str(v).strip() if v is not None else ""
-            if not bc and (k in BC_KEYS or kk in BC_KEYS or kk == "barcode"):
+            elif not bc and (k in BC_KEYS or _match(kk, BC_KEYS)):
                 bc = _normalize_barcode(v)
-            if not qty and (k in QTY_KEYS or kk in QTY_KEYS or kk == "qty"):
+            elif not qty and (k in QTY_KEYS or _match(kk, QTY_KEYS)):
                 qty = _to_float(v)
+            elif not desc and (k in DESC_KEYS or _match(kk, DESC_KEYS)):
+                desc = str(v).strip() if v is not None else ""
+            elif not cat and (k in CAT_KEYS or _match(kk, CAT_KEYS)):
+                cat = str(v).strip() if v is not None else ""
+            elif not mrp and (k in MRP_KEYS or _match(kk, MRP_KEYS)):
+                mrp = _to_float(v)
+            elif not cost and (k in COST_KEYS or _match(kk, COST_KEYS)):
+                cost = _to_float(v)
+            elif not acode and (k in ACODE_KEYS or _match(kk, ACODE_KEYS)):
+                acode = str(v).strip() if v is not None else ""
+            elif not aname and (k in ANAME_KEYS or _match(kk, ANAME_KEYS)):
+                aname = str(v).strip() if v is not None else ""
         if bc and qty:
-            canon.append({"location": loc, "barcode": bc, "qty": qty})
+            canon.append({
+                "location": loc, "barcode": bc, "qty": qty,
+                "description": desc, "category": cat, "mrp": mrp, "cost": cost,
+                "article_code": acode, "article_name": aname,
+            })
     return canon
 
 
@@ -446,6 +470,9 @@ async def upload_stock(day_id: str, file: UploadFile = File(...), mode: str = Fo
     docs = [{
         "project_id": day["project_id"], "day_id": day_id, "day_no": day["day_no"],
         "location": r["location"], "barcode": r["barcode"], "qty": r["qty"],
+        "description": r.get("description", ""), "category": r.get("category", ""),
+        "mrp": r.get("mrp", 0), "cost": r.get("cost", 0),
+        "article_code": r.get("article_code", ""), "article_name": r.get("article_name", ""),
         "uploaded_at": _now_iso()
     } for r in rows]
     if docs:
@@ -678,3 +705,272 @@ async def check_bin_status(pid: str, location: str):
         {"project_id": pid, "location": location}, {"_id": 0}
     ).to_list(50)
     return {"location": location, "closed_in_days": closed, "is_duplicate": len(closed) > 0}
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Reports-page integration:
+# Endpoints below shape cycle-count data into the SAME response format as the
+# regular reports endpoints (`/reports/{sid}/{report_type}`) so the existing
+# Reports UI renders cycle-count days and projects side-by-side with normal
+# audit sessions.  Field-name mapping:
+#     expected_qty   → stock_qty
+#     scanned_qty    → physical_qty
+#     variance_qty   → diff_qty / difference_qty
+#     effective_qty  → final_qty   (no reco for cycle-count yet)
+# Plus extra picking-aware columns added to every row:
+#     pre_pick_qty, post_pick_qty, ending_stock, classification, _is_cycle_count
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _load_master_for_client(client_id: str) -> Dict[str, Dict[str, Any]]:
+    """Mini master loader — picks description / category / mrp / cost from
+    master_products so cycle-count reports can show product names and roll up
+    by category exactly like regular reports do."""
+    out: Dict[str, Dict[str, Any]] = {}
+    cur = db.master_products.find({"client_id": client_id}, {"_id": 0})
+    async for p in cur:
+        bc = _normalize_barcode(p.get("barcode"))
+        if not bc:
+            continue
+        out[bc] = {
+            "description": p.get("description") or p.get("product_name", ""),
+            "category": p.get("category") or p.get("category_name", ""),
+            "mrp": _to_float(p.get("mrp")),
+            "cost": _to_float(p.get("cost")),
+            "article_code": p.get("article_code", ""),
+            "article_name": p.get("article_name", ""),
+        }
+    return out
+
+
+def _enrich_with_master(rows: List[Dict[str, Any]], master: Dict[str, Dict[str, Any]],
+                        loc_stock_meta: Dict[str, Dict[str, Dict[str, Any]]]) -> None:
+    """Attach description/category/mrp/cost/article info to each cycle-count row.
+    Prefers the per-day uploaded stock metadata (if present) and falls back to
+    the client-level master_products record."""
+    for r in rows:
+        bc = r.get("barcode", "")
+        loc = r.get("location", "")
+        meta = (loc_stock_meta.get(loc, {}) or {}).get(bc) or master.get(bc) or {}
+        r.setdefault("description", meta.get("description", ""))
+        r.setdefault("category", meta.get("category", "") or "Unmapped")
+        r.setdefault("mrp", _to_float(meta.get("mrp")))
+        r.setdefault("cost", _to_float(meta.get("cost")))
+        r.setdefault("article_code", meta.get("article_code", ""))
+        r.setdefault("article_name", meta.get("article_name", ""))
+
+
+async def _stock_meta_map(project_id: str, day_id: Optional[str] = None) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """{location: {barcode: {description, category, mrp, cost, article_code, article_name}}}
+    Built from the day's uploaded stock rows (so that any rich columns the user
+    included in their stock Excel are honoured in reports)."""
+    q: Dict[str, Any] = {"project_id": project_id}
+    if day_id:
+        q["day_id"] = day_id
+    out: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    async for s in db.cycle_day_stock.find(q, {"_id": 0}):
+        loc = s.get("location", "")
+        bc = s.get("barcode", "")
+        bucket = out.setdefault(loc, {})
+        if bc not in bucket:
+            bucket[bc] = {
+                "description": s.get("description", ""),
+                "category": s.get("category", ""),
+                "mrp": _to_float(s.get("mrp")),
+                "cost": _to_float(s.get("cost")),
+                "article_code": s.get("article_code", ""),
+                "article_name": s.get("article_name", ""),
+            }
+    return out
+
+
+def _shape_report(report_type: str, base_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Re-shape cycle-count base rows (per-(loc, barcode)) into the format the
+    Reports UI expects for each report_type."""
+    # Common per-row mapper
+    def detailed_row(r: Dict[str, Any]) -> Dict[str, Any]:
+        # Build a friendly remark string used by the existing Reports UI icons.
+        reason_map = {
+            "match": "Exact Match", "surplus": "Surplus", "shortage": "Shortage",
+            "reconciled_via_picks": "Reconciled (Picks)",
+        }
+        remark_bits = []
+        cls = r.get("classification", "planned")
+        if cls == "extra":
+            remark_bits.append("Extra Bin")
+        remark_bits.append(reason_map.get(r.get("reason"), "Match"))
+        if r.get("duplicate_warning"):
+            remark_bits.append(f"Duplicate (D{r['duplicate_warning'].get('closed_on_day')})")
+        return {
+            "location": r["location"], "barcode": r["barcode"],
+            "description": r.get("description", ""), "category": r.get("category", "Unmapped"),
+            "mrp": r.get("mrp", 0), "cost": r.get("cost", 0),
+            "article_code": r.get("article_code", ""), "article_name": r.get("article_name", ""),
+            "stock_qty": r["expected_qty"],
+            "physical_qty": r["scanned_qty"],
+            "reco_qty": 0,
+            "final_qty": r["effective_qty"],
+            "diff_qty": r["variance_qty"],
+            "difference_qty": r["variance_qty"],
+            "remark": " · ".join(remark_bits),
+            # cycle-count specific
+            "pre_pick_qty": r.get("pre_pick_qty", 0),
+            "post_pick_qty": r.get("post_pick_qty", 0),
+            "effective_qty": r.get("effective_qty", 0),
+            "ending_stock": r.get("ending_stock", 0),
+            "classification": r.get("classification", "planned"),
+            "duplicate_warning": r.get("duplicate_warning"),
+            "_is_cycle_count": True,
+        }
+
+    if report_type == "detailed":
+        rows = [detailed_row(r) for r in base_rows]
+    elif report_type == "bin-wise":
+        # Group by location
+        agg: Dict[str, Dict[str, Any]] = {}
+        for r in base_rows:
+            loc = r["location"]
+            row = agg.setdefault(loc, {
+                "location": loc, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
+                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
+                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
+                "barcode_count": 0, "_is_cycle_count": True,
+            })
+            row["stock_qty"] += r["expected_qty"]
+            row["physical_qty"] += r["scanned_qty"]
+            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
+            row["post_pick_qty"] += r.get("post_pick_qty", 0)
+            row["final_qty"] += r["effective_qty"]
+            row["effective_qty"] += r["effective_qty"]
+            row["ending_stock"] += r.get("ending_stock", 0)
+            row["diff_qty"] += r["variance_qty"]
+            row["difference_qty"] += r["variance_qty"]
+            row["barcode_count"] += 1
+        rows = list(agg.values())
+    elif report_type == "barcode-wise":
+        # Group by barcode (across locations)
+        agg = {}
+        for r in base_rows:
+            bc = r["barcode"]
+            row = agg.setdefault(bc, {
+                "barcode": bc, "description": r.get("description", ""), "category": r.get("category", "Unmapped"),
+                "mrp": r.get("mrp", 0), "cost": r.get("cost", 0),
+                "article_code": r.get("article_code", ""), "article_name": r.get("article_name", ""),
+                "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
+                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
+                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
+                "_is_cycle_count": True,
+            })
+            row["stock_qty"] += r["expected_qty"]
+            row["physical_qty"] += r["scanned_qty"]
+            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
+            row["post_pick_qty"] += r.get("post_pick_qty", 0)
+            row["final_qty"] += r["effective_qty"]
+            row["effective_qty"] += r["effective_qty"]
+            row["ending_stock"] += r.get("ending_stock", 0)
+            row["diff_qty"] += r["variance_qty"]
+            row["difference_qty"] += r["variance_qty"]
+        rows = list(agg.values())
+    elif report_type == "category-summary":
+        agg = {}
+        for r in base_rows:
+            cat = r.get("category", "") or "Unmapped"
+            row = agg.setdefault(cat, {
+                "category": cat, "stock_qty": 0, "physical_qty": 0, "reco_qty": 0,
+                "final_qty": 0, "diff_qty": 0, "difference_qty": 0,
+                "pre_pick_qty": 0, "post_pick_qty": 0, "effective_qty": 0, "ending_stock": 0,
+                "item_count": 0, "_is_cycle_count": True,
+            })
+            row["stock_qty"] += r["expected_qty"]
+            row["physical_qty"] += r["scanned_qty"]
+            row["pre_pick_qty"] += r.get("pre_pick_qty", 0)
+            row["post_pick_qty"] += r.get("post_pick_qty", 0)
+            row["final_qty"] += r["effective_qty"]
+            row["effective_qty"] += r["effective_qty"]
+            row["ending_stock"] += r.get("ending_stock", 0)
+            row["diff_qty"] += r["variance_qty"]
+            row["difference_qty"] += r["variance_qty"]
+            row["item_count"] += 1
+        rows = list(agg.values())
+    else:
+        rows = [detailed_row(r) for r in base_rows]
+
+    # Totals
+    totals = {
+        "stock_qty": 0.0, "physical_qty": 0.0, "reco_qty": 0.0,
+        "final_qty": 0.0, "diff_qty": 0.0, "difference_qty": 0.0,
+        "pre_pick_qty": 0.0, "post_pick_qty": 0.0,
+        "effective_qty": 0.0, "ending_stock": 0.0,
+    }
+    for r in rows:
+        for k in totals:
+            totals[k] += _to_float(r.get(k, 0))
+    if totals["stock_qty"] > 0:
+        totals["accuracy_pct"] = min(100.0, (min(totals["stock_qty"], totals["final_qty"]) / totals["stock_qty"]) * 100)
+    else:
+        totals["accuracy_pct"] = 0.0
+    return {"report": rows, "totals": totals}
+
+
+@cycle_router.get("/days/{day_id}/report/{report_type}")
+async def cycle_day_report(day_id: str, report_type: str):
+    """Reports-UI compatible variance report for a single cycle-count day."""
+    day = await db.cycle_days.find_one({"id": day_id}, {"_id": 0})
+    if not day:
+        raise HTTPException(404, "Day not found")
+    project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0})
+    if not project:
+        raise HTTPException(404, "Project not found")
+    base = await _compute_day_variance(project, day)
+    master = await _load_master_for_client(project["client_id"])
+    stock_meta = await _stock_meta_map(project["id"], day_id)
+    _enrich_with_master(base["report"], master, stock_meta)
+    shaped = _shape_report(report_type, base["report"])
+    shaped["session_info"] = {
+        "id": f"cc_day_{day_id}", "name": f"{project['name']} · Day {day['day_no']}",
+        "client_id": project["client_id"], "variance_mode": "cycle-count-day",
+        "is_cycle_count": True, "day_no": day["day_no"], "day_date": day["date"], "status": day["status"],
+    }
+    shaped["bins_summary"] = base.get("bins_summary", {})
+    return shaped
+
+
+@cycle_router.get("/projects/{pid}/report/{report_type}")
+async def cycle_project_report(pid: str, report_type: str):
+    """Reports-UI compatible consolidated variance report (all days)."""
+    project = await db.cycle_projects.find_one({"id": pid}, {"_id": 0})
+    if not project:
+        raise HTTPException(404, "Project not found")
+    days = await db.cycle_days.find({"project_id": pid}, {"_id": 0}).sort("day_no", 1).to_list(1000)
+    master = await _load_master_for_client(project["client_id"])
+    stock_meta = await _stock_meta_map(project["id"])
+
+    # Aggregate every day's report rows by (location, barcode) — sum qtys; if a
+    # bin is recounted across days we keep the cumulative numbers (latest day's
+    # picking + scans contribute fully).
+    bin_agg: Dict[str, Dict[str, Any]] = {}
+    for d in days:
+        v = await _compute_day_variance(project, d)
+        for r in v["report"]:
+            key = f"{r['location']}|{r['barcode']}"
+            existing = bin_agg.get(key)
+            if existing:
+                existing["expected_qty"] += r["expected_qty"]
+                existing["scanned_qty"] += r["scanned_qty"]
+                existing["pre_pick_qty"] += r["pre_pick_qty"]
+                existing["post_pick_qty"] += r["post_pick_qty"]
+                existing["effective_qty"] += r["effective_qty"]
+                existing["variance_qty"] += r["variance_qty"]
+                existing["ending_stock"] += r["ending_stock"]
+            else:
+                bin_agg[key] = dict(r)
+
+    base_rows = list(bin_agg.values())
+    _enrich_with_master(base_rows, master, stock_meta)
+    shaped = _shape_report(report_type, base_rows)
+    shaped["session_info"] = {
+        "id": f"cc_proj_{pid}", "name": f"{project['name']} · Consolidated",
+        "client_id": project["client_id"], "variance_mode": "cycle-count-consolidated",
+        "is_cycle_count": True, "status": project.get("status", "active"),
+    }
+    return shaped

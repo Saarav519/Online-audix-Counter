@@ -22,8 +22,6 @@ const PortalDashboard = React.lazy(() => import("./pages/portal/PortalDashboard"
 const PortalClients = React.lazy(() => import("./pages/portal/PortalClients"));
 const PortalSessions = React.lazy(() => import("./pages/portal/PortalSessions"));
 const PortalCycleCount = React.lazy(() => import("./pages/portal/PortalCycleCount"));
-const CycleDayFullReport = React.lazy(() => import("./pages/portal/CycleDayFullReport"));
-const CycleConsolidatedFullReport = React.lazy(() => import("./pages/portal/CycleConsolidatedFullReport"));
 const PortalDevices = React.lazy(() => import("./pages/portal/PortalDevices"));
 const PortalReports = React.lazy(() => import("./pages/portal/PortalReports"));
 const PortalSyncLogs = React.lazy(() => import("./pages/portal/PortalSyncLogs"));
@@ -181,22 +179,6 @@ function AppRoutes() {
         >
           <Route index element={<Suspense fallback={<PageLoader />}><PortalCycleCount /></Suspense>} />
         </Route>
-        <Route
-          path="/portal/cycle-count/days/:dayId/full"
-          element={
-            <PortalProtectedRoute>
-              <Suspense fallback={<PageLoader />}><CycleDayFullReport /></Suspense>
-            </PortalProtectedRoute>
-          }
-        />
-        <Route
-          path="/portal/cycle-count/projects/:projectId/consolidated"
-          element={
-            <PortalProtectedRoute>
-              <Suspense fallback={<PageLoader />}><CycleConsolidatedFullReport /></Suspense>
-            </PortalProtectedRoute>
-          }
-        />
         <Route
           path="/portal/devices"
           element={

@@ -383,7 +383,15 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
     if (r.ok) { toast.success('Day deleted'); setActiveDay(null); onChange(); }
   };
 
-  const openFullReport = () => navigate(`/portal/cycle-count/days/${day.id}/full`);
+  const openInReports = () => {
+    // Deep-link into Reports with this cycle-count day pre-selected.
+    // Reports page reads ?client_id and ?session_id from the URL on mount.
+    const params = new URLSearchParams();
+    const projectClient = days[0] && days[0]._client_id;  // optional — may be undefined
+    if (projectId) params.set('project_id', projectId);
+    params.set('session_id', `cc_day_${day.id}`);
+    navigate(`/portal/reports?${params.toString()}`);
+  };
 
   return (
     <div>
@@ -491,31 +499,26 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
         </div>
       )}
 
-      {/* Big "Open Full Report" CTA card — replaces the cramped inline table */}
+      {/* Big "Open in Reports" CTA card — links into the unified Reports page */}
       <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-xl p-6 text-center"
         data-testid="cc-open-full-report-card">
         <Eye className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
         <h3 className="text-lg font-bold text-gray-900 mb-1">
           {vLoading ? 'Computing variance…' : (variance?.report?.length > 0
-            ? `${variance.report.length} variance rows ready`
+            ? `${variance.report.length} variance rows ready in Reports`
             : 'No variance rows yet')}
         </h3>
         <p className="text-sm text-gray-600 mb-4 max-w-lg mx-auto">
           {variance?.report?.length > 0
-            ? 'Open the full-screen variance report to see all rows with picking reconciliation, search, filters and CSV export.'
-            : 'Upload morning stock and start scanning. Variance will appear here in real-time.'}
+            ? 'Open this day in the Reports page to view variance side-by-side with all your other audits — same Detailed / Bin-wise / Barcode-wise / Category views, plus picking-aware columns.'
+            : 'Upload morning stock and start scanning. Variance will appear here in real-time and inside the Reports section under this client.'}
         </p>
-        <Button onClick={openFullReport} size="lg"
+        <Button onClick={openInReports} size="lg"
           className="bg-emerald-600 hover:bg-emerald-700 gap-2"
           data-testid="cc-open-full-report-btn">
           <ExternalLink className="w-4 h-4" />
-          Open Full Variance Report
+          Open in Reports
         </Button>
-        {variance?.report?.length > 0 && (
-          <p className="text-[10px] text-gray-500 mt-3">
-            Tip: Right-click the button to open in a new tab.
-          </p>
-        )}
       </div>
     </div>
   );
@@ -759,7 +762,8 @@ function UploadCard({ title, icon: Icon, accent, endpoint, extraField, uploadedA
 function ConsolidatedView({ data, onRefresh, projectId }) {
   const navigate = useNavigate();
   if (!data) return <div className="text-center py-12 text-gray-400">Loading…</div>;
-  const openFull = () => navigate(`/portal/cycle-count/projects/${projectId}/consolidated`);
+  const openInReports = () => navigate(`/portal/reports?session_id=cc_proj_${projectId}`);
+  const openDayInReports = (dayId) => navigate(`/portal/reports?session_id=cc_day_${dayId}`);
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-3">
@@ -796,7 +800,7 @@ function ConsolidatedView({ data, onRefresh, projectId }) {
             <tbody>
               {data.days.map(d => (
                 <tr key={d.day_id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                  onClick={() => navigate(`/portal/cycle-count/days/${d.day_id}/full`)}>
+                  onClick={() => openDayInReports(d.day_id)}>
                   <Td><b>D{d.day_no}</b></Td>
                   <Td>{d.date}</Td>
                   <Td>
@@ -828,7 +832,7 @@ function ConsolidatedView({ data, onRefresh, projectId }) {
         </p>
       </div>
 
-      {/* Big "Open Full Consolidated" CTA */}
+      {/* Big "Open Consolidated in Reports" CTA */}
       <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-xl p-6 text-center"
         data-testid="cc-cons-cta">
         <Layers className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
@@ -836,12 +840,12 @@ function ConsolidatedView({ data, onRefresh, projectId }) {
           {data.report.length} bin-wise rows across {data.days.length} day{data.days.length !== 1 ? 's' : ''}
         </h3>
         <p className="text-sm text-gray-600 mb-4 max-w-lg mx-auto">
-          Open the full-screen consolidated report for the complete bin-wise rollup with search, filters, recount detection, and CSV export.
+          Open the consolidated variance in the unified Reports page — same Detailed / Bin-wise / Barcode-wise / Category views as your other audits, with picking-aware columns layered on top.
         </p>
-        <Button onClick={openFull} size="lg"
+        <Button onClick={openInReports} size="lg"
           className="bg-emerald-600 hover:bg-emerald-700 gap-2"
           data-testid="cc-open-cons-full-btn">
-          <ExternalLink className="w-4 h-4" /> Open Full Consolidated Report
+          <ExternalLink className="w-4 h-4" /> Open Consolidated in Reports
         </Button>
       </div>
     </div>
