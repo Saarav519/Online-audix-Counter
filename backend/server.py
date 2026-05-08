@@ -158,6 +158,34 @@ async def startup():
         logger.info("Created audit portal admin user")
     # Create indexes for performance (non-destructive)
     await create_indexes()
+    # Auto-purge orphan sync/inbox/batch records from sessions that were deleted
+    # before the cascade-delete fix landed. Idempotent and safe to run on every boot.
+    await purge_orphan_session_data()
+
+
+async def purge_orphan_session_data():
+    """Remove any session-scoped records (sync_inbox, sync_raw_logs, synced_locations,
+    forward_batches, conflict_locations, devices, alerts, expected_stock) whose
+    session_id no longer corresponds to an existing audit_session.
+    """
+    try:
+        existing_ids = {s["id"] for s in await db.audit_sessions.find({}, {"id": 1, "_id": 0}).to_list(100000)}
+        collections = [
+            "sync_inbox", "sync_raw_logs", "synced_locations", "forward_batches",
+            "conflict_locations", "devices", "alerts", "expected_stock"
+        ]
+        total = 0
+        for col in collections:
+            referenced = await db[col].distinct("session_id")
+            orphans = [sid for sid in referenced if sid and sid not in existing_ids]
+            if orphans:
+                r = await db[col].delete_many({"session_id": {"$in": orphans}})
+                total += r.deleted_count
+                logger.info(f"Purged {r.deleted_count} orphans from {col}")
+        if total:
+            logger.info(f"Orphan purge complete — removed {total} records across {len(collections)} collections")
+    except Exception as e:
+        logger.warning(f"Orphan purge skipped due to error: {e}")
 
 
 async def create_indexes():

@@ -1292,16 +1292,23 @@ async def update_session_status(session_id: str, status: str):
 
 @portal_router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str):
-    # Delete all related data first
-    await db.expected_stock.delete_many({"session_id": session_id})
-    await db.synced_locations.delete_many({"session_id": session_id})
-    await db.alerts.delete_many({"session_id": session_id})
-    
-    # Delete the session
+    # Full cascading delete — purge ALL data tied to this session so no orphan
+    # references remain in batches/sync logs/conflicts after deletion.
+    deleted = {}
+    deleted["expected_stock"] = (await db.expected_stock.delete_many({"session_id": session_id})).deleted_count
+    deleted["synced_locations"] = (await db.synced_locations.delete_many({"session_id": session_id})).deleted_count
+    deleted["sync_inbox"] = (await db.sync_inbox.delete_many({"session_id": session_id})).deleted_count
+    deleted["sync_raw_logs"] = (await db.sync_raw_logs.delete_many({"session_id": session_id})).deleted_count
+    deleted["conflict_locations"] = (await db.conflict_locations.delete_many({"session_id": session_id})).deleted_count
+    deleted["forward_batches"] = (await db.forward_batches.delete_many({"session_id": session_id})).deleted_count
+    deleted["devices"] = (await db.devices.delete_many({"session_id": session_id})).deleted_count
+    deleted["alerts"] = (await db.alerts.delete_many({"session_id": session_id})).deleted_count
+
+    # Delete the session itself
     result = await db.audit_sessions.delete_one({"id": session_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Session not found")
-    return {"message": "Session and all related data deleted"}
+    return {"message": "Session and all related data permanently deleted", "deleted": deleted}
 
 @portal_router.post("/sessions/{session_id}/import-expected")
 async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
@@ -2343,18 +2350,54 @@ async def delete_synced_location(req: DeleteSyncedLocationRequest):
     }
 
 @portal_router.get("/search-synced-location")
-async def search_synced_location(query: str = ""):
-    """Search for a location across all forwarded batches."""
+async def search_synced_location(query: str = "", session_id: str = "", client_id: str = ""):
+    """Search for a location across forwarded batches.
+
+    Scope:
+    • If ``session_id`` is provided, results are limited to that session only.
+    • Else if ``client_id`` is provided, results are limited to all sessions of
+      that client.
+    • Orphaned entries (whose underlying session no longer exists, e.g. session
+      was deleted) are filtered out so they never appear in search results.
+    """
     if not query or len(query) < 2:
         return {"results": []}
-    
+
+    # Build session-scope filter
+    inbox_filter = {
+        "location_name": {"$regex": query, "$options": "i"},
+        "status": "forwarded"
+    }
+    allowed_session_ids = None
+    if session_id:
+        inbox_filter["session_id"] = session_id
+        allowed_session_ids = {session_id}
+    elif client_id:
+        sess = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(10000)
+        allowed_session_ids = {s["id"] for s in sess}
+        if not allowed_session_ids:
+            return {"results": []}
+        inbox_filter["session_id"] = {"$in": list(allowed_session_ids)}
+
     entries = await db.sync_inbox.find(
-        {"location_name": {"$regex": query, "$options": "i"}, "status": "forwarded"},
+        inbox_filter,
         {"_id": 0, "location_name": 1, "device_name": 1, "total_items": 1, "total_quantity": 1,
          "forward_batch_id": 1, "session_id": 1, "synced_at": 1}
     ).to_list(100)
-    
-    batch_ids = list(set(e.get("forward_batch_id", "") for e in entries if e.get("forward_batch_id")))
+
+    # Drop orphaned entries (session no longer exists)
+    if allowed_session_ids is None:
+        unique_sids = list({e.get("session_id", "") for e in entries if e.get("session_id")})
+        if unique_sids:
+            existing = await db.audit_sessions.find(
+                {"id": {"$in": unique_sids}}, {"id": 1, "_id": 0}
+            ).to_list(10000)
+            allowed_session_ids = {s["id"] for s in existing}
+        else:
+            allowed_session_ids = set()
+    entries = [e for e in entries if e.get("session_id", "") in allowed_session_ids]
+
+    batch_ids = list({e.get("forward_batch_id", "") for e in entries if e.get("forward_batch_id")})
     batches = {}
     if batch_ids:
         batch_docs = await db.forward_batches.find(
@@ -2362,7 +2405,7 @@ async def search_synced_location(query: str = ""):
             {"_id": 0, "id": 1, "forwarded_at": 1}
         ).to_list(1000)
         batches = {b["id"]: b for b in batch_docs}
-    
+
     results = []
     for e in entries:
         bid = e.get("forward_batch_id", "")
@@ -2377,7 +2420,7 @@ async def search_synced_location(query: str = ""):
             "batch_forwarded_at": batch_info.get("forwarded_at", ""),
             "synced_at": e.get("synced_at", "")
         })
-    
+
     return {"results": results, "count": len(results)}
 
 @portal_router.get("/forward-batch-locations/{batch_id}")

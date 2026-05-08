@@ -1513,36 +1513,53 @@ export default function PortalReports() {
     const visibleCols = columnConfig.filter(c => c.key !== '_expand' && !hiddenColumns.has(c.key));
 
     // Summary KPIs from current filtered data
+    // NOTE: bin-wise report uses `difference_qty` while every other report uses
+    // `diff_qty` — always read both so PDF Variance is correct everywhere.
     const totals = rows.reduce((acc, r) => {
       acc.stock += Number(r.stock_qty || 0);
       acc.physical += Number(r.physical_qty || 0);
-      acc.diff += Number(r.diff_qty || 0);
+      acc.reco += Number(r.reco_qty || 0);
+      acc.final += Number(r.final_qty != null ? r.final_qty : (Number(r.physical_qty || 0) + Number(r.reco_qty || 0)));
+      acc.diff += Number(r.diff_qty != null ? r.diff_qty : (r.difference_qty != null ? r.difference_qty : 0));
       return acc;
-    }, { stock: 0, physical: 0, diff: 0 });
+    }, { stock: 0, physical: 0, reco: 0, final: 0, diff: 0 });
     const accuracy = totals.stock > 0
-      ? Math.min(100, (Math.min(totals.stock, totals.physical) / totals.stock) * 100)
+      ? Math.min(100, (Math.min(totals.stock, totals.final) / totals.stock) * 100)
       : 0;
 
     const summary = [
       { label: 'Expected', value: totals.stock.toLocaleString('en-IN'), color: 'slate' },
       { label: 'Physical', value: totals.physical.toLocaleString('en-IN'), color: 'blue' },
-      { label: 'Variance', value: (totals.diff > 0 ? '+' : '') + totals.diff.toLocaleString('en-IN'), color: totals.diff < 0 ? 'rose' : 'emerald' },
+      { label: 'Variance', value: (totals.diff > 0 ? '+' : '') + totals.diff.toLocaleString('en-IN'), color: totals.diff < 0 ? 'rose' : totals.diff > 0 ? 'amber' : 'emerald' },
       { label: 'Accuracy', value: accuracy.toFixed(1) + '%', color: accuracy >= 98 ? 'emerald' : accuracy >= 75 ? 'amber' : 'rose' },
       { label: 'Rows', value: rows.length.toLocaleString('en-IN'), color: 'emerald' },
     ];
 
     // Table head & body from visible columns
+    const NUMERIC_KEYS = new Set([
+      'stock_qty', 'physical_qty', 'reco_qty', 'final_qty', 'diff_qty', 'difference_qty',
+      'mrp', 'cost', 'item_count', 'barcode_count', 'accuracy_pct',
+      'stock_value_mrp', 'stock_value_cost', 'physical_value_mrp', 'physical_value_cost',
+      'final_value_mrp', 'final_value_cost', 'diff_value_mrp', 'diff_value_cost',
+    ]);
     const formatCell = (v, col) => {
       if (v === null || v === undefined || v === '') return '—';
       if (typeof v === 'number') {
         const needsDecimals = ['mrp', 'cost'].some(k => col.key.includes(k)) || col.key.includes('value');
+        if (col.key === 'accuracy_pct') return v.toFixed(1) + '%';
         return v.toLocaleString('en-IN', { minimumFractionDigits: needsDecimals ? 2 : 0, maximumFractionDigits: needsDecimals ? 2 : 0 });
       }
-      return String(v).slice(0, 60);
+      return String(v).slice(0, 80);
     };
 
     const head = [visibleCols.map(c => c.label)];
     const body = rows.map(r => visibleCols.map(c => formatCell(r[c.key], c)));
+    // Column metadata so the PDF can right-align numbers and size columns smartly.
+    const columnsMeta = visibleCols.map(c => ({
+      key: c.key,
+      label: c.label,
+      numeric: NUMERIC_KEYS.has(c.key) || /value|qty|count|pct/.test(c.key),
+    }));
 
     const meta = {
       'Client': client?.name || '—',
@@ -1563,6 +1580,7 @@ export default function PortalReports() {
         summary,
         tableHead: head,
         tableBody: body,
+        columnsMeta,
         filename,
       });
       toast.success('PDF downloaded');

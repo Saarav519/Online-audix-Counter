@@ -390,7 +390,12 @@ export default function PortalSyncLogs() {
     }
     setSearching(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/audit/portal/search-synced-location?query=${encodeURIComponent(locationSearch)}`);
+      // Scope search to the currently selected client/session so cross-client
+      // and orphan (deleted-session) results never appear.
+      const params = new URLSearchParams({ query: locationSearch });
+      if (selectedSession) params.append('session_id', selectedSession);
+      if (selectedClient) params.append('client_id', selectedClient);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/search-synced-location?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data.results);

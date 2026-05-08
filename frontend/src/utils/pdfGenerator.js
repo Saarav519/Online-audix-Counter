@@ -5,13 +5,17 @@ import autoTable from 'jspdf-autotable';
  * Branded PDF export for Audix reports.
  *
  * generatePDF({
- *   title: 'Variance Report',
- *   subtitle: 'Reliance Retail · July 2026 Audit',
- *   meta: { 'Client': 'Reliance Retail', 'Session': 'July 2026', 'Generated': new Date().toLocaleString() },
- *   summary: [ { label: 'Expected', value: 15420 }, { label: 'Physical', value: 15200 }, ... ],
- *   tableHead: [['Location', 'Barcode', 'Description', 'Expected', 'Physical', 'Variance']],
- *   tableBody: rows,
- *   filename: 'variance-report.pdf',
+ *   title:       'Variance Report',
+ *   subtitle:    'Reliance Retail · July 2026 Audit',
+ *   meta:        { 'Client': 'Reliance Retail', ... },
+ *   summary:     [{ label: 'Expected', value: 15420 }, ... ],
+ *   tableHead:   [['Location', 'Barcode', 'Description', ...]],
+ *   tableBody:   rows,
+ *   columnsMeta: [{ key, label, numeric }, ...]   // optional — when provided,
+ *                // numeric columns get right-aligned, fixed narrow widths and
+ *                // wide text columns (description/remark/category) get a sensible
+ *                // max width so the layout stays clean across reports.
+ *   filename:    'variance-report.pdf',
  * });
  */
 export function generatePDF({
@@ -21,6 +25,7 @@ export function generatePDF({
   summary = [],
   tableHead = [],
   tableBody = [],
+  columnsMeta = null,
   filename = 'audix-report.pdf',
   orientation = 'landscape',
   brandName = 'AudiX Solutions & Co.',
@@ -114,9 +119,10 @@ export function generatePDF({
       const kpiColor = stat.color === 'rose' ? [244, 63, 94]
                        : stat.color === 'amber' ? [245, 158, 11]
                        : stat.color === 'blue' ? [59, 130, 246]
+                       : stat.color === 'slate' ? [71, 85, 105]
                        : [16, 185, 129]; // emerald default
-      doc.setFillColor(...kpiColor, 0.08);
-      doc.setDrawColor(...kpiColor);
+      doc.setFillColor(kpiColor[0], kpiColor[1], kpiColor[2], 0.08);
+      doc.setDrawColor(kpiColor[0], kpiColor[1], kpiColor[2]);
       doc.setLineWidth(0.5);
       doc.roundedRect(x, cursorY, cardWidth, 50, 4, 4, 'FD');
 
@@ -127,10 +133,33 @@ export function generatePDF({
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.setTextColor(...kpiColor);
+      doc.setTextColor(kpiColor[0], kpiColor[1], kpiColor[2]);
       doc.text(String(stat.value), x + 8, cursorY + 36);
     });
     cursorY += 70;
+  }
+
+  // ─── Build columnStyles for clean alignment & widths ───
+  // Numeric columns → right-align, narrow fixed width.
+  // Wide text columns (description/remark/category/article_name) → bigger min,
+  // wrapped text. Identifier columns (location/barcode/article_code) → mono-ish
+  // narrower so they don't dominate the row.
+  const columnStyles = {};
+  if (columnsMeta && columnsMeta.length) {
+    columnsMeta.forEach((c, idx) => {
+      const k = (c.key || '').toLowerCase();
+      let style = { halign: 'left' };
+      if (c.numeric) {
+        style = { halign: 'right', cellWidth: k.includes('value') ? 70 : 50 };
+      } else if (k === 'description' || k === 'remark' || k === 'article_name') {
+        style = { halign: 'left', cellWidth: 'auto', overflow: 'linebreak' };
+      } else if (k === 'category') {
+        style = { halign: 'left', cellWidth: 70, overflow: 'linebreak' };
+      } else if (k === 'location' || k === 'barcode' || k === 'article_code' || k === 'status') {
+        style = { halign: 'left', cellWidth: 60, overflow: 'linebreak', font: 'courier', fontSize: 7.5 };
+      }
+      columnStyles[idx] = style;
+    });
   }
 
   // ─── Main Data Table ───
@@ -140,23 +169,32 @@ export function generatePDF({
       head: tableHead,
       body: tableBody,
       theme: 'grid',
+      tableWidth: 'auto',
       headStyles: {
         fillColor: [16, 185, 129],
         textColor: [255, 255, 255],
-        fontSize: 9,
+        fontSize: 8.5,
         fontStyle: 'bold',
         halign: 'center',
+        valign: 'middle',
+        cellPadding: 5,
       },
       bodyStyles: {
-        fontSize: 8,
+        fontSize: 7.5,
         textColor: [30, 41, 59],
-        cellPadding: 4,
+        cellPadding: 3,
+        valign: 'middle',
+        overflow: 'linebreak',
       },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: {
         lineColor: [226, 232, 240],
         lineWidth: 0.3,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        minCellHeight: 14,
       },
+      columnStyles,
       margin: { left: 32, right: 32 },
       didDrawPage: (data) => {
         // Footer on every page
