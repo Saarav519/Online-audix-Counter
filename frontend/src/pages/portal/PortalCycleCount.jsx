@@ -1,9 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Plus, Trash2, Calendar, Upload, Lock, Unlock, RefreshCw, FileSpreadsheet,
-  AlertTriangle, CheckCircle2, ArrowLeft, Package, TrendingUp, TrendingDown,
-  Repeat, Sparkles, Layers, Search, Eye
+  CheckCircle2, ArrowLeft, Package, TrendingUp, TrendingDown,
+  Repeat, Layers, ExternalLink, Eye
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -19,6 +20,7 @@ const CLIENT_API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal/client
 
 // ───────────────────────────────────────────────────── Page Component
 export default function PortalCycleCount() {
+  const navigate = useNavigate();
   const [activeProjectId, setActiveProjectId] = useState(null);
 
   // List view
@@ -313,7 +315,7 @@ function CycleProjectDetail({ projectId, onBack, clients }) {
           projectId={projectId} onChange={load} loading={loading} />
       )}
       {tab === 'consolidated' && (
-        <ConsolidatedView data={consolidated} onRefresh={loadConsolidated} />
+        <ConsolidatedView data={consolidated} onRefresh={loadConsolidated} projectId={projectId} />
       )}
     </div>
   );
@@ -330,11 +332,10 @@ function Pill({ label, value }) {
 
 // ───────────────────────────────────────────────────── Day View
 function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }) {
+  const navigate = useNavigate();
   const day = days.find(d => d.id === activeDay);
   const [variance, setVariance] = useState(null);
   const [vLoading, setVLoading] = useState(false);
-  const [filter, setFilter] = useState('');
-  const [classFilter, setClassFilter] = useState('all'); // all | planned | extra | duplicate | shortage | surplus
 
   const loadVariance = useCallback(async () => {
     if (!day) return;
@@ -345,23 +346,6 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
     } finally { setVLoading(false); }
   }, [day]);
   useEffect(() => { loadVariance(); }, [loadVariance]);
-
-  // NOTE: All hooks must run on every render — keep useMemo above early returns
-  // to avoid React's "rendered more hooks than during the previous render" error.
-  const rows = useMemo(() => {
-    const all = variance?.report || [];
-    const term = filter.trim().toLowerCase();
-    return all.filter(r => {
-      if (classFilter === 'planned' && r.classification !== 'planned') return false;
-      if (classFilter === 'extra' && r.classification !== 'extra') return false;
-      if (classFilter === 'duplicate' && !r.duplicate_warning) return false;
-      if (classFilter === 'shortage' && r.variance_qty >= 0) return false;
-      if (classFilter === 'surplus' && r.variance_qty <= 0) return false;
-      if (!term) return true;
-      return (r.location || '').toLowerCase().includes(term) ||
-             (r.barcode || '').toLowerCase().includes(term);
-    });
-  }, [variance, filter, classFilter]);
 
   if (loading && !day) return <div className="text-center py-12 text-gray-400">Loading…</div>;
   if (!day) return (
@@ -398,6 +382,8 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
     const r = await fetch(`${API}/days/${day.id}`, { method: 'DELETE' });
     if (r.ok) { toast.success('Day deleted'); setActiveDay(null); onChange(); }
   };
+
+  const openFullReport = () => navigate(`/portal/cycle-count/days/${day.id}/full`);
 
   return (
     <div>
@@ -502,35 +488,32 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex items-center gap-2 flex-wrap bg-white border border-gray-200 rounded-xl p-2 mb-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input value={filter} onChange={e => setFilter(e.target.value)}
-            placeholder="Search location or barcode..."
-            data-testid="cc-variance-search"
-            className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-        </div>
-        {[
-          { k: 'all', label: 'All', count: variance?.report?.length },
-          { k: 'planned', label: 'Planned', count: variance?.report?.filter(r => r.classification === 'planned').length },
-          { k: 'extra', label: 'Extras', count: variance?.report?.filter(r => r.classification === 'extra').length },
-          { k: 'shortage', label: 'Shortage', count: variance?.report?.filter(r => r.variance_qty < 0).length },
-          { k: 'surplus', label: 'Surplus', count: variance?.report?.filter(r => r.variance_qty > 0).length },
-          { k: 'duplicate', label: 'Duplicates', count: variance?.report?.filter(r => r.duplicate_warning).length },
-        ].map(t => (
-          <button key={t.k} onClick={() => setClassFilter(t.k)}
-            data-testid={`cc-filter-${t.k}`}
-            className={`text-[11px] px-2 py-1 rounded-md border transition-colors ${
-              classFilter === t.k ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'
-            }`}>
-            {t.label} <span className="opacity-75">({t.count ?? 0})</span>
-          </button>
-        ))}
+      {/* Big "Open Full Report" CTA card — replaces the cramped inline table */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-xl p-6 text-center"
+        data-testid="cc-open-full-report-card">
+        <Eye className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
+        <h3 className="text-lg font-bold text-gray-900 mb-1">
+          {vLoading ? 'Computing variance…' : (variance?.report?.length > 0
+            ? `${variance.report.length} variance rows ready`
+            : 'No variance rows yet')}
+        </h3>
+        <p className="text-sm text-gray-600 mb-4 max-w-lg mx-auto">
+          {variance?.report?.length > 0
+            ? 'Open the full-screen variance report to see all rows with picking reconciliation, search, filters and CSV export.'
+            : 'Upload morning stock and start scanning. Variance will appear here in real-time.'}
+        </p>
+        <Button onClick={openFullReport} size="lg"
+          className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+          data-testid="cc-open-full-report-btn">
+          <ExternalLink className="w-4 h-4" />
+          Open Full Variance Report
+        </Button>
+        {variance?.report?.length > 0 && (
+          <p className="text-[10px] text-gray-500 mt-3">
+            Tip: Right-click the button to open in a new tab.
+          </p>
+        )}
       </div>
-
-      {/* Variance Table */}
-      <VarianceTable rows={rows} loading={vLoading} totals={variance?.totals} />
     </div>
   );
 }
@@ -730,8 +713,10 @@ function UploadCard({ title, icon: Icon, accent, endpoint, extraField, uploadedA
 }
 
 // ───────────────────────────────────────────────────── Consolidated View
-function ConsolidatedView({ data, onRefresh }) {
+function ConsolidatedView({ data, onRefresh, projectId }) {
+  const navigate = useNavigate();
   if (!data) return <div className="text-center py-12 text-gray-400">Loading…</div>;
+  const openFull = () => navigate(`/portal/cycle-count/projects/${projectId}/consolidated`);
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-3">
@@ -745,6 +730,7 @@ function ConsolidatedView({ data, onRefresh }) {
         <Kpi label="Ending" value={data.totals.ending.toFixed(0)} />
       </div>
 
+      {/* Days Breakdown — quick summary */}
       <div className="bg-white rounded-xl border border-gray-200 mb-3 overflow-hidden">
         <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
           <h4 className="font-semibold text-sm text-gray-800">
@@ -766,7 +752,8 @@ function ConsolidatedView({ data, onRefresh }) {
             </thead>
             <tbody>
               {data.days.map(d => (
-                <tr key={d.day_id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={d.day_id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                  onClick={() => navigate(`/portal/cycle-count/days/${d.day_id}/full`)}>
                   <Td><b>D{d.day_no}</b></Td>
                   <Td>{d.date}</Td>
                   <Td>
@@ -793,47 +780,26 @@ function ConsolidatedView({ data, onRefresh }) {
             </tbody>
           </table>
         </div>
+        <p className="text-[10px] text-gray-400 px-3 py-2 bg-gray-50/60 border-t border-gray-100">
+          Tip: Click any day row above to open its full variance report.
+        </p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-3 py-2 border-b border-gray-100">
-          <h4 className="font-semibold text-sm text-gray-800">Bin-wise Consolidated</h4>
-        </div>
-        <div className="overflow-x-auto max-h-[60vh]">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 sticky top-0">
-              <tr>
-                <Th>Day</Th><Th>Location</Th><Th>Barcode</Th>
-                <Th align="right">Expected</Th><Th align="right">Scanned</Th>
-                <Th align="right">Pre-Pick</Th><Th align="right">Post-Pick</Th>
-                <Th align="right">Variance</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.report.map((r, i) => (
-                <tr key={i} className={`border-b border-gray-100 hover:bg-gray-50 ${r.is_recount ? 'bg-amber-50/30' : ''}`}>
-                  <Td>
-                    <span className="font-semibold">D{r.day_no}</span>
-                    {r.is_recount && <span className="ml-1 text-[9px] font-bold text-amber-700 bg-amber-100 px-1 py-0.5 rounded-full">RECOUNT</span>}
-                  </Td>
-                  <Td className="font-mono">{r.location}</Td>
-                  <Td className="font-mono">{r.barcode}</Td>
-                  <Td align="right" mono>{r.expected_qty}</Td>
-                  <Td align="right" mono>{r.scanned_qty}</Td>
-                  <Td align="right" mono className={r.pre_pick_qty ? 'text-amber-700 font-semibold' : 'text-gray-300'}>{r.pre_pick_qty || '—'}</Td>
-                  <Td align="right" mono className={r.post_pick_qty ? 'text-rose-700 font-semibold' : 'text-gray-300'}>{r.post_pick_qty || '—'}</Td>
-                  <Td align="right" mono className={`font-bold ${
-                    r.variance_qty === 0 ? 'text-emerald-700' : r.variance_qty > 0 ? 'text-amber-700' : 'text-rose-700'
-                  }`}>
-                    {r.variance_qty === 0 ? '0' : (r.variance_qty > 0 ? '+' + r.variance_qty : r.variance_qty)}
-                  </Td>
-                  <Td><Badge classification={r.classification} reason={r.reason} /></Td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Big "Open Full Consolidated" CTA */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-xl p-6 text-center"
+        data-testid="cc-cons-cta">
+        <Layers className="w-12 h-12 mx-auto text-emerald-600 mb-3" />
+        <h3 className="text-lg font-bold text-gray-900 mb-1">
+          {data.report.length} bin-wise rows across {data.days.length} day{data.days.length !== 1 ? 's' : ''}
+        </h3>
+        <p className="text-sm text-gray-600 mb-4 max-w-lg mx-auto">
+          Open the full-screen consolidated report for the complete bin-wise rollup with search, filters, recount detection, and CSV export.
+        </p>
+        <Button onClick={openFull} size="lg"
+          className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+          data-testid="cc-open-cons-full-btn">
+          <ExternalLink className="w-4 h-4" /> Open Full Consolidated Report
+        </Button>
       </div>
     </div>
   );
