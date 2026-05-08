@@ -587,12 +587,10 @@ export default function PortalSessions() {
               >
                 <option value="bin-wise">Bin-wise (Location + Barcode)</option>
                 <option value="barcode-wise">Barcode-wise (No Bins)</option>
-                <option value="article-wise">Article-wise (Article grouping)</option>
               </select>
               <p className="text-xs text-gray-500 mt-1">
                 {formData.variance_mode === 'bin-wise' && 'Variance calculated per location/bin with barcode detail'}
                 {formData.variance_mode === 'barcode-wise' && 'Variance calculated per barcode, aggregated across all locations'}
-                {formData.variance_mode === 'article-wise' && 'Multiple barcodes grouped by article, variance at article level'}
               </p>
             </div>
             <div>

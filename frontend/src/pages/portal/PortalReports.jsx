@@ -591,7 +591,7 @@ export default function PortalReports() {
   const [hiddenColumns, setHiddenColumns] = useState(new Set());
   const [frozenColumns, setFrozenColumns] = useState(new Set());
   const tableContainerRef = useRef(null);
-  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true });
+  const [schemaValueFields, setSchemaValueFields] = useState({ has_mrp: true, has_cost: true, has_article: false });
   const [visibleRowCount, setVisibleRowCount] = useState(MAX_VISIBLE_ROWS);
 
   // Report cache: stores fetched data keyed by `${sessionId}_${reportType}`
@@ -873,12 +873,13 @@ export default function PortalReports() {
         fields.forEach(f => { fieldMap[f.name] = f; });
         setSchemaValueFields({
           has_mrp: fieldMap.mrp ? fieldMap.mrp.enabled : true,
-          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true
+          has_cost: fieldMap.cost ? fieldMap.cost.enabled : true,
+          has_article: !!(fieldMap.article_code && fieldMap.article_code.enabled)
         });
       }
     } catch (error) {
       console.error('Failed to fetch schema:', error);
-      setSchemaValueFields({ has_mrp: true, has_cost: true });
+      setSchemaValueFields({ has_mrp: true, has_cost: true, has_article: false });
     }
   };
 
@@ -1009,8 +1010,13 @@ export default function PortalReports() {
       }
       if (activeModes.has('barcode-wise')) {
         optMap.set('barcode-wise', { value: 'barcode-wise', label: 'Barcode-wise Variance' });
+        // Article-wise is a sub-report under Barcode-wise — only when schema has article_code
+        if (schemaValueFields.has_article) {
+          optMap.set('article-wise', { value: 'article-wise', label: 'Article-wise Variance' });
+        }
       }
-      if (activeModes.has('article-wise')) {
+      // Legacy: existing article-wise sessions still show article-wise (only if schema has article_code)
+      if (activeModes.has('article-wise') && schemaValueFields.has_article) {
         optMap.set('article-wise', { value: 'article-wise', label: 'Article-wise Variance' });
       }
       optMap.set('category-summary', { value: 'category-summary', label: 'Category-wise Summary' });
@@ -1030,7 +1036,12 @@ export default function PortalReports() {
       options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
     } else if (mode === 'barcode-wise') {
       options.push({ value: 'barcode-wise', label: 'Barcode-wise Variance' });
+      // Article-wise sub-report — only when schema has article_code field enabled
+      if (schemaValueFields.has_article) {
+        options.push({ value: 'article-wise', label: 'Article-wise Variance' });
+      }
     } else if (mode === 'article-wise') {
+      // Legacy support for already-created article-wise sessions
       options.push({ value: 'article-wise', label: 'Article-wise Variance' });
     }
     
