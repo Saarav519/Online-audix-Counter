@@ -163,7 +163,10 @@ export const AppProvider = ({ children }) => {
           // No backup - check metadata for data loss detection
           const meta = getMasterMeta();
           const prevCount = meta?.products?.count || 0;
-          
+          // Init flag: set on any user action (sync/clear/import). Distinguishes
+          // "truly first launch" from "user cleared/synced to empty" states.
+          const initialized = localStorage.getItem('audix_master_initialized');
+
           if (prevCount > 0) {
             console.error(`DATA LOSS: Previously had ${prevCount} products, no backup available`);
             setMasterProducts([]);
@@ -171,10 +174,15 @@ export const AppProvider = ({ children }) => {
               products: prevCount,
               detectedAt: new Date().toISOString()
             }));
+          } else if (initialized) {
+            // User has interacted before (cleared/synced) — do NOT re-seed mock
+            setMasterProducts([]);
+            console.log('Master products empty (previously cleared/synced) — not re-seeding mock');
           } else {
             // Truly first time - save mock data
             await MasterProductsDB.importAll(mockMasterProducts);
             setMasterProducts(mockMasterProducts);
+            localStorage.setItem('audix_master_initialized', '1');
           }
         }
       } catch (err) {
@@ -220,13 +228,18 @@ export const AppProvider = ({ children }) => {
 
           const meta = getMasterMeta();
           const prevCount = meta?.locations?.count || 0;
-          
+          const initialized = localStorage.getItem('audix_locations_initialized');
+
           if (prevCount > 0) {
             console.error(`DATA LOSS: Previously had ${prevCount} locations, no backup available`);
             setMasterLocations([]);
+          } else if (initialized) {
+            setMasterLocations([]);
+            console.log('Master locations empty (previously cleared/synced) — not re-seeding mock');
           } else {
             await MasterLocationsDB.importAll(mockMasterLocations);
             setMasterLocations(mockMasterLocations);
+            localStorage.setItem('audix_locations_initialized', '1');
           }
         }
       } catch (err) {
@@ -1195,6 +1208,8 @@ export const AppProvider = ({ children }) => {
   const setMasterProductsDirect = (products) => {
     console.log(`Setting ${products.length} master products directly`);
     setMasterProducts(products);
+    // Lock first-run mock seed for any future loads
+    localStorage.setItem('audix_master_initialized', '1');
     // IMMEDIATE SAVE to IndexedDB - don't rely on debounced auto-save
     // This prevents data loss if app closes before auto-save triggers
     MasterProductsDB.safeSave(products)
@@ -1217,6 +1232,8 @@ export const AppProvider = ({ children }) => {
     } else {
       setMasterProducts(prev => [...prev, ...newProducts]);
     }
+    // Lock first-run mock seed
+    localStorage.setItem('audix_master_initialized', '1');
     // IMMEDIATE SAVE + BACKUP
     MasterProductsDB.safeSave(newProducts).catch(() => {});
     _backupMasterToLocalStorage('products', newProducts);
@@ -1248,6 +1265,8 @@ export const AppProvider = ({ children }) => {
   const setMasterLocationsDirect = (locations) => {
     console.log(`Setting ${locations.length} master locations directly`);
     setMasterLocations(locations);
+    // Lock first-run mock seed
+    localStorage.setItem('audix_locations_initialized', '1');
     // IMMEDIATE SAVE to IndexedDB
     MasterLocationsDB.safeSave(locations)
       .then(() => console.log('Master locations saved immediately to IndexedDB'))
@@ -1270,6 +1289,8 @@ export const AppProvider = ({ children }) => {
     } else {
       setMasterLocations(prev => [...prev, ...newLocations]);
     }
+    // Lock first-run mock seed
+    localStorage.setItem('audix_locations_initialized', '1');
     // IMMEDIATE SAVE + BACKUP
     MasterLocationsDB.safeSave(newLocations).catch(() => {});
     _backupMasterToLocalStorage('locations', newLocations);
@@ -1292,6 +1313,8 @@ export const AppProvider = ({ children }) => {
     setMasterProducts([]);
     localStorage.removeItem('audix_master_products');
     localStorage.removeItem('audix_master_data_lost');
+    // Mark as user-initialized so the first-run mock seed does NOT run on next load
+    localStorage.setItem('audix_master_initialized', '1');
     try { await MasterProductsDB.clear(); } catch (e) { /* ignore */ }
   };
 
@@ -1299,6 +1322,7 @@ export const AppProvider = ({ children }) => {
   const clearMasterLocations = async () => {
     setMasterLocations([]);
     localStorage.removeItem('audix_master_locations');
+    localStorage.setItem('audix_locations_initialized', '1');
     try { await MasterLocationsDB.clear(); } catch (e) { /* ignore */ }
   };
 
