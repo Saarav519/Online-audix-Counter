@@ -163,6 +163,9 @@ export const AppProvider = ({ children }) => {
           // No backup - check metadata for data loss detection
           const meta = getMasterMeta();
           const prevCount = meta?.products?.count || 0;
+          // FIX: If user has ever touched master (imported or cleared), do NOT
+          // re-seed mock/dummy data on subsequent loads. Mock is for true first-run only.
+          const initialized = localStorage.getItem('audix_master_initialized');
           
           if (prevCount > 0) {
             console.error(`DATA LOSS: Previously had ${prevCount} products, no backup available`);
@@ -171,10 +174,16 @@ export const AppProvider = ({ children }) => {
               products: prevCount,
               detectedAt: new Date().toISOString()
             }));
+          } else if (initialized) {
+            // User has previously imported or explicitly cleared master.
+            // Keep state empty — do NOT re-introduce demo/mock products.
+            setMasterProducts([]);
+            console.log('Master products empty (user previously cleared/synced) — not re-seeding mock data');
           } else {
             // Truly first time - save mock data
             await MasterProductsDB.importAll(mockMasterProducts);
             setMasterProducts(mockMasterProducts);
+            localStorage.setItem('audix_master_initialized', '1');
           }
         }
       } catch (err) {
@@ -220,13 +229,20 @@ export const AppProvider = ({ children }) => {
 
           const meta = getMasterMeta();
           const prevCount = meta?.locations?.count || 0;
+          // FIX: same "user has touched master" check as products
+          const initialized = localStorage.getItem('audix_locations_initialized');
           
           if (prevCount > 0) {
             console.error(`DATA LOSS: Previously had ${prevCount} locations, no backup available`);
             setMasterLocations([]);
+          } else if (initialized) {
+            // User has previously imported or explicitly cleared locations.
+            setMasterLocations([]);
+            console.log('Master locations empty (user previously cleared/synced) — not re-seeding mock data');
           } else {
             await MasterLocationsDB.importAll(mockMasterLocations);
             setMasterLocations(mockMasterLocations);
+            localStorage.setItem('audix_locations_initialized', '1');
           }
         }
       } catch (err) {
@@ -1202,6 +1218,8 @@ export const AppProvider = ({ children }) => {
       .catch(err => console.warn('Immediate IndexedDB save failed:', err));
     // BACKUP to localStorage for recovery
     _backupMasterToLocalStorage('products', products);
+    // FIX: lock out future mock seeds — user has explicitly populated master.
+    localStorage.setItem('audix_master_initialized', '1');
   };
 
   // Import master products from CSV data - replaces old data
@@ -1220,6 +1238,8 @@ export const AppProvider = ({ children }) => {
     // IMMEDIATE SAVE + BACKUP
     MasterProductsDB.safeSave(newProducts).catch(() => {});
     _backupMasterToLocalStorage('products', newProducts);
+    // FIX: lock out future mock seeds
+    localStorage.setItem('audix_master_initialized', '1');
     return newProducts.length;
   };
 
@@ -1254,6 +1274,8 @@ export const AppProvider = ({ children }) => {
       .catch(err => console.warn('Immediate IndexedDB save failed:', err));
     // BACKUP to localStorage for recovery
     _backupMasterToLocalStorage('locations', locations);
+    // FIX: lock out future mock seeds
+    localStorage.setItem('audix_locations_initialized', '1');
   };
 
   // Import master locations from CSV data
@@ -1273,6 +1295,8 @@ export const AppProvider = ({ children }) => {
     // IMMEDIATE SAVE + BACKUP
     MasterLocationsDB.safeSave(newLocations).catch(() => {});
     _backupMasterToLocalStorage('locations', newLocations);
+    // FIX: lock out future mock seeds
+    localStorage.setItem('audix_locations_initialized', '1');
     return newLocations.length;
   };
 
@@ -1296,6 +1320,9 @@ export const AppProvider = ({ children }) => {
     // does NOT silently restore the just-cleared data from the backup chain
     // (IndexedDB empty → backup restore → "purana data wapas appear ho jata hai").
     localStorage.removeItem('audix_master_products_backup');
+    // FIX: mark master as user-initialized so the load flow does NOT
+    // re-seed dummy mock products on next reload after an intentional clear.
+    localStorage.setItem('audix_master_initialized', '1');
     try { await MasterProductsDB.clear(); } catch (e) { /* ignore */ }
   };
 
@@ -1305,6 +1332,8 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('audix_master_locations');
     // BUG FIX: same backup-restore-after-clear issue as products
     localStorage.removeItem('audix_master_locations_backup');
+    // FIX: no mock re-seed after intentional clear
+    localStorage.setItem('audix_locations_initialized', '1');
     try { await MasterLocationsDB.clear(); } catch (e) { /* ignore */ }
   };
 
