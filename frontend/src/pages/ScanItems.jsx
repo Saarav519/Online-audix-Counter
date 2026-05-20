@@ -246,6 +246,7 @@ const ScanItems = () => {
     locations, 
     scannedItems, 
     settings,
+    masterProducts,
     addScannedItem,
     batchSaveScannedItems, // For reliable batch submit
     deleteScannedItem,
@@ -588,10 +589,18 @@ const ScanItems = () => {
   // Add item to temporary state (not saved until submit)
   const addTempItem = useCallback((barcode, quantity = 1) => {
     const product = getProductByBarcode ? getProductByBarcode(barcode) : null;
-    const isValidBarcode = product !== undefined && product !== null;
-    
-    // Check if non-master products are allowed
-    if (!isValidBarcode && !settings.allowNonMasterProducts) {
+    const productFound = product !== undefined && product !== null;
+    // FIX: When master is EMPTY (nothing uploaded yet), treat every scan as
+    // valid for the purpose of beep feedback. When master has products,
+    // `isValid` strictly reflects whether the scanned barcode is in master —
+    // regardless of whether Non-Master Allowed is ON. This keeps the beep
+    // honest (valid → in master / master empty, invalid → not in master).
+    const masterIsEmpty = !masterProducts || masterProducts.length === 0;
+    const isValidBarcode = productFound || masterIsEmpty;
+
+    // Allow-list check: items still get ADDED when Non-Master Allowed is ON,
+    // even if the barcode isn't in master (only beep changes).
+    if (!productFound && !masterIsEmpty && !settings.allowNonMasterProducts) {
       return { success: false, error: 'Barcode not in master list', isValid: false };
     }
     
@@ -632,7 +641,7 @@ const ScanItems = () => {
     });
     
     return { success: true, isValid: isValidBarcode, product, item: newItem };
-  }, [getProductByBarcode, settings.allowNonMasterProducts]);
+  }, [getProductByBarcode, settings.allowNonMasterProducts, masterProducts]);
   
   // Delete item from temp state - IMMEDIATELY persists to localStorage
   const deleteTempItem = useCallback((itemId) => {
@@ -830,8 +839,9 @@ const ScanItems = () => {
         // Clear barcode input immediately for next scan
         setBarcodeInput('');
         
-        // Play sound (non-blocking)
-        requestAnimationFrame(() => playSound(true));
+        // Play sound based on master membership (valid → in master / master empty,
+        // invalid → non-master barcode added because Non-Master Allowed is ON)
+        requestAnimationFrame(() => playSound(result.isValid));
         
         // Clear result after short delay (faster for rapid scanning)
         scanResultTimeoutRef.current = setTimeout(() => {
@@ -1235,7 +1245,9 @@ const ScanItems = () => {
               
               setBarcodeInput('');
               
-              playSound(result.success);
+              // Beep reflects master membership: success=true means item was
+              // added, but it may still be a non-master barcode → invalid beep.
+              playSound(result.success && result.isValid);
               setTimeout(() => setLastScanResult(null), 3000);
               
               if (barcodeInputRef.current) {
@@ -1270,10 +1282,14 @@ const ScanItems = () => {
   // Show quantity popup for a barcode
   const showQtyPopup = useCallback((barcode) => {
     const product = getProductByBarcode ? getProductByBarcode(barcode) : null;
-    const isValid = product !== undefined && product !== null;
-    
-    // Check if non-master products are allowed
-    if (!isValid && !settings.allowNonMasterProducts) {
+    const productFound = product !== undefined && product !== null;
+    // FIX: Master-empty case → treat as valid (no master to validate against).
+    // Master-with-products case → strictly check membership for beep purposes.
+    const masterIsEmpty = !masterProducts || masterProducts.length === 0;
+    const isValid = productFound || masterIsEmpty;
+
+    // Allow-list check: block popup only when item also can't be added
+    if (!productFound && !masterIsEmpty && !settings.allowNonMasterProducts) {
       return { success: false, error: 'Barcode not in master list' };
     }
     
@@ -1291,8 +1307,8 @@ const ScanItems = () => {
       }
     }, 100);
     
-    return { success: true };
-  }, [getProductByBarcode, settings.allowNonMasterProducts]);
+    return { success: true, isValid };
+  }, [getProductByBarcode, settings.allowNonMasterProducts, masterProducts]);
 
   // Confirm quantity from popup and add item
   const confirmQuantityPopup = () => {
@@ -1329,7 +1345,8 @@ const ScanItems = () => {
       ...result
     });
     
-    playSound(result.success);
+    // Beep reflects master membership (not just add-success)
+    playSound(result.success && result.isValid);
     setTimeout(() => setLastScanResult(null), 3000);
     
     // Close popup and reset
@@ -1404,8 +1421,9 @@ const ScanItems = () => {
     // Clear barcode input immediately after scan
     setBarcodeInput('');
     
-    // Play success/error sound
-    playSound(result.success);
+    // Beep: valid only if barcode is in master (or master is empty).
+    // A non-master barcode added because Non-Master Allowed is ON → invalid beep.
+    playSound(result.success && result.isValid);
     
     // Clear result after 3 seconds
     setTimeout(() => setLastScanResult(null), 3000);

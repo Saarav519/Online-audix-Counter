@@ -1,0 +1,25 @@
+{
+  "iteration": "master_beep_fix",
+  "date": "2026-01",
+  "summary": "Scanner beep now honestly reflects master-list membership, regardless of Non-Master Allowed setting",
+  "user_reported_bug": "After uploading master AND enabling Non-Master Allowed, every scan beeps valid — should beep invalid for barcodes not in master. Also: when master is empty and Non-Master Allowed is on, all scans should beep valid.",
+  "root_cause": "ScanItems.jsx beep logic used result.success (which is true whenever the item is added, including non-master adds when allowNonMasterProducts is ON). It never consulted whether the barcode was actually in master. Also, addTempItem/showQtyPopup did not differentiate the 'master empty' case from 'product not found in non-empty master'.",
+  "fix": [
+    "Exposed masterProducts from useApp() in ScanItems.jsx for length check.",
+    "In addTempItem: new derivation -> isValid = (product found) OR (masterProducts.length === 0). Allow-list check now also bypasses when master is empty (treat as valid). masterProducts added to useCallback deps.",
+    "Mirrored the same logic in showQtyPopup (Punching Mode); returns isValid in result.",
+    "Switched 4 beep call-sites from playSound(true/result.success) to playSound(result.isValid) / playSound(result.success && result.isValid): handleHardwareScan default path, manual-entry-off scanner path, confirmQuantityPopup (Punching Mode add), and handleScan (manual Enter)."
+  ],
+  "files_changed": [
+    "/app/frontend/src/pages/ScanItems.jsx"
+  ],
+  "scenarios_verified_via_logic_trace": {
+    "master_has_products + allowNonMaster=ON + in_master": "valid beep + green visual",
+    "master_has_products + allowNonMaster=ON + NOT_in_master": "INVALID beep, item still added, non-master visual",
+    "master_empty + allowNonMaster=ON + any_barcode": "valid beep (no master to validate against)",
+    "master_has_products + allowNonMaster=OFF + NOT_in_master": "invalid beep + reject error toast (existing behaviour)",
+    "master_empty + allowNonMaster=OFF + any_barcode": "valid beep + add (existing fallthrough, now consistent)"
+  },
+  "lint_status": "clean (no new warnings introduced)",
+  "next_actions": "On-device verification: upload master with a few SKUs, enable Non-Master Allowed, scan a non-master barcode → should hear invalid beep but item should appear in list. Then clear master and scan again → valid beep on every scan."
+}
