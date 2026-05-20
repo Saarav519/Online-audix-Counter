@@ -244,14 +244,82 @@ export const useHardwareScanner = (onScan, isEnabled = true, allowKeyInput = tru
     if (!isEnabled) return;
 
     const handleKeyDown = (e) => {
-      // Skip qty inputs and dialogs
+      // Skip qty inputs and dialogs — BUT first detect if a scanner is
+      // firing into them by accident (rapid keystrokes on a qty field while
+      // the user hasn't typed for a while). When detected, commandeer the
+      // input and reroute the scan to the scanner pipeline.
       const target = e.target;
       const isQtyInput = target && (
         target.hasAttribute('data-qty-input') ||
-        target.closest('[data-qty-edit]') ||
-        target.closest('[role="dialog"]')
+        target.closest('[data-qty-edit]')
       );
+      const isInDialog = target && target.closest('[role="dialog"]');
+
+      if (isInDialog) {
+        // Inside a dialog (e.g., quantity popup). Don't interfere — the popup
+        // has its own qty handling + 20000 cap. Just reset our buffer state.
+        bufferRef.current = '';
+        scannerModeRef.current = false;
+        return;
+      }
+
       if (isQtyInput) {
+        const currentTime = Date.now();
+        const timeDiff = currentTime - lastKeyTimeRef.current;
+
+        // SCANNER INTERCEPT: a rapid printable keystroke on a qty input
+        // strongly implies a scanner is firing at the wrong field
+        // (user previously edited qty in a row, then scanned without
+        // tapping back on the barcode input). Hijack it.
+        if (
+          e.key.length === 1 &&
+          !e.ctrlKey && !e.altKey && !e.metaKey &&
+          lastKeyTimeRef.current > 0 &&
+          timeDiff < 50
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // Figure out what chars already leaked into the qty input
+          // before we caught the scanner activity, then restore the field
+          // to its committed value (set by parent via data-original-qty).
+          const originalQty = target.getAttribute('data-original-qty') || '';
+          const currentValue = (target.value || '').toString();
+          let leakedChars = '';
+          if (originalQty && currentValue.startsWith(originalQty)) {
+            leakedChars = currentValue.slice(originalQty.length);
+          } else {
+            // onFocus selects the existing qty so scanner chars replace it
+            leakedChars = currentValue;
+          }
+
+          // Restore qty input to its prop value using the native setter so
+          // React's controlled input picks up the change.
+          try {
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+              window.HTMLInputElement.prototype,
+              'value'
+            ).set;
+            nativeSetter.call(target, originalQty);
+            target.dispatchEvent(new Event('input', { bubbles: true }));
+          } catch (_) { /* ignore */ }
+
+          // Release focus so subsequent scanner chars (and the trailing
+          // Enter most scanners emit) fall through to the barcode input
+          // via the existing keep-focus-on-barcode logic.
+          try { target.blur(); } catch (_) { /* ignore */ }
+
+          // Seed the scanner buffer with everything that leaked + this key
+          bufferRef.current = (leakedChars || '') + e.key;
+          lastKeyTimeRef.current = currentTime;
+          scannerModeRef.current = true;
+          if (scannerModeTimerRef.current) clearTimeout(scannerModeTimerRef.current);
+          scannerModeTimerRef.current = setTimeout(() => { scannerModeRef.current = false; }, 300);
+
+          return;
+        }
+
+        // Slow manual typing into qty input — leave it alone
         bufferRef.current = '';
         scannerModeRef.current = false;
         return;

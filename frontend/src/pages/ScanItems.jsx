@@ -87,6 +87,13 @@ const useDebouncedCallback = (callback, delay) => {
 };
 
 // Memoized ScannedItem component for better performance with large lists
+
+// Hard upper-bound for any manually-entered quantity (popup or row edit).
+// Anything bigger than 5 digits (>99999) is almost certainly a scanned
+// barcode misfired into the qty field — beep + reject instead of silently
+// accepting it as a legitimate quantity.
+const MAX_MANUAL_QTY = 99999;
+
 const ScannedItemRow = memo(({ 
   item, 
   isEditing, 
@@ -124,10 +131,11 @@ const ScannedItemRow = memo(({
             type="number"
             min="0.01"
             step="any"
-            max={singleSkuMode ? item.quantity : undefined}
+            max={singleSkuMode ? item.quantity : MAX_MANUAL_QTY}
             inputMode="decimal"
             value={isEditing ? editQuantity : item.quantity}
             data-qty-input="true"
+            data-original-qty={String(item.quantity)}
             className={`w-16 h-8 text-center text-sm font-bold p-1 rounded border focus:outline-none focus:ring-2 ${
               singleSkuMode 
                 ? 'border-amber-300 bg-amber-50 text-amber-700 focus:ring-amber-500 focus:border-amber-500' 
@@ -146,6 +154,15 @@ const ScannedItemRow = memo(({
                 const numVal = parseFloat(val);
                 if (!isNaN(numVal) && numVal > item.quantity) {
                   val = String(item.quantity);
+                }
+              }
+              // FIX: hard cap manual qty entry (Multi-SKU mode) — anything above
+              // MAX_MANUAL_QTY is almost certainly a scanned barcode misfired
+              // into the qty field. Clamp back so the bad value never reaches state.
+              if (!singleSkuMode && val !== '') {
+                const numVal = parseFloat(val);
+                if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
+                  val = String(MAX_MANUAL_QTY);
                 }
               }
               setEditQuantity(val);
@@ -1285,7 +1302,29 @@ const ScanItems = () => {
   const confirmQuantityPopup = () => {
     const qty = parseFloat(popupQuantity) || 1;
     if (qty <= 0) return;
-    
+    // FIX: cap qty at MAX_MANUAL_QTY. If user accidentally scanned a barcode
+    // into the qty popup (giving a 12+ digit number), beep invalid + show
+    // an error toast and keep the popup open so they can retype.
+    if (qty > MAX_MANUAL_QTY) {
+      playSound(false);
+      setLastScanResult({
+        barcode: pendingBarcode,
+        quantity: 0,
+        success: false,
+        error: `Quantity too large — max allowed is ${MAX_MANUAL_QTY}`,
+      });
+      // Reset the popup qty so the user can retype, keep popup open
+      setPopupQuantity('1');
+      setTimeout(() => {
+        if (popupQuantityRef.current) {
+          popupQuantityRef.current.focus();
+          popupQuantityRef.current.select();
+        }
+      }, 50);
+      setTimeout(() => setLastScanResult(null), 3000);
+      return;
+    }
+
     const result = addTempItem(pendingBarcode, qty);
     
     setLastScanResult({
@@ -1412,6 +1451,15 @@ const ScanItems = () => {
   const handleQuantityUpdate = (itemId) => {
     const newQty = parseFloat(editQuantity);
     if (newQty > 0) {
+      // FIX: reject obviously-too-big values (likely a barcode scanned into
+      // the qty field). Play invalid beep + revert silently.
+      if (newQty > MAX_MANUAL_QTY) {
+        playSound(false);
+        setEditingItemId(null);
+        setEditQuantity('');
+        setTimeout(() => { if (barcodeInputRef.current) barcodeInputRef.current.focus(); }, 50);
+        return;
+      }
       // In Single SKU mode, only allow DECREASE (not increase)
       if (isSingleSkuMode) {
         const currentItem = locationItems.find(i => i.id === itemId);
@@ -2022,7 +2070,16 @@ const ScanItems = () => {
                   min="0.01"
                   value={popupQuantity}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    let val = e.target.value;
+                    // FIX: clamp popup qty to MAX_MANUAL_QTY for immediate
+                    // feedback if user (or a misfired scanner) types a value
+                    // larger than the realistic per-line cap.
+                    if (val !== '') {
+                      const numVal = parseFloat(val);
+                      if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
+                        val = String(MAX_MANUAL_QTY);
+                      }
+                    }
                     setPopupQuantity(val);
                   }}
                   onKeyDown={(e) => {
@@ -2524,7 +2581,14 @@ const ScanItems = () => {
                 min="0.01"
                 value={popupQuantity}
                 onChange={(e) => {
-                  const val = e.target.value;
+                  let val = e.target.value;
+                  // FIX: same MAX_MANUAL_QTY clamp on the second popup variant
+                  if (val !== '') {
+                    const numVal = parseFloat(val);
+                    if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
+                      val = String(MAX_MANUAL_QTY);
+                    }
+                  }
                   setPopupQuantity(val);
                 }}
                 onKeyDown={(e) => {
