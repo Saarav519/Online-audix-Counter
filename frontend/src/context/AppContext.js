@@ -1292,6 +1292,10 @@ export const AppProvider = ({ children }) => {
     setMasterProducts([]);
     localStorage.removeItem('audix_master_products');
     localStorage.removeItem('audix_master_data_lost');
+    // BUG FIX: also drop the localStorage backup so the next app reload
+    // does NOT silently restore the just-cleared data from the backup chain
+    // (IndexedDB empty → backup restore → "purana data wapas appear ho jata hai").
+    localStorage.removeItem('audix_master_products_backup');
     try { await MasterProductsDB.clear(); } catch (e) { /* ignore */ }
   };
 
@@ -1299,6 +1303,8 @@ export const AppProvider = ({ children }) => {
   const clearMasterLocations = async () => {
     setMasterLocations([]);
     localStorage.removeItem('audix_master_locations');
+    // BUG FIX: same backup-restore-after-clear issue as products
+    localStorage.removeItem('audix_master_locations_backup');
     try { await MasterLocationsDB.clear(); } catch (e) { /* ignore */ }
   };
 
