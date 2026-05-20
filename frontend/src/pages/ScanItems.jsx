@@ -156,15 +156,11 @@ const ScannedItemRow = memo(({
                   val = String(item.quantity);
                 }
               }
-              // FIX: hard cap manual qty entry (Multi-SKU mode) — anything above
-              // MAX_MANUAL_QTY is almost certainly a scanned barcode misfired
-              // into the qty field. Clamp back so the bad value never reaches state.
-              if (!singleSkuMode && val !== '') {
-                const numVal = parseFloat(val);
-                if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
-                  val = String(MAX_MANUAL_QTY);
-                }
-              }
+              // NOTE: For Multi-SKU mode, do NOT clamp to MAX_MANUAL_QTY here.
+              // We let the raw value flow into state so handleQuantityUpdate
+              // (called on blur/Enter) can detect a barcode-misfired-into-qty
+              // case (>MAX_MANUAL_QTY) and REJECT it with an invalid beep +
+              // error toast, instead of silently accepting the clamped value.
               setEditQuantity(val);
             }}
             onKeyDown={(e) => {
@@ -1452,11 +1448,20 @@ const ScanItems = () => {
     const newQty = parseFloat(editQuantity);
     if (newQty > 0) {
       // FIX: reject obviously-too-big values (likely a barcode scanned into
-      // the qty field). Play invalid beep + revert silently.
+      // the qty field). Play invalid beep + show a visible error toast +
+      // revert silently. Original quantity is preserved since we never call
+      // updateTempItemQuantity below.
       if (newQty > MAX_MANUAL_QTY) {
         playSound(false);
+        setLastScanResult({
+          barcode: String(editQuantity).slice(0, 20),
+          quantity: 0,
+          success: false,
+          error: `Invalid quantity — max allowed is ${MAX_MANUAL_QTY} (looks like a barcode was scanned into the qty field)`,
+        });
         setEditingItemId(null);
         setEditQuantity('');
+        setTimeout(() => setLastScanResult(null), 3000);
         setTimeout(() => { if (barcodeInputRef.current) barcodeInputRef.current.focus(); }, 50);
         return;
       }
@@ -2070,16 +2075,12 @@ const ScanItems = () => {
                   min="0.01"
                   value={popupQuantity}
                   onChange={(e) => {
-                    let val = e.target.value;
-                    // FIX: clamp popup qty to MAX_MANUAL_QTY for immediate
-                    // feedback if user (or a misfired scanner) types a value
-                    // larger than the realistic per-line cap.
-                    if (val !== '') {
-                      const numVal = parseFloat(val);
-                      if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
-                        val = String(MAX_MANUAL_QTY);
-                      }
-                    }
+                    const val = e.target.value;
+                    // NOTE: Do NOT clamp to MAX_MANUAL_QTY here. We let the
+                    // raw value flow in so confirmQuantityPopup() can detect
+                    // a barcode-misfired-into-qty case (>MAX_MANUAL_QTY) and
+                    // REJECT it with an invalid beep + visible error toast,
+                    // keeping the popup open for retry.
                     setPopupQuantity(val);
                   }}
                   onKeyDown={(e) => {
@@ -2581,14 +2582,10 @@ const ScanItems = () => {
                 min="0.01"
                 value={popupQuantity}
                 onChange={(e) => {
-                  let val = e.target.value;
-                  // FIX: same MAX_MANUAL_QTY clamp on the second popup variant
-                  if (val !== '') {
-                    const numVal = parseFloat(val);
-                    if (!isNaN(numVal) && numVal > MAX_MANUAL_QTY) {
-                      val = String(MAX_MANUAL_QTY);
-                    }
-                  }
+                  const val = e.target.value;
+                  // NOTE: Do NOT clamp to MAX_MANUAL_QTY here. See mobile
+                  // popup variant above — confirmQuantityPopup() will reject
+                  // (>MAX_MANUAL_QTY) with invalid beep + error toast.
                   setPopupQuantity(val);
                 }}
                 onKeyDown={(e) => {

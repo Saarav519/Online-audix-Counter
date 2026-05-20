@@ -1,0 +1,18 @@
+{
+  "iteration": "qty_overflow_fix",
+  "date": "2026-01",
+  "summary": "Fixed qty-field accepts-clamped-barcode bug in Scanner app",
+  "root_cause": "Three onChange handlers in ScanItems.jsx (inline row edit, mobile popup, desktop popup) silently clamped any value > MAX_MANUAL_QTY (99999) down to 99999. Because the value was clamped BEFORE state, the downstream rejection check (newQty > MAX_MANUAL_QTY) never triggered, and the clamped 99999 was committed as a legitimate quantity.",
+  "fix": [
+    "Removed clamp from ScannedItemRow inline qty onChange (multi-SKU path)",
+    "Removed clamp from mobile Quantity Popup onChange",
+    "Removed clamp from desktop Quantity Popup onChange",
+    "Added visible error toast (setLastScanResult) in handleQuantityUpdate when newQty > MAX_MANUAL_QTY, in addition to existing invalid beep + state revert"
+  ],
+  "files_changed": [
+    "/app/frontend/src/pages/ScanItems.jsx"
+  ],
+  "expected_behavior": "Scanning a barcode (>99999) into any qty input field plays invalid beep, shows error toast 'Invalid quantity — max allowed is 99999', reverts to the original quantity, and refocuses the barcode input.",
+  "lint_status": "clean",
+  "next_actions": "Manual on-device verification with a real handheld scanner recommended (mobile-only guard prevents desktop e2e)."
+}
