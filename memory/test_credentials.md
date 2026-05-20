@@ -1,7 +1,7 @@
 # Portal Test Credentials
 
 ## Audit Admin Portal
-- URL: https://github-audix-preview.preview.emergentagent.com/portal
+- URL: https://counter-scanner.preview.emergentagent.com/portal
 - **Username**: admin
 - **Password**: admin123
 - Role: admin (auto-seeded on startup)
