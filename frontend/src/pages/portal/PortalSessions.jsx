@@ -578,7 +578,18 @@ export default function PortalSessions() {
                 id="client"
                 data-testid="new-session-client-select"
                 value={formData.client_id}
-                onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                onChange={(e) => {
+                  const newClientId = e.target.value;
+                  // FIX (Problem 1): Store clients are audited barcode-wise only.
+                  // Auto-flip variance_mode to barcode-wise when a store client
+                  // is selected, and back to bin-wise as the sensible default
+                  // for warehouse clients.
+                  const newClient = clients.find(c => c.id === newClientId);
+                  const newVarianceMode = newClient?.client_type === 'store'
+                    ? 'barcode-wise'
+                    : formData.variance_mode;
+                  setFormData({ ...formData, client_id: newClientId, variance_mode: newVarianceMode });
+                }}
                 className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
               >
                 <option value="">Select Client</option>
@@ -616,19 +627,33 @@ export default function PortalSessions() {
             </div>
             <div>
               <Label htmlFor="variance_mode">Variance Mode *</Label>
-              <select
-                id="variance_mode"
-                value={formData.variance_mode}
-                onChange={(e) => setFormData({ ...formData, variance_mode: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="bin-wise">Bin-wise (Location + Barcode)</option>
-                <option value="barcode-wise">Barcode-wise (No Bins)</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {formData.variance_mode === 'bin-wise' && 'Variance calculated per location/bin with barcode detail'}
-                {formData.variance_mode === 'barcode-wise' && 'Variance calculated per barcode, aggregated across all locations'}
-              </p>
+              {(() => {
+                const selectedClientForForm = clients.find(c => c.id === formData.client_id);
+                const isStoreClient = selectedClientForForm?.client_type === 'store';
+                return (
+                  <>
+                    <select
+                      id="variance_mode"
+                      value={formData.variance_mode}
+                      onChange={(e) => setFormData({ ...formData, variance_mode: e.target.value })}
+                      className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                      disabled={isStoreClient}
+                    >
+                      {/* Store clients are barcode-wise only — Bin-wise hidden
+                          since store audits don't use locations/bins. */}
+                      {!isStoreClient && (
+                        <option value="bin-wise">Bin-wise (Location + Barcode)</option>
+                      )}
+                      <option value="barcode-wise">Barcode-wise (No Bins)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {isStoreClient && 'Store clients are audited barcode-wise only (no bin/location tracking).'}
+                      {!isStoreClient && formData.variance_mode === 'bin-wise' && 'Variance calculated per location/bin with barcode detail'}
+                      {!isStoreClient && formData.variance_mode === 'barcode-wise' && 'Variance calculated per barcode, aggregated across all locations'}
+                    </p>
+                  </>
+                );
+              })()}
             </div>
             <div>
               <Label htmlFor="start_date">Start Date</Label>
