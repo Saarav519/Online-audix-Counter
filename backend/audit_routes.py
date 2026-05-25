@@ -4816,6 +4816,13 @@ async def get_article_wise_report(session_id: str):
     
     reco_maps = await _get_session_reco_maps(session_info)
     extra_columns = await _get_extra_columns_for_client(session_info.get("client_id", "")) if session_info else []
+    # FIX: article_code, article_name, category are NATIVE fixed columns in the
+    # Article-wise report (rendered before MRP/Cost). When the schema also has
+    # them enabled they leak in via _get_extra_columns_for_client and the
+    # frontend renders a duplicate "Article Code" column. Strip them here so
+    # only TRULY extra/custom fields flow into the report's extra_columns.
+    _ARTICLE_NATIVE_COLS = {"article_code", "article_name", "category"}
+    extra_columns = [c for c in extra_columns if c["name"] not in _ARTICLE_NATIVE_COLS]
 
     # Pre-fetch active barcode edits so we can remap scanner barcodes BEFORE aggregation.
     # Without this, a barcode edit made from the Detailed/Barcode-wise report would

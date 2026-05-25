@@ -1,0 +1,24 @@
+{
+  "iteration": "articlewise_duplicate_column_fix",
+  "date": "2026-01",
+  "summary": "Fixed duplicate 'Article Code' column appearing in Article-wise report. Root cause: schema-enabled article_code was leaking into extra_columns even though Article-wise renders it as a native fixed column.",
+  "user_report": "Why are there two Article columns and one Barcode column in the Article-wise report?",
+  "root_cause": "audit_routes.py::_get_extra_columns_for_client returns any enabled schema field that is NOT in REPORT_FIXED_COLUMNS = {barcode, description, category, mrp, cost}. article_code / article_name are not in that set, so they were returned as 'extras'. Article-wise report renders article_code, article_name and category as native fixed columns AND also iterates extra_columns to render them again → duplicate 'Article Code'. (Bin-wise and Barcode-wise rely on extra_columns for article_code rendering, so the global set wasn't expanded — fix is scoped to article-wise only.)",
+  "fix": "In get_article_wise_report (audit_routes.py line 4818-4825), after fetching extra_columns, filter out names in {'article_code','article_name','category'} since those are native fixed columns for the Article-wise view. Other endpoints unchanged.",
+  "files_changed": ["/app/backend/audit_routes.py"],
+  "api_verification": {
+    "store_article_wise_after_fix": "extra_columns=[], rows=13735, stock_qty=103058.89 (unchanged)",
+    "warehouse_article_wise_after_fix": "extra_columns=[], rows=60, stock_qty=1636.0 (unchanged)",
+    "store_barcode_wise": "extra_columns=[{name: article_code, label: Article Code, type: text}] (intentionally preserved — barcode-wise needs it)"
+  },
+  "ui_verification_playwright": {
+    "article_code_columns": 1,
+    "article_name_columns": 1,
+    "barcodes_columns": 1,
+    "total_columns": 36,
+    "column_order": "Article Code, Article Name, Category, MRP, Cost, Barcodes, Stock Qty, ..."
+  },
+  "barcodes_column_note": "The remaining 'Barcodes' column (single occurrence) shows barcode_count per article and lets the user expand a row to see child barcodes. It is intentional to the Article-wise view — not a duplicate. Kept as-is.",
+  "lint_status": "Only pre-existing E702/F841 style warnings — no new issues introduced.",
+  "next_actions": "User refresh of Article-wise report should show a clean single Article Code column."
+}
