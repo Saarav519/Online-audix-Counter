@@ -1,0 +1,28 @@
+{
+  "iteration": "store_session_and_article_wise_fix",
+  "date": "2026-01",
+  "summary": "Fixed Bin-wise option exposed for Store clients (Problem 1) and empty Article-wise report for barcode-wise/Store sessions (Problem 2)",
+  "problem_1": {
+    "user_report": "Store clients should NOT see Bin-wise variance option when creating a session — stores are audited barcode-wise directly.",
+    "fix": "PortalSessions.jsx: on client_id change, when selected client.client_type === 'store', auto-set variance_mode='barcode-wise'. Variance Mode dropdown now (a) hides the bin-wise option entirely, (b) is disabled, (c) shows helper 'Store clients are audited barcode-wise only (no bin/location tracking).' Warehouse clients keep both options unchanged.",
+    "files_changed": [
+      "/app/frontend/src/pages/portal/PortalSessions.jsx"
+    ],
+    "verification": "Playwright drove the New Session dialog: [STORE] options=[barcode-wise only], disabled=True, value=barcode-wise. [WAREHOUSE] options=[bin-wise, barcode-wise], disabled=False."
+  },
+  "problem_2": {
+    "user_report": "Stock uploaded for Store client shows in Barcode-wise variance but NOT in Article-wise. (Category-wise reportedly also empty per user; backend data check showed Category-wise IS populated, but Article-wise was empty.)",
+    "root_cause": "audit_routes.py::get_article_wise_report had a filter `if e.get('location','') not in scanned_locations: continue` intended to make article totals match bin-wise totals for partially-scanned bin sessions. For barcode-wise sessions (Store clients) every expected stock row has location='' and synced_locations is empty until store is fully scanned — so the filter discarded all 13,743 rows, leaving the report empty.",
+    "fix": "Apply the scanned-location filter ONLY when session.variance_mode === 'bin-wise'. For barcode-wise (Store) and other modes, all expected rows are included — matching the behaviour of barcode-wise and category-summary reports.",
+    "files_changed": [
+      "/app/backend/audit_routes.py"
+    ],
+    "verification": {
+      "before_fix": "GET /api/audit/portal/reports/{store_session}/article-wise -> {report: [], totals.stock_qty: 0}",
+      "after_fix": "GET .../article-wise -> 13719 rows, totals.stock_qty=103058.89 (matches barcode-wise), totals.stock_value_mrp=18,589,112.73",
+      "category_wise_unchanged": "GET .../category-summary still works (was never affected)"
+    }
+  },
+  "lint_status": "Frontend: clean. Backend: only pre-existing style warnings (E702 semicolons, F841 unused vars) — none introduced by this fix.",
+  "next_actions": "User should hard-refresh the Reports page, open Nicobar Store -> Nicobar session -> Article-wise tab to confirm 13,719 articles now visible."
+}

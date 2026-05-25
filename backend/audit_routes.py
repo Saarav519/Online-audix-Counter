@@ -4877,10 +4877,20 @@ async def get_article_wise_report(session_id: str):
             else:
                 physical_by_article[article_code] = physical_by_article.get(article_code, 0) + item["quantity"]
     
-    # Build expected_by_article ONLY from scanned locations (matches bin-wise stock totals)
+    # Build expected_by_article from expected stock.
+    # FIX (Problem 2 — store/barcode-wise sessions): The original code filtered
+    # expected to only `location in scanned_locations` so that article-wise
+    # totals match bin-wise totals for partially-scanned bin sessions. But for
+    # barcode-wise sessions (Store clients), there are no locations to scan —
+    # every expected row has location='' and synced_locations is empty until
+    # the entire store is scanned. The filter therefore wiped out ALL stock,
+    # leaving the article-wise report empty. We now apply the scanned-location
+    # filter ONLY for bin-wise sessions, matching the behaviour of
+    # barcode-wise and category-summary reports.
+    is_bin_wise = (session_info or {}).get("variance_mode") == "bin-wise"
     expected_by_article = {}
     for e in expected:
-        if e.get("location", "") not in scanned_locations:
+        if is_bin_wise and e.get("location", "") not in scanned_locations:
             continue
         bc = e["barcode"]
         article_code = e.get("article_code", "") or barcode_to_article.get(bc, "") or bc
