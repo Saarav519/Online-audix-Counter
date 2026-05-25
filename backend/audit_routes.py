@@ -5126,6 +5126,295 @@ async def get_category_summary(session_id: str):
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     return {"report": report, "totals": {k: round(v, 2) if 'value' in k else v for k, v in totals.items()}}
 
+# ==================== INVALID CODES (Store clients only) ====================
+# Workflow:
+#   1. List barcodes scanned for a session that don't exist in either master_products
+#      or expected_stock — these are typically misfired scans or genuinely new SKUs.
+#   2. Export the list as an .xlsx with columns:
+#        barcode | correct_barcode (blank) | description | category | article_code
+#        | article_name | mrp | cost | <extra schema columns>
+#      User fills correct_barcode (to auto-correct mis-scans) and/or master detail
+#      columns (to add the SKU to master).
+#   3. Re-upload the filled file:
+#        - correct_barcode filled  → synced_locations.items.barcode is rewritten to
+#                                    correct_barcode (auto-correction).
+#        - master details filled    → master_products is upserted with the resolved
+#                                    barcode (correct_barcode if provided, else the
+#                                    original).
+#        - Both filled              → both happen.
+#      Caches (master + report) are invalidated so reports refresh.
+# Strictly store-only — warehouse / cycle-count clients receive HTTP 400.
+
+async def _get_invalid_codes_for_session(session_id: str):
+    """Compute invalid scanned barcodes for a session.
+
+    Invalid = scanned in synced_locations but NOT in master_products
+    AND NOT in expected_stock for the session.
+    Returns: (session_doc, client_doc, list[dict]).
+    """
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    client_id = session.get("client_id", "")
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if client.get("client_type") != "store":
+        raise HTTPException(status_code=400, detail="Invalid Codes feature is available only for Store clients")
+
+    synced_task = db.synced_locations.find(
+        {"session_id": session_id},
+        {"_id": 0, "items": 1, "location_name": 1}
+    ).to_list(100000)
+    expected_task = db.expected_stock.find(
+        {"session_id": session_id},
+        {"_id": 0, "barcode": 1}
+    ).to_list(500000)
+    master_task = db.master_products.find(
+        {"client_id": client_id},
+        {"_id": 0, "barcode": 1}
+    ).to_list(500000)
+    synced, expected, master = await asyncio.gather(synced_task, expected_task, master_task)
+
+    known = {e["barcode"] for e in expected if e.get("barcode")}
+    known |= {m["barcode"] for m in master if m.get("barcode")}
+
+    invalid_map = {}
+    for s in synced:
+        loc = s.get("location_name", "")
+        for item in (s.get("items") or []):
+            bc = item.get("barcode")
+            if not bc or bc in known:
+                continue
+            rec = invalid_map.setdefault(bc, {
+                "barcode": bc,
+                "scanned_qty": 0,
+                "locations": set(),
+                "sample_product_name": item.get("product_name", "") or "",
+            })
+            try:
+                rec["scanned_qty"] += float(item.get("quantity", 0) or 0)
+            except (ValueError, TypeError):
+                pass
+            if loc:
+                rec["locations"].add(loc)
+            if not rec["sample_product_name"] and item.get("product_name"):
+                rec["sample_product_name"] = item["product_name"]
+
+    items = []
+    for bc in sorted(invalid_map.keys()):
+        rec = invalid_map[bc]
+        items.append({
+            "barcode": rec["barcode"],
+            "scanned_qty": rec["scanned_qty"],
+            "locations": sorted(list(rec["locations"])),
+            "sample_product_name": rec["sample_product_name"],
+        })
+    return session, client, items
+
+
+@portal_router.get("/sessions/{session_id}/invalid-codes")
+async def list_invalid_codes(session_id: str):
+    """List invalid scanned barcodes for a Store session (not in master + not in expected)."""
+    _session, client, items = await _get_invalid_codes_for_session(session_id)
+    return {
+        "session_id": session_id,
+        "client_id": client["id"],
+        "total": len(items),
+        "items": items,
+    }
+
+
+@portal_router.get("/sessions/{session_id}/invalid-codes/export")
+async def export_invalid_codes(session_id: str):
+    """Download an .xlsx of invalid codes for the user to fill in.
+
+    Columns: barcode | correct_barcode | description | category | article_code
+             | article_name | mrp | cost | <enabled extra schema cols>
+    """
+    from openpyxl import Workbook  # lazy import keeps cold-start light
+    _session, client, items = await _get_invalid_codes_for_session(session_id)
+    client_id = client["id"]
+    extra_columns = await _get_extra_columns_for_client(client_id)
+    # Skip extras that already exist as fixed columns to avoid duplicate headers
+    fixed_cols = ["barcode", "correct_barcode", "description", "category",
+                  "article_code", "article_name", "mrp", "cost"]
+    fixed_set = set(fixed_cols)
+    extra_labels = [c.get("label", c["name"]) for c in extra_columns if c["name"] not in fixed_set]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Invalid Codes"
+    pretty_headers = [h.replace("_", " ").title() for h in fixed_cols] + extra_labels
+    ws.append(pretty_headers)
+    for it in items:
+        # barcode pre-filled; correct_barcode + master detail columns + extras blank for user to fill
+        row = [it["barcode"]] + [""] * (len(pretty_headers) - 1)
+        ws.append(row)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"invalid_codes_{session_id[:8]}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@portal_router.post("/sessions/{session_id}/invalid-codes/import")
+async def import_invalid_codes(session_id: str, file: UploadFile = File(...)):
+    """Accept the filled invalid-codes file (.xlsx or .csv) and apply corrections.
+
+    Per row:
+      * correct_barcode filled → rewrite barcode in synced_locations.items
+        (auto-correct previously-misscanned barcodes).
+      * Any master detail filled (description / category / article_code /
+        article_name / mrp / cost / schema extras) → upsert master_products
+        with the resolved barcode (correct_barcode if given else original).
+    Caches are invalidated; client.master_product_count is refreshed.
+    """
+    from openpyxl import load_workbook  # lazy import
+
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    client_id = session.get("client_id", "")
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if client.get("client_type") != "store":
+        raise HTTPException(status_code=400, detail="Invalid Codes feature is available only for Store clients")
+
+    # Schema-driven extra fields (same logic as import_master_products)
+    schema = await db.client_schemas.find_one({"client_id": client_id}, {"_id": 0})
+    extra_field_names = []
+    if schema:
+        for f in schema.get("fields", []):
+            if f.get("enabled", True) and f["name"] not in STANDARD_IMPORT_FIELD_NAMES:
+                extra_field_names.append(f["name"])
+
+    content = await file.read()
+    fname = (file.filename or "").lower()
+    rows = []
+    try:
+        if fname.endswith(".csv"):
+            try:
+                decoded = content.decode("utf-8")
+            except UnicodeDecodeError:
+                decoded = content.decode("latin-1")
+            reader = csv.DictReader(io.StringIO(decoded))
+            for r in reader:
+                rows.append({
+                    (k or "").strip().lower().replace(" ", "_"):
+                        (v.strip() if isinstance(v, str) else v)
+                    for k, v in r.items()
+                })
+        else:
+            wb = load_workbook(io.BytesIO(content), data_only=True)
+            ws = wb.active
+            try:
+                header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+            except StopIteration:
+                header_cells = ()
+            headers = [
+                (str(h).strip().lower().replace(" ", "_") if h is not None else "")
+                for h in header_cells
+            ]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not any(c not in (None, "") for c in row):
+                    continue
+                r = {}
+                for idx, h in enumerate(headers):
+                    if not h:
+                        continue
+                    val = row[idx] if idx < len(row) else None
+                    r[h] = str(val).strip() if val is not None else ""
+                rows.append(r)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {e}")
+
+    items_replaced_locations = 0
+    masters_upserted = 0
+    rows_processed = 0
+    skipped = 0
+    detail_fields = ("description", "category", "article_code", "article_name", "mrp", "cost")
+
+    for row in rows:
+        original_bc = normalize_barcode(row.get("barcode", ""))
+        correct_bc = normalize_barcode(row.get("correct_barcode", ""))
+        if not original_bc:
+            skipped += 1
+            continue
+        rows_processed += 1
+
+        # Replace barcode inside synced_locations.items for this session
+        if correct_bc and correct_bc != original_bc:
+            r = await db.synced_locations.update_many(
+                {"session_id": session_id, "items.barcode": original_bc},
+                {"$set": {"items.$[elem].barcode": correct_bc}},
+                array_filters=[{"elem.barcode": original_bc}],
+            )
+            items_replaced_locations += getattr(r, "modified_count", 0) or 0
+
+        # Decide if any master-detail content is present
+        has_details = any(
+            (row.get(k, "") or "").strip() not in ("", "0", "0.0")
+            for k in detail_fields
+        ) or any((row.get(fn, "") or "").strip() != "" for fn in extra_field_names)
+
+        if has_details:
+            target_bc = correct_bc or original_bc
+            master = MasterProduct(
+                client_id=client_id,
+                barcode=target_bc,
+                description=row.get("description", "") or "",
+                category=row.get("category", "") or "",
+                article_code=row.get("article_code", "") or "",
+                article_name=row.get("article_name", "") or "",
+                mrp=parse_number(row.get("mrp", 0)),
+                cost=parse_number(row.get("cost", 0)),
+            )
+            doc = master.model_dump()
+            doc["imported_at"] = doc["imported_at"].isoformat()
+            custom_fields = {}
+            for fn in extra_field_names:
+                v = (row.get(fn, "") or "").strip()
+                if v:
+                    custom_fields[fn] = v
+            if custom_fields:
+                doc["custom_fields"] = custom_fields
+            new_id = doc.pop("id")
+            await db.master_products.update_one(
+                {"client_id": client_id, "barcode": target_bc},
+                {"$set": doc, "$setOnInsert": {"id": new_id}},
+                upsert=True,
+            )
+            masters_upserted += 1
+
+    # Invalidate master + report caches; expected cache for this session for good measure
+    _invalidate_master_cache_for_client(client_id)
+    _expected_cache.invalidate(f"expected_{session_id}")
+
+    new_total = await db.master_products.count_documents({"client_id": client_id})
+    await db.clients.update_one(
+        {"id": client_id},
+        {"$set": {"master_imported": True, "master_product_count": new_total}}
+    )
+
+    return {
+        "message": "Invalid codes processed",
+        "rows_processed": rows_processed,
+        "items_replaced": items_replaced_locations,
+        "masters_upserted": masters_upserted,
+        "skipped_empty_rows": skipped,
+        "new_master_total": new_total,
+    }
+
+
 @portal_router.get("/reports/{session_id}/daily-progress")
 async def get_daily_progress(session_id: str):
     """Daily progress report"""

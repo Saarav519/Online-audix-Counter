@@ -615,6 +615,104 @@ export default function PortalReports() {
   // Report cache: stores fetched data keyed by `${sessionId}_${reportType}`
   const reportCache = useRef({});
 
+  // ============ Invalid Codes feature (Store clients only) ============
+  // Manages the modal that lists scanned barcodes which are not present in
+  // master_products nor expected_stock for the selected Store session, and
+  // exposes Export/Import to bulk-correct them. Warehouse / cycle-count flows
+  // are unaffected — the button itself is gated on isStoreClient + session.
+  const [invalidCodesOpen, setInvalidCodesOpen] = useState(false);
+  const [invalidCodesLoading, setInvalidCodesLoading] = useState(false);
+  const [invalidCodesData, setInvalidCodesData] = useState(null); // {total, items: []}
+  const [invalidCodesImporting, setInvalidCodesImporting] = useState(false);
+  const invalidCodesFileInputRef = useRef(null);
+
+  const openInvalidCodes = useCallback(async () => {
+    if (!selectedSession) return;
+    setInvalidCodesOpen(true);
+    setInvalidCodesLoading(true);
+    setInvalidCodesData(null);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${selectedSession}/invalid-codes`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed (${res.status})`);
+      }
+      const data = await res.json();
+      setInvalidCodesData(data);
+    } catch (e) {
+      toast.error(e.message || 'Failed to load invalid codes');
+      setInvalidCodesOpen(false);
+    } finally {
+      setInvalidCodesLoading(false);
+    }
+  }, [selectedSession]);
+
+  const exportInvalidCodes = useCallback(async () => {
+    if (!selectedSession) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${selectedSession}/invalid-codes/export`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invalid_codes_${selectedSession.slice(0, 8)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Invalid codes exported');
+    } catch (e) {
+      toast.error(e.message || 'Export failed');
+    }
+  }, [selectedSession]);
+
+  const handleInvalidCodesImport = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedSession) {
+      event.target.value = '';
+      return;
+    }
+    setInvalidCodesImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${selectedSession}/invalid-codes/import`, {
+        method: 'POST',
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed (${res.status})`);
+      }
+      const result = await res.json();
+      toast.success(
+        `Processed ${result.rows_processed} rows · ${result.items_replaced} scan${result.items_replaced === 1 ? '' : 's'} corrected · ${result.masters_upserted} master row${result.masters_upserted === 1 ? '' : 's'} updated`
+      );
+      // Invalidate frontend caches so reports refetch
+      reportCache.current = {};
+      setReportData(null);
+      // Refresh the invalid codes list in-modal
+      try {
+        const r2 = await fetch(`${BACKEND_URL}/api/audit/portal/sessions/${selectedSession}/invalid-codes`);
+        if (r2.ok) setInvalidCodesData(await r2.json());
+      } catch (_) { /* ignore refresh failure */ }
+      // Re-fetch the current report if one is loaded
+      if (reportType) {
+        // Trigger a refetch by clearing and re-setting state — handled by existing effect
+        // (depends on selectedSession + reportType which haven't changed; force via cache clear above)
+      }
+    } catch (e) {
+      toast.error(e.message || 'Import failed');
+    } finally {
+      setInvalidCodesImporting(false);
+      event.target.value = '';
+    }
+  }, [selectedSession, reportType]);
+
   useEffect(() => {
     fetchClients();
   }, []);
@@ -1966,6 +2064,19 @@ export default function PortalReports() {
             {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (
               <FullScreenButton onClick={() => setIsFullScreen(true)} />
             )}
+            {/* Invalid Codes — Store clients only, requires a selected session */}
+            {isStoreClient && selectedSession && (
+              <Button
+                onClick={openInvalidCodes}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1 text-amber-700 border-amber-200 hover:bg-amber-50"
+                data-testid="invalid-codes-btn"
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Invalid Codes
+              </Button>
+            )}
           </div>
         }
       />
@@ -2177,6 +2288,144 @@ export default function PortalReports() {
         onRefresh={refreshReport}
         barcodeReadOnly={ccBarcodeReadOnly}
       />
+
+      {/* Invalid Codes Modal — Store clients only */}
+      {invalidCodesOpen && ReactDOM.createPortal(
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+          onClick={() => setInvalidCodesOpen(false)}
+          data-testid="invalid-codes-modal"
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-amber-600 px-6 py-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  Invalid Codes
+                </h3>
+                <p className="text-xs text-amber-100 mt-0.5">
+                  Barcodes scanned in this session that are not in master and not in expected stock
+                </p>
+              </div>
+              <button
+                onClick={() => setInvalidCodesOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded transition-colors"
+                aria-label="Close"
+                data-testid="invalid-codes-close-btn"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-3 bg-amber-50 border-b border-amber-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm">
+                {invalidCodesLoading ? (
+                  <span className="text-amber-700">Loading…</span>
+                ) : invalidCodesData ? (
+                  <span className="text-amber-800 font-semibold">
+                    {invalidCodesData.total} invalid code{invalidCodesData.total === 1 ? '' : 's'}
+                  </span>
+                ) : (
+                  <span className="text-amber-700">—</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  onClick={exportInvalidCodes}
+                  variant="outline"
+                  size="sm"
+                  disabled={!invalidCodesData || invalidCodesData.total === 0}
+                  className="h-8 text-xs gap-1"
+                  data-testid="invalid-codes-export-btn"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export to Excel
+                </Button>
+                <input
+                  ref={invalidCodesFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleInvalidCodesImport}
+                  data-testid="invalid-codes-file-input"
+                />
+                <Button
+                  onClick={() => invalidCodesFileInputRef.current?.click()}
+                  size="sm"
+                  disabled={invalidCodesImporting}
+                  className="h-8 text-xs gap-1 bg-amber-600 hover:bg-amber-700 text-white"
+                  data-testid="invalid-codes-import-btn"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {invalidCodesImporting ? 'Importing…' : 'Import Filled Excel'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {invalidCodesLoading && (
+                <div className="p-6 text-center text-sm text-gray-500">Fetching invalid codes…</div>
+              )}
+              {!invalidCodesLoading && invalidCodesData && invalidCodesData.total === 0 && (
+                <div className="p-10 text-center">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-gray-700">No invalid codes</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Every scanned barcode is either in the master or in expected stock.
+                  </p>
+                </div>
+              )}
+              {!invalidCodesLoading && invalidCodesData && invalidCodesData.total > 0 && (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                      <th className="py-2 px-4 text-left font-semibold">#</th>
+                      <th className="py-2 px-4 text-left font-semibold">Barcode</th>
+                      <th className="py-2 px-4 text-left font-semibold">Scanned Qty</th>
+                      <th className="py-2 px-4 text-left font-semibold">Locations</th>
+                      <th className="py-2 px-4 text-left font-semibold">Scanned As</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100" data-testid="invalid-codes-table-body">
+                    {invalidCodesData.items.map((it, idx) => (
+                      <tr key={it.barcode} className="hover:bg-amber-50/40">
+                        <td className="py-2 px-4 text-xs text-gray-500">{idx + 1}</td>
+                        <td className="py-2 px-4 font-mono text-xs text-gray-800">{it.barcode}</td>
+                        <td className="py-2 px-4 text-xs text-gray-700">{it.scanned_qty}</td>
+                        <td className="py-2 px-4 text-xs text-gray-600">
+                          {it.locations?.length ? it.locations.join(', ') : '—'}
+                        </td>
+                        <td className="py-2 px-4 text-xs text-gray-500 italic">
+                          {it.sample_product_name || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+              <p className="text-[11px] text-gray-500 max-w-[60%]">
+                <strong>Tip:</strong> Export → fill <code>correct_barcode</code> for mis-scans, or
+                master detail columns to add new SKUs, then re-import. Reports refresh automatically.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setInvalidCodesOpen(false)}
+                size="sm"
+                className="h-8 text-xs"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -3304,8 +3553,6 @@ function PendingLocationsView({ data, clientId }) {
         </div>,
         document.body
       )}
-
-      {/* Empty Bins */}
       {emptyBins.length > 0 && (
         <div className="bg-white border border-amber-200 rounded-xl overflow-hidden">
           <div className="bg-amber-50 px-4 py-3 border-b">

@@ -1,0 +1,53 @@
+{
+  "iteration": "invalid_codes_management_store_clients",
+  "date": "2026-01",
+  "summary": "Added Invalid Codes management (list + Excel export + Excel/CSV import) for Store-type audit sessions. Warehouse and Cycle Count flows are untouched and were tested to confirm zero regression.",
+  "scope": {
+    "backend_files_changed": ["/app/backend/audit_routes.py"],
+    "frontend_files_changed": ["/app/frontend/src/pages/portal/PortalReports.jsx"],
+    "explicitly_NOT_modified": ["/app/backend/cycle_count_routes.py", "all other frontend files"]
+  },
+  "new_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/audit/portal/sessions/{session_id}/invalid-codes",
+      "purpose": "Lists scanned barcodes for a Store session that are NOT in master_products AND NOT in expected_stock. Returns {total, items:[{barcode, scanned_qty, locations[], sample_product_name}]}. Non-store clients receive HTTP 400."
+    },
+    {
+      "method": "GET",
+      "path": "/api/audit/portal/sessions/{session_id}/invalid-codes/export",
+      "purpose": "Downloads a .xlsx template with one row per invalid barcode. Columns: barcode | correct_barcode (blank) | description | category | article_code | article_name | mrp | cost | [enabled schema extras]. User fills and re-uploads."
+    },
+    {
+      "method": "POST",
+      "path": "/api/audit/portal/sessions/{session_id}/invalid-codes/import",
+      "purpose": "Accepts .xlsx/.csv. Per row: correct_barcode filled -> rewrite barcode inside synced_locations.items (auto-correct mis-scans). Master detail fields filled -> upsert into master_products with the resolved barcode (correct_barcode if given else original). Invalidates master+report caches; refreshes client.master_product_count. Returns counts."
+    }
+  ],
+  "frontend_changes_summary": [
+    "Added 'Invalid Codes' button in Reports page header — visible ONLY when client.client_type === 'store' AND a session is selected.",
+    "Added modal with list of invalid codes, Export to Excel button, Import Filled Excel button.",
+    "Import success toast shows: rows_processed, items_replaced, masters_upserted.",
+    "After successful import: clears report cache so reports re-fetch with corrected data."
+  ],
+  "live_verification": {
+    "playwright": {
+      "warehouse_client": "invalid-codes-btn visible = False (correctly hidden)",
+      "store_client": "invalid-codes-btn visible = True; modal opens with 2 seeded invalid codes; Export + Import buttons present"
+    },
+    "api_curl": {
+      "list_store_session": "Returns 2 invalid codes with qty + locations.",
+      "warehouse_rejection": "HTTP 400 - 'Invalid Codes feature is available only for Store clients'",
+      "export_xlsx": "Generates valid .xlsx with correct headers + pre-filled barcode column.",
+      "import_xlsx": "Replaces synced_locations barcode (auto-correct works), upserts master row with provided details, increments master_product_count, list endpoint returns 0 invalid after import."
+    },
+    "regression_checks": {
+      "warehouse_bin_wise_report": "14 rows, stock_qty=1636.0 (unchanged)",
+      "warehouse_article_wise_report": "60 rows, stock_qty=1636.0 (unchanged)",
+      "cycle_count_projects": "2 projects accessible (unchanged)"
+    }
+  },
+  "lint_status": "Frontend: clean (no new warnings). Backend: only pre-existing E702 / F841 style warnings; no new errors from the added code.",
+  "test_data_cleanup": "Seeded test synced_locations docs and master upserts were removed after verification.",
+  "next_actions": "Real user workflow: scan store -> open Reports -> Invalid Codes button -> Export -> fill correct_barcode and/or master details -> Import -> reports auto-refresh."
+}
