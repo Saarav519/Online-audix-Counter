@@ -614,7 +614,7 @@ async def change_user_role(user_id: str, role_data: dict, request: Request):
         {"id": user_id},
         {"$set": {"role": role}}
     )
-    if result.modified_count == 0:
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": f"User role changed to {role}"}
 

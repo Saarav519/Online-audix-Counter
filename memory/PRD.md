@@ -137,7 +137,24 @@ Edits in BOTH modules are now gated by a confirmation modal showing recent histo
 
 **Time formatting** — inline relative helper ("just now / 5 min ago / yesterday / Jan 12, 2026"). Avoids pulling `date-fns` for a single use.
 
+## Prompt 3 — Admin / Supervisor Role System (May 2026) ✅
+Two-role system: `admin` (full access incl. user approval) and `supervisor` (full data access, no user-management actions).
+
+**New shared file**
+- `backend/shared/auth_middleware.py` — `get_current_user(request, db)` reads `X-User-Id` header → loads `portal_users` row → raises 401/403 for missing/disabled/unapproved; `require_admin(user)` raises 403 if `role != "admin"`; `get_user_role(user_id, db)` quick lookup; `migrate_legacy_roles(db)` idempotent viewer→supervisor migration, always restores `username='admin'` → `role='admin'`.
+
+**Backend changes**
+- `audit_routes.py` — `PortalUser` model default `role="supervisor"` (was "viewer"); `/register` sets `role="supervisor"`; new `GET /api/audit/portal/me` returns current user (sans `password_hash`); `/users/{id}/approve|reject|toggle-active|role|DELETE` all gated with `get_current_user + require_admin`; `/role` accepts `admin`/`supervisor` (legacy `viewer` → `supervisor` alias); uses `matched_count` for idempotent role updates.
+- `server.py` — startup calls `migrate_legacy_roles(db)` inside try/except (never blocks boot).
+
+**Frontend changes**
+- `pages/AuditApp.js` — extended `useAudit()` hook with `isAdmin`, `role`, `authHeaders()`, `refreshMe()` (calls `/me` on mount + after login). `AuditProvider` now mounted at App.js root.
+- `pages/portal/PortalUsers.jsx` — uses `useAudit()` for `isAdmin` gating: supervisors see "Read-only" label in Actions column, no Approve/Reject/Disable/Enable/Delete buttons, no role-select dropdown; all fetches carry `authHeaders()`; ADMIN / SUPERVISOR badge next to every username.
+- `pages/portal/PortalLayout.jsx` — pulls user from `useAudit()` context (live role updates); ADMIN / SUPERVISOR badge in sidebar bottom-left.
+
 **Testing**
-- 44/44 backend pytest cases passing (17 new prompt-2 + 27 prompt-1 regression) via `/app/backend/tests/test_last_edited_popup_backend.py` + `/app/backend/tests/test_audit_movement_log.py`
-- Test report: `/app/test_reports/iteration_last_edited_popup.json`
-- Verified live: `/audit-logs/recent` returns [] for no-history (silent skip), returns cross-module entries (warehouse + cycle_count) when both modules have edits for the same barcode.
+- 67/67 backend pytest cases passing (23 new prompt-3 + 17 prompt-2 + 27 prompt-1 regression)
+- Test report: `/app/test_reports/iteration_role_system.json`
+- Test file: `/app/backend/tests/test_role_system.py` (8 classes)
+- E2E verified: register → admin approves → supervisor login → supervisor blocked on approve/role/delete (403) → supervisor can read /users + /audit-logs/search (200) → admin promotes supervisor to admin → new admin can approve (no re-login needed) → legacy viewer→supervisor migration idempotent.
+- Bug fixed in this round: `/users/{id}/role` was using `modified_count` → false 404 when re-applying same role. Now uses `matched_count` (idempotent, verified live).
