@@ -123,6 +123,21 @@ Fields: id, module ('warehouse'|'cycle_count'), action_type (edit/undo/reco_adju
 - `_parse_date_ceil` was returning midnight for bare 'YYYY-MM-DD' inputs (since `fromisoformat` accepts them and `else` branch never triggered). Now rolls bare dates to 23:59:59.999 for inclusive end-of-day filtering.
 - `BarcodeEditCell.jsx` had a conditional `if (readOnly) return ...` before hooks → moved after hooks (was blocking the dev build).
 
+## Prompt 2 — "Last Edited" Popup Gate (May 2026) ✅
+Edits in BOTH modules are now gated by a confirmation modal showing recent history.
+
+**New shared files**
+- `frontend/src/components/LastEditedPopup.jsx` — Radix Dialog that fetches `/audit-logs/recent`, silently calls `onProceed` if no history (or on API failure), otherwise renders compact history table (Time / User / Module / Field / Old → New) with most-recent LATEST badge, Proceed / Cancel buttons.
+- `frontend/src/hooks/useLastEditPopup.js` — `openPopup(barcode, clientId, onProceedCb)` / `closePopup` / `popupProps`. Stores callback in ref, cleared BEFORE invocation to prevent double-fire.
+
+**Integration sites**
+- `BarcodeEditCell.jsx` — `startEdit` now wraps `_openEditor` in `lastEdit.openPopup(barcode, clientId, _openEditor)`. Popup rendered in both editing + display branches.
+- `PortalReports.jsx` — `RecoInput` accepts new `clientId` + `recoBarcode` props; `openEditor` gated. All 3 callsites (detailed / barcode / article) pass props.
+- `FullScreenReport.jsx` — `RecoCell` gated identically; callsite passes `clientId` from parent.
+
+**Time formatting** — inline relative helper ("just now / 5 min ago / yesterday / Jan 12, 2026"). Avoids pulling `date-fns` for a single use.
+
 **Testing**
-- 27/27 backend pytest cases passing (`/app/backend/tests/test_audit_movement_log.py`)
-- Test report: `/app/test_reports/iteration_movement_audit_log.json`
+- 44/44 backend pytest cases passing (17 new prompt-2 + 27 prompt-1 regression) via `/app/backend/tests/test_last_edited_popup_backend.py` + `/app/backend/tests/test_audit_movement_log.py`
+- Test report: `/app/test_reports/iteration_last_edited_popup.json`
+- Verified live: `/audit-logs/recent` returns [] for no-history (silent skip), returns cross-module entries (warehouse + cycle_count) when both modules have edits for the same barcode.
