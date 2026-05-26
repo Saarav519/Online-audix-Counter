@@ -28,8 +28,9 @@ const navItems = [
 
 export default function PortalLayout({ children }) {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
-  const { logout } = useAudit();
+  const { portalUser, logout } = useAudit();
+  // localStorage fallback covers the initial render before /me lands.
+  const user = portalUser || JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('portalSidebarCollapsed') === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -156,7 +157,18 @@ export default function PortalLayout({ children }) {
             <>
               <div className="flex-1 min-w-0 leading-tight">
                 <p className="text-[12px] font-semibold text-slate-800 truncate">{user.username || 'Admin'}</p>
-                <p className="text-[10px] text-slate-500 truncate capitalize">{user.role || 'admin'}</p>
+                <div className="flex items-center gap-1">
+                  <span
+                    className={`inline-flex items-center gap-0.5 px-1 py-0 rounded text-[9px] font-bold uppercase tracking-wide ${
+                      (user.role === 'admin')
+                        ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+                        : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                    }`}
+                    data-testid="sidebar-role-badge"
+                  >
+                    {user.role === 'admin' ? 'Admin' : 'Supervisor'}
+                  </span>
+                </div>
               </div>
               <Button
                 variant="ghost"

@@ -295,6 +295,17 @@ async def create_indexes():
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
 
+    # Prompt 3 — Role migration: legacy "viewer" → "supervisor".
+    # Idempotent; safe to call on every startup. Wrapped in its own
+    # try/except so a migration failure can't block server boot.
+    try:
+        from shared.auth_middleware import migrate_legacy_roles
+        stats = await migrate_legacy_roles(db)
+        if any(stats.values()):
+            logger.info(f"Role migration applied: {stats}")
+    except Exception as e:
+        logger.warning(f"Role migration skipped: {e}")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

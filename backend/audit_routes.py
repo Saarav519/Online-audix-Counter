@@ -23,6 +23,12 @@ from shared.audit_log_helper import (
     export_audit_logs_excel,
     resolve_module_for_client,
 )
+from shared.auth_middleware import (
+    get_current_user,
+    require_admin,
+    ADMIN_ROLE,
+    SUPERVISOR_ROLE,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -151,7 +157,7 @@ class PortalUser(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     username: str
     password_hash: str
-    role: str = "viewer"  # admin, viewer
+    role: str = "supervisor"  # admin, supervisor (legacy "viewer" auto-migrated)
     is_active: bool = True
     is_approved: bool = False  # New users need admin approval
     last_login: Optional[str] = None
@@ -160,7 +166,7 @@ class PortalUser(BaseModel):
 class PortalUserCreate(BaseModel):
     username: str
     password: str
-    role: str = "viewer"
+    role: str = "supervisor"
 
 class PortalUserLogin(BaseModel):
     username: str
@@ -422,7 +428,7 @@ async def register_portal_user(user: PortalUserCreate):
     portal_user = PortalUser(
         username=user.username,
         password_hash=hash_password(user.password),
-        role="viewer",  # All new registrations are viewers by default
+        role="supervisor",  # All new registrations are supervisors after approval
         is_active=True,
         is_approved=False  # Needs admin approval
     )
@@ -532,15 +538,29 @@ async def reset_password(request: Request, body: PasswordResetRequest):
 
 # ==================== USER MANAGEMENT ROUTES ====================
 
+@portal_router.get("/me")
+async def get_me(request: Request):
+    """Return the currently-logged-in portal user (resolved from
+    X-User-Id header). Used by the FE to keep the role badge / approval
+    button visibility in sync after page reloads.
+    """
+    user = await get_current_user(request, db)
+    # Strip nothing sensitive — password_hash already excluded by the
+    # middleware's projection.
+    return user
+
+
 @portal_router.get("/users")
 async def get_portal_users():
-    """List all registered portal users (admin only)"""
+    """List all registered portal users."""
     users = await db.portal_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
 @portal_router.put("/users/{user_id}/approve")
-async def approve_user(user_id: str):
-    """Approve a pending user"""
+async def approve_user(user_id: str, request: Request):
+    """Approve a pending user (admin-only)."""
+    actor = await get_current_user(request, db)
+    require_admin(actor)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": True}}
@@ -550,8 +570,10 @@ async def approve_user(user_id: str):
     return {"message": "User approved successfully"}
 
 @portal_router.put("/users/{user_id}/reject")
-async def reject_user(user_id: str):
-    """Reject/unapprove a user"""
+async def reject_user(user_id: str, request: Request):
+    """Reject/unapprove a user (admin-only)."""
+    actor = await get_current_user(request, db)
+    require_admin(actor)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": False}}
@@ -561,12 +583,14 @@ async def reject_user(user_id: str):
     return {"message": "User rejected"}
 
 @portal_router.put("/users/{user_id}/toggle-active")
-async def toggle_user_active(user_id: str):
-    """Enable/disable a user"""
+async def toggle_user_active(user_id: str, request: Request):
+    """Enable/disable a user (admin-only)."""
+    actor = await get_current_user(request, db)
+    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     new_status = not user.get("is_active", True)
     await db.portal_users.update_one(
         {"id": user_id},
@@ -575,12 +599,17 @@ async def toggle_user_active(user_id: str):
     return {"message": f"User {'enabled' if new_status else 'disabled'}", "is_active": new_status}
 
 @portal_router.put("/users/{user_id}/role")
-async def change_user_role(user_id: str, role_data: dict):
-    """Change user role (admin/viewer)"""
-    role = role_data.get("role", "viewer")
-    if role not in ["admin", "viewer"]:
-        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'viewer'")
-    
+async def change_user_role(user_id: str, role_data: dict, request: Request):
+    """Change user role (admin / supervisor) — admin-only."""
+    actor = await get_current_user(request, db)
+    require_admin(actor)
+    role = role_data.get("role", SUPERVISOR_ROLE)
+    # Backwards compat: accept legacy "viewer" as "supervisor".
+    if role == "viewer":
+        role = SUPERVISOR_ROLE
+    if role not in [ADMIN_ROLE, SUPERVISOR_ROLE]:
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'supervisor'")
+
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"role": role}}
@@ -590,14 +619,16 @@ async def change_user_role(user_id: str, role_data: dict):
     return {"message": f"User role changed to {role}"}
 
 @portal_router.delete("/users/{user_id}")
-async def delete_portal_user(user_id: str):
-    """Delete a portal user"""
+async def delete_portal_user(user_id: str, request: Request):
+    """Delete a portal user (admin-only)."""
+    actor = await get_current_user(request, db)
+    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.get("username") == "admin":
         raise HTTPException(status_code=400, detail="Cannot delete the default admin user")
-    
+
     await db.portal_users.delete_one({"id": user_id})
     return {"message": "User deleted successfully"}
 

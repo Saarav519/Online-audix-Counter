@@ -1,0 +1,45 @@
+{
+  "summary": "Backend testing of Prompt-3 admin/supervisor role system. 23/23 new tests pass; full regression of prompt-1 (movement log, 27) and prompt-2 (last-edited popup, 17) also passes — 67/67 total. Verified: migrate_legacy_roles idempotency + admin-row protection (set role='viewer' on admin then re-run migration → admin restored), /me endpoint (401 no header, 401 invalid id, 200 valid supervisor, 403 unapproved, 403 disabled, password_hash never returned), admin-only gating on approve/reject/toggle-active/role/delete (401 unauth, 403 supervisor, 200 admin, 404 missing), /role validation (random→400, viewer→supervisor alias, admin/supervisor accept), shared data endpoints accessible to supervisors (users list, audit-logs/search, reco-adjustments GET), full e2e supervisor→admin promotion grants live approve powers without re-login, default admin cannot be deleted (400).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PUT /api/audit/portal/users/{id}/role",
+        "issue": "Endpoint returns 404 when role update has modified_count==0. Setting the same role twice (e.g. setting 'viewer' on an already-supervisor user) yields 404 'User not found' even though the user exists. Should use matched_count instead of modified_count, or return 200 idempotently. Minor cosmetic — currently masked because admin UI only allows toggling between admin/supervisor, not re-applying same role."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_role_system.py",
+    "/app/test_reports/pytest/role_system.xml",
+    "/app/test_reports/pytest/regression_p1_p2.xml"
+  ],
+  "action_items": [
+    "Optional: change PUT /users/{id}/role to use matched_count instead of modified_count so re-applying the same role doesn't return 404. Cosmetic only — no functional impact since FE never re-applies same role.",
+    "Optional: align validation error message text. Currently: \"Role must be 'admin' or 'supervisor'\" — message is clear and acceptable as-is."
+  ],
+  "critical_code_review_comments": [
+    "auth_middleware.py is clean, well-documented, and correctly idempotent. Migration silently swallows all exceptions (`except Exception: pass`) to keep startup resilient — acceptable for migration but consider adding a logger.warning() so silent failures are detectable in prod.",
+    "audit_routes.py role endpoint correctly treats legacy 'viewer' as supervisor alias before validation — good backwards-compat.",
+    "/users (list) endpoint has NO auth gate — any client can list users (without password_hash). If this is intentional (FE needs it pre-login for register/reset flows) document it; otherwise consider get_current_user gate.",
+    "audit-logs/search and reco-adjustments are intentionally ungated (data-access endpoints for both roles) — consistent with prompt spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_role_system.py (new — 23 tests, 8 classes)"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "not tested (per request — backend only)"
+  },
+  "test_credentials": "admin / admin123 (read from /app/memory/test_credentials.md). Supervisor users are auto-created and torn down per-test using TEST_ prefix.",
+  "seed_data_creation": "All test users are created with username prefix TEST_ and deleted in fixture teardown. Migration test temporarily inserts a TEST_mig_<uuid> user with no role field and deletes it after assertion. Default admin role is briefly set to 'viewer' then restored by migrate_legacy_roles within the same test (verified restored before the test exits).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Test file at /app/backend/tests/test_role_system.py is a clean regression suite for the role system. Run with: `cd /app && source backend/.env && python -m pytest backend/tests/test_role_system.py -v`. Tests are fully self-contained (create+approve+delete their own users via admin headers). Test report XMLs in /app/test_reports/pytest/. Prompt-1 (test_audit_movement_log.py — 27 tests) and prompt-2 (test_last_edited_popup_backend.py — 17 tests) also pass cleanly against the current backend.",
+  "rca of the issue": "N/A — no bugs found. One cosmetic minor: role endpoint uses modified_count to detect missing user → false 404 when re-applying same role. Existing behavior, not regression."
+}

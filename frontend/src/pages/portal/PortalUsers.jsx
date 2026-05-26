@@ -18,6 +18,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
 import PageHeader from '../../components/portal/PageHeader';
+import { useAudit } from '../AuditApp';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -26,7 +27,9 @@ export default function PortalUsers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const currentUser = JSON.parse(localStorage.getItem('portalUser') || '{}');
+  // Role-aware UI gating — supervisors see read-only list, no admin actions.
+  const { portalUser: currentUserCtx, isAdmin, authHeaders } = useAudit();
+  const currentUser = currentUserCtx || JSON.parse(localStorage.getItem('portalUser') || '{}');
 
   // Auth confirmation state
   const [authDialog, setAuthDialog] = useState(null); // { action, userId, username, label }
@@ -77,13 +80,13 @@ export default function PortalUsers() {
       let response;
 
       if (action === 'delete') {
-        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}`, { method: 'DELETE' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}`, { method: 'DELETE', headers: authHeaders() });
       } else if (action === 'disable') {
-        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT', headers: authHeaders() });
       } else if (action === 'enable') {
-        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/toggle-active`, { method: 'PUT', headers: authHeaders() });
       } else if (action === 'reject') {
-        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/reject`, { method: 'PUT' });
+        response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/reject`, { method: 'PUT', headers: authHeaders() });
       }
 
       if (response && response.ok) {
@@ -112,10 +115,13 @@ export default function PortalUsers() {
   // ---- Actions that don't need auth ----
   const handleApprove = async (userId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/approve`, { method: 'PUT' });
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/approve`, { method: 'PUT', headers: authHeaders() });
       if (response.ok) {
         toast.success('User approved — they can now login');
         fetchUsers();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.detail || 'Failed to approve user');
       }
     } catch (error) {
       toast.error('Failed to approve user');
@@ -126,12 +132,15 @@ export default function PortalUsers() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/audit/portal/users/${userId}/role`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ role: newRole })
       });
       if (response.ok) {
         toast.success(`Role changed to ${newRole}`);
         fetchUsers();
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.detail || 'Failed to change role');
       }
     } catch (error) {
       toast.error('Failed to change role');
@@ -339,7 +348,7 @@ export default function PortalUsers() {
                   const isCurrentUser = user.id === currentUser.id;
                   const isPending = user.is_approved === false;
                   const isDisabled = user.is_active === false;
-                  const isAdmin = user.role === 'admin';
+                  const userIsAdmin = user.role === 'admin';
                   const isDefaultAdmin = user.username === 'admin';
 
                   return (
@@ -348,15 +357,26 @@ export default function PortalUsers() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium ${
-                            isAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                            userIsAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
                           }`}>
                             {user.username.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900">
-                              {user.username}
-                              {isCurrentUser && <span className="ml-2 text-xs text-emerald-600">(You)</span>}
-                              {isDefaultAdmin && <span className="ml-2 text-xs text-blue-500">(Default)</span>}
+                            <p className="font-medium text-gray-900 flex items-center gap-2">
+                              <span>{user.username}</span>
+                              <span
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                                  userIsAdmin
+                                    ? 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+                                    : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                                }`}
+                                data-testid={`user-role-badge-${user.username}`}
+                              >
+                                {userIsAdmin && <Shield className="w-2.5 h-2.5" />}
+                                {userIsAdmin ? 'Admin' : 'Supervisor'}
+                              </span>
+                              {isCurrentUser && <span className="text-xs text-emerald-600">(You)</span>}
+                              {isDefaultAdmin && <span className="text-xs text-blue-500">(Default)</span>}
                             </p>
                             <p className="text-xs text-gray-400">{user.id.substring(0, 8)}...</p>
                           </div>
@@ -365,20 +385,21 @@ export default function PortalUsers() {
 
                       {/* Role */}
                       <td className="px-6 py-4">
-                        {isCurrentUser || isDefaultAdmin ? (
+                        {(!isAdmin || isCurrentUser || isDefaultAdmin) ? (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                            isAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                            userIsAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
                           }`}>
-                            {isAdmin && <Shield className="w-3 h-3" />}
+                            {userIsAdmin && <Shield className="w-3 h-3" />}
                             {user.role}
                           </span>
                         ) : (
                           <select
-                            value={user.role}
+                            value={user.role === 'viewer' ? 'supervisor' : user.role}
                             onChange={(e) => handleChangeRole(user.id, e.target.value)}
                             className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white cursor-pointer"
+                            data-testid={`role-select-${user.username}`}
                           >
-                            <option value="viewer">viewer</option>
+                            <option value="supervisor">supervisor</option>
                             <option value="admin">admin</option>
                           </select>
                         )}
@@ -414,16 +435,21 @@ export default function PortalUsers() {
                         {formatDate(user.created_at)}
                       </td>
 
-                      {/* Actions - Clear labeled buttons */}
+                      {/* Actions - admin-only; supervisors see read-only state */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          {/* Pending user actions */}
-                          {isPending && (
+                        <div className="flex items-center justify-end gap-2" data-testid={`user-actions-${user.username}`}>
+                          {!isAdmin && (
+                            <span className="text-xs text-slate-400 italic" data-testid={`user-actions-readonly-${user.username}`}>
+                              Read-only
+                            </span>
+                          )}
+                          {isAdmin && isPending && (
                             <>
                               <Button
                                 size="sm"
                                 onClick={() => handleApprove(user.id)}
                                 className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-8 px-3"
+                                data-testid={`approve-btn-${user.username}`}
                               >
                                 <UserCheck className="w-3.5 h-3.5 mr-1" />
                                 Approve
@@ -433,6 +459,7 @@ export default function PortalUsers() {
                                 size="sm"
                                 onClick={() => requestAuth('reject', user.id, user.username, `Reject user "${user.username}"? They will not be able to login.`)}
                                 className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-8 px-3"
+                                data-testid={`reject-btn-${user.username}`}
                               >
                                 <UserX className="w-3.5 h-3.5 mr-1" />
                                 Reject
@@ -441,7 +468,7 @@ export default function PortalUsers() {
                           )}
 
                           {/* Active/Disabled user actions */}
-                          {!isPending && !isCurrentUser && !isDefaultAdmin && (
+                          {isAdmin && !isPending && !isCurrentUser && !isDefaultAdmin && (
                             <>
                               {isDisabled ? (
                                 <Button
@@ -466,8 +493,8 @@ export default function PortalUsers() {
                             </>
                           )}
 
-                          {/* Delete - always available for non-admin, non-self users */}
-                          {!isCurrentUser && !isDefaultAdmin && (
+                          {/* Delete - admin only, non-self, non-default */}
+                          {isAdmin && !isCurrentUser && !isDefaultAdmin && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -480,7 +507,7 @@ export default function PortalUsers() {
                           )}
 
                           {/* Protected user - no actions */}
-                          {(isCurrentUser || isDefaultAdmin) && !isPending && (
+                          {isAdmin && (isCurrentUser || isDefaultAdmin) && !isPending && (
                             <span className="text-xs text-gray-400 italic">Protected</span>
                           )}
                         </div>

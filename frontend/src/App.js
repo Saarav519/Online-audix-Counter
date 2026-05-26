@@ -2,6 +2,7 @@ import React, { useEffect, Suspense } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AppProvider, useApp } from "./context/AppContext";
+import { AuditProvider } from "./pages/AuditApp";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
@@ -332,11 +333,13 @@ function App() {
   return (
     <ErrorBoundary>
       <AppProvider>
-        <BrowserRouter>
-          <AppRoutes />
-          <Toaster position="top-right" />
-          <PWAInstallPrompt />
-        </BrowserRouter>
+        <AuditProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <Toaster position="top-right" />
+            <PWAInstallPrompt />
+          </BrowserRouter>
+        </AuditProvider>
       </AppProvider>
     </ErrorBoundary>
   );
