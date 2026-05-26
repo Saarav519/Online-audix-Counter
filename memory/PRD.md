@@ -155,6 +155,61 @@ Two-role system: `admin` (full access incl. user approval) and `supervisor` (ful
 **Testing**
 - 67/67 backend pytest cases passing (23 new prompt-3 + 17 prompt-2 + 27 prompt-1 regression)
 - Test report: `/app/test_reports/iteration_role_system.json`
+
+## Prompt 4 — Owner-Assignment Delegation (May 2026) ✅
+Owners (`clients.created_by`) can delegate sessions OR specific report types to other portal users. Assignees can VIEW + edit RECO ONLY in the Detailed report. Owners retain full control.
+
+**New shared file**
+- `backend/shared/assignment_helper.py` — `create_assignment(db, data)` / `revoke_assignment(db, id, requester_user_id)` / `get_my_assignments(db, user_id)` / `get_assignments_by_me(db, user_id)` / `check_assignment_access(db, user_id, session_id, client_id, report_type, cycle_day)` returning `{has_access, can_edit_reco, can_edit_all, is_owner, assignment_id}` / `migrate_clients_created_by(db, fallback_user_id)`.
+
+**New endpoints (audit_routes.py)**
+- `POST /api/audit/portal/assignments` — body `{module, assigned_to, session_id, assignment_type, report_types, cycle_day, notes}`; owner-only; rejects self-assignment + unapproved/missing assignees
+- `GET /api/audit/portal/assignments/my` — active assignments where I'm the assignee
+- `GET /api/audit/portal/assignments/by-me` — all assignments I've created (active + revoked)
+- `DELETE /api/audit/portal/assignments/{id}` — soft-revoke; only the original assigner can call
+- `GET /api/audit/portal/assignments/users` — approved+active users except caller (dropdown source)
+- `GET /api/audit/portal/assignments/check?session_id=…&report_type=…&cycle_day=…` — returns the ACL row
+
+**DB changes**
+- `clients` — new field `created_by` (portal_users.id). Migration backfills existing rows to default admin id. `POST /clients` now reads `X-User-Id` to stamp the creator.
+- New collection `report_assignments` with 4 indexes (assigned_to+is_active, assigned_by+date desc, session_id+assigned_to+is_active, client_id).
+
+**Edit-endpoint enforcement (security in backend)**
+- `POST /reports/edit-barcode`, `POST /reports/undo-edit`, `POST /reco-adjustments` — actor is read STRICTLY from `X-User-Id` header (body `user_id` stays for audit-trail attribution only). Gate runs ONLY when the actor exists in `portal_users` — legacy/synthetic IDs bypass for backward compatibility.
+- Reco gate: owner → reco everywhere. Assignee with detailed-report access → reco only in detailed (not barcode-wise / article-wise).
+- Cycle-count day/project operations (`close`, `reopen`, `delete`, `complete`) gated to OWNER only via `_require_owner_for_session` helper.
+
+**Frontend changes**
+- New page `PortalAssignments.jsx` with 3 tabs (Assign / My Assignments cards / Assigned by Me table with revoke). Cascading wizard: Module → Client → Session → Scope (full/specific) → Report types → Cycle day → Assignees → Notes → Assign button.
+- `PortalReports.jsx` — fetches `/assignments/check` per session+report_type; shows amber "Assigned access" banner when current user is a non-owner. Auto-forces `barcodeReadOnly=true` for assignees + restricts `isRecoEditable` to detailed-report-only when assignee.
+- `PortalLayout.jsx` — new "Assignments" sidebar item between Movement Log and Sync Logs (UserCog icon, badge count of pending assignments to me).
+- `App.js` — `/portal/assignments` route added.
+
+**Testing**
+- **103/103 backend pytest cases passing** (32 prompt-4 + 67 regression + 4 actor-resolution invariant). Test reports: `/app/test_reports/iteration_assignment_feature.json` + `/app/test_reports/iteration_assignment_feature_retest.json`.
+- New test files: `/app/backend/tests/test_assignment_feature.py`, `/app/backend/tests/test_actor_resolution_invariant.py`.
+
+**Bugs caught & fixed live (during testing iteration)**
+- ObjectId leak in `POST /assignments` response — explicitly stripped `_id` after motor `insert_one`.
+- Initial actor resolution used body `user_id` as fallback → broke 16 prompt-1/2/3 regression tests. Fixed by reading actor STRICTLY from `X-User-Id` header + gating enforcement on `portal_users.find_one()` so synthetic test IDs bypass cleanly.
+- `check_assignment_access` was defaulting `can_edit_reco=True` when `report_type` was omitted — now `False` unless `report_type == "detailed"`.
+Two-role system: `admin` (full access incl. user approval) and `supervisor` (full data access, no user-management actions).
+
+**New shared file**
+- `backend/shared/auth_middleware.py` — `get_current_user(request, db)` reads `X-User-Id` header → loads `portal_users` row → raises 401/403 for missing/disabled/unapproved; `require_admin(user)` raises 403 if `role != "admin"`; `get_user_role(user_id, db)` quick lookup; `migrate_legacy_roles(db)` idempotent viewer→supervisor migration, always restores `username='admin'` → `role='admin'`.
+
+**Backend changes**
+- `audit_routes.py` — `PortalUser` model default `role="supervisor"` (was "viewer"); `/register` sets `role="supervisor"`; new `GET /api/audit/portal/me` returns current user (sans `password_hash`); `/users/{id}/approve|reject|toggle-active|role|DELETE` all gated with `get_current_user + require_admin`; `/role` accepts `admin`/`supervisor` (legacy `viewer` → `supervisor` alias); uses `matched_count` for idempotent role updates.
+- `server.py` — startup calls `migrate_legacy_roles(db)` inside try/except (never blocks boot).
+
+**Frontend changes**
+- `pages/AuditApp.js` — extended `useAudit()` hook with `isAdmin`, `role`, `authHeaders()`, `refreshMe()` (calls `/me` on mount + after login). `AuditProvider` now mounted at App.js root.
+- `pages/portal/PortalUsers.jsx` — uses `useAudit()` for `isAdmin` gating: supervisors see "Read-only" label in Actions column, no Approve/Reject/Disable/Enable/Delete buttons, no role-select dropdown; all fetches carry `authHeaders()`; ADMIN / SUPERVISOR badge next to every username.
+- `pages/portal/PortalLayout.jsx` — pulls user from `useAudit()` context (live role updates); ADMIN / SUPERVISOR badge in sidebar bottom-left.
+
+**Testing**
+- 67/67 backend pytest cases passing (23 new prompt-3 + 17 prompt-2 + 27 prompt-1 regression)
+- Test report: `/app/test_reports/iteration_role_system.json`
 - Test file: `/app/backend/tests/test_role_system.py` (8 classes)
 - E2E verified: register → admin approves → supervisor login → supervisor blocked on approve/role/delete (403) → supervisor can read /users + /audit-logs/search (200) → admin promotes supervisor to admin → new admin can approve (no re-login needed) → legacy viewer→supervisor migration idempotent.
 - Bug fixed in this round: `/users/{id}/role` was using `modified_count` → false 404 when re-applying same role. Now uses `matched_count` (idempotent, verified live).
