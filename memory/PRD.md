@@ -80,3 +80,49 @@ Frontend: React (CRA + Tailwind + shadcn/ui) · Backend: FastAPI · DB: MongoDB.
 
 ## Test Credentials
 admin / admin123
+
+## Prompt 1 — Movement / Audit Log (May 2026) ✅
+Cross-module audit trail powering the new `/portal/movement` page.
+
+**Shared helper** (`backend/shared/audit_log_helper.py`)
+- `log_audit_entry()` — async, non-blocking (try/except, never raises)
+- `search_audit_logs(filters)` — paginated (default 50, max 500), sort by timestamp_dt desc
+- `fetch_recent_for_barcode(barcode, client_id, limit)` — powers "Last Edited" popup
+- `export_audit_logs_excel(filters)` — 13-col xlsx via openpyxl, 50k-row cap
+- `resolve_module_for_client(client_id)` — auto-detects warehouse vs cycle_count from client_type
+
+**MongoDB collection** `audit_logs` (6 indexes on barcode+client_id+ts, session_id+ts, user_id+ts, client_id+ts, module+ts, ts; all desc on ts)
+Fields: id, module ('warehouse'|'cycle_count'), action_type (edit/undo/reco_adjust/delete/assign/revoke), barcode, client_id, session_id, cycle_day, field_name, old_value, new_value, user_id, username, report_type, location, timestamp (ISO), timestamp_dt (BSON datetime).
+
+**Hooks added (audit_routes.py)**
+- `POST /reports/edit-barcode` — logs `edit` (or `undo` on same-value revert)
+- `POST /reports/undo-edit` — logs `undo` w/ purged-reco metadata
+- `POST /reco-adjustments` — logs `reco_adjust` w/ prev qty → new qty
+
+**Hooks added (cycle_count_routes.py)** — all read X-User-Id / X-Username headers
+- `POST /days/{id}/close` → assign / day_status open→closed
+- `POST /days/{id}/reopen` → revoke / day_status closed→open
+- `DELETE /days/{id}` → delete / day
+- `POST /projects/{id}/complete` → assign / project_status active→completed
+- `POST /projects/{id}/reopen` → revoke / project_status completed→active
+- `DELETE /projects/{id}` → delete / project
+
+**New endpoints (audit_portal_router)**
+- `POST /api/audit/portal/audit-logs/search` (filters: module/client_id/session_id/user_id/barcode/cycle_day/action_type/start_date/end_date/limit/skip)
+- `GET  /api/audit/portal/audit-logs/recent?barcode=…&client_id=…&limit=5`
+- `POST /api/audit/portal/audit-logs/export` (xlsx StreamingResponse)
+
+**Frontend** (`pages/portal/PortalMovement.jsx`)
+- New route `/portal/movement`, "Movement Log" sidebar item (History icon)
+- Collapsible filter card; Module/Client/Session(filtered)/CycleDay(visible when module=cycle_count)/Barcode/User/From/To
+- Results table: Timestamp · Module badge · Action badge · User · Client · Session · Day · Barcode · Field · Old→New diff
+- Pagination 50/page; Excel export streams xlsx with auto-named file
+- BarcodeEditCell + saveRecoAdjustment + PortalCycleCount mutation calls all now carry user attribution (body fields or X-User-* headers)
+
+**Bug fixed during this session**
+- `_parse_date_ceil` was returning midnight for bare 'YYYY-MM-DD' inputs (since `fromisoformat` accepts them and `else` branch never triggered). Now rolls bare dates to 23:59:59.999 for inclusive end-of-day filtering.
+- `BarcodeEditCell.jsx` had a conditional `if (readOnly) return ...` before hooks → moved after hooks (was blocking the dev build).
+
+**Testing**
+- 27/27 backend pytest cases passing (`/app/backend/tests/test_audit_movement_log.py`)
+- Test report: `/app/test_reports/iteration_movement_audit_log.json`
