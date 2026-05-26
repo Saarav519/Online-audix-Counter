@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { X, Download, Maximize2, Search, Copy, Check, Pin, PinOff, Eye, EyeOff, Columns,
   ChevronUp, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown, Filter } from 'lucide-react';
 import { BarcodeEditCell } from './BarcodeEditCell';
+import LastEditedPopup from './LastEditedPopup';
+import useLastEditPopup from '../hooks/useLastEditPopup';
 
 const ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 28;
@@ -468,20 +470,32 @@ function FSColumnSettings({ columns, hiddenColumns, frozenColumns, onToggleVisib
 }
 
 // ===== Reco Cell =====
-function RecoCell({ value, onSave, rowData, recoType }) {
+function RecoCell({ value, onSave, rowData, recoType, clientId = '' }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || 0);
+  // Last-Edited popup gate (shared with PortalReports + warehouse + cycle count)
+  const lastEdit = useLastEditPopup();
   if (!onSave) return <span className="text-gray-400">-</span>;
+  const startEditing = (e) => {
+    e?.stopPropagation?.();
+    const _bc = rowData?._original_value || rowData?.barcode || rowData?.article_code || '';
+    const _go = () => { setEditing(true); setVal(value || 0); };
+    if (_bc) lastEdit.openPopup(_bc, clientId, _go); else _go();
+  };
   if (!editing) {
     return (
-      <button onClick={(e) => { e.stopPropagation(); setEditing(true); setVal(value || 0); }}
+      <>
+      <button onClick={startEditing}
         className="w-full text-right text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-1 py-0.5 rounded text-xs cursor-pointer"
         data-testid={`reco-btn-${rowData.barcode || rowData.article_code || ''}`}>
         {value || '-'}
       </button>
+      <LastEditedPopup {...lastEdit.popupProps} />
+      </>
     );
   }
   return (
+    <>
     <input type="number" value={val}
       onChange={(e) => setVal(e.target.value)}
       onKeyDown={(e) => {
@@ -502,6 +516,8 @@ function RecoCell({ value, onSave, rowData, recoType }) {
       autoFocus
       className="w-16 px-1 py-0.5 text-xs border border-blue-300 rounded text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
       onClick={(e) => e.stopPropagation()} />
+    <LastEditedPopup {...lastEdit.popupProps} />
+    </>
   );
 }
 
@@ -676,7 +692,7 @@ function GridRenderer({
                         style={{ width: getColWidth(col.key), minWidth: getColWidth(col.key) }}
                         className={`${cellClass} ${isNumeric ? 'text-right' : ''}`}
                         onClick={() => handleCellClick(rowIdx, globalIdx)}>
-                        <RecoCell value={row.reco_qty || row.reco || 0} onSave={onSaveReco} rowData={row} recoType={recoType} />
+                        <RecoCell value={row.reco_qty || row.reco || 0} onSave={onSaveReco} rowData={row} recoType={recoType} clientId={clientId} />
                       </td>
                     );
                   }

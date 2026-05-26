@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Pencil, Undo2, Check, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import LastEditedPopup from './LastEditedPopup';
+import useLastEditPopup from '../hooks/useLastEditPopup';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -43,6 +45,9 @@ export function BarcodeEditCell({
   const [savedFlash, setSavedFlash] = useState(false);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
+  // Last-Edited gate — same hook is used by both warehouse AND cycle count
+  // (cycle-count edits go through this exact component via PortalReports).
+  const lastEdit = useLastEditPopup();
 
   // Search master data for auto-complete
   const searchMaster = useCallback(async (q) => {
@@ -74,17 +79,26 @@ export function BarcodeEditCell({
 
   const startEdit = (e) => {
     e.stopPropagation();
-    setEditing(true);
-    setInputVal(value || '');
-    setSuggestions([]);
-    setFocusIdx(0);
-    setErrorMsg('');
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, 50);
+    // The actual "enter edit mode" steps — kept identical to pre-popup
+    // behaviour. Wrapped in a fn so the popup can call it on Proceed.
+    const _openEditor = () => {
+      setEditing(true);
+      setInputVal(value || '');
+      setSuggestions([]);
+      setFocusIdx(0);
+      setErrorMsg('');
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 50);
+    };
+    // Show Last-Edited popup gate. If the barcode has no history the
+    // popup silently calls _openEditor (no UI flash). If it has history,
+    // user clicks Proceed → _openEditor; Cancel → noop.
+    const _bc = isEdited ? originalValue : value;
+    lastEdit.openPopup(_bc, clientId, _openEditor);
   };
 
   const cancelEdit = () => {
@@ -201,6 +215,7 @@ export function BarcodeEditCell({
   // Editing mode
   if (editing) {
     return (
+      <>
       <div className="relative" onClick={(e) => e.stopPropagation()} ref={dropdownRef}>
         <div className="flex items-center gap-1">
           <input
@@ -321,11 +336,14 @@ export function BarcodeEditCell({
           </div>
         )}
       </div>
+      <LastEditedPopup {...lastEdit.popupProps} />
+      </>
     );
   }
 
   // Display mode with edit/undo buttons
   return (
+    <>
     <div className={`flex items-center gap-1 group ${savedFlash ? 'animate-pulse' : ''}`}>
       <span className={`${compact ? 'text-xs' : ''} ${isEdited ? 'text-blue-600 font-semibold' : ''} ${savedFlash ? 'text-emerald-600' : ''}`}>
         {value || '-'}
@@ -363,6 +381,8 @@ export function BarcodeEditCell({
         </button>
       )}
     </div>
+    <LastEditedPopup {...lastEdit.popupProps} />
+    </>
   );
 }
 

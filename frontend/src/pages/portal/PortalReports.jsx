@@ -35,6 +35,8 @@ import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { FullScreenButton, FullScreenReport } from '../../components/FullScreenReport';
 import { BarcodeEditCell } from '../../components/BarcodeEditCell';
+import LastEditedPopup from '../../components/LastEditedPopup';
+import useLastEditPopup from '../../hooks/useLastEditPopup';
 import PageHeader from '../../components/portal/PageHeader';
 import { generatePDF } from '../../utils/pdfGenerator';
 import { FileText as FilePdfIcon } from 'lucide-react';
@@ -2620,10 +2622,12 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
 }
 
 // ============ Reco Input Component ============
-function RecoInput({ value, onSave, dataTestId }) {
+function RecoInput({ value, onSave, dataTestId, recoBarcode = '', clientId = '' }) {
   const [editing, setEditing] = React.useState(false);
   const [inputVal, setInputVal] = React.useState(value || 0);
   const inputRef = React.useRef(null);
+  // Last-Edited popup gate (shared between warehouse + cycle count)
+  const lastEdit = useLastEditPopup();
 
   React.useEffect(() => { setInputVal(value || 0); }, [value]);
 
@@ -2633,18 +2637,39 @@ function RecoInput({ value, onSave, dataTestId }) {
     setEditing(false);
   };
 
+  const openEditor = () => {
+    const _go = () => {
+      setEditing(true);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    };
+    // Gate the edit-mode-entry behind the Last-Edited popup. recoBarcode
+    // can be a barcode or article_code — both are stored as 'barcode' on
+    // the audit_log row, so the recent-lookup works for both.
+    if (recoBarcode) {
+      lastEdit.openPopup(recoBarcode, clientId, _go);
+    } else {
+      _go();
+    }
+  };
+
   if (!editing) {
     return (
-      <button data-testid={dataTestId} onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.focus(), 50); }}
+      <>
+      <button data-testid={dataTestId} onClick={openEditor}
         className={`w-full text-right px-1.5 py-0.5 rounded cursor-pointer hover:bg-blue-50 transition-colors ${value ? 'text-blue-700 font-semibold bg-blue-50' : 'text-gray-400'}`}>
         {value ? (value > 0 ? `+${value}` : value) : '—'}
       </button>
+      <LastEditedPopup {...lastEdit.popupProps} />
+      </>
     );
   }
   return (
+    <>
     <input ref={inputRef} type="number" value={inputVal} onChange={e => setInputVal(e.target.value)}
       onBlur={handleSave} onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
       className="w-16 text-right px-1 py-0.5 border border-blue-400 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+    <LastEditedPopup {...lastEdit.popupProps} />
+    </>
   );
 }
 
@@ -2754,7 +2779,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row._original_value || row.barcode, location: row.location, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row._original_value || row.barcode, location: row.location, reco_qty: val })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -2915,7 +2940,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row._original_value || row.barcode, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row._original_value || row.barcode, reco_qty: val })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -3074,7 +3099,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
                   {isRecoEditable && (
                     <td className="py-1 px-2 bg-blue-50/30" onClick={e => e.stopPropagation()}>
-                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row._original_value || row.article_code, reco_qty: val })} />
+                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.article_code} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row._original_value || row.article_code, reco_qty: val })} />
                     </td>
                   )}
                   {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
