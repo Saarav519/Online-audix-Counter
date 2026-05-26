@@ -1,0 +1,51 @@
+{
+  "summary": "Prompt 4 assignment feature backend testing: 32/32 new tests pass (client created_by stamping + migration, assignment CRUD + validations, /assignments/check permission matrix, edit-barcode/undo-edit/reco-adjustments ACL gates, revoke + post-revoke removal, cycle-count day/project owner gates). REGRESSION DETECTED in prompt 1-2-3 tests (16 failed): legacy tests pass `user_id` in body / X-User-Id header as audit-trail attribution for a non-owner user, but new ACL gate now treats that as the actor and returns 403.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "/api/audit/portal/reco-adjustments, /reports/edit-barcode, /reports/undo-edit",
+        "issue": "ACL gate reads actor from body `adj.user_id` / `data.get('user_id')` as a fallback to the X-User-Id header. Existing prompt 1/2 audit-log tests send a non-owner user_id for audit-trail attribution only, which now incorrectly triggers the assignment ACL check and returns 403. Spec says: 'missing X-User-Id header is treated as legacy/no-check', but the code's fallback to body user_id breaks that contract.",
+        "priority": "HIGH"
+      },
+      {
+        "endpoint": "/api/audit/portal/cycle-count/days/{id}/close, /reopen, /delete, /projects/{id}/complete, /reopen, /delete",
+        "issue": "Same root cause via X-User-Id header. Existing prompt 1 test_audit_movement_log.py sends X-User-Id = TEST_USER_ID (a non-owner created for audit-trail) and now gets 403 from _require_owner_for_session. Either tests need to use the owner's id, or the gate should accept the request when the X-User-Id user is unknown/legacy.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_assignment_feature.py",
+    "/app/test_reports/pytest/assignment_feature.xml",
+    "/app/test_reports/pytest/regression_p1_p2_p3.xml"
+  ],
+  "action_items": [
+    "Decide actor-vs-audit-trail semantics for X-User-Id and adj.user_id. Recommended: For ACL only read the X-User-Id header (NOT body user_id), and either (a) update legacy tests to send the client owner's user_id, or (b) introduce a separate `X-Actor-Id` header so audit-trail user_id doesn't conflict with ACL principal.",
+    "Patch /reports/edit-barcode (line ~3096), /reports/undo-edit (line ~3350), /reco-adjustments (line ~3814) — remove the `or adj.user_id` / `or data.get('user_id')` fallback in actor_id resolution so that body-supplied user_id is used ONLY for audit-trail logging, not ACL gating.",
+    "After patch, re-run /app/backend/tests/test_audit_movement_log.py and test_last_edited_popup_backend.py to confirm regressions resolved.",
+    "Consider adding an integration test that asserts: when X-User-Id is absent but body carries user_id, no 403 is raised (legacy behaviour)."
+  ],
+  "critical_code_review_comments": [
+    "audit_routes.py is 7328 lines — well past the 700-line guidance. Split into routers (clients, sessions, reports, reco, assignments, users).",
+    "assignment_helper.create_assignment does NOT check for duplicate active assignments — the same (assigned_to, session_id) can be inserted multiple times. Consider an upsert or a uniqueness guard so /by-me doesn't show duplicates and /check doesn't iterate dead rows.",
+    "check_assignment_access returns can_edit_reco=True when report_type is omitted (`(not rt_norm and True)`). This is permissive for callers that forget to pass report_type — recommend defaulting to False unless explicit.",
+    "DELETE /assignments/{id} is idempotent for already-revoked rows, but it bypasses the ownership check (returns success without verifying assigned_by) — minor info-disclosure: a 3rd party could detect that an assignment_id exists. Move the assigned_by check before the is_active short-circuit.",
+    "create_client falls back to admin's id when X-User-Id is empty — fine for migration, but in steady-state this attributes anonymous create operations to admin which can hide intent. Consider rejecting with 401 when X-User-Id is missing on /clients POST, once the FE consistently sends it.",
+    "/assignments/users response is not paginated (to_list(2000)). Fine today, but should bound for large portals."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_assignment_feature.py"
+  ],
+  "success_rate": {
+    "backend": "100% on Prompt-4 assignment tests (32/32); regression suite drops to ~73% (43/59 + 7 errors) due to the actor-fallback bug described above",
+    "frontend": "not tested (skipped per request)"
+  },
+  "test_credentials": "Admin username=admin password=admin123 (from /app/memory/test_credentials.md). Tests dynamically register TEST_assignee_* and TEST_stranger_* users via /register then approve via admin /users/{id}/approve.",
+  "seed_data_creation": "Tests create TEST_-prefixed clients, sessions, portal users, and one transient barcode_edits row (deleted in finally). Cycle-count tests create a TEST_cc_ client + project + day.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All prompt-4 assertions are green. The remaining work is: (1) main agent fixes the actor-fallback so adj.user_id in body is not used for ACL; (2) re-run /app/backend/tests/test_assignment_feature.py to confirm no prompt-4 regression and /app/backend/tests/test_audit_movement_log.py + test_last_edited_popup_backend.py for regression closure. The portal route prefix is /api/audit/portal (not /api directly) — easy to miss. Cycle-count router prefix is /api/audit/portal/cycle-count.",
+  "rca_of_the_issue": "Root cause: actor_id in reco-adjustments / edit-barcode / undo-edit is resolved as `(X-User-Id header) or (body user_id) or ''`. Legacy callers (prompt 1/2/3 tests) pass body user_id PURELY for audit-trail attribution (so the Movement Log knows who saved the row). Prompt 4's gate now interprets that same field as the auth principal and 403's any non-owner. Reproduction: POST /api/audit/portal/reco-adjustments with no X-User-Id header but body {\"user_id\":\"some-random-id\", \"client_id\":\"...\"} → 403 instead of 200. Mitigation: read actor strictly from `X-User-Id` header (or a dedicated `X-Actor-Id`), and keep body user_id solely for audit-trail. Same pattern applies to /reports/edit-barcode and /reports/undo-edit."
+}

@@ -48,6 +48,7 @@ import uuid
 import logging
 
 from shared.audit_log_helper import log_audit_entry
+from shared.assignment_helper import check_assignment_access
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -74,6 +75,28 @@ def _user_from_request(request: Optional[Request]) -> Dict[str, str]:
         }
     except Exception:
         return {"user_id": "", "username": ""}
+
+
+async def _require_owner_for_session(session_id: Optional[str], client_id: Optional[str],
+                                     user_id: str) -> None:
+    """Prompt 4 — gate destructive cycle-count operations to OWNER only.
+    Assignees are restricted to reco edits (handled in audit_routes
+    /reco-adjustments). Days/projects can only be opened/closed/deleted
+    by the client owner.
+    Raises HTTPException(403) when blocked. No-op when no X-User-Id was
+    sent (legacy behaviour — keeps existing scripts working).
+    """
+    if not user_id:
+        return
+    acl = await check_assignment_access(
+        db, user_id=user_id, session_id=session_id, client_id=client_id,
+    )
+    if acl.get("is_owner"):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Day/project operations are restricted to the client owner.",
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -417,6 +440,8 @@ async def delete_project(pid: str, request: Request = None):
     p = await db.cycle_projects.find_one({"id": pid})
     if not p:
         raise HTTPException(404, "Project not found")
+    u = _user_from_request(request)
+    await _require_owner_for_session(p.get("audit_session_id"), p.get("client_id"), u["user_id"])
     deleted: Dict[str, int] = {}
     deleted["cycle_day_stock"] = (await db.cycle_day_stock.delete_many({"project_id": pid})).deleted_count
     deleted["cycle_day_picks"] = (await db.cycle_day_picks.delete_many({"project_id": pid})).deleted_count
@@ -448,6 +473,11 @@ async def delete_project(pid: str, request: Request = None):
 
 @cycle_router.post("/projects/{pid}/complete")
 async def complete_project(pid: str, request: Request = None):
+    p_pre = await db.cycle_projects.find_one({"id": pid}, {"_id": 0, "audit_session_id": 1, "client_id": 1})
+    if not p_pre:
+        raise HTTPException(404, "Project not found")
+    u = _user_from_request(request)
+    await _require_owner_for_session(p_pre.get("audit_session_id"), p_pre.get("client_id"), u["user_id"])
     res = await db.cycle_projects.update_one(
         {"id": pid}, {"$set": {"status": "completed", "completed_at": _now_iso()}}
     )
@@ -472,6 +502,11 @@ async def complete_project(pid: str, request: Request = None):
 
 @cycle_router.post("/projects/{pid}/reopen")
 async def reopen_project(pid: str, request: Request = None):
+    p_pre = await db.cycle_projects.find_one({"id": pid}, {"_id": 0, "audit_session_id": 1, "client_id": 1})
+    if not p_pre:
+        raise HTTPException(404, "Project not found")
+    u = _user_from_request(request)
+    await _require_owner_for_session(p_pre.get("audit_session_id"), p_pre.get("client_id"), u["user_id"])
     await db.cycle_projects.update_one(
         {"id": pid}, {"$set": {"status": "active"}, "$unset": {"completed_at": ""}}
     )
@@ -645,6 +680,8 @@ async def close_day(day_id: str, _: CloseDayRequest, request: Request = None):
     project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0})
     if not project:
         raise HTTPException(404, "Project not found")
+    u = _user_from_request(request)
+    await _require_owner_for_session(project.get("audit_session_id"), project.get("client_id"), u["user_id"])
 
     # Compute final variance and freeze it
     variance = await _compute_day_variance(project, day)
@@ -700,6 +737,8 @@ async def reopen_day(day_id: str, request: Request = None):
     if not day:
         raise HTTPException(404, "Day not found")
     project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0, "client_id": 1, "audit_session_id": 1}) or {}
+    u = _user_from_request(request)
+    await _require_owner_for_session(project.get("audit_session_id"), project.get("client_id"), u["user_id"])
     await db.cycle_closed_bins.delete_many({"day_id": day_id})
     await db.cycle_days.update_one(
         {"id": day_id},
@@ -728,6 +767,8 @@ async def delete_day(day_id: str, request: Request = None):
     if not day:
         raise HTTPException(404, "Day not found")
     project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0, "client_id": 1, "audit_session_id": 1}) or {}
+    u = _user_from_request(request)
+    await _require_owner_for_session(project.get("audit_session_id"), project.get("client_id"), u["user_id"])
     deleted: Dict[str, int] = {}
     deleted["cycle_day_stock"] = (await db.cycle_day_stock.delete_many({"day_id": day_id})).deleted_count
     deleted["cycle_day_picks"] = (await db.cycle_day_picks.delete_many({"day_id": day_id})).deleted_count

@@ -291,6 +291,12 @@ async def create_indexes():
         await db.audit_logs.create_index([("client_id", 1), ("timestamp_dt", -1)])
         await db.audit_logs.create_index([("module", 1), ("timestamp_dt", -1)])
         await db.audit_logs.create_index([("timestamp_dt", -1)])
+        # Report Assignments — Prompt 4
+        await db.report_assignments.create_index([("assigned_to", 1), ("is_active", 1)])
+        await db.report_assignments.create_index([("assigned_by", 1), ("assigned_at_dt", -1)])
+        await db.report_assignments.create_index([("session_id", 1), ("assigned_to", 1), ("is_active", 1)])
+        await db.report_assignments.create_index([("client_id", 1)])
+        await db.clients.create_index("created_by")
         logger.info("MongoDB indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
@@ -305,6 +311,19 @@ async def create_indexes():
             logger.info(f"Role migration applied: {stats}")
     except Exception as e:
         logger.warning(f"Role migration skipped: {e}")
+
+    # Prompt 4 — Backfill `clients.created_by` for existing rows so the
+    # assignment feature has a valid owner to attribute. Falls back to
+    # the default admin user.
+    try:
+        from shared.assignment_helper import migrate_clients_created_by
+        admin = await db.portal_users.find_one({"username": "admin"}, {"_id": 0, "id": 1})
+        admin_id = (admin or {}).get("id") or ""
+        n = await migrate_clients_created_by(db, admin_id)
+        if n:
+            logger.info(f"Backfilled clients.created_by on {n} legacy client(s)")
+    except Exception as e:
+        logger.warning(f"clients.created_by migration skipped: {e}")
 
 
 @app.on_event("shutdown")

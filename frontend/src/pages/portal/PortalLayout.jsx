@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, FolderOpen, Smartphone,
   FileBarChart, Users, LogOut, Database, AlertTriangle,
-  ChevronLeft, ChevronRight, Search, Menu, X, Repeat, History
+  ChevronLeft, ChevronRight, Search, Menu, X, Repeat, History, UserCog
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useAudit } from '../AuditApp';
@@ -21,6 +21,7 @@ const navItems = [
   { to: '/portal/devices', icon: Smartphone, label: 'Devices' },
   { to: '/portal/reports', icon: FileBarChart, label: 'Reports' },
   { to: '/portal/movement', icon: History, label: 'Movement Log' },
+  { to: '/portal/assignments', icon: UserCog, label: 'Assignments', badgeKey: 'assignmentsPending' },
   { to: '/portal/sync-logs', icon: Database, label: 'Sync Logs', badgeKey: 'syncPending' },
   { to: '/portal/conflicts', icon: AlertTriangle, label: 'Conflicts', badgeKey: 'conflictsPending' },
   { to: '/portal/users', icon: Users, label: 'Users', badgeKey: 'usersPending' },
@@ -34,7 +35,7 @@ export default function PortalLayout({ children }) {
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('portalSidebarCollapsed') === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [badges, setBadges] = useState({ syncPending: 0, conflictsPending: 0, usersPending: 0 });
+  const [badges, setBadges] = useState({ syncPending: 0, conflictsPending: 0, usersPending: 0, assignmentsPending: 0 });
 
   useEffect(() => {
     localStorage.setItem('portalSidebarCollapsed', collapsed ? '1' : '0');
@@ -45,11 +46,18 @@ export default function PortalLayout({ children }) {
     let alive = true;
     const load = async () => {
       try {
-        const [conflictsRes, usersRes] = await Promise.all([
+        const headers = {};
+        try {
+          const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+          if (u?.id) headers['X-User-Id'] = u.id;
+          if (u?.username) headers['X-Username'] = u.username;
+        } catch { /* noop */ }
+        const [conflictsRes, usersRes, assignmentsRes] = await Promise.all([
           fetch(`${API_URL}/api/audit/portal/conflicts/summary`).catch(() => null),
           fetch(`${API_URL}/api/audit/portal/users`).catch(() => null),
+          fetch(`${API_URL}/api/audit/portal/assignments/my`, { headers }).catch(() => null),
         ]);
-        const newBadges = { syncPending: 0, conflictsPending: 0, usersPending: 0 };
+        const newBadges = { syncPending: 0, conflictsPending: 0, usersPending: 0, assignmentsPending: 0 };
         if (conflictsRes?.ok) {
           const data = await conflictsRes.json();
           newBadges.conflictsPending = data?.pending_count || data?.total_pending || 0;
@@ -57,6 +65,10 @@ export default function PortalLayout({ children }) {
         if (usersRes?.ok) {
           const users = await usersRes.json();
           newBadges.usersPending = Array.isArray(users) ? users.filter((u) => !u.is_approved).length : 0;
+        }
+        if (assignmentsRes?.ok) {
+          const data = await assignmentsRes.json();
+          newBadges.assignmentsPending = data?.count || 0;
         }
         if (alive) setBadges(newBadges);
       } catch { /* silent */ }

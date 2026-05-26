@@ -28,7 +28,8 @@ import {
   PinOff,
   Columns,
   Smartphone,
-  Send
+  Send,
+  ShieldAlert
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/button';
@@ -616,6 +617,54 @@ export default function PortalReports() {
 
   // Report cache: stores fetched data keyed by `${sessionId}_${reportType}`
   const reportCache = useRef({});
+
+  // ─────────── Prompt 4 — Assignment ACL
+  // For non-owners (assignees), barcode/article edits and reco edits on
+  // non-detailed reports must be blocked + a banner shown explaining what
+  // they can do. Owners (the user who created the client) are unaffected.
+  const [assignmentAcl, setAssignmentAcl] = useState({
+    has_access: true, can_edit_reco: true, can_edit_all: true, is_owner: true,
+  });
+  const [assignmentAssigner, setAssignmentAssigner] = useState(null);
+  useEffect(() => {
+    if (!selectedSession) {
+      setAssignmentAcl({ has_access: true, can_edit_reco: true, can_edit_all: true, is_owner: true });
+      setAssignmentAssigner(null);
+      return;
+    }
+    const headers = {};
+    try {
+      const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+      if (u?.id) headers['X-User-Id'] = u.id;
+      if (u?.username) headers['X-Username'] = u.username;
+    } catch { /* noop */ }
+    const qs = new URLSearchParams({ session_id: selectedSession });
+    if (reportType) qs.set('report_type', reportType);
+    fetch(`${BACKEND_URL}/api/audit/portal/assignments/check?${qs}`, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) setAssignmentAcl(d);
+        // If the user is not the owner, pull the assignment row to show
+        // the assigner's username on the banner.
+        if (d && !d.is_owner && d.assignment_id) {
+          fetch(`${BACKEND_URL}/api/audit/portal/assignments/my`, { headers })
+            .then(r => r.ok ? r.json() : { assignments: [] })
+            .then(({ assignments }) => {
+              const me = (assignments || []).find(a => a.id === d.assignment_id);
+              if (me) setAssignmentAssigner(me.assigned_by || null);
+            }).catch(() => {});
+        } else {
+          setAssignmentAssigner(null);
+        }
+      })
+      .catch(() => {});
+  }, [selectedSession, reportType]);
+
+  // Helper exposed to children: only Reco edits in detailed report are
+  // allowed for assignees. Owners → everything is allowed.
+  const isOwner = !!assignmentAcl.is_owner;
+  const canEditBarcode = isOwner; // assignees can't touch barcode/article values
+  const canEditReco = isOwner || (assignmentAcl.can_edit_reco && reportType === 'detailed');
 
   // ============ Invalid Codes feature (Store clients only) ============
   // Manages the modal that lists scanned barcodes which are not present in
@@ -2054,6 +2103,35 @@ export default function PortalReports() {
 
   return (
     <div className="p-3 md:p-4 lg:p-5">
+      {/* Prompt 4 — Assignment banner. Visible only when current user is
+          NOT the owner of the selected session's client. */}
+      {selectedSession && !assignmentAcl.is_owner && assignmentAcl.has_access && (
+        <div
+          className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"
+          data-testid="assignment-banner"
+        >
+          <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs">
+            <p>
+              <span className="font-bold">Assigned access.</span>{' '}
+              {assignmentAssigner ? <>by <span className="font-semibold">{assignmentAssigner.slice(0, 8)}…</span> · </> : null}
+              You can <span className="font-semibold">VIEW</span> these reports and <span className="font-semibold">edit RECO only in the Detailed report</span>.
+              Barcode / article edits and other changes are restricted to the client owner.
+            </p>
+          </div>
+        </div>
+      )}
+      {selectedSession && !assignmentAcl.is_owner && !assignmentAcl.has_access && (
+        <div
+          className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900"
+          data-testid="assignment-no-access-banner"
+        >
+          <ShieldAlert className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <p className="text-xs">
+            You don't have access to this report. Ask the client owner to assign it to you.
+          </p>
+        </div>
+      )}
       <PageHeader
         title="Reports"
         subtitle="Variance analysis and audit reports"
@@ -2255,9 +2333,9 @@ export default function PortalReports() {
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
           {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
-          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={isCycleCountClient ? isCcDayView : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'bin-wise')} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isCycleCountClient ? false : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'barcode-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={(isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
+          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={canEditReco && (isCycleCountClient ? isCcDayView : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'bin-wise'))} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={canEditReco && (isCycleCountClient ? false : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'barcode-wise'))} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={canEditReco && ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'article-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
           {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
           </div>
           {/* Load More button for large datasets */}

@@ -29,6 +29,14 @@ from shared.auth_middleware import (
     ADMIN_ROLE,
     SUPERVISOR_ROLE,
 )
+from shared.assignment_helper import (
+    create_assignment as _h_create_assignment,
+    revoke_assignment as _h_revoke_assignment,
+    get_my_assignments as _h_get_my_assignments,
+    get_assignments_by_me as _h_get_assignments_by_me,
+    check_assignment_access as _h_check_assignment_access,
+    FULL_SESSION, SPECIFIC_REPORTS, VALID_TYPES, VALID_MODULES,
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -183,6 +191,7 @@ class Client(BaseModel):
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None  # portal_users.id of the creator
     is_active: bool = True
     master_imported: bool = False
     master_product_count: int = 0
@@ -761,19 +770,27 @@ async def get_clients():
     return clients
 
 @portal_router.post("/clients")
-async def create_client(client: ClientCreate):
+async def create_client(client: ClientCreate, request: Request):
     # Check if code exists
     existing = await db.clients.find_one({"code": client.code})
     if existing:
         raise HTTPException(status_code=400, detail="Client code already exists")
-    
+
     new_client = Client(**client.model_dump())
     doc = new_client.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
+    # Stamp `created_by` from the X-User-Id header (set by the FE on
+    # every state-changing call). Falls back to the seeded admin so the
+    # assignment feature always has a valid owner to attribute.
+    creator_id = (request.headers.get("x-user-id", "") or "").strip()
+    if not creator_id:
+        admin = await db.portal_users.find_one({"username": "admin"}, {"_id": 0, "id": 1})
+        creator_id = (admin or {}).get("id", "")
+    doc['created_by'] = creator_id
     await db.clients.insert_one(doc)
-    
+
     # Return the client data without MongoDB's _id field
-    return {"message": "Client created", "client": new_client.model_dump()}
+    return {"message": "Client created", "client": {**new_client.model_dump(), "created_by": creator_id}}
 
 @portal_router.get("/clients/{client_id}")
 async def get_client(client_id: str):
@@ -3051,7 +3068,7 @@ def generate_remark(expected_qty: float, physical_qty: float, accuracy: float, i
 # ==================== BARCODE EDIT ENDPOINTS ====================
 
 @portal_router.post("/reports/edit-barcode")
-async def edit_barcode(data: dict):
+async def edit_barcode(data: dict, request: Request):
     """Edit a barcode/article code for an extra scanned item (not in expected stock).
     
     If new_value equals the original_value, the edit is treated as an undo
@@ -3073,6 +3090,20 @@ async def edit_barcode(data: dict):
 
     if not client_id or not report_type or not original_value or not new_value:
         raise HTTPException(400, "Missing required fields: client_id, report_type, original_value, new_value")
+
+    # Prompt 4 — only OWNER can edit barcode/article values. Assignees
+    # are restricted to reco edits on the detailed report.
+    actor_id = (request.headers.get("x-user-id", "") or user_id or "").strip()
+    if actor_id:
+        acl = await _h_check_assignment_access(
+            db, user_id=actor_id, client_id=client_id, session_id=session_id,
+            report_type=report_type, cycle_day=cycle_day,
+        )
+        if not acl.get("can_edit_all"):
+            raise HTTPException(
+                status_code=403,
+                detail="Barcode/article edits are restricted to the client owner.",
+            )
 
     module = module_override or await resolve_module_for_client(db, client_id)
 
@@ -3305,7 +3336,7 @@ async def _purge_recos_for_edit(edit: Dict[str, Any]) -> int:
 
 
 @portal_router.post("/reports/undo-edit")
-async def undo_barcode_edit(data: dict):
+async def undo_barcode_edit(data: dict, request: Request):
     """Undo a barcode/article edit — reverts to original value AND removes
     any Reco adjustments that were tied to this edit (so the row's totals
     don't carry a lingering +N after the rename is reverted)."""
@@ -3315,6 +3346,20 @@ async def undo_barcode_edit(data: dict):
     edit = await db.barcode_edits.find_one({"id": edit_id}, {"_id": 0})
     if not edit:
         raise HTTPException(404, "Edit not found")
+    # Prompt 4 — only OWNER can undo barcode/article edits.
+    actor_id = (request.headers.get("x-user-id", "") or data.get("user_id") or "").strip()
+    if actor_id:
+        acl = await _h_check_assignment_access(
+            db, user_id=actor_id, client_id=edit.get("client_id"),
+            session_id=data.get("session_id") or "",
+            report_type=edit.get("report_type") or "",
+            cycle_day=data.get("cycle_day"),
+        )
+        if not acl.get("can_edit_all"):
+            raise HTTPException(
+                status_code=403,
+                detail="Undo is restricted to the client owner.",
+            )
     result = await db.barcode_edits.update_one({"id": edit_id}, {"$set": {"is_active": False}})
     if result.modified_count == 0:
         # Already inactive — still purge any orphaned recos for safety
@@ -3762,8 +3807,34 @@ def _compute_validated_reco(reco_maps, expected_results, synced_results):
 
 
 @portal_router.post("/reco-adjustments")
-async def save_reco_adjustment(adj: RecoAdjustmentCreate):
+async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
     """Save or update a reconciliation adjustment (client-level for consolidated reports)."""
+    # Prompt 4 — assignees may edit reco ONLY on the detailed report.
+    # Owners may edit reco everywhere.
+    actor_id = (request.headers.get("x-user-id", "") or adj.user_id or "").strip()
+    if actor_id:
+        rt_for_check = {
+            "detailed": "detailed",
+            "barcode":  "barcode-wise",
+            "article":  "article-wise",
+        }.get(adj.reco_type, adj.reco_type)
+        acl = await _h_check_assignment_access(
+            db, user_id=actor_id, client_id=adj.client_id,
+            session_id=adj.session_id or "",
+            report_type=rt_for_check,
+            cycle_day=adj.cycle_day,
+        )
+        if not acl.get("is_owner") and not acl.get("can_edit_reco"):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to edit reco for this session.",
+            )
+        # Assignees can ONLY touch reco_qty in the detailed report.
+        if not acl.get("is_owner") and adj.reco_type != "detailed":
+            raise HTTPException(
+                status_code=403,
+                detail="Assigned users can edit reco only in the Detailed report.",
+            )
     filter_key = {"client_id": adj.client_id, "reco_type": adj.reco_type}
     if adj.reco_type == "detailed":
         filter_key["barcode"] = adj.barcode
@@ -3863,6 +3934,145 @@ async def audit_logs_export(filters: dict):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
+
+
+# ==================== REPORT ASSIGNMENTS (Prompt 4) ====================
+
+class AssignmentCreate(BaseModel):
+    module: str = "warehouse"            # warehouse | cycle_count
+    assigned_to: str                     # portal_users.id
+    session_id: str                      # warehouse session OR cycle audit_session_id
+    assignment_type: str = FULL_SESSION  # full_session | specific_reports
+    report_types: Optional[List[str]] = None
+    cycle_day: Optional[int] = None
+    notes: Optional[str] = ""
+
+
+async def _resolve_client_for_session(session_id: str) -> Optional[Dict[str, Any]]:
+    """Best-effort lookup of the client doc that owns a given session.
+    Tries audit_sessions first, then cycle_projects.audit_session_id.
+    """
+    if not session_id:
+        return None
+    sess = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0, "client_id": 1})
+    cid = (sess or {}).get("client_id")
+    if not cid:
+        proj = await db.cycle_projects.find_one(
+            {"audit_session_id": session_id}, {"_id": 0, "client_id": 1}
+        )
+        cid = (proj or {}).get("client_id")
+    if not cid:
+        return None
+    return await db.clients.find_one({"id": cid}, {"_id": 0})
+
+
+@portal_router.post("/assignments")
+async def create_report_assignment(payload: AssignmentCreate, request: Request):
+    """Create a report assignment. The requester must be the OWNER
+    (`clients.created_by`) of the session's client. Re-assignment by
+    assignees is prevented because they are never owners.
+    """
+    actor = await get_current_user(request, db)
+    if payload.module not in VALID_MODULES:
+        raise HTTPException(status_code=400, detail="Invalid module")
+    if payload.assignment_type not in VALID_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid assignment_type")
+    if payload.assignment_type == SPECIFIC_REPORTS and not (payload.report_types or []):
+        raise HTTPException(status_code=400, detail="report_types is required for specific_reports")
+
+    client = await _resolve_client_for_session(payload.session_id)
+    if not client:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if (client.get("created_by") or "") != actor["id"]:
+        raise HTTPException(status_code=403, detail="Only the client owner can assign this session")
+
+    # Block self-assignment + assigning to a non-existent user.
+    if payload.assigned_to == actor["id"]:
+        raise HTTPException(status_code=400, detail="You cannot assign a session to yourself")
+    target = await db.portal_users.find_one({"id": payload.assigned_to}, {"_id": 0, "username": 1, "is_approved": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Assignee not found")
+    if not target.get("is_approved", True):
+        raise HTTPException(status_code=400, detail="Assignee must be an approved user")
+
+    doc = await _h_create_assignment(db, {
+        "module": payload.module,
+        "assigned_to": payload.assigned_to,
+        "assigned_by": actor["id"],
+        "session_id": payload.session_id,
+        "client_id": client.get("id"),
+        "assignment_type": payload.assignment_type,
+        "report_types": payload.report_types or [],
+        "cycle_day": payload.cycle_day,
+        "notes": payload.notes or "",
+    })
+    return {"message": "Assignment created", "assignment": doc}
+
+
+@portal_router.get("/assignments/my")
+async def list_my_assignments(request: Request):
+    """All ACTIVE assignments where the caller is the assignee."""
+    actor = await get_current_user(request, db)
+    rows = await _h_get_my_assignments(db, actor["id"])
+    return {"assignments": rows, "count": len(rows)}
+
+
+@portal_router.get("/assignments/by-me")
+async def list_assignments_by_me(request: Request):
+    """Every assignment the caller has made (active + revoked) — used by
+    the 'Assigned by me' tab."""
+    actor = await get_current_user(request, db)
+    rows = await _h_get_assignments_by_me(db, actor["id"])
+    return {"assignments": rows, "count": len(rows)}
+
+
+@portal_router.delete("/assignments/{assignment_id}")
+async def revoke_report_assignment(assignment_id: str, request: Request):
+    """Soft-revoke an assignment. Only the original assigner can revoke."""
+    actor = await get_current_user(request, db)
+    try:
+        return await _h_revoke_assignment(db, assignment_id, actor["id"])
+    except ValueError as ve:
+        msg = str(ve)
+        if msg == "not_found":
+            raise HTTPException(status_code=404, detail="Assignment not found")
+        if msg == "forbidden":
+            raise HTTPException(status_code=403, detail="Only the original assigner can revoke this assignment")
+        raise HTTPException(status_code=400, detail=msg)
+
+
+@portal_router.get("/assignments/users")
+async def list_assignable_users(request: Request):
+    """List of users that can be picked as assignees in the FE
+    dropdown. Returns approved, active users EXCEPT the caller."""
+    actor = await get_current_user(request, db)
+    rows = await db.portal_users.find(
+        {"is_approved": True, "is_active": True, "id": {"$ne": actor["id"]}},
+        {"_id": 0, "password_hash": 0},
+    ).to_list(2000)
+    return {"users": rows, "count": len(rows)}
+
+
+@portal_router.get("/assignments/check")
+async def check_assignment_route(
+    request: Request,
+    session_id: Optional[str] = None,
+    client_id: Optional[str] = None,
+    report_type: Optional[str] = None,
+    cycle_day: Optional[int] = None,
+):
+    """Return {has_access, can_edit_reco, can_edit_all, is_owner,
+    assignment_id} for the current user against the given context."""
+    actor = await get_current_user(request, db)
+    result = await _h_check_assignment_access(
+        db,
+        user_id=actor["id"],
+        session_id=session_id,
+        client_id=client_id,
+        report_type=report_type,
+        cycle_day=cycle_day,
+    )
+    return result
 
 # ==================== REPORTS ROUTES ====================
 

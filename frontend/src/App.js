@@ -29,6 +29,7 @@ const PortalSyncLogs = React.lazy(() => import("./pages/portal/PortalSyncLogs"))
 const PortalUsers = React.lazy(() => import("./pages/portal/PortalUsers"));
 const PortalConflicts = React.lazy(() => import("./pages/portal/PortalConflicts"));
 const PortalMovement = React.lazy(() => import("./pages/portal/PortalMovement"));
+const PortalAssignments = React.lazy(() => import("./pages/portal/PortalAssignments"));
 
 // Minimal loading fallback for lazy routes
 const PageLoader = () => (
@@ -252,6 +253,18 @@ function AppRoutes() {
           }
         >
           <Route index element={<Suspense fallback={<PageLoader />}><PortalMovement /></Suspense>} />
+        </Route>
+        <Route
+          path="/portal/assignments"
+          element={
+            <PortalProtectedRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PortalLayout />
+              </Suspense>
+            </PortalProtectedRoute>
+          }
+        >
+          <Route index element={<Suspense fallback={<PageLoader />}><PortalAssignments /></Suspense>} />
         </Route>
 
         {/* Scanner App Routes - Mobile Only */}
