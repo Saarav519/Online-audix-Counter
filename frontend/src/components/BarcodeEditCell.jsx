@@ -3,6 +3,17 @@ import { Pencil, Undo2, Check, X, Loader2, AlertCircle, CheckCircle2 } from 'luc
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
+// Best-effort attribution for the Movement / Audit Log. Reads the
+// portal user that was stashed by PortalLogin at login time. If the
+// user object is missing the request still succeeds — the audit log
+// just records an empty user (handled gracefully by the backend).
+function _portalUser() {
+  try {
+    const raw = localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser');
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
 export function BarcodeEditCell({
   value,
   row,
@@ -11,7 +22,11 @@ export function BarcodeEditCell({
   field = 'barcode',
   onEditComplete,
   compact = false,
-  readOnly = false
+  readOnly = false,
+  // Audit-trail attribution (optional)
+  sessionId = '',
+  cycleDay = null,
+  module: moduleProp = null
 }) {
   const isEditable = row?.is_editable;
   const isEdited = row?.is_edited;
@@ -99,6 +114,7 @@ export function BarcodeEditCell({
     setLoading(true);
     setErrorMsg('');
     try {
+      const _u = _portalUser();
       const res = await fetch(`${BACKEND_URL}/api/audit/portal/reports/edit-barcode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,7 +123,13 @@ export function BarcodeEditCell({
           report_type: reportType,
           original_value: isEdited ? originalValue : value,
           new_value: trimmed,
-          location: row?.location || ''
+          location: row?.location || '',
+          // Movement / Audit Log attribution
+          user_id: _u.id || '',
+          username: _u.username || '',
+          session_id: sessionId || '',
+          cycle_day: cycleDay != null ? cycleDay : undefined,
+          module: moduleProp || undefined,
         })
       });
       const text = await res.text();
@@ -133,10 +155,18 @@ export function BarcodeEditCell({
     if (!editId) return;
     setUndoing(true);
     try {
+      const _u = _portalUser();
       const res = await fetch(`${BACKEND_URL}/api/audit/portal/reports/undo-edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ edit_id: editId })
+        body: JSON.stringify({
+          edit_id: editId,
+          user_id: _u.id || '',
+          username: _u.username || '',
+          session_id: sessionId || '',
+          cycle_day: cycleDay != null ? cycleDay : undefined,
+          module: moduleProp || undefined,
+        })
       });
       const text = await res.text();
       let data;

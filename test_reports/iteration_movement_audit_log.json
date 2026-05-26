@@ -1,0 +1,48 @@
+{
+  "summary": "Backend-only coverage of the Movement / Audit Log feature (shared/audit_log_helper.py + audit_routes.py + cycle_count_routes.py + server.py indexes). 27 pytest tests written in /app/backend/tests/test_audit_movement_log.py, all passing against the live preview URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "coverage_breakdown": {
+    "search_endpoint": "Empty filters return {logs:[], total:int, limit:50, skip:0}; explicit limit/skip honored; limit capped at 500; module='all' accepted",
+    "recent_endpoint": "GET /audit-logs/recent returns {logs:[]} when no match; returns matching rows for created barcodes; 422 when barcode missing",
+    "export_endpoint": "Returns Content-Type application/vnd.openxmlformats-officedocument.spreadsheetml.sheet AND first 4 bytes 0x504b0304 (PK), both with empty filters and with module+limit filters",
+    "cycle_count_hooks": "close-day -> assign/day_status open->closed; reopen-day -> revoke/day_status closed->open; delete-day -> delete/day; complete-project -> assign/project_status active->completed; reopen-project -> revoke/project_status completed->active; delete-project -> delete/project. All capture X-User-Id + X-Username via _user_from_request",
+    "reco_adjust_hooks": "POST /reco-adjustments logs module='warehouse', action_type='reco_adjust', field_name='reco_qty', new_value=7 with user_id/username from body. reco_qty=0 logs new_value='0' (deletion case)",
+    "filter_coverage": "user_id, client_id, module=warehouse, module=cycle_count, barcode substring (regex), cycle_day=1, start/end date inclusive (today returns rows; past-only window returns 0 verifying _parse_date_ceil works)",
+    "non_blocking": "Static-source check confirms log_audit_entry is wrapped in try/except Exception before db.audit_logs.insert_one() with 'NEVER raise' comment",
+    "indexes": "All 6 expected audit_logs indexes verified via pymongo index_information(): (barcode,client_id,timestamp_dt desc), (session_id,timestamp_dt desc), (user_id,timestamp_dt desc), (client_id,timestamp_dt desc), (module,timestamp_dt desc), (timestamp_dt desc)"
+  },
+  "items_not_directly_tested": [
+    "POST /reports/edit-barcode happy-path log entry — requires uploading master_products / expected_stock fixtures (validator rejects barcodes not in master). Verified via static code review (lines 3064-3078 log undo on same-value revert; lines 3127+ log edit). The existing edit/reco/undo functionality continues to return original success payloads as the audit-log calls are appended after the response is computed and wrapped in try/except.",
+    "POST /reports/undo-edit explicit endpoint — same constraint (requires existing barcode_edit), reviewed in source at line 3276+ which calls log_audit_entry with action_type='undo'."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_audit_movement_log.py",
+    "/app/test_reports/pytest/movement_audit_log.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "audit_routes.py is 7087 lines — already known and out of scope here, but worth eventually splitting (clients, sessions, reports, reco, audit-logs into separate routers).",
+    "shared/audit_log_helper.py uses sort('timestamp_dt', -1) but projects out timestamp_dt — fine for output, but means callers cannot tie-break further. Acceptable.",
+    "_parse_date_ceil bare-date detection relies on string length == 10. If a caller sends 'YYYY-MM-DDT00:00:00Z' meaning 'start of that day to end of that day' they will get only the first second of the day. Today's spec ('YYYY-MM-DD' is end-of-day) is honored.",
+    "export_audit_logs_excel hard-caps at 50,000 rows but does NOT surface a 'truncated' flag in the response. Future improvement: add a warning header when len(rows) == 50000.",
+    "log_audit_entry stores timestamp as ISO string AND timestamp_dt as BSON datetime — duplicate but useful for client display vs server query. OK.",
+    "/audit-logs/search accepts a raw dict (no Pydantic model). Consider adding a SearchFilters Pydantic model so invalid types (e.g., cycle_day='abc') are caught at parse time rather than silently dropped by _build_search_query."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_audit_movement_log.py (new)"
+  ],
+  "success_rate": {"backend": "100% (27/27)", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "Not used — portal endpoints under /api/audit/portal/* accept attribution via request body fields (user_id/username) or X-User-Id/X-Username headers (cycle-count). Admin/admin123 not required for the audit-log endpoints under test.",
+  "seed_data_creation": "Each test run creates two TEST_MOV_<8-hex> clients (warehouse + cycle_count), one cycle project, one cycle day, and ~10 audit_logs entries. All cleaned up via DELETE /clients/{id} (cascading) in fixture teardown.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/test_audit_movement_log.py -v` for regression. Test uses BASE_URL from REACT_APP_BACKEND_URL. If MongoDB index test fails, server.py startup may not have re-run — restart backend supervisor. edit-barcode/undo-edit endpoint logging was not exercised end-to-end here because it requires master-data upload; if you want that coverage, upload master via POST /api/audit/portal/clients/{cid}/import-master with a CSV containing at least one barcode before calling edit-barcode."
+}

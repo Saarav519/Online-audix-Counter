@@ -16,6 +16,14 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import asyncio
 
+from shared.audit_log_helper import (
+    log_audit_entry,
+    search_audit_logs,
+    fetch_recent_for_barcode,
+    export_audit_logs_excel,
+    resolve_module_for_client,
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -357,6 +365,13 @@ class RecoAdjustmentCreate(BaseModel):
     location: str = ""
     article_code: str = ""
     reco_qty: float
+    # Audit-trail attribution (optional — provided by FE so the
+    # Movement Log knows who saved this Reco). Never required to save.
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    session_id: Optional[str] = None
+    cycle_day: Optional[int] = None
+    module: Optional[str] = None  # auto-detected from client_type if not set
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -3017,8 +3032,18 @@ async def edit_barcode(data: dict):
     new_value = data.get("new_value")
     location = data.get("location", "")
 
+    # Audit-trail attribution (optional, sent by FE — never required)
+    user_id = data.get("user_id") or ""
+    username = data.get("username") or ""
+    session_id = data.get("session_id") or ""
+    cycle_day = data.get("cycle_day")
+    module_override = data.get("module")  # "warehouse" | "cycle_count" | None
+    field_name = "article_code" if report_type == "article-wise" else "barcode"
+
     if not client_id or not report_type or not original_value or not new_value:
         raise HTTPException(400, "Missing required fields: client_id, report_type, original_value, new_value")
+
+    module = module_override or await resolve_module_for_client(db, client_id)
 
     # If user types the original value, treat as "revert/undo" (deactivate existing edit)
     if original_value == new_value:
@@ -3035,6 +3060,22 @@ async def edit_barcode(data: dict):
             # row's totals don't carry a lingering +N after the revert.
             purged = await _purge_recos_for_edit(existing)
             _report_cache.invalidate_all()
+            # Movement Log — same-value revert
+            await log_audit_entry(db, {
+                "module": module,
+                "action_type": "undo",
+                "barcode": original_value,
+                "client_id": client_id,
+                "session_id": session_id,
+                "cycle_day": cycle_day,
+                "field_name": field_name,
+                "old_value": existing.get("new_value", ""),
+                "new_value": original_value,
+                "user_id": user_id,
+                "username": username,
+                "report_type": report_type,
+                "location": location,
+            })
             return {"success": True, "reverted": True, "reco_adjustments_removed": purged,
                     "message": "Edit reverted — original value restored"}
         # No existing edit and user didn't change anything → not really an error
@@ -3078,6 +3119,22 @@ async def edit_barcode(data: dict):
             }, "edited_at": datetime.now(timezone.utc).isoformat()}}
         )
         _report_cache.invalidate_all()
+        # Movement Log — updated existing edit
+        await log_audit_entry(db, {
+            "module": module,
+            "action_type": "edit",
+            "barcode": new_value,
+            "client_id": client_id,
+            "session_id": session_id,
+            "cycle_day": cycle_day,
+            "field_name": field_name,
+            "old_value": existing.get("new_value", original_value),
+            "new_value": new_value,
+            "user_id": user_id,
+            "username": username,
+            "report_type": report_type,
+            "location": location,
+        })
         return {"success": True, "edit_id": existing["id"], "updated": True,
                 "master_info": {
                     "description": master_info.get("description", ""),
@@ -3106,6 +3163,22 @@ async def edit_barcode(data: dict):
     }
     await db.barcode_edits.insert_one(edit)
     _report_cache.invalidate_all()
+    # Movement Log — brand new edit
+    await log_audit_entry(db, {
+        "module": module,
+        "action_type": "edit",
+        "barcode": new_value,
+        "client_id": client_id,
+        "session_id": session_id,
+        "cycle_day": cycle_day,
+        "field_name": field_name,
+        "old_value": original_value,
+        "new_value": new_value,
+        "user_id": user_id,
+        "username": username,
+        "report_type": report_type,
+        "location": location,
+    })
     return {"success": True, "edit_id": edit["id"],
             "master_info": {
                 "description": master_info.get("description", ""),
@@ -3217,6 +3290,24 @@ async def undo_barcode_edit(data: dict):
         pass
     purged = await _purge_recos_for_edit(edit)
     _report_cache.invalidate_all()
+    # Movement Log — explicit undo
+    rt = edit.get("report_type", "")
+    module = data.get("module") or await resolve_module_for_client(db, edit.get("client_id"))
+    await log_audit_entry(db, {
+        "module": module,
+        "action_type": "undo",
+        "barcode": edit.get("original_value", ""),
+        "client_id": edit.get("client_id", ""),
+        "session_id": data.get("session_id") or "",
+        "cycle_day": data.get("cycle_day"),
+        "field_name": "article_code" if rt == "article-wise" else "barcode",
+        "old_value": edit.get("new_value", ""),
+        "new_value": edit.get("original_value", ""),
+        "user_id": data.get("user_id") or "",
+        "username": data.get("username") or "",
+        "report_type": rt,
+        "location": edit.get("location", ""),
+    })
     return {"success": True, "reco_adjustments_removed": purged}
 
 @portal_router.get("/reports/edits/{client_id}")
@@ -3650,13 +3741,49 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate):
         filter_key["barcode"] = adj.barcode
     elif adj.reco_type == "article":
         filter_key["article_code"] = adj.article_code
+    # Capture previous reco qty for the audit log diff
+    prev = await db.reco_adjustments.find_one(filter_key, {"_id": 0, "reco_qty": 1})
+    prev_qty = (prev or {}).get("reco_qty", 0) or 0
+    module = adj.module or await resolve_module_for_client(db, adj.client_id)
+    field_name = "reco_qty"
+    audit_barcode = adj.barcode or adj.article_code
     if adj.reco_qty == 0:
         await db.reco_adjustments.delete_one(filter_key)
         _reco_cache.invalidate(f"reco_{adj.client_id}")
+        await log_audit_entry(db, {
+            "module": module,
+            "action_type": "reco_adjust",
+            "barcode": audit_barcode,
+            "client_id": adj.client_id,
+            "session_id": adj.session_id or "",
+            "cycle_day": adj.cycle_day,
+            "field_name": field_name,
+            "old_value": prev_qty,
+            "new_value": 0,
+            "user_id": adj.user_id or "",
+            "username": adj.username or "",
+            "report_type": adj.reco_type,
+            "location": adj.location or "",
+        })
         return {"status": "deleted"}
     doc = {**filter_key, "reco_qty": adj.reco_qty, "updated_at": datetime.now(timezone.utc).isoformat()}
     await db.reco_adjustments.update_one(filter_key, {"$set": doc}, upsert=True)
     _reco_cache.invalidate(f"reco_{adj.client_id}")
+    await log_audit_entry(db, {
+        "module": module,
+        "action_type": "reco_adjust",
+        "barcode": audit_barcode,
+        "client_id": adj.client_id,
+        "session_id": adj.session_id or "",
+        "cycle_day": adj.cycle_day,
+        "field_name": field_name,
+        "old_value": prev_qty,
+        "new_value": adj.reco_qty,
+        "user_id": adj.user_id or "",
+        "username": adj.username or "",
+        "report_type": adj.reco_type,
+        "location": adj.location or "",
+    })
     return {"status": "saved", "reco_qty": adj.reco_qty}
 
 @portal_router.get("/reco-adjustments/{client_id}")
@@ -3671,6 +3798,40 @@ async def clear_reco_adjustments(client_id: str):
     result = await db.reco_adjustments.delete_many({"client_id": client_id})
     _reco_cache.invalidate(f"reco_{client_id}")
     return {"deleted": result.deleted_count}
+
+
+# ==================== AUDIT LOG (MOVEMENT / AUDIT TRAIL) ====================
+
+@portal_router.post("/audit-logs/search")
+async def audit_logs_search(filters: dict):
+    """Paginated search over the audit-trail log. Accepts any subset of:
+    client_id, session_id, barcode, user_id, start_date, end_date,
+    module, cycle_day, action_type, limit, skip.
+    """
+    return await search_audit_logs(db, filters or {})
+
+
+@portal_router.get("/audit-logs/recent")
+async def audit_logs_recent(barcode: str, client_id: Optional[str] = None, limit: int = 5):
+    """Last N entries for a given barcode — powers the 'Last Edited' popup
+    in both warehouse and cycle-count reports."""
+    logs = await fetch_recent_for_barcode(db, barcode=barcode, client_id=client_id, limit=limit)
+    return {"logs": logs}
+
+
+@portal_router.post("/audit-logs/export")
+async def audit_logs_export(filters: dict):
+    """Excel export of every audit-log entry matching the given filters.
+    Streams an .xlsx file straight to the browser."""
+    blob = await export_audit_logs_excel(db, filters or {})
+    headers = {
+        "Content-Disposition": 'attachment; filename="audit_movement_log.xlsx"'
+    }
+    return StreamingResponse(
+        io.BytesIO(blob),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
 
 # ==================== REPORTS ROUTES ====================
 

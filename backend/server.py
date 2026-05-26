@@ -284,6 +284,13 @@ async def create_indexes():
         await db.cycle_day_picks.create_index([("project_id", 1), ("day_id", 1), ("type", 1)])
         await db.cycle_closed_bins.create_index([("project_id", 1), ("location", 1)])
         await db.cycle_closed_bins.create_index("day_id")
+        # Audit Logs (Movement / Audit Trail) — Prompt 1
+        await db.audit_logs.create_index([("barcode", 1), ("client_id", 1), ("timestamp_dt", -1)])
+        await db.audit_logs.create_index([("session_id", 1), ("timestamp_dt", -1)])
+        await db.audit_logs.create_index([("user_id", 1), ("timestamp_dt", -1)])
+        await db.audit_logs.create_index([("client_id", 1), ("timestamp_dt", -1)])
+        await db.audit_logs.create_index([("module", 1), ("timestamp_dt", -1)])
+        await db.audit_logs.create_index([("timestamp_dt", -1)])
         logger.info("MongoDB indexes created successfully")
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")

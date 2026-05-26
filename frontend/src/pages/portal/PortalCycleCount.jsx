@@ -18,6 +18,19 @@ import EmptyState from '../../components/portal/EmptyState';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal/cycle-count`;
 const CLIENT_API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal/clients`;
 
+// Movement / Audit Log attribution — injected on every state-changing
+// cycle-count request so the audit log knows who triggered the action.
+// Safe to call even when no user is logged in (yields empty strings).
+function _userHeaders() {
+  try {
+    const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+    return {
+      'X-User-Id': (u && u.id) ? String(u.id) : '',
+      'X-Username': (u && u.username) ? String(u.username) : '',
+    };
+  } catch { return { 'X-User-Id': '', 'X-Username': '' }; }
+}
+
 // ───────────────────────────────────────────────────── Page Component
 export default function PortalCycleCount() {
   const navigate = useNavigate();
@@ -68,7 +81,7 @@ export default function PortalCycleCount() {
 
   const handleDelete = async (pid) => {
     if (!window.confirm('Delete this project and ALL its data permanently?')) return;
-    const r = await fetch(`${API}/projects/${pid}`, { method: 'DELETE' });
+    const r = await fetch(`${API}/projects/${pid}`, { method: 'DELETE', headers: _userHeaders() });
     if (r.ok) { toast.success('Project deleted'); loadProjects(); }
     else toast.error('Delete failed');
   };
@@ -250,12 +263,12 @@ function CycleProjectDetail({ projectId, onBack, clients }) {
 
   const completeProject = async () => {
     if (!window.confirm('Mark this project as completed? You can reopen later.')) return;
-    const r = await fetch(`${API}/projects/${projectId}/complete`, { method: 'POST' });
+    const r = await fetch(`${API}/projects/${projectId}/complete`, { method: 'POST', headers: _userHeaders() });
     if (r.ok) { toast.success('Project completed'); load(); }
   };
 
   const reopenProject = async () => {
-    const r = await fetch(`${API}/projects/${projectId}/reopen`, { method: 'POST' });
+    const r = await fetch(`${API}/projects/${projectId}/reopen`, { method: 'POST', headers: _userHeaders() });
     if (r.ok) { toast.success('Project reopened'); load(); }
   };
 
@@ -363,7 +376,7 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
   const closeDay = async () => {
     if (!window.confirm(`Close Day ${day.day_no}? Variance will be frozen.`)) return;
     const r = await fetch(`${API}/days/${day.id}/close`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ..._userHeaders() },
       body: JSON.stringify({ confirm: true })
     });
     if (r.ok) {
@@ -377,13 +390,13 @@ function DayView({ days, activeDay, setActiveDay, projectId, onChange, loading }
 
   const reopenDay = async () => {
     if (!window.confirm(`Reopen Day ${day.day_no}? Closed-bin entries for this day will be cleared.`)) return;
-    const r = await fetch(`${API}/days/${day.id}/reopen`, { method: 'POST' });
+    const r = await fetch(`${API}/days/${day.id}/reopen`, { method: 'POST', headers: _userHeaders() });
     if (r.ok) { toast.success('Day reopened'); onChange(); loadVariance(); }
   };
 
   const deleteDay = async () => {
     if (!window.confirm(`Delete Day ${day.day_no} and ALL its data? Cannot be undone.`)) return;
-    const r = await fetch(`${API}/days/${day.id}`, { method: 'DELETE' });
+    const r = await fetch(`${API}/days/${day.id}`, { method: 'DELETE', headers: _userHeaders() });
     if (r.ok) { toast.success('Day deleted'); setActiveDay(null); onChange(); }
   };
 

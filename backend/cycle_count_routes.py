@@ -34,7 +34,7 @@ Storage layout (collections):
   cycle_closed_bins     {project_id, day_id, day_no, location, closed_at} (for dup-detect)
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -47,6 +47,8 @@ import csv
 import uuid
 import logging
 
+from shared.audit_log_helper import log_audit_entry
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -55,6 +57,23 @@ _client = AsyncIOMotorClient(mongo_url)
 db = _client[os.environ['DB_NAME']]
 
 cycle_router = APIRouter()
+
+
+def _user_from_request(request: Optional[Request]) -> Dict[str, str]:
+    """Best-effort extraction of acting user from X-User-Id / X-Username
+    request headers (sent by the admin portal frontend on every state-
+    changing call). Returns empty strings when not provided — never
+    raises. Used to attribute Movement / Audit Log entries.
+    """
+    if request is None:
+        return {"user_id": "", "username": ""}
+    try:
+        return {
+            "user_id": request.headers.get("x-user-id", "") or "",
+            "username": request.headers.get("x-username", "") or "",
+        }
+    except Exception:
+        return {"user_id": "", "username": ""}
 logger = logging.getLogger(__name__)
 
 
@@ -394,7 +413,7 @@ async def get_project(pid: str):
 
 
 @cycle_router.delete("/projects/{pid}")
-async def delete_project(pid: str):
+async def delete_project(pid: str, request: Request = None):
     p = await db.cycle_projects.find_one({"id": pid})
     if not p:
         raise HTTPException(404, "Project not found")
@@ -411,24 +430,65 @@ async def delete_project(pid: str):
         deleted["forward_batches"] = (await db.forward_batches.delete_many({"session_id": sid})).deleted_count
         deleted["audit_sessions"] = (await db.audit_sessions.delete_many({"id": sid})).deleted_count
     deleted["cycle_projects"] = (await db.cycle_projects.delete_many({"id": pid})).deleted_count
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "delete",
+        "barcode": "",
+        "client_id": p.get("client_id", ""),
+        "session_id": sid or "",
+        "field_name": "project",
+        "old_value": p.get("name", "") or pid,
+        "new_value": "",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": "Project and all data permanently deleted", "deleted": deleted}
 
 
 @cycle_router.post("/projects/{pid}/complete")
-async def complete_project(pid: str):
+async def complete_project(pid: str, request: Request = None):
     res = await db.cycle_projects.update_one(
         {"id": pid}, {"$set": {"status": "completed", "completed_at": _now_iso()}}
     )
     if res.matched_count == 0:
         raise HTTPException(404, "Project not found")
+    p = await db.cycle_projects.find_one({"id": pid}, {"_id": 0})
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "assign",
+        "barcode": "",
+        "client_id": (p or {}).get("client_id", ""),
+        "session_id": (p or {}).get("audit_session_id", "") or "",
+        "field_name": "project_status",
+        "old_value": "active",
+        "new_value": "completed",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": "Project marked complete"}
 
 
 @cycle_router.post("/projects/{pid}/reopen")
-async def reopen_project(pid: str):
+async def reopen_project(pid: str, request: Request = None):
     await db.cycle_projects.update_one(
         {"id": pid}, {"$set": {"status": "active"}, "$unset": {"completed_at": ""}}
     )
+    p = await db.cycle_projects.find_one({"id": pid}, {"_id": 0})
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "revoke",
+        "barcode": "",
+        "client_id": (p or {}).get("client_id", ""),
+        "session_id": (p or {}).get("audit_session_id", "") or "",
+        "field_name": "project_status",
+        "old_value": "completed",
+        "new_value": "active",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": "Project reopened"}
 
 
@@ -576,7 +636,7 @@ async def day_variance(day_id: str):
 
 
 @cycle_router.post("/days/{day_id}/close")
-async def close_day(day_id: str, _: CloseDayRequest):
+async def close_day(day_id: str, _: CloseDayRequest, request: Request = None):
     day = await db.cycle_days.find_one({"id": day_id}, {"_id": 0})
     if not day:
         raise HTTPException(404, "Day not found")
@@ -616,33 +676,77 @@ async def close_day(day_id: str, _: CloseDayRequest):
             "stats.duplicate_bins": variance["bins_summary"]["duplicate_bins"],
         }}
     )
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "assign",
+        "barcode": "",
+        "client_id": project.get("client_id", ""),
+        "session_id": project.get("audit_session_id", "") or "",
+        "cycle_day": day.get("day_no"),
+        "field_name": "day_status",
+        "old_value": "open",
+        "new_value": "closed",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": f"Day {day['day_no']} closed", "scanned_bins": len(scanned_bins),
             "variance": variance["totals"], "duplicate_bins": variance["bins_summary"]["duplicate_bins"]}
 
 
 @cycle_router.post("/days/{day_id}/reopen")
-async def reopen_day(day_id: str):
+async def reopen_day(day_id: str, request: Request = None):
     day = await db.cycle_days.find_one({"id": day_id})
     if not day:
         raise HTTPException(404, "Day not found")
+    project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0, "client_id": 1, "audit_session_id": 1}) or {}
     await db.cycle_closed_bins.delete_many({"day_id": day_id})
     await db.cycle_days.update_one(
         {"id": day_id},
         {"$set": {"status": "open"}, "$unset": {"closed_at": "", "frozen_report": ""}}
     )
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "revoke",
+        "barcode": "",
+        "client_id": project.get("client_id", ""),
+        "session_id": project.get("audit_session_id", "") or "",
+        "cycle_day": day.get("day_no"),
+        "field_name": "day_status",
+        "old_value": "closed",
+        "new_value": "open",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": f"Day {day['day_no']} reopened"}
 
 
 @cycle_router.delete("/days/{day_id}")
-async def delete_day(day_id: str):
+async def delete_day(day_id: str, request: Request = None):
     day = await db.cycle_days.find_one({"id": day_id})
     if not day:
         raise HTTPException(404, "Day not found")
+    project = await db.cycle_projects.find_one({"id": day["project_id"]}, {"_id": 0, "client_id": 1, "audit_session_id": 1}) or {}
     deleted: Dict[str, int] = {}
     deleted["cycle_day_stock"] = (await db.cycle_day_stock.delete_many({"day_id": day_id})).deleted_count
     deleted["cycle_day_picks"] = (await db.cycle_day_picks.delete_many({"day_id": day_id})).deleted_count
     deleted["cycle_closed_bins"] = (await db.cycle_closed_bins.delete_many({"day_id": day_id})).deleted_count
     deleted["cycle_days"] = (await db.cycle_days.delete_many({"id": day_id})).deleted_count
+    u = _user_from_request(request)
+    await log_audit_entry(db, {
+        "module": "cycle_count",
+        "action_type": "delete",
+        "barcode": "",
+        "client_id": project.get("client_id", ""),
+        "session_id": project.get("audit_session_id", "") or "",
+        "cycle_day": day.get("day_no"),
+        "field_name": "day",
+        "old_value": f"Day {day.get('day_no')}",
+        "new_value": "",
+        "user_id": u["user_id"],
+        "username": u["username"],
+    })
     return {"message": "Day deleted", "deleted": deleted}
 
 

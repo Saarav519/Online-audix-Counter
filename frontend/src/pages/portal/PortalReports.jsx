@@ -1235,6 +1235,24 @@ export default function PortalReports() {
         return;
       }
       const body = { client_id: selectedClient, ...params };
+      // Movement / Audit Log attribution + cycle context
+      try {
+        const _u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+        if (_u && _u.id) body.user_id = _u.id;
+        if (_u && _u.username) body.username = _u.username;
+      } catch { /* ignore */ }
+      if (selectedSession) body.session_id = selectedSession;
+      if (isCycleCountClient) {
+        body.module = 'cycle_count';
+        const _selDay = (selectedDay && selectedDay !== 'consolidated') ? selectedDay : '';
+        if (_selDay) {
+          const _proj = selectedProjectObj;
+          const _day = (_proj?.days || []).find(d => d.id === _selDay);
+          if (_day?.day_no != null) body.cycle_day = _day.day_no;
+        }
+      } else {
+        body.module = isStoreClient ? 'warehouse' : 'warehouse';
+      }
       const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (response.ok) {
         // Invalidate all cached reports for this client — reco propagates
@@ -1417,6 +1435,14 @@ export default function PortalReports() {
     if (!isCycleCountClient || !selectedSession) return null;
     return sessions.find(s => s.id === selectedSession) || null;
   }, [isCycleCountClient, selectedSession, sessions]);
+  // Numeric Day No (for the Movement / Audit Log). Pulled from the
+  // selected cycle-count day so per-day edits/recos are attributable.
+  const selectedDayNo = useMemo(() => {
+    if (!isCycleCountClient || !selectedDay || selectedDay === 'consolidated') return null;
+    const _proj = selectedProjectObj;
+    const _day = (_proj?.days || []).find(d => d.id === selectedDay);
+    return _day?.day_no != null ? _day.day_no : null;
+  }, [isCycleCountClient, selectedDay, selectedProjectObj]);
   // For cycle_count consolidated view (selectedDay === 'consolidated') we expose
   // empty-bins + pending-locations report types in addition to the daily ones.
   const isCcConsolidatedView = isCycleCountClient && selectedDay === 'consolidated';
@@ -2227,9 +2253,9 @@ export default function PortalReports() {
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
           {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
-          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={isCycleCountClient ? isCcDayView : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'bin-wise')} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} />}
-          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isCycleCountClient ? false : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'barcode-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} />}
-          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={(isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} />}
+          {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={isCycleCountClient ? isCcDayView : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'bin-wise')} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
+          {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={isCycleCountClient ? false : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'barcode-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
+          {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={(isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'article-wise'} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
           {reportType === 'category-summary' && <CategorySummaryTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
           </div>
           {/* Load More button for large datasets */}
@@ -2623,7 +2649,7 @@ function RecoInput({ value, onSave, dataTestId }) {
 }
 
 // ============ Detailed Item-wise Table ============
-function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false }) {
+function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isConsolidated, isRecoEditable, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false, auditSessionId = '', auditCycleDay = null, auditModule = null }) {
   const t = data.totals || {};
   const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   const parentRef = useRef(null);
@@ -2710,7 +2736,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               return (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-3">{row.location || '-'}</td>
-                <td className="py-2 px-3 font-mono"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="detailed" field="barcode" onEditComplete={onRefresh} readOnly={barcodeReadOnly} /></td>
+                <td className="py-2 px-3 font-mono"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="detailed" field="barcode" onEditComplete={onRefresh} readOnly={barcodeReadOnly} sessionId={auditSessionId} cycleDay={auditCycleDay} module={auditModule} /></td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">{row.category || '-'}</td>
                 {extraColumns.map(col => (
@@ -2775,7 +2801,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
 }
 
 // ============ Barcode-wise Table ============
-function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false }) {
+function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false, auditSessionId = '', auditCycleDay = null, auditModule = null }) {
   const t = data.totals || {};
   const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
   const parentRef = useRef(null);
@@ -2867,7 +2893,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               const i = virtualRow.index;
               return (
               <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="py-2 px-3 font-mono text-xs"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="barcode-wise" field="barcode" onEditComplete={onRefresh} compact readOnly={barcodeReadOnly} /></td>
+                <td className="py-2 px-3 font-mono text-xs"><BarcodeEditCell value={row.barcode} row={row} clientId={clientId} reportType="barcode-wise" field="barcode" onEditComplete={onRefresh} compact readOnly={barcodeReadOnly} sessionId={auditSessionId} cycleDay={auditCycleDay} module={auditModule} /></td>
                 <td className="py-2 px-3">{row.description || '-'}</td>
                 <td className="py-2 px-3">
                   {row.category ? (
@@ -2937,7 +2963,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
 }
 
 // ============ Article-wise Table ============
-function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false }) {
+function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, onSaveReco, isRecoEditable, isConsolidated, extraColumns = [], clientId, onRefresh, schemaValueFields = { has_mrp: true, has_cost: true }, barcodeReadOnly = false, auditSessionId = '', auditCycleDay = null, auditModule = null }) {
   const [expandedRows, setExpandedRows] = React.useState(new Set());
 
   const toggleRow = (index) => {
@@ -3029,7 +3055,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-2 text-center">
                     <span className={`inline-block transition-transform duration-200 text-gray-400 ${expandedRows.has(i) ? 'rotate-90' : ''}`}>&#9654;</span>
                   </td>
-                  <td className="py-2 px-3 font-mono text-xs font-medium"><BarcodeEditCell value={row.article_code} row={row} clientId={clientId} reportType="article-wise" field="article_code" onEditComplete={onRefresh} compact readOnly={barcodeReadOnly} /></td>
+                  <td className="py-2 px-3 font-mono text-xs font-medium"><BarcodeEditCell value={row.article_code} row={row} clientId={clientId} reportType="article-wise" field="article_code" onEditComplete={onRefresh} compact readOnly={barcodeReadOnly} sessionId={auditSessionId} cycleDay={auditCycleDay} module={auditModule} /></td>
                   <td className="py-2 px-3">{row.article_name || '-'}</td>
                   <td className="py-2 px-3">
                     {row.category ? <span className={`px-2 py-0.5 rounded text-xs ${row.category === 'Unmapped' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}>{row.category}</span> : '-'}

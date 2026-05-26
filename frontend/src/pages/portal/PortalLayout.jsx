@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, FolderOpen, Smartphone,
   FileBarChart, Users, LogOut, Database, AlertTriangle,
-  ChevronLeft, ChevronRight, Search, Menu, X, Repeat
+  ChevronLeft, ChevronRight, Search, Menu, X, Repeat, History
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { useAudit } from '../AuditApp';
@@ -20,6 +20,7 @@ const navItems = [
   { to: '/portal/cycle-count', icon: Repeat, label: 'Cycle Count' },
   { to: '/portal/devices', icon: Smartphone, label: 'Devices' },
   { to: '/portal/reports', icon: FileBarChart, label: 'Reports' },
+  { to: '/portal/movement', icon: History, label: 'Movement Log' },
   { to: '/portal/sync-logs', icon: Database, label: 'Sync Logs', badgeKey: 'syncPending' },
   { to: '/portal/conflicts', icon: AlertTriangle, label: 'Conflicts', badgeKey: 'conflictsPending' },
   { to: '/portal/users', icon: Users, label: 'Users', badgeKey: 'usersPending' },
