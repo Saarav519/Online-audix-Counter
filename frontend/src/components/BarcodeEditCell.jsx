@@ -13,12 +13,6 @@ export function BarcodeEditCell({
   compact = false,
   readOnly = false
 }) {
-  // Hard read-only override (e.g. Cycle Count Consolidated view).
-  // When set, render plain value with no edit affordance, regardless of
-  // the row's server-side is_editable flag.
-  if (readOnly) {
-    return <span className={compact ? 'text-xs font-mono' : 'font-mono'}>{value || '-'}</span>;
-  }
   const isEditable = row?.is_editable;
   const isEdited = row?.is_edited;
   const editId = row?._edit_id;
@@ -54,6 +48,14 @@ export function BarcodeEditCell({
       return () => clearTimeout(timer);
     }
   }, [inputVal, editing, searchMaster]);
+
+  // Hard read-only override (e.g. Cycle Count Consolidated view).
+  // When set, render plain value with no edit affordance, regardless of
+  // the row's server-side is_editable flag.
+  // NOTE: kept after all hooks above to preserve hook call order.
+  if (readOnly) {
+    return <span className={compact ? 'text-xs font-mono' : 'font-mono'}>{value || '-'}</span>;
+  }
 
   const startEdit = (e) => {
     e.stopPropagation();
