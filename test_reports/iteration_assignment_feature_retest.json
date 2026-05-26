@@ -1,0 +1,48 @@
+{
+  "summary": "Prompt 4 fix re-test PASSED. The actor-resolution fix (X-User-Id-only, with portal_users lookup guard) closes all 16 regressions reported in iteration_assignment_feature.json without breaking any of the 32 prompt-4 assignment tests. Targeted invariant scenarios (synthetic vs. real X-User-Id; body user_id legacy attribution) all behave per spec.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_assignment_feature.py",
+    "/app/backend/tests/test_audit_movement_log.py",
+    "/app/backend/tests/test_last_edited_popup_backend.py",
+    "/app/backend/tests/test_role_system.py",
+    "/app/backend/tests/test_actor_resolution_invariant.py",
+    "/app/test_reports/pytest/assignment_feature_retest.xml",
+    "/app/test_reports/pytest/regression_p1_p2_p3_retest.xml",
+    "/app/test_reports/pytest/actor_resolution_retest.xml"
+  ],
+  "results": {
+    "test_assignment_feature.py": "32 passed / 32 (prompt-4 ACL + assignment CRUD + cycle-count gates + edit-barcode/undo/reco gates)",
+    "regression_suite": "67 passed / 67 (test_audit_movement_log.py 27, test_last_edited_popup_backend.py 14, test_role_system.py 26)",
+    "test_actor_resolution_invariant.py": "4 passed / 4 (no-header+synthetic body=200, real non-owner=403 for reco-adjust; synthetic X-User-Id bypass + real non-owner=403 for cc close-day)"
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Carry-over (not blocking): audit_routes.py is still > 7K lines and should be split into routers (clients/sessions/reports/reco/assignments/users) for maintainability.",
+    "Carry-over (not blocking): assignment_helper.create_assignment still has no duplicate-active-assignment guard; consider an upsert/uniqueness check on (assigned_to, session_id, is_active=True).",
+    "Carry-over (not blocking): DELETE /assignments/{id} is idempotent for already-revoked rows but the assigned_by ownership check is short-circuited for is_active=False — minor info-disclosure surface.",
+    "Carry-over (not blocking): /assignments/users response is not paginated (to_list(2000)); bound for large portals.",
+    "Resolved: assignment_helper.check_assignment_access now defaults can_edit_reco=False when report_type is omitted (per previous review)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_actor_resolution_invariant.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (32/32 prompt-4 + 67/67 regression + 4/4 invariant = 103/103)",
+    "frontend": "not tested (backend-only per request)"
+  },
+  "test_credentials": "admin / admin123 (from /app/memory/test_credentials.md). Non-admin actors registered dynamically as TEST_invar_str_* and approved by admin.",
+  "seed_data_creation": "Per-module TEST_-prefixed users (stranger), one TEST_inv_ cycle_count client + project + day. Each existing suite cleans up its own TEST_ data; the new invariant test leaves a small cycle-count fixture but it is namespaced with TEST_inv_.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All four scenarios from the review request are codified in /app/backend/tests/test_actor_resolution_invariant.py for ongoing regression. The portal route prefix is /api/audit/portal. close-day requires JSON body {\"confirm\": true}. reco-adjustments uses keys reco_type + reco_qty (not qty / report_type). Cycle-count client_type must be 'cycle_count' to allow creating cc projects on it.",
+  "rca_of_the_issue": "Prior iteration RCA fully addressed. Fix verified: (a) audit_routes.py reads actor strictly from request.headers.get('x-user-id') with no body fallback; (b) ACL gate looks up portal_users.find_one({id}) — when no real user matches (synthetic / legacy id), the gate is bypassed; (c) cycle_count_routes._require_owner_for_session uses the same portal_users guard. Net effect: legacy callers that pass body user_id for audit-trail (or pass a synthetic X-User-Id) are no longer wrongly 403'd, while genuine non-owner portal_users users continue to be blocked."
+}

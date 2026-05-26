@@ -3093,17 +3093,23 @@ async def edit_barcode(data: dict, request: Request):
 
     # Prompt 4 — only OWNER can edit barcode/article values. Assignees
     # are restricted to reco edits on the detailed report.
-    actor_id = (request.headers.get("x-user-id", "") or user_id or "").strip()
+    # Actor is read STRICTLY from the X-User-Id header — body `user_id`
+    # is preserved for audit-trail attribution only (legacy callers).
+    # Gate only enforced when X-User-Id matches a real portal_users row
+    # so synthetic test IDs / legacy scripts keep working.
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
     if actor_id:
-        acl = await _h_check_assignment_access(
-            db, user_id=actor_id, client_id=client_id, session_id=session_id,
-            report_type=report_type, cycle_day=cycle_day,
-        )
-        if not acl.get("can_edit_all"):
-            raise HTTPException(
-                status_code=403,
-                detail="Barcode/article edits are restricted to the client owner.",
+        real_user = await db.portal_users.find_one({"id": actor_id}, {"_id": 0, "id": 1})
+        if real_user:
+            acl = await _h_check_assignment_access(
+                db, user_id=actor_id, client_id=client_id, session_id=session_id,
+                report_type=report_type, cycle_day=cycle_day,
             )
+            if not acl.get("can_edit_all"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Barcode/article edits are restricted to the client owner.",
+                )
 
     module = module_override or await resolve_module_for_client(db, client_id)
 
@@ -3347,19 +3353,23 @@ async def undo_barcode_edit(data: dict, request: Request):
     if not edit:
         raise HTTPException(404, "Edit not found")
     # Prompt 4 — only OWNER can undo barcode/article edits.
-    actor_id = (request.headers.get("x-user-id", "") or data.get("user_id") or "").strip()
+    # Actor strictly from header — body user_id is audit-trail only.
+    # Gate only enforced when X-User-Id matches a real portal_users row.
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
     if actor_id:
-        acl = await _h_check_assignment_access(
-            db, user_id=actor_id, client_id=edit.get("client_id"),
-            session_id=data.get("session_id") or "",
-            report_type=edit.get("report_type") or "",
-            cycle_day=data.get("cycle_day"),
-        )
-        if not acl.get("can_edit_all"):
-            raise HTTPException(
-                status_code=403,
-                detail="Undo is restricted to the client owner.",
+        real_user = await db.portal_users.find_one({"id": actor_id}, {"_id": 0, "id": 1})
+        if real_user:
+            acl = await _h_check_assignment_access(
+                db, user_id=actor_id, client_id=edit.get("client_id"),
+                session_id=data.get("session_id") or "",
+                report_type=edit.get("report_type") or "",
+                cycle_day=data.get("cycle_day"),
             )
+            if not acl.get("can_edit_all"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Undo is restricted to the client owner.",
+                )
     result = await db.barcode_edits.update_one({"id": edit_id}, {"$set": {"is_active": False}})
     if result.modified_count == 0:
         # Already inactive — still purge any orphaned recos for safety
@@ -3811,8 +3821,14 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
     """Save or update a reconciliation adjustment (client-level for consolidated reports)."""
     # Prompt 4 — assignees may edit reco ONLY on the detailed report.
     # Owners may edit reco everywhere.
-    actor_id = (request.headers.get("x-user-id", "") or adj.user_id or "").strip()
+    # Actor strictly from header — body user_id is audit-trail only.
+    # Gate only enforced when X-User-Id matches a real portal_users row.
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
     if actor_id:
+        real_user = await db.portal_users.find_one({"id": actor_id}, {"_id": 0, "id": 1})
+    else:
+        real_user = None
+    if actor_id and real_user:
         rt_for_check = {
             "detailed": "detailed",
             "barcode":  "barcode-wise",

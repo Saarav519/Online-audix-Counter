@@ -282,8 +282,9 @@ async def check_assignment_access(
                 out["has_access"] = rt_norm in rts
         if out["has_access"]:
             out["assignment_id"] = row["id"]
-            # Reco-edit gate: ONLY in detailed report.
-            out["can_edit_reco"] = (rt_norm == "detailed") or (not rt_norm and True)
+            # Reco-edit gate: ONLY in detailed report. Callers that omit
+            # report_type get can_edit_reco=False (must be explicit).
+            out["can_edit_reco"] = (rt_norm == "detailed")
             # Assignees can NEVER edit barcode/article/days.
             out["can_edit_all"] = False
             return out

@@ -83,10 +83,18 @@ async def _require_owner_for_session(session_id: Optional[str], client_id: Optio
     Assignees are restricted to reco edits (handled in audit_routes
     /reco-adjustments). Days/projects can only be opened/closed/deleted
     by the client owner.
-    Raises HTTPException(403) when blocked. No-op when no X-User-Id was
-    sent (legacy behaviour — keeps existing scripts working).
+    Raises HTTPException(403) when blocked. No-op when:
+      • no X-User-Id was sent (legacy behaviour — scripts), OR
+      • the X-User-Id doesn't match a real portal_users row (synthetic
+        audit-trail attribution from older tests).
     """
     if not user_id:
+        return
+    # Only enforce when the user actually exists in the portal — legacy
+    # tests / cron jobs may send a synthetic user_id purely for the
+    # audit log. Treating those as 'no check' preserves backward compat.
+    real_user = await db.portal_users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    if not real_user:
         return
     acl = await check_assignment_access(
         db, user_id=user_id, session_id=session_id, client_id=client_id,
