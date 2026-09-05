@@ -2854,10 +2854,12 @@ function RecoInput({ value, onSave, dataTestId, recoBarcode = '', clientId = '' 
       setEditing(true);
       setTimeout(() => inputRef.current?.focus(), 50);
     };
-    // Gate the edit-mode-entry behind the Last-Edited popup. recoBarcode
-    // can be a barcode or article_code — both are stored as 'barcode' on
-    // the audit_log row, so the recent-lookup works for both.
-    if (recoBarcode) {
+    // The history popup belongs to a cell that already carries a reco value —
+    // that is the case where you need to see who put it there before changing
+    // it. On a blank cell there is nothing to overwrite, so it opens straight
+    // into the editor. recoBarcode can be a barcode or article_code; both are
+    // stored as 'barcode' on the audit_log row, so the lookup works for either.
+    if (recoBarcode && value) {
       lastEdit.openPopup(recoBarcode, clientId, _go);
     } else {
       _go();
