@@ -45,6 +45,41 @@ let _latestUser = readUser();
 
 export const getPortalAuthHeaders = () => headersFromUser(_latestUser);
 
+// The backend scopes what it returns to the calling user, so every portal API
+// call has to carry the identity. Portal pages reach the API through plain
+// fetch() in several hundred places, so attach it once here instead of
+// threading headers through each one. Only this app's own API is touched, a
+// header the caller set itself always wins, and a browser with no logged-in
+// portal user (a scanner device) is left exactly as it was.
+const installIdentityInterceptor = () => {
+  if (typeof window === 'undefined' || window.__audixIdentityFetch) return;
+  if (typeof window.fetch !== 'function') return;
+  // Bound to window — fetch throws "Illegal invocation" when called detached.
+  const nativeFetch = window.fetch.bind(window);
+  window.__audixIdentityFetch = true;
+
+  window.fetch = function audixFetch(input, init) {
+    try {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      const user = _latestUser;
+      if (!user || !user.id || !url.includes('/api/audit/')) {
+        return nativeFetch(input, init);
+      }
+      const headers = new Headers(
+        (init && init.headers) || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined)
+      );
+      if (!headers.has('X-User-Id')) headers.set('X-User-Id', String(user.id));
+      if (!headers.has('X-Username') && user.username) headers.set('X-Username', String(user.username));
+      return nativeFetch(input, { ...(init || {}), headers });
+    } catch {
+      // Never let the interceptor be the reason a request fails.
+      return nativeFetch(input, init);
+    }
+  };
+};
+
+installIdentityInterceptor();
+
 export const AuditProvider = ({ children }) => {
   const [portalUser, setPortalUser] = useState(_latestUser);
 

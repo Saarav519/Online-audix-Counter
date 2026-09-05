@@ -48,7 +48,7 @@ import uuid
 import logging
 
 from shared.audit_log_helper import log_audit_entry
-from shared.assignment_helper import check_assignment_access
+from shared.assignment_helper import check_assignment_access, get_visible_client_ids
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -428,8 +428,13 @@ async def create_project(req: CreateProject):
 
 
 @cycle_router.get("/projects")
-async def list_projects(client_id: Optional[str] = None):
-    q = {"client_id": client_id} if client_id else {}
+async def list_projects(request: Request, client_id: Optional[str] = None):
+    if client_id:
+        q = {"client_id": client_id}
+    else:
+        # "Every project" still means only the caller's own clients.
+        visible = await get_visible_client_ids(db, (request.headers.get("x-user-id", "") or "").strip())
+        q = {} if visible is None else {"client_id": {"$in": visible}}
     items = await db.cycle_projects.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
     # Decorate with day count + scanned bins
     for p in items:
