@@ -26,7 +26,6 @@ from shared.audit_log_helper import (
 )
 from shared.auth_middleware import (
     get_current_user,
-    require_admin,
     ADMIN_ROLE,
     SUPERVISOR_ROLE,
 )
@@ -36,6 +35,7 @@ from shared.assignment_helper import (
     get_my_assignments as _h_get_my_assignments,
     get_assignments_by_me as _h_get_assignments_by_me,
     check_assignment_access as _h_check_assignment_access,
+    get_visible_client_ids as _h_get_visible_client_ids,
     FULL_SESSION, SPECIFIC_REPORTS, VALID_TYPES, VALID_MODULES,
 )
 
@@ -560,17 +560,90 @@ async def get_me(request: Request):
     return user
 
 
+async def _visible_client_ids(request: Request) -> Optional[List[str]]:
+    """Client ids the caller of this request may see, or None for "don't scope".
+
+    The portal FE stamps X-User-Id on every call, so a logged-in user gets their
+    own clients plus whatever was assigned to them and nothing else. A caller
+    with no identity — a scanner, a cron job, an old script — is not scoped, the
+    same soft-gate the edit endpoints already use.
+    """
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
+    return await _h_get_visible_client_ids(db, actor_id)
+
+
+def _scope_query(query: dict, visible: Optional[List[str]], field: str = "client_id") -> dict:
+    """Narrow `query` to the visible clients. A no-op when not scoping."""
+    if visible is None:
+        return query
+    return {**query, field: {"$in": visible}}
+
+
 @portal_router.get("/users")
 async def get_portal_users():
     """List all registered portal users."""
     users = await db.portal_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
+@portal_router.post("/users")
+async def create_portal_user(payload: PortalUserCreate, request: Request):
+    """Create a portal user directly. Any logged-in portal user may do this.
+
+    Self-registration was the only way an account could come into existence, and
+    it lands unapproved — so somebody had to walk every new supervisor through
+    the login page before they could be picked as an assignee. A user created
+    here is approved and active straight away.
+
+    Deliberately not admin-only: when the admin is away, the supervisor running
+    the count still has to be able to add someone and get the reco done.
+    """
+    actor = await get_current_user(request, db)
+
+    username = (payload.username or "").strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    # Same minimum the reset-password endpoint enforces.
+    if len(payload.password or "") < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+
+    role = payload.role or SUPERVISOR_ROLE
+    if role == "viewer":  # legacy alias, handled the same way by /users/{id}/role
+        role = SUPERVISOR_ROLE
+    if role not in (ADMIN_ROLE, SUPERVISOR_ROLE):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'supervisor'")
+
+    # Case-insensitive so "Ravi" and "ravi" cannot become two accounts nobody
+    # can tell apart in the assignee list.
+    existing = await db.portal_users.find_one(
+        {"username": {"$regex": f"^{re.escape(username)}$", "$options": "i"}}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    portal_user = PortalUser(
+        username=username,
+        password_hash=hash_password(payload.password),
+        role=role,
+        is_active=True,
+        is_approved=True,  # an admin created it; a second approval step adds nothing
+    )
+    doc = portal_user.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['created_by'] = actor["id"]
+    # Build the response before inserting: insert_one stamps a BSON _id onto the
+    # dict in place, which does not survive JSON encoding.
+    public = {k: v for k, v in doc.items() if k != "password_hash"}
+    await db.portal_users.insert_one(doc)
+
+    return {
+        "message": f"User '{username}' created — they can log in and be assigned now",
+        "user": public,
+    }
+
 @portal_router.put("/users/{user_id}/approve")
 async def approve_user(user_id: str, request: Request):
-    """Approve a pending user (admin-only)."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Approve a pending user. Open to any logged-in portal user."""
+    await get_current_user(request, db)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": True}}
@@ -581,9 +654,8 @@ async def approve_user(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/reject")
 async def reject_user(user_id: str, request: Request):
-    """Reject/unapprove a user (admin-only)."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Reject/unapprove a user. Open to any logged-in portal user."""
+    await get_current_user(request, db)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": False}}
@@ -594,12 +666,14 @@ async def reject_user(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/toggle-active")
 async def toggle_user_active(user_id: str, request: Request):
-    """Enable/disable a user (admin-only)."""
+    """Enable/disable a user. Open to any logged-in portal user."""
     actor = await get_current_user(request, db)
-    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Disabling yourself logs you straight out with no way back in.
+    if user["id"] == actor["id"]:
+        raise HTTPException(status_code=400, detail="You cannot disable your own account")
 
     new_status = not user.get("is_active", True)
     await db.portal_users.update_one(
@@ -610,9 +684,8 @@ async def toggle_user_active(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/role")
 async def change_user_role(user_id: str, role_data: dict, request: Request):
-    """Change user role (admin / supervisor) — admin-only."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Change user role (admin / supervisor). Open to any logged-in portal user."""
+    await get_current_user(request, db)
     role = role_data.get("role", SUPERVISOR_ROLE)
     # Backwards compat: accept legacy "viewer" as "supervisor".
     if role == "viewer":
@@ -630,14 +703,16 @@ async def change_user_role(user_id: str, role_data: dict, request: Request):
 
 @portal_router.delete("/users/{user_id}")
 async def delete_portal_user(user_id: str, request: Request):
-    """Delete a portal user (admin-only)."""
+    """Delete a portal user. Open to any logged-in portal user."""
     actor = await get_current_user(request, db)
-    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.get("username") == "admin":
         raise HTTPException(status_code=400, detail="Cannot delete the default admin user")
+    # Deleting yourself mid-session leaves the portal with a logged-in ghost.
+    if user["id"] == actor["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
     await db.portal_users.delete_one({"id": user_id})
     return {"message": "User deleted successfully"}
@@ -840,8 +915,14 @@ async def download_schema_template(client_id: str, template_type: str = "master"
 # ==================== CLIENT ROUTES ====================
 
 @portal_router.get("/clients")
-async def get_clients():
-    clients = await db.clients.find({}, {"_id": 0}).to_list(1000)
+async def get_clients(request: Request):
+    """Clients the caller owns or has been assigned. This list is the gateway to
+    every other portal view — Sessions, Reports, Sync Logs, Movement and the
+    rest all start from a client picked here — so scoping it is what keeps a
+    fresh user's portal empty instead of showing them somebody else's work."""
+    visible = await _visible_client_ids(request)
+    query = {} if visible is None else {"id": {"$in": visible}}
+    clients = await db.clients.find(query, {"_id": 0}).to_list(1000)
     return clients
 
 @portal_router.post("/clients")
@@ -1310,10 +1391,14 @@ async def clear_client_stock(client_id: str):
 # ==================== AUDIT SESSION ROUTES ====================
 
 @portal_router.get("/sessions")
-async def get_sessions(client_id: Optional[str] = None, include_cycle_count: bool = False):
+async def get_sessions(request: Request, client_id: Optional[str] = None, include_cycle_count: bool = False):
     query = {}
     if client_id:
         query["client_id"] = client_id
+    else:
+        # No client asked for → "every session", which must still be only the
+        # ones the caller can see. Scanners send no identity and are unscoped.
+        query = _scope_query(query, await _visible_client_ids(request))
     # Auto-show cycle-count sessions for clients of type cycle_count so that
     # scanners can see and sync against them. For other client types we keep
     # the cycle-count backing sessions hidden by default (managed via the
@@ -1700,8 +1785,11 @@ async def get_session_progress(session_id: str):
 # ==================== DEVICE ROUTES ====================
 
 @portal_router.get("/devices")
-async def get_devices():
-    devices = await db.devices.find({}, {"_id": 0, "sync_password_hash": 0}).to_list(1000)
+async def get_devices(request: Request):
+    visible = await _visible_client_ids(request)
+    devices = await db.devices.find(
+        _scope_query({}, visible), {"_id": 0, "sync_password_hash": 0}
+    ).to_list(1000)
     return devices
 
 @portal_router.post("/devices/register")
@@ -2930,13 +3018,15 @@ async def get_sync_logs(client_id: str = None, session_id: str = None, date: str
     return logs
 
 @portal_router.get("/sync-logs/grouped")
-async def get_sync_logs_grouped(client_id: str = None, limit: int = 500):
+async def get_sync_logs_grouped(request: Request, client_id: str = None, limit: int = 500):
     """Get sync logs grouped by client_id and sync_date for the admin portal view.
     Does NOT include raw_payload to keep response lightweight for large datasets."""
     query = {}
     if client_id:
         query["client_id"] = client_id
-    
+    else:
+        query = _scope_query(query, await _visible_client_ids(request))
+
     # Exclude raw_payload from the response to avoid sending large data to frontend
     logs = await db.sync_raw_logs.find(query, {"_id": 0, "raw_payload": 0}).sort("synced_at", -1).to_list(limit)
     
@@ -2990,13 +3080,15 @@ async def get_sync_logs_grouped(client_id: str = None, limit: int = 500):
     return result
 
 @portal_router.get("/sync-logs/by-scanner")
-async def get_sync_logs_by_scanner(client_id: str = None, session_id: str = None, limit: int = 2000):
+async def get_sync_logs_by_scanner(request: Request, client_id: str = None, session_id: str = None, limit: int = 2000):
     """Get sync logs grouped by scanner (device_name). Each scanner shows individual sync entries."""
     query = {}
     if client_id:
         query["client_id"] = client_id
     if session_id:
         query["session_id"] = session_id
+    if not client_id and not session_id:
+        query = _scope_query(query, await _visible_client_ids(request))
 
     logs = await db.sync_raw_logs.find(query, {"_id": 0, "raw_payload": 0}).sort("synced_at", -1).to_list(limit)
 
@@ -4062,13 +4154,28 @@ async def clear_reco_adjustments(client_id: str):
 
 # ==================== AUDIT LOG (MOVEMENT / AUDIT TRAIL) ====================
 
+async def _scope_log_filters(request: Request, filters: dict) -> dict:
+    """Restrict a movement-log filter payload to the caller's visible clients.
+
+    An explicit client_id the caller cannot see collapses to an empty list, which
+    matches no rows — the log must never become a way around the client scope.
+    """
+    out = dict(filters or {})
+    visible = await _visible_client_ids(request)
+    if visible is None:
+        return out
+    asked = out.get("client_id")
+    out["client_id"] = ([asked] if asked in visible else []) if asked else visible
+    return out
+
+
 @portal_router.post("/audit-logs/search")
-async def audit_logs_search(filters: dict):
+async def audit_logs_search(filters: dict, request: Request):
     """Paginated search over the audit-trail log. Accepts any subset of:
     client_id, session_id, barcode, user_id, start_date, end_date,
     module, cycle_day, action_type, limit, skip.
     """
-    return await search_audit_logs(db, filters or {})
+    return await search_audit_logs(db, await _scope_log_filters(request, filters))
 
 
 @portal_router.get("/audit-logs/recent")
@@ -4080,10 +4187,10 @@ async def audit_logs_recent(barcode: str, client_id: Optional[str] = None, limit
 
 
 @portal_router.post("/audit-logs/export")
-async def audit_logs_export(filters: dict):
+async def audit_logs_export(filters: dict, request: Request):
     """Excel export of every audit-log entry matching the given filters.
     Streams an .xlsx file straight to the browser."""
-    blob = await export_audit_logs_excel(db, filters or {})
+    blob = await export_audit_logs_excel(db, await _scope_log_filters(request, filters))
     headers = {
         "Content-Disposition": 'attachment; filename="audit_movement_log.xlsx"'
     }
@@ -6357,8 +6464,24 @@ async def get_empty_bins_summary(client_id: Optional[str] = None, date: Optional
 # ==================== DASHBOARD ROUTES ====================
 
 @portal_router.get("/dashboard")
-async def get_dashboard():
-    """Live dashboard data - parallelized for speed"""
+async def get_dashboard(request: Request):
+    """Live dashboard data - parallelized for speed.
+
+    Every count except the user tallies is scoped to the caller's own clients,
+    so a fresh user lands on an empty dashboard rather than a summary of
+    somebody else's audits."""
+    visible = await _visible_client_ids(request)
+    # synced_locations carries session_id, not client_id — resolve the sessions
+    # inside the visible clients once and scope the location counts by those.
+    session_filter = None
+    if visible is not None:
+        session_filter = await db.audit_sessions.distinct("id", {"client_id": {"$in": visible}})
+
+    def _by_session(query: dict) -> dict:
+        if session_filter is None:
+            return query
+        return {**query, "session_id": {"$in": session_filter}}
+
     # Run ALL queries in parallel using asyncio.gather
     (
         clients_count,
@@ -6371,17 +6494,17 @@ async def get_dashboard():
         recent_syncs,
         devices
     ) = await asyncio.gather(
-        db.clients.count_documents({"is_active": True}),
-        db.audit_sessions.count_documents({"status": "active"}),
-        db.devices.count_documents({"is_active": True}),
+        db.clients.count_documents(_scope_query({"is_active": True}, visible, "id")),
+        db.audit_sessions.count_documents(_scope_query({"status": "active"}, visible)),
+        db.devices.count_documents(_scope_query({"is_active": True}, visible)),
         db.portal_users.count_documents({}),
         db.portal_users.count_documents({"is_approved": False}),
-        db.synced_locations.count_documents({"is_empty": True}),
-        db.conflict_locations.count_documents({"status": "pending"}),
-        db.synced_locations.find({}, {"_id": 0}).sort("synced_at", -1).limit(10).to_list(10),
-        db.devices.find({"is_active": True}, {"_id": 0, "sync_password_hash": 0}).to_list(100),
+        db.synced_locations.count_documents(_by_session({"is_empty": True})),
+        db.conflict_locations.count_documents(_scope_query({"status": "pending"}, visible)),
+        db.synced_locations.find(_by_session({}), {"_id": 0}).sort("synced_at", -1).limit(10).to_list(10),
+        db.devices.find(_scope_query({"is_active": True}, visible), {"_id": 0, "sync_password_hash": 0}).to_list(100),
     )
-    
+
     return {
         "stats": {
             "clients": clients_count,
@@ -6397,9 +6520,12 @@ async def get_dashboard():
     }
 
 @portal_router.get("/dashboard/audit-summary")
-async def get_audit_summary():
+async def get_audit_summary(request: Request):
     """Audit summary per active client — overview card data for dashboard."""
-    clients = await db.clients.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    visible = await _visible_client_ids(request)
+    clients = await db.clients.find(
+        _scope_query({"is_active": True}, visible, "id"), {"_id": 0}
+    ).to_list(1000)
     summaries = []
     for client in clients:
         cid = client["id"]
@@ -6625,13 +6751,15 @@ async def mark_all_alerts_read():
 # ==================== CONFLICT RESOLUTION ROUTES ====================
 
 @portal_router.get("/conflicts")
-async def get_conflicts(client_id: str = None, session_id: str = None, status: str = None):
+async def get_conflicts(request: Request, client_id: str = None, session_id: str = None, status: str = None):
     """Get all conflicts, filterable by client, session, and status"""
     query = {}
     if client_id:
         query["client_id"] = client_id
     if session_id:
         query["session_id"] = session_id
+    if not client_id and not session_id:
+        query = _scope_query(query, await _visible_client_ids(request))
     if status:
         query["status"] = status
     

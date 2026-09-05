@@ -177,6 +177,43 @@ async def revoke_assignment(db, assignment_id: str, requester_user_id: str) -> D
     return {"message": "Assignment revoked", "id": assignment_id}
 
 
+# ─────────────────────────────────────────────────────── Visibility scope
+
+
+async def get_visible_client_ids(db, user_id: str) -> Optional[List[str]]:
+    """Client ids this portal user may see — the ones they own, plus the ones an
+    active assignment grants them.
+
+    Returns None to mean "do not scope at all": the caller is not an identified
+    portal user. Scanners, cron jobs and legacy scripts send no identity and
+    must keep working, so an unknown caller is left alone rather than blinded.
+    An identified user with nothing of their own gets [] — an empty portal,
+    which is the point.
+    """
+    if not user_id:
+        return None
+    user = await db.portal_users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    if not user:
+        return None
+
+    visible = set(await db.clients.distinct("id", {"created_by": user_id}))
+
+    rows = await db.report_assignments.find(
+        {"assigned_to": user_id, "is_active": True},
+        {"_id": 0, "client_id": 1, "session_id": 1},
+    ).to_list(2000)
+    for row in rows:
+        cid = row.get("client_id")
+        if not cid:
+            # Older assignment rows stored only the session — resolve through it
+            # so an assignee never loses access to what they were given.
+            cid = await _resolve_client_id_from_session(db, row.get("session_id") or "")
+        if cid:
+            visible.add(cid)
+
+    return sorted(visible)
+
+
 # ─────────────────────────────────────────────────────── Listing
 
 

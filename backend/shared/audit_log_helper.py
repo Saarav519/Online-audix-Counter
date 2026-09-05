@@ -97,8 +97,13 @@ def _build_search_query(filters: Dict[str, Any]) -> Dict[str, Any]:
     q: Dict[str, Any] = {}
     if filters.get("module") and filters["module"] != "all":
         q["module"] = filters["module"]
-    if filters.get("client_id"):
-        q["client_id"] = filters["client_id"]
+    cid = filters.get("client_id")
+    if isinstance(cid, (list, tuple, set)):
+        # A list arrives when the caller is scoped to a set of clients. An empty
+        # one means "nothing visible" and must match no rows — not everything.
+        q["client_id"] = {"$in": list(cid)}
+    elif cid:
+        q["client_id"] = cid
     if filters.get("session_id"):
         q["session_id"] = filters["session_id"]
     if filters.get("user_id"):
