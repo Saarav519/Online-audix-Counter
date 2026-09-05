@@ -39,6 +39,7 @@ import { FullScreenButton, FullScreenReport } from '../../components/FullScreenR
 import { BarcodeEditCell } from '../../components/BarcodeEditCell';
 import LastEditedPopup from '../../components/LastEditedPopup';
 import useLastEditPopup from '../../hooks/useLastEditPopup';
+import useLiveActivity, { describeActivity } from '../../hooks/useLiveActivity';
 import PageHeader from '../../components/portal/PageHeader';
 import { generatePDF } from '../../utils/pdfGenerator';
 import { FileText as FilePdfIcon } from 'lucide-react';
@@ -1567,6 +1568,31 @@ export default function PortalReports() {
     const norm = (v) => String(v || '').replace(/_/g, '-').toLowerCase();
     return new Set(forSession.flatMap(a => (a.report_types || []).map(norm)));
   }, [isClientOwner, clientAssignments, selectedSession]);
+
+  // ─────────── Live activity
+  // Two people reconciling the same report used to overwrite each other's work
+  // blind: a reco entered elsewhere only appeared after a manual refresh. Poll
+  // the audit trail while a report is open, say who changed what, and pull the
+  // fresh numbers in.
+  const handleLiveActivity = useCallback((entries) => {
+    entries.slice(0, 3).forEach(e => {
+      toast.info(describeActivity(e), { duration: 6000 });
+    });
+    if (entries.length > 3) {
+      toast.info(`+${entries.length - 3} more change(s) by other users`, { duration: 6000 });
+    }
+    // The cached copy is now stale for every report of this session.
+    reportCache.current = {};
+    fetchReport(true);
+  }, [fetchReport]);
+
+  useLiveActivity({
+    clientId: selectedClient,
+    // The consolidated view spans every session, so it must not be pinned to one.
+    sessionId: selectedSession === '__consolidated__' ? '' : selectedSession,
+    enabled: !!selectedClient && !!reportType,
+    onActivity: handleLiveActivity,
+  });
   const isCycleCountClient = selectedClientObj?.client_type === 'cycle_count';
   // Store-type client detection — Reco column + editing is exposed for
   // single-session views too (Option B), matching the Cycle Count parity
