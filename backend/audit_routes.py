@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from rate_limit import limiter
 import os
+import re
 import logging
 import hashlib
 import csv
@@ -1928,6 +1929,7 @@ async def cancel_sync_staging(batch_id: str):
 async def upload_sync_backup(
     file: UploadFile = File(...),
     client_name: str = Form(...),
+    client_id: str = Form(""),
     session_name: str = Form(""),
     session_id: str = Form(""),
     variance_mode: str = Form("bin-wise"),
@@ -1957,10 +1959,21 @@ async def upload_sync_backup(
         norm = {k.strip().lower().replace(' ', '_'): v.strip() if v else '' for k, v in row.items() if k}
         norm_rows.append(norm)
 
-    # 2. Find or create client
-    client = await db.clients.find_one({"name": {"$regex": f"^{client_name.strip()}$", "$options": "i"}}, {"_id": 0})
+    # 2. Resolve client. An explicit client_id from the portal always wins so the UI can
+    # never silently mint a duplicate client on a name mismatch. The name fallback is
+    # regex-escaped — names like "ABC (North)" previously never matched.
+    client = None
+    if client_id and client_id.strip():
+        client = await db.clients.find_one({"id": client_id.strip()}, {"_id": 0})
+        if not client:
+            raise HTTPException(status_code=404, detail="Specified client not found")
+    if not client:
+        client = await db.clients.find_one(
+            {"name": {"$regex": f"^{re.escape(client_name.strip())}$", "$options": "i"}}, {"_id": 0}
+        )
     if client:
         client_id = client["id"]
+        client_name = client.get("name", client_name)
     else:
         client_id = str(uuid.uuid4())
         new_client = {
@@ -1992,6 +2005,8 @@ async def upload_sync_backup(
         # Try to use existing session
         existing_session = await db.audit_sessions.find_one({"id": session_id.strip()}, {"_id": 0})
         if existing_session:
+            if existing_session.get("client_id") and existing_session["client_id"] != client_id:
+                raise HTTPException(status_code=400, detail="Session does not belong to the selected client")
             session_id = existing_session["id"]
             session_name = existing_session.get("name", session_name)
             used_existing_session = True

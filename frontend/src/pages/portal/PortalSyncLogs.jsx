@@ -46,6 +46,7 @@ export default function PortalSyncLogs() {
   const [showBackupDialog, setShowBackupDialog] = useState(false);
   const [backupUploading, setBackupUploading] = useState(false);
   const [backupForm, setBackupForm] = useState({
+    clientId: '',
     clientName: '',
     sessionId: '',  // existing session ID (if selected)
     sessionName: '', // new session name (if creating new)
@@ -88,8 +89,8 @@ export default function PortalSyncLogs() {
   }, [activeTab, selectedSession, selectedClient]);
 
   const handleBackupUpload = async () => {
-    if (!backupForm.clientName.trim()) {
-      toast.error('Please enter a client name');
+    if (!backupForm.clientId) {
+      toast.error('Please select a client');
       return;
     }
     if (!backupForm.sessionId && !backupForm.sessionName.trim()) {
@@ -114,6 +115,7 @@ export default function PortalSyncLogs() {
         const file = backupForm.files[i];
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('client_id', backupForm.clientId || '');
         formData.append('client_name', backupForm.clientName.trim());
         formData.append('device_name', backupForm.deviceName.trim() || 'backup-restore');
         formData.append('variance_mode', backupForm.varianceMode);
@@ -175,23 +177,14 @@ export default function PortalSyncLogs() {
   };
 
   // Fetch sessions for the selected client in backup dialog
-  const fetchBackupSessions = async (clientName) => {
-    if (!clientName.trim()) {
+  const fetchBackupSessions = async (clientId) => {
+    if (!clientId) {
       setBackupSessions([]);
       return;
     }
     try {
-      // Find matching client
-      const matchedClient = clients.find(c => c.name.toLowerCase() === clientName.trim().toLowerCase());
-      if (matchedClient) {
-        const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${matchedClient.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setBackupSessions(data);
-        }
-      } else {
-        setBackupSessions([]);
-      }
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
+      setBackupSessions(res.ok ? await res.json() : []);
     } catch (err) {
       setBackupSessions([]);
     }
@@ -528,7 +521,7 @@ export default function PortalSyncLogs() {
         breadcrumbs={[{ label: 'Sync Logs' }]}
         actions={
           <div className="flex items-center gap-2">
-            <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientName: '', sessionId: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', files: [] }); setBackupSessions([]); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
+            <Button onClick={() => { setShowBackupDialog(true); setBackupResult(null); setBackupForm({ clientId: '', clientName: '', sessionId: '', sessionName: '', varianceMode: 'bin-wise', deviceName: 'backup-restore', files: [] }); setBackupSessions([]); }} variant="outline" size="sm" className="text-amber-700 border-amber-300 hover:bg-amber-50" data-testid="upload-backup-btn">
               <Upload className="w-4 h-4 mr-2" />
               Restore Backup
             </Button>
@@ -1171,7 +1164,7 @@ export default function PortalSyncLogs() {
               Restore Sync Backup
             </DialogTitle>
             <DialogDescription>
-              Upload a scanner backup CSV to restore sync data. A new client & session will be created if needed.
+              Upload a scanner backup CSV to restore sync data into an existing client. A new session will be created if needed.
             </DialogDescription>
           </DialogHeader>
 
@@ -1206,26 +1199,32 @@ export default function PortalSyncLogs() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Client Name */}
+              {/* Client */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
-                <input
-                  type="text"
-                  value={backupForm.clientName}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client *</label>
+                <select
+                  value={backupForm.clientId}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setBackupForm(prev => ({ ...prev, clientName: val, sessionId: '', sessionName: '' }));
-                    fetchBackupSessions(val);
+                    const picked = clients.find(c => c.id === val);
+                    setBackupForm(prev => ({ ...prev, clientId: val, clientName: picked ? picked.name : '', sessionId: '', sessionName: '' }));
+                    if (val) {
+                      fetchBackupSessions(val);
+                    } else {
+                      setBackupSessions([]);
+                    }
                   }}
-                  placeholder="e.g., Reliance Retail"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  list="existing-clients"
-                  data-testid="backup-client-name"
-                />
-                <datalist id="existing-clients">
-                  {clients.map(c => <option key={c.id} value={c.name} />)}
-                </datalist>
-                <p className="text-xs text-gray-400 mt-1">Type an existing client name or enter a new one</p>
+                  data-testid="backup-client-select"
+                >
+                  <option value="">-- Select client --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{`${c.name}${c.code ? ` (${c.code})` : ''}`}</option>
+                  ))}
+                </select>
+                {clients.length === 0 && (
+                  <p className="text-xs text-gray-400 mt-1">No clients yet — create one from the Clients page first.</p>
+                )}
               </div>
 
               {/* Session Selection */}
@@ -1373,7 +1372,7 @@ export default function PortalSyncLogs() {
                 <Button variant="outline" onClick={() => setShowBackupDialog(false)} className="flex-1">Cancel</Button>
                 <Button 
                   onClick={handleBackupUpload} 
-                  disabled={backupUploading || !backupForm.clientName || (!backupForm.sessionId && !backupForm.sessionName) || backupForm.files.length === 0}
+                  disabled={backupUploading || !backupForm.clientId || (!backupForm.sessionId && !backupForm.sessionName) || backupForm.files.length === 0}
                   className="flex-1 bg-amber-600 hover:bg-amber-700 text-white"
                   data-testid="backup-upload-submit"
                 >
