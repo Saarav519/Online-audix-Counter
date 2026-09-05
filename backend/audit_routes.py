@@ -811,84 +811,66 @@ async def update_client(client_id: str, client: ClientCreate):
 
 @portal_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str):
-    """Delete client and ALL related data (cascading delete)"""
-    result = await db.clients.delete_one({"id": client_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Client not found")
-    
-    # Get all session IDs for this client (needed for session-level data cleanup)
-    sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(100000)
-    session_ids = [s["id"] for s in sessions]
-    
-    # Cascading delete — remove ALL related data
-    deleted_summary = {}
-    
-    # 1. Master products
-    r = await db.master_products.delete_many({"client_id": client_id})
-    deleted_summary["master_products"] = r.deleted_count
-    
-    # 2. Expected stock for all sessions of this client
-    if session_ids:
-        r = await db.expected_stock.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["expected_stock"] = r.deleted_count
-    
-    # 3. Synced locations for all sessions of this client
-    if session_ids:
-        r = await db.synced_locations.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["synced_locations"] = r.deleted_count
-    
-    # 4. Sync raw logs for this client
-    r = await db.sync_raw_logs.delete_many({"client_id": client_id})
-    deleted_summary["sync_raw_logs"] = r.deleted_count
-    
-    # 5. Audit sessions for this client
-    r = await db.audit_sessions.delete_many({"client_id": client_id})
-    deleted_summary["audit_sessions"] = r.deleted_count
-    
-    # 6. Alerts for this client
-    r = await db.alerts.delete_many({"client_id": client_id})
-    deleted_summary["alerts"] = r.deleted_count
-    
-    # 7. Client-level stock
-    r = await db.client_stock.delete_many({"client_id": client_id})
-    deleted_summary["client_stock"] = r.deleted_count
-    
-    # 8. Client schema
-    r = await db.client_schemas.delete_many({"client_id": client_id})
-    deleted_summary["client_schemas"] = r.deleted_count
-    
-    # 9. Conflict locations for all sessions
-    if session_ids:
-        r = await db.conflict_locations.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["conflict_locations"] = r.deleted_count
-    
-    # 10. Sync inbox for all sessions
-    if session_ids:
-        r = await db.sync_inbox.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["sync_inbox"] = r.deleted_count
-    
-    # 11. Forward batches for all sessions
-    if session_ids:
-        r = await db.forward_batches.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["forward_batches"] = r.deleted_count
-    
-    # 12. Barcode edits for this client
-    r = await db.barcode_edits.delete_many({"client_id": client_id})
-    deleted_summary["barcode_edits"] = r.deleted_count
-    
-    # 13. Location master for this client
-    r = await db.location_master.delete_many({"client_id": client_id})
-    deleted_summary["location_master"] = r.deleted_count
-    
-    # 14. Reco adjustments for this client
-    r = await db.reco_adjustments.delete_many({"client_id": client_id})
-    deleted_summary["reco_adjustments"] = r.deleted_count
-    
-    # 15. Devices linked to this client's sessions
-    if session_ids:
-        r = await db.devices.delete_many({"session_id": {"$in": session_ids}})
-        deleted_summary["devices"] = r.deleted_count
-    
+    """Delete client and ALL related data (cascading delete).
+
+    Re-runnable by design: the client row is removed LAST, and a client row
+    that is already gone does NOT short-circuit the cleanup. A cascade that
+    died part-way can simply be called again to finish purging its children.
+    """
+    client_existed = await db.clients.find_one({"id": client_id}, {"_id": 0, "id": 1}) is not None
+
+    # Session ids for this client. Async cursor — never silently truncated the
+    # way a .to_list(N) cap can be.
+    session_ids: List[str] = []
+    async for s in db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}):
+        sid = s.get("id")
+        if sid:
+            session_ids.append(sid)
+
+    # Cycle-count projects for this client. Their day-scoped data is keyed by
+    # project_id / day_id, not by client_id, so it needs the project ids.
+    project_ids: List[str] = []
+    async for pr in db.cycle_projects.find({"client_id": client_id}, {"id": 1, "_id": 0}):
+        pid = pr.get("id")
+        if pid:
+            project_ids.append(pid)
+
+    deleted_summary: Dict[str, int] = {}
+
+    async def _purge(col: str, query: Dict[str, Any]) -> None:
+        deleted_summary[col] = (await db[col].delete_many(query)).deleted_count
+
+    by_client = {"client_id": client_id}
+    by_session = {"session_id": {"$in": session_ids}}
+    # Collections carrying BOTH scopes: a row may reference the client, or one
+    # of its sessions, or both — purge either way.
+    by_either = {"$or": [by_client, by_session]}
+    by_project = {"project_id": {"$in": project_ids}}
+
+    # 1. Client-scoped only
+    for col in ("master_products", "client_stock", "client_schemas",
+                "barcode_edits", "location_master", "reco_adjustments"):
+        await _purge(col, by_client)
+
+    # 2. Session-scoped only
+    for col in ("expected_stock", "synced_locations", "sync_inbox",
+                "forward_batches", "conflict_locations"):
+        await _purge(col, by_session)
+
+    # 3. Carry both client_id and session_id
+    for col in ("sync_raw_logs", "alerts", "devices", "audit_logs",
+                "report_assignments", "location_assignments", "sync_staging"):
+        await _purge(col, by_either)
+
+    # 4. Cycle-count: day-scoped data first (keyed by project_id), then the
+    #    projects themselves.
+    for col in ("cycle_day_stock", "cycle_day_picks", "cycle_closed_bins", "cycle_days"):
+        await _purge(col, by_project)
+    await _purge("cycle_projects", by_client)
+
+    # 5. The sessions themselves
+    await _purge("audit_sessions", by_client)
+
     # Invalidate any cached data for this client
     try:
         _invalidate_master_cache_for_client(client_id)
@@ -897,7 +879,13 @@ async def delete_client(client_id: str):
         _report_cache.invalidate_all()
     except Exception:
         pass
-    
+
+    # 6. The client row LAST, so any failure above leaves the cascade re-runnable
+    deleted_summary["clients"] = (await db.clients.delete_one({"id": client_id})).deleted_count
+
+    if not client_existed and not sum(deleted_summary.values()):
+        raise HTTPException(status_code=404, detail="Client not found")
+
     return {
         "message": "Client and all related data deleted",
         "deleted": deleted_summary
@@ -1427,6 +1415,10 @@ async def delete_session(session_id: str):
     deleted["forward_batches"] = (await db.forward_batches.delete_many({"session_id": session_id})).deleted_count
     deleted["devices"] = (await db.devices.delete_many({"session_id": session_id})).deleted_count
     deleted["alerts"] = (await db.alerts.delete_many({"session_id": session_id})).deleted_count
+    deleted["audit_logs"] = (await db.audit_logs.delete_many({"session_id": session_id})).deleted_count
+    deleted["report_assignments"] = (await db.report_assignments.delete_many({"session_id": session_id})).deleted_count
+    deleted["location_assignments"] = (await db.location_assignments.delete_many({"session_id": session_id})).deleted_count
+    deleted["sync_staging"] = (await db.sync_staging.delete_many({"session_id": session_id})).deleted_count
 
     # Delete the session itself
     result = await db.audit_sessions.delete_one({"id": session_id})

@@ -93,8 +93,16 @@ async def _require_owner_for_session(session_id: Optional[str], client_id: Optio
     # Only enforce when the user actually exists in the portal — legacy
     # tests / cron jobs may send a synthetic user_id purely for the
     # audit log. Treating those as 'no check' preserves backward compat.
-    real_user = await db.portal_users.find_one({"id": user_id}, {"_id": 0, "id": 1})
+    real_user = await db.portal_users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
     if not real_user:
+        return
+    # Admins are never blocked by client ownership.
+    if (real_user.get("role") or "") == "admin":
+        return
+    # Orphan cleanup: ownership is derived from clients.created_by, so once the
+    # client row is gone nobody can ever be its owner and the project would be
+    # frozen forever (undeletable, days stuck). Allow the operation instead.
+    if client_id and not await db.clients.find_one({"id": client_id}, {"_id": 0, "id": 1}):
         return
     acl = await check_assignment_access(
         db, user_id=user_id, session_id=session_id, client_id=client_id,
