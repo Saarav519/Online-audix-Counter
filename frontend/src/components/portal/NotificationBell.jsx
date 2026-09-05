@@ -53,8 +53,59 @@ export default function NotificationBell() {
 
   useEffect(() => {
     load();
+    // Polling is now only the safety net — the live stream below does the real
+    // work — so it can be slow. If the stream is dropped by a proxy the bell
+    // still catches up within this interval.
     const id = setInterval(load, 30000);
     return () => clearInterval(id);
+  }, []);
+
+  // Live feed: an assignment should appear the moment it is made, not on the
+  // next poll. Reconnects on its own if the connection drops.
+  useEffect(() => {
+    let uid = '';
+    try {
+      const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+      uid = u?.id || '';
+    } catch { /* not logged in */ }
+    if (!uid) return undefined;
+
+    let es = null;
+    let retry = null;
+    let closed = false;
+
+    const connect = () => {
+      if (closed) return;
+      try {
+        es = new EventSource(`${API_URL}/api/audit/portal/alerts/stream?user_id=${encodeURIComponent(uid)}`);
+      } catch {
+        return;
+      }
+      es.addEventListener('alert', (ev) => {
+        let a = null;
+        try { a = JSON.parse(ev.data); } catch { return; }
+        if (!a?.id) return;
+        setAlerts(prev => (prev.some(p => p.id === a.id) ? prev : [a, ...prev]));
+        if (seenRef.current && seenRef.current.has(a.id)) return;
+        seenRef.current?.add(a.id);
+        if (a.alert_type === 'assignment') {
+          toast.info('Assigned to you', { description: a.message });
+        }
+      });
+      es.onerror = () => {
+        es?.close();
+        if (closed) return;
+        // Back off a little so a server restart doesn't get hammered.
+        retry = setTimeout(connect, 5000);
+      };
+    };
+    connect();
+
+    return () => {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      es?.close();
+    };
   }, []);
 
   useEffect(() => {

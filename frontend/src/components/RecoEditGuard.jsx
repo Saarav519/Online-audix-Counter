@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
@@ -12,6 +13,10 @@ const API_URL = process.env.REACT_APP_BACKEND_URL || '';
  *
  * Deliberately separate from <LastEditedPopup />: that one guards barcode
  * edits and has no reason field, and its contract is pinned by tests.
+ *
+ * Rendered through a portal on document.body, above the Full View overlay
+ * (z-9999) and its own popovers (z-10002/3). Without that it opened *behind*
+ * Full View — the save silently did nothing from there.
  */
 export default function RecoEditGuard({ isOpen, barcode, clientId, pendingQty, overwritingOther, onProceed, onCancel }) {
   const [logs, setLogs] = useState([]);
@@ -35,8 +40,8 @@ export default function RecoEditGuard({ isOpen, barcode, clientId, pendingQty, o
 
   const canProceed = reason.trim().length > 0;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" data-testid="reco-guard">
+  return createPortal(
+    <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/50 p-4" data-testid="reco-guard">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between p-4 border-b border-gray-200">
           <div className="flex items-start gap-2">
@@ -118,6 +123,7 @@ export default function RecoEditGuard({ isOpen, barcode, clientId, pendingQty, o
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

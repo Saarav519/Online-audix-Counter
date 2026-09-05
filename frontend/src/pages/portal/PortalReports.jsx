@@ -685,7 +685,12 @@ export default function PortalReports() {
   // allowed for assignees. Owners → everything is allowed.
   const isOwner = !!assignmentAcl.is_owner;
   const canEditBarcode = isOwner; // assignees can't touch barcode/article values
-  const canEditReco = isOwner || (assignmentAcl.can_edit_reco && reportType === 'detailed');
+  // Reco is open to anyone who can reach the report — the backend no longer
+  // gates it on ownership, it asks for a reason instead (and shows the item's
+  // recent history when the value being replaced is someone else's). Leaving
+  // the old owner/detailed-only check here would keep the cell dead for the
+  // very users the change was meant to unblock.
+  const canEditReco = true;
 
   // ============ Invalid Codes feature (Store clients only) ============
   // Manages the modal that lists scanned barcodes which are not present in

@@ -16,6 +16,7 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
 import asyncio
+import json
 
 from shared.audit_log_helper import (
     log_audit_entry,
@@ -6789,6 +6790,58 @@ async def get_alerts(client_id: Optional[str] = None, session_id: Optional[str] 
     
     alerts = await db.alerts.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return alerts
+
+@portal_router.get("/alerts/stream")
+async def stream_alerts(user_id: str = "", since: str = ""):
+    """Server-Sent Events feed of a user's alerts.
+
+    The bell used to poll every 30s, so an assignment could sit unseen for half
+    a minute even though the person was looking at the screen. This pushes new
+    alerts as they are written. Polling stays in the client as a fallback for
+    environments that buffer or drop long-lived responses.
+    """
+    async def gen():
+        # Only alerts newer than this cursor are pushed, so a reconnect does
+        # not replay everything the bell has already shown.
+        cursor = since or datetime.now(timezone.utc).isoformat()
+        # Tell the client we are live before the first alert exists.
+        yield "event: ready\ndata: {}\n\n"
+        idle = 0
+        while True:
+            try:
+                q = {"created_at": {"$gt": cursor}}
+                if user_id:
+                    q["$or"] = [{"user_id": user_id}, {"user_id": ""}, {"user_id": {"$exists": False}}]
+                fresh = await db.alerts.find(q, {"_id": 0}).sort("created_at", 1).to_list(20)
+                for a in fresh:
+                    cursor = a.get("created_at") or cursor
+                    yield f"event: alert\ndata: {json.dumps(a)}\n\n"
+                if fresh:
+                    idle = 0
+                else:
+                    idle += 1
+                    # A comment line every ~20s keeps proxies from closing an
+                    # idle connection, and lets the client notice a dead one.
+                    if idle % 20 == 0:
+                        yield ": keep-alive\n\n"
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"Alert stream error: {e}")
+                return
+            await asyncio.sleep(1)
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        # Railway/nginx style proxies buffer by default — this turns it off.
+        "X-Accel-Buffering": "no",
+        # GZipMiddleware holds a response back until it reaches minimum_size,
+        # which for small SSE events means nothing ever reaches the browser.
+        # Declaring an encoding makes it skip this response entirely.
+        "Content-Encoding": "identity",
+    })
+
 
 @portal_router.put("/alerts/{alert_id}/read")
 async def mark_alert_read(alert_id: str):

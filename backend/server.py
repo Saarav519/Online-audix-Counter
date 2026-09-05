@@ -339,6 +339,10 @@ async def create_indexes():
         except Exception as e:
             logger.warning(f"failed_login_attempts TTL index skipped: {e}")
 
+        # Alerts: the notification bell's live stream polls by created_at, and
+        # the bell itself filters by the user an alert is addressed to.
+        await db.alerts.create_index([("created_at", 1)])
+        await db.alerts.create_index([("user_id", 1), ("created_at", -1)])
         await db.location_master.create_index([("client_id", 1)])
         await db.location_master.create_index([("client_id", 1), ("location_code", 1)])
         await db.file_uploads.create_index("file_id", unique=True)
