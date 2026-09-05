@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -9,6 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from rate_limit import limiter
+import asyncio
 import os
 import logging
 import uuid
@@ -58,6 +60,9 @@ class SafeJSONResponse(JSONResponse):
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env', override=False)
+
+# Uploads directory — required env var, no hardcoded fallback (fail closed)
+UPLOAD_DIR = os.environ['UPLOAD_DIR']
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -124,7 +129,11 @@ app.include_router(cycle_router, prefix="/api/audit/portal/cycle-count", tags=["
 # Serve uploaded files
 @app.get("/api/uploads/{file_path:path}")
 async def serve_upload(file_path: str):
-    full_path = f"/app/backend/uploads/{file_path}"
+    upload_root = Path(UPLOAD_DIR).resolve()
+    full_path = (upload_root / file_path).resolve()
+    # Path-traversal guard: the resolved path must stay inside the upload dir
+    if not full_path.is_relative_to(upload_root):
+        return {"error": "File not found"}
     if os.path.exists(full_path):
         ext = Path(full_path).suffix.lower()
         media_map = {
@@ -144,7 +153,7 @@ async def serve_upload(file_path: str):
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=os.environ['CORS_ORIGINS'].split(','),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -156,29 +165,44 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.on_event("startup")
 async def startup():
     # Create uploads directory
-    os.makedirs("/app/backend/uploads", exist_ok=True)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     logger.info("Server started - Audix Data Management API")
     # Ensure audit portal admin user exists (non-destructive, production-safe)
     admin_exists = await db.portal_users.find_one({"username": "admin"})
     if not admin_exists:
-        from audit_routes import hash_password
-        admin_user = {
-            "id": str(uuid.uuid4()),
-            "username": "admin",
-            "password_hash": hash_password("admin123"),
-            "role": "admin",
-            "is_active": True,
-            "is_approved": True,
-            "last_login": None,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.portal_users.insert_one(admin_user)
-        logger.info("Created audit portal admin user")
-    # Create indexes for performance (non-destructive)
-    await create_indexes()
-    # Auto-purge orphan sync/inbox/batch records from sessions that were deleted
-    # before the cascade-delete fix landed. Idempotent and safe to run on every boot.
-    await purge_orphan_session_data()
+        admin_password = os.environ.get("ADMIN_INITIAL_PASSWORD") or ""
+        if not admin_password:
+            logger.warning("ADMIN_INITIAL_PASSWORD not set — skipping admin user seed (fail closed)")
+        else:
+            from audit_routes import hash_password
+            admin_user = {
+                "id": str(uuid.uuid4()),
+                "username": "admin",
+                "password_hash": hash_password(admin_password),
+                "role": "admin",
+                "is_active": True,
+                "is_approved": True,
+                "last_login": None,
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.portal_users.insert_one(admin_user)
+            logger.info("Created audit portal admin user")
+    # Indexes, orphan purge and migrations must never block startup (healthcheck
+    # would time out waiting on them) — run them in the background instead.
+    asyncio.create_task(_startup_maintenance())
+
+
+async def _startup_maintenance():
+    """Background wrapper for boot-time maintenance; a failure here must never
+    crash the process."""
+    try:
+        # Create indexes for performance (non-destructive)
+        await create_indexes()
+        # Auto-purge orphan sync/inbox/batch records from sessions that were deleted
+        # before the cascade-delete fix landed. Idempotent and safe to run on every boot.
+        await purge_orphan_session_data()
+    except Exception as e:
+        logger.warning(f"Startup maintenance failed (server keeps running): {e}")
 
 
 async def purge_orphan_session_data():
@@ -329,3 +353,28 @@ async def create_indexes():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+
+# ==================== SERVE REACT SPA ====================
+# Must stay at the very end of this file: the catch-all below is matched only
+# after every route registered above it (routers, /health, /docs, uploads).
+FRONTEND_DIR = Path(os.environ.get('FRONTEND_DIR') or (ROOT_DIR.parent / 'frontend' / 'build')).resolve()
+
+if FRONTEND_DIR.is_dir():
+    # CRA emits hashed JS/CSS under build/static/
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR / "static"), name="spa-static")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # API routes that reached the catch-all are unknown endpoints — they
+        # must 404 as JSON, never fall back to index.html.
+        if full_path == "api" or full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        # Root-level build assets (favicon.ico, manifest.json, ...), with a
+        # path-traversal guard: the resolved path must stay inside the build dir.
+        candidate = (FRONTEND_DIR / full_path).resolve()
+        if full_path and candidate.is_relative_to(FRONTEND_DIR) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(FRONTEND_DIR / "index.html", media_type="text/html")
+else:
+    logger.warning(f"Frontend build dir not found at {FRONTEND_DIR} — SPA serving disabled (API only)")

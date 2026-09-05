@@ -45,6 +45,8 @@ jobs:
         env:
           CI: false
           DISABLE_ESLINT_PLUGIN: true
+          REACT_APP_BACKEND_URL: https://data.audix.co.in
+          REACT_APP_APP_TARGET: scanner
         run: yarn build
 
       - name: Sync Capacitor

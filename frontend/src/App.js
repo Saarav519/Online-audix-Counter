@@ -278,10 +278,11 @@ function AppRoutes() {
             </MobileOnlyGuard>
           }
         />
-        {/* Default route redirects to Reports */}
+        {/* Default route target is build-time configurable:
+            REACT_APP_APP_TARGET=web -> /portal, scanner (default) -> /reports */}
         <Route
           path="/"
-          element={<Navigate to="/reports" replace />}
+          element={<Navigate to={process.env.REACT_APP_APP_TARGET === 'web' ? '/portal' : '/reports'} replace />}
         />
         {/* Legacy /locations route redirects to Reports */}
         <Route
