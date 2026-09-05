@@ -46,6 +46,18 @@ const ensureAppFolder = async () => {
 };
 
 /**
+ * Quote one CSV cell. A product name carrying a comma or a double quote used to
+ * shift every column after it, so the restore importer read a timestamp where the
+ * quantity should have been and stored 0.
+ * @param {*} value - Raw cell value
+ * @returns {string} Quoted, escaped cell safe to join with commas
+ */
+export const csvCell = (value) => {
+  const text = value === null || value === undefined ? '' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+};
+
+/**
  * Build CSV content efficiently using array join (much faster than string concatenation)
  * For large datasets, builds in chunks to avoid blocking the UI thread
  */
@@ -209,6 +221,7 @@ export const isValidCSV = (file) => {
 export default { 
   downloadCSV,
   buildCSV,
+  csvCell,
   listExportedFiles,
   isAndroid, 
   isMobile, 

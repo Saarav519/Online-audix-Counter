@@ -109,6 +109,7 @@ export default function PortalSyncLogs() {
       let totalLocations = 0;
       let totalItems = 0;
       let totalQty = 0;
+      const allWarnings = [];
       let usedSessionId = backupForm.sessionId || '';
 
       for (let i = 0; i < backupForm.files.length; i++) {
@@ -145,6 +146,7 @@ export default function PortalSyncLogs() {
         totalLocations += result.locations_restored || 0;
         totalItems += result.total_items || 0;
         totalQty += result.total_quantity || 0;
+        (result.warnings || []).forEach(w => allWarnings.push(`${file.name}: ${w}`));
 
         // After first file, use the returned session_id for subsequent files
         if (!usedSessionId && result.session_id) {
@@ -157,7 +159,8 @@ export default function PortalSyncLogs() {
         locations_restored: totalLocations,
         total_items: totalItems,
         total_quantity: totalQty,
-        files_uploaded: backupForm.files.length
+        files_uploaded: backupForm.files.length,
+        warnings: allWarnings
       };
       setBackupResult(combinedResult);
       toast.success(`Backup restored! ${backupForm.files.length} file(s), ${totalLocations} locations, ${totalItems} items`);
@@ -1190,6 +1193,14 @@ export default function PortalSyncLogs() {
                   <div className="font-medium">{backupResult.total_quantity}</div>
                 </div>
               </div>
+              {backupResult.warnings?.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-amber-800 mb-1">Check these rows</p>
+                  <ul className="list-disc pl-5 space-y-0.5 text-xs text-amber-700">
+                    {backupResult.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
               <p className="text-xs text-gray-500">
                 Data is now in the <strong>Sync Inbox</strong>. Go to the Inbox tab to review and forward to variance.
               </p>

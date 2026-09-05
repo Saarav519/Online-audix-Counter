@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useDeviceDetection } from '../hooks/useDeviceDetection';
-import { downloadCSV, getCSVAcceptTypes } from '../utils/fileDownload';
+import { downloadCSV, getCSVAcceptTypes, csvCell } from '../utils/fileDownload';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -343,13 +343,15 @@ const Reports = () => {
     const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
     const rows = allItems.map(item => {
       const masterProduct = masterProducts.find(p => p.barcode === item.barcode);
+      // csvCell escapes embedded quotes; an unescaped one shifts every later column,
+      // which lands as a zero quantity when the file is restored in the portal.
       return [
-        `"${item.locationName}"`,
+        csvCell(item.locationName),
         `="${item.barcode}"`,
-        `"${item.productName}"`,
+        csvCell(item.productName),
         masterProduct?.price?.toFixed(2) || '0.00',
         item.quantity,
-        `"${new Date(item.scannedAt).toLocaleString()}"`
+        csvCell(new Date(item.scannedAt).toLocaleString())
       ];
     });
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -656,13 +658,15 @@ COLD-01,Cold Storage Unit 1`;
     const headers = ['Location', 'Barcode', 'Product Name', 'Price', 'Quantity', 'Scanned At'];
     const rows = allExportItems.map(item => {
       const masterProduct = getMasterProductDetails(item.barcode);
+      // csvCell escapes embedded quotes; an unescaped one shifts every later column,
+      // which lands as a zero quantity when the file is restored in the portal.
       return [
-        `"${item.locationName}"`,
+        csvCell(item.locationName),
         `="${item.barcode}"`,
-        `"${item.productName}"`,
+        csvCell(item.productName),
         masterProduct?.price?.toFixed(2) || '0.00',
         item.quantity,
-        `"${new Date(item.scannedAt).toLocaleString()}"`
+        csvCell(new Date(item.scannedAt).toLocaleString())
       ];
     });
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
