@@ -18,7 +18,9 @@ from datetime import datetime, timezone
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://counter-app-demo-1.preview.emergentagent.com").rstrip("/")
+from conftest import get_base_url
+
+BASE_URL = get_base_url()
 PORTAL = f"{BASE_URL}/api/audit/portal"
 CC = f"{PORTAL}/cycle-count"
 
