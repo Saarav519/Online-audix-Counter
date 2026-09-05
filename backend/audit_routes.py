@@ -691,6 +691,80 @@ def parse_number(value):
         return 0.0
 
 
+# ==================== BACKUP CSV COLUMN RESOLUTION ====================
+# Scanner backups are written by whichever app build is installed on the device,
+# and the captions drift ("Qty" vs "Quantity", "Location Name" vs "Location").
+# The restore parser used to look up one hardcoded key per column, so a file with
+# a caption it did not know imported silently — every row landing with quantity 0
+# while location and barcode came through fine. Resolve each column through an
+# alias list instead, and refuse the file when a required column is absent.
+BACKUP_COLUMN_ALIASES = {
+    "location": (
+        "location", "location_name", "loc", "bin", "bin_name", "bin_location",
+        "rack", "section", "aisle",
+    ),
+    "barcode": (
+        "barcode", "bar_code", "barcodes", "item_code", "itemcode", "item_barcode",
+        "sku", "ean", "upc", "product_code", "code",
+    ),
+    "product_name": (
+        "product_name", "productname", "description", "item_name", "itemname",
+        "product", "name", "article_name",
+    ),
+    "price": ("price", "mrp", "rate", "unit_price", "cost"),
+    "quantity": (
+        "quantity", "qty", "quantities", "qty_scanned", "scanned_qty",
+        "quantity_scanned", "physical_qty", "physical_quantity", "counted_qty",
+        "count", "total_qty", "total_quantity", "pcs", "nos", "units",
+    ),
+    "scanned_at": (
+        "scanned_at", "scannedat", "scan_time", "scanned_on", "scan_date",
+        "timestamp", "date_time", "datetime", "time",
+    ),
+}
+
+# Columns a backup cannot be restored without — anything else may be missing.
+BACKUP_REQUIRED_COLUMNS = ("barcode", "quantity")
+
+# A numeric cell that really says zero, so an unparseable one can be told apart from it.
+_NUMERIC_ZERO_RE = re.compile(r"^[-+]?0*\.?0*$")
+
+
+def slugify_header(header) -> str:
+    """Fold a CSV caption to its lookup key: 'Scanned At' -> scanned_at, 'Qty.' -> qty."""
+    return re.sub(r"[^a-z0-9]+", "_", str(header or "").strip().lower()).strip("_")
+
+
+def resolve_backup_columns(headers):
+    """Map canonical backup columns onto the slugged captions the file actually uses.
+
+    Returns {canonical: slug}. Only columns present in the file appear.
+    """
+    seen = []
+    for h in headers or []:
+        slug = slugify_header(h)
+        if slug and slug not in seen:
+            seen.append(slug)
+
+    resolved = {}
+    for canonical, aliases in BACKUP_COLUMN_ALIASES.items():
+        for alias in aliases:
+            if alias in seen:
+                resolved[canonical] = alias
+                break
+    return resolved
+
+
+def unwrap_csv_cell(value) -> str:
+    """Undo the Excel text armour exports use: ="890123" and '890123 both mean 890123."""
+    text = str(value if value is not None else "").strip()
+    if len(text) >= 3 and text.startswith('="') and text.endswith('"'):
+        text = text[2:-1]
+    elif text.startswith("'"):
+        text = text[1:]
+    return text.strip().strip('"').strip()
+
+
 class SchemaField(BaseModel):
     name: str
     label: str
@@ -1925,6 +1999,101 @@ async def cancel_sync_staging(batch_id: str):
 
 # ==================== BACKUP RESTORE (Upload Sync Backup CSV) ====================
 
+def parse_backup_csv(text: str, filename: str = ""):
+    """Parse a scanner backup CSV into the location/item shape a sync produces.
+
+    Returns (locations, stats). Raises HTTPException(400) when the file cannot be
+    read as a backup — a file whose quantity column is unrecognised must fail
+    loudly, because importing it silently is what produced whole sessions of
+    zero-quantity rows.
+    """
+    reader = csv.DictReader(io.StringIO(text))
+    rows = list(reader)
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows")
+
+    # Slug the captions, then resolve the canonical columns through their aliases so a
+    # backup written by any scanner build ("Qty" as well as "Quantity") is understood.
+    columns = resolve_backup_columns(reader.fieldnames)
+    missing = [c for c in BACKUP_REQUIRED_COLUMNS if c not in columns]
+    if missing:
+        found = ", ".join(h for h in (reader.fieldnames or []) if h) or "none"
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"CSV is missing the {' and '.join(missing)} column"
+                f"{'s' if len(missing) > 1 else ''}. Columns found in "
+                f"{filename or 'the file'}: {found}. Expected a scanner backup with "
+                "Location, Barcode, Product Name, Price, Quantity, Scanned At."
+            ),
+        )
+
+    def cell(row, canonical):
+        """Read a canonical column out of a row using the caption this file uses."""
+        key = columns.get(canonical)
+        return unwrap_csv_cell(row.get(key, '')) if key else ''
+
+    location_map = {}
+    skipped_blank_rows = 0
+    unparsed_quantity_rows = 0
+
+    for raw_row in rows:
+        # Slug the row's keys so they line up with the resolved column keys.
+        row = {}
+        for k, v in raw_row.items():
+            slug = slugify_header(k)
+            if not slug or slug in row:  # first column wins on duplicate captions
+                continue
+            row[slug] = v.strip() if isinstance(v, str) else ('' if v is None else str(v))
+
+        barcode = cell(row, 'barcode')
+        raw_quantity = cell(row, 'quantity')
+
+        # Trailing blank rows are what spreadsheet editors leave behind; importing them
+        # as zero-quantity items inflates the counts the admin reviews before forwarding.
+        if not barcode and not raw_quantity:
+            skipped_blank_rows += 1
+            continue
+
+        # parse_number copes with the shapes exports actually produce: "1,234", " 3 ", "2.0".
+        quantity = parse_number(raw_quantity)
+        if raw_quantity and quantity == 0 and not _NUMERIC_ZERO_RE.match(raw_quantity):
+            unparsed_quantity_rows += 1
+
+        raw_price = cell(row, 'price')
+        price = parse_number(raw_price) if raw_price else None
+        # An unreadable price stays unknown rather than being recorded as a real 0.00.
+        if price == 0 and raw_price and not _NUMERIC_ZERO_RE.match(raw_price):
+            price = None
+
+        loc_name = cell(row, 'location') or 'Unknown'
+        location_map.setdefault(loc_name, []).append({
+            "barcode": barcode,
+            "productName": cell(row, 'product_name'),
+            "price": price,
+            "quantity": quantity,
+            "scannedAt": cell(row, 'scanned_at') or datetime.now(timezone.utc).isoformat()
+        })
+
+    if not location_map:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows")
+
+    # Same shape as a device sync payload, so the inbox writer is shared with /sync.
+    locations = [{
+        "id": str(uuid.uuid4()),
+        "name": loc_name,
+        "is_empty": len(items) == 0,
+        "empty_remarks": "",
+        "items": items
+    } for loc_name, items in location_map.items()]
+
+    return locations, {
+        "columns_detected": columns,
+        "skipped_blank_rows": skipped_blank_rows,
+        "unparsed_quantity_rows": unparsed_quantity_rows,
+    }
+
+
 @portal_router.post("/sync-inbox/upload-backup")
 async def upload_sync_backup(
     file: UploadFile = File(...),
@@ -1938,9 +2107,6 @@ async def upload_sync_backup(
     """Upload a scanner backup CSV to restore sync data.
     If session_id is provided and valid, uses that existing session.
     Otherwise creates client/session if needed, then populates sync_inbox."""
-    import csv as csv_module
-    import io
-
     # 1. Read and parse the CSV
     content = await file.read()
     try:
@@ -1948,16 +2114,7 @@ async def upload_sync_backup(
     except UnicodeDecodeError:
         text = content.decode('latin-1')
 
-    reader = csv_module.DictReader(io.StringIO(text))
-    rows = list(reader)
-    if not rows:
-        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows")
-
-    # Normalize headers (lowercase, strip)
-    norm_rows = []
-    for row in rows:
-        norm = {k.strip().lower().replace(' ', '_'): v.strip() if v else '' for k, v in row.items() if k}
-        norm_rows.append(norm)
+    all_locations, parse_stats = parse_backup_csv(text, file.filename or "")
 
     # 2. Resolve client. An explicit client_id from the portal always wins so the UI can
     # never silently mint a duplicate client on a name mismatch. The name fallback is
@@ -2041,50 +2198,7 @@ async def upload_sync_backup(
         }
         await db.devices.insert_one(device)
 
-    # 5. Group items by location
-    location_map = {}
-    for row in norm_rows:
-        loc_name = row.get('location', 'Unknown')
-        if not loc_name:
-            loc_name = 'Unknown'
-        if loc_name not in location_map:
-            location_map[loc_name] = []
-
-        barcode = row.get('barcode', '').strip().strip('="').strip('"')
-        quantity = 0
-        try:
-            quantity = float(row.get('quantity', 0) or 0)
-        except (ValueError, TypeError):
-            pass
-
-        price = None
-        try:
-            price_val = row.get('price', '') or ''
-            if price_val:
-                price = float(price_val)
-        except (ValueError, TypeError):
-            pass
-
-        location_map[loc_name].append({
-            "barcode": barcode,
-            "productName": row.get('product_name', row.get('description', '')),
-            "price": price,
-            "quantity": quantity,
-            "scannedAt": row.get('scanned_at', datetime.now(timezone.utc).isoformat())
-        })
-
-    # 6. Build locations list (same format as sync)
-    all_locations = []
-    for loc_name, items in location_map.items():
-        all_locations.append({
-            "id": str(uuid.uuid4()),
-            "name": loc_name,
-            "is_empty": len(items) == 0,
-            "empty_remarks": "",
-            "items": items
-        })
-
-    # 7. Create sync_raw_log
+    # 5. Create sync_raw_log
     sync_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     sync_timestamp = datetime.now(timezone.utc).isoformat()
     sync_log_id = str(uuid.uuid4())
@@ -2114,11 +2228,22 @@ async def upload_sync_backup(
     }
     await db.sync_raw_logs.insert_one(raw_log)
 
-    # 8. Store locations in sync_inbox
+    # 6. Store locations in sync_inbox
     synced_count = await _store_locations_to_inbox(
         all_locations, device, session_id, client_id,
         device_name, sync_log_id, sync_date, sync_timestamp
     )
+
+    # Report which caption each column was read from, plus rows that did not parse, so a
+    # mismatched file is visible in the portal instead of showing up later as zero counts.
+    warnings = []
+    if parse_stats["unparsed_quantity_rows"]:
+        warnings.append(
+            f"{parse_stats['unparsed_quantity_rows']} row(s) had a quantity value that could not "
+            f"be read as a number and were imported as 0."
+        )
+    if parse_stats["skipped_blank_rows"]:
+        warnings.append(f"{parse_stats['skipped_blank_rows']} blank row(s) were skipped.")
 
     return {
         "message": "Backup restored successfully",
@@ -2130,7 +2255,9 @@ async def upload_sync_backup(
         "total_items": raw_log["total_items"],
         "total_quantity": raw_log["total_quantity"],
         "sync_log_id": sync_log_id,
-        "used_existing_session": used_existing_session
+        "used_existing_session": used_existing_session,
+        "columns_detected": parse_stats["columns_detected"],
+        "warnings": warnings
     }
 
 # ==================== SYNC INBOX & FORWARD TO VARIANCE ====================

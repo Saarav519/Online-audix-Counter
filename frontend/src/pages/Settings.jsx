@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { downloadCSV, buildCSV } from '../utils/fileDownload';
+import { downloadCSV, buildCSV, csvCell } from '../utils/fileDownload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -272,7 +272,16 @@ const Settings = () => {
           // Format barcode to preserve in Excel
           const formattedBarcode = `="${item.barcode}"`;
           
-          csvContent += `"${location.name}",${formattedBarcode},"${productName}",${price},${item.quantity},"${item.scannedAt}"\n`;
+          // Every text cell goes through csvCell so a comma or quote in a name cannot
+          // shift the quantity column when the backup is restored in the portal.
+          csvContent += [
+            csvCell(location.name),
+            formattedBarcode,
+            csvCell(productName),
+            csvCell(price),
+            item.quantity,
+            csvCell(item.scannedAt)
+          ].join(',') + '\n';
         });
       });
 
