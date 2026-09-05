@@ -626,6 +626,25 @@ export default function PortalReports() {
     has_access: true, can_edit_reco: true, can_edit_all: true, is_owner: true,
   });
   const [assignmentAssigner, setAssignmentAssigner] = useState(null);
+
+  // Who is looking. Used to tell the client's owner apart from an assignee, so
+  // an assignee is shown only what was actually shared with them.
+  const currentUserId = useMemo(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+      return u?.id || '';
+    } catch { return ''; }
+  }, []);
+
+  // Everything assigned TO me, so the pickers below can be narrowed to it.
+  const [myAssignments, setMyAssignments] = useState([]);
+  useEffect(() => {
+    fetch(`${BACKEND_URL}/api/audit/portal/assignments/my`)
+      .then(r => r.ok ? r.json() : { assignments: [] })
+      .then(d => setMyAssignments(d.assignments || []))
+      .catch(() => setMyAssignments([]));
+  }, []);
+
   useEffect(() => {
     if (!selectedSession) {
       setAssignmentAcl({ has_access: true, can_edit_reco: true, can_edit_all: true, is_owner: true });
@@ -633,12 +652,10 @@ export default function PortalReports() {
       return;
     }
     const headers = {};
-    try {
-      const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
-      if (u?.id) headers['X-User-Id'] = u.id;
-      if (u?.username) headers['X-Username'] = u.username;
-    } catch { /* noop */ }
     const qs = new URLSearchParams({ session_id: selectedSession });
+    // The consolidated view is not a session, so the backend cannot resolve the
+    // client from it — send the client so ownership still reads correctly.
+    if (selectedClient) qs.set('client_id', selectedClient);
     if (reportType) qs.set('report_type', reportType);
     fetch(`${BACKEND_URL}/api/audit/portal/assignments/check?${qs}`, { headers })
       .then(r => r.ok ? r.json() : null)
@@ -658,7 +675,7 @@ export default function PortalReports() {
         }
       })
       .catch(() => {});
-  }, [selectedSession, reportType]);
+  }, [selectedSession, selectedClient, reportType]);
 
   // Helper exposed to children: only Reco edits in detailed report are
   // allowed for assignees. Owners → everything is allowed.
@@ -1477,6 +1494,45 @@ export default function PortalReports() {
 
   // Cycle-count client detection: project-based cascading (Client → Project → Day → Report Type)
   const selectedClientObj = useMemo(() => clients.find(c => c.id === selectedClient), [clients, selectedClient]);
+
+  // ─────────── What an assignee is allowed to pick
+  // Sharing one session must show that session only. Without this the assignee
+  // lands on the client and sees every session plus the consolidated roll-up,
+  // which is everything the owner has rather than what was shared.
+  const isClientOwner = !selectedClientObj
+    || !currentUserId
+    || (selectedClientObj.created_by || '') === currentUserId;
+
+  const clientAssignments = useMemo(
+    () => (myAssignments || []).filter(a => a.client_id === selectedClient),
+    [myAssignments, selectedClient]
+  );
+  const assignedSessionIds = useMemo(
+    () => new Set(clientAssignments.map(a => a.session_id)),
+    [clientAssignments]
+  );
+
+  // Sessions offered in the picker: everything for the owner, only what was
+  // shared for an assignee.
+  const visibleSessions = useMemo(() => {
+    if (isClientOwner) return sessions;
+    return sessions.filter(s => assignedSessionIds.has(s.id));
+  }, [isClientOwner, sessions, assignedSessionIds]);
+
+  const canPickConsolidated = isClientOwner || assignedSessionIds.has('__consolidated__');
+
+  // Report types offered: narrowed to the shared list when every assignment on
+  // the selected session is a "specific reports" one. Several assignments can
+  // cover the same session, so the allowed types are their union, and a single
+  // full-session grant means no narrowing at all.
+  const allowedReportTypes = useMemo(() => {
+    if (isClientOwner) return null;   // null = no narrowing
+    const forSession = clientAssignments.filter(a => a.session_id === selectedSession);
+    if (forSession.length === 0) return null;
+    if (forSession.some(a => a.assignment_type !== 'specific_reports')) return null;
+    const norm = (v) => String(v || '').replace(/_/g, '-').toLowerCase();
+    return new Set(forSession.flatMap(a => (a.report_types || []).map(norm)));
+  }, [isClientOwner, clientAssignments, selectedSession]);
   const isCycleCountClient = selectedClientObj?.client_type === 'cycle_count';
   // Store-type client detection — Reco column + editing is exposed for
   // single-session views too (Option B), matching the Cycle Count parity
@@ -2006,8 +2062,38 @@ export default function PortalReports() {
     return <CheckCircle2 className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />;
   };
 
-  // Report type options based on session's variance mode
-  const reportOptions = getReportTypeOptions();
+  // Report type options based on session's variance mode, then narrowed to the
+  // reports an assignee was actually given.
+  const reportOptions = (() => {
+    const opts = getReportTypeOptions();
+    if (!allowedReportTypes) return opts;
+    // Deliberately not falling back to the full list when nothing matches —
+    // an empty picker is right, showing reports that were not shared is not.
+    return opts.filter(o => allowedReportTypes.has(o.value));
+  })();
+
+  // The session/report defaults above are picked from the session's variance
+  // mode, which knows nothing about assignments — so an assignee could land on
+  // a report that was never shared. Fall back to the first one they do have.
+  useEffect(() => {
+    if (!reportType || reportOptions.length === 0) return;
+    if (!reportOptions.some(o => o.value === reportType)) {
+      setReportType(reportOptions[0].value);
+    }
+  }, [reportOptions, reportType]);
+
+  // Same for the session: a stale pick (or a revoked assignment) must not keep
+  // showing a session the assignee can no longer open.
+  useEffect(() => {
+    if (!selectedSession || isClientOwner) return;
+    const stillAllowed = selectedSession === '__consolidated__'
+      ? canPickConsolidated
+      : visibleSessions.some(s => s.id === selectedSession);
+    if (!stillAllowed) {
+      setSelectedSession('');
+      setReportData(null);
+    }
+  }, [selectedSession, isClientOwner, canPickConsolidated, visibleSessions]);
 
   // ─── PDF EXPORT ─── Branded PDF with summary KPIs + table
   const exportPDF = () => {
@@ -2218,10 +2304,10 @@ export default function PortalReports() {
             data-testid="report-session-select"
           >
             <option value="">{isCycleCountClient ? 'Select Project' : 'Select Session'}</option>
-            {selectedClient && !isCycleCountClient && !isStoreClient && (
+            {selectedClient && !isCycleCountClient && !isStoreClient && canPickConsolidated && (
               <option value="__consolidated__">All Sessions (Consolidated)</option>
             )}
-            {sessions.map(session => (
+            {visibleSessions.map(session => (
               <option key={session.id} value={session.id}>
                 {isCycleCountClient
                   ? session.name
