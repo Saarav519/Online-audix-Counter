@@ -1,8 +1,10 @@
-"""Admin-created portal users.
+"""Portal user creation and management.
 
 Self-registration was the only way an account could come into existence, and it
-lands unapproved — so the portal offered an admin no way to produce a user that
-could be picked as an assignee. These cover POST /portal/users.
+lands unapproved — so the portal offered no way to produce a user that could be
+picked as an assignee. These cover POST /portal/users plus the rest of user
+management, which is open to every logged-in portal user: when the admin is
+away, the supervisor running the count still has to be able to add someone.
 
 Style note: the admin id is read straight from Mongo (with a /users fallback)
 rather than through /login, which is rate limited to 5 per 15 minutes — the same
@@ -133,11 +135,54 @@ def test_invalid_payloads_are_rejected(admin_headers, username, password, role, 
     assert expected in r.json()["detail"].lower()
 
 
-def test_supervisor_cannot_create_users(admin_headers, created_user):
-    """A supervisor must not be able to mint accounts."""
+def test_supervisor_gets_every_user_management_option(admin_headers, created_user):
+    """When the admin is away the supervisor running the count has to be able to
+    add someone and get the reco done, so none of this is admin-only."""
     sup_headers = {"X-User-Id": created_user["id"], "X-Username": created_user["username"]}
-    r = _post("/users", headers=sup_headers, json={"username": _username(), "password": "passwd123"})
-    assert r.status_code == 403, r.text
+
+    r = _post("/users", headers=sup_headers,
+              json={"username": _username(), "password": "passwd123", "role": "supervisor"})
+    assert r.status_code == 200, r.text
+    made = r.json()["user"]
+
+    try:
+        assert requests.put(f"{API}/users/{made['id']}/reject", headers=sup_headers,
+                            timeout=30).status_code == 200
+        assert requests.put(f"{API}/users/{made['id']}/approve", headers=sup_headers,
+                            timeout=30).status_code == 200
+
+        disabled = requests.put(f"{API}/users/{made['id']}/toggle-active",
+                                headers=sup_headers, timeout=30)
+        assert disabled.status_code == 200 and disabled.json()["is_active"] is False
+        requests.put(f"{API}/users/{made['id']}/toggle-active", headers=sup_headers, timeout=30)
+
+        assert requests.put(f"{API}/users/{made['id']}/role", headers=sup_headers,
+                            json={"role": "admin"}, timeout=30).status_code == 200
+
+        assert _del(f"/users/{made['id']}", headers=sup_headers).status_code == 200
+    finally:
+        _del(f"/users/{made['id']}", headers=admin_headers)
+
+
+def test_you_cannot_lock_yourself_out(created_user):
+    """Everyone can manage users now, so self-delete and self-disable have to be
+    refused — otherwise a supervisor can strand their own session."""
+    own = {"X-User-Id": created_user["id"], "X-Username": created_user["username"]}
+
+    r = _del(f"/users/{created_user['id']}", headers=own)
+    assert r.status_code == 400, r.text
+    assert "own account" in r.json()["detail"].lower()
+
+    r = requests.put(f"{API}/users/{created_user['id']}/toggle-active", headers=own, timeout=30)
+    assert r.status_code == 400, r.text
+    assert "own account" in r.json()["detail"].lower()
+
+
+def test_default_admin_stays_undeletable(admin_headers, created_user):
+    sup_headers = {"X-User-Id": created_user["id"], "X-Username": created_user["username"]}
+    r = _del(f"/users/{ADMIN_ID}", headers=sup_headers)
+    assert r.status_code == 400, r.text
+    assert "default admin" in r.json()["detail"].lower()
 
 
 def test_unauthenticated_request_is_rejected():

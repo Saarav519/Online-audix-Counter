@@ -28,8 +28,9 @@ export default function PortalUsers() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  // Role-aware UI gating — supervisors see read-only list, no admin actions.
-  const { portalUser: currentUserCtx, isAdmin, authHeaders } = useAudit();
+  // User management is open to every logged-in portal user, so the actions are
+  // not role-gated — only the self / default-admin protections remain.
+  const { portalUser: currentUserCtx, authHeaders } = useAudit();
   const currentUser = currentUserCtx || JSON.parse(localStorage.getItem('portalUser') || '{}');
 
   // Auth confirmation state
@@ -59,16 +60,16 @@ export default function PortalUsers() {
     fetchUsers();
   }, []);
 
-  // ---- Verify admin password before sensitive actions ----
+  // ---- Re-enter your own password before sensitive actions ----
   const verifyAdminAndExecute = async () => {
     if (!authPassword) {
-      toast.error('Please enter your admin password');
+      toast.error('Please enter your password');
       return;
     }
 
     setAuthLoading(true);
     try {
-      // Verify admin credentials
+      // Verify the caller's own credentials
       const verifyRes = await fetch(`${BACKEND_URL}/api/audit/portal/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,7 +77,7 @@ export default function PortalUsers() {
       });
 
       if (!verifyRes.ok) {
-        toast.error('Incorrect admin password');
+        toast.error('Incorrect password');
         setAuthLoading(false);
         return;
       }
@@ -228,7 +229,7 @@ export default function PortalUsers() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Authorization Required</h3>
-                  <p className="text-sm text-gray-500">Enter admin password to confirm</p>
+                  <p className="text-sm text-gray-500">Enter your password to confirm</p>
                 </div>
               </div>
               <button onClick={() => { setAuthDialog(null); setAuthPassword(''); }} className="text-gray-400 hover:text-gray-600">
@@ -252,11 +253,11 @@ export default function PortalUsers() {
             </div>
 
             <div className="mb-4">
-              <Label htmlFor="auth-password">Admin Password</Label>
+              <Label htmlFor="auth-password">Your Password</Label>
               <Input
                 id="auth-password"
                 type="password"
-                placeholder="Enter your admin password"
+                placeholder="Enter your password"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && verifyAdminAndExecute()}
@@ -370,7 +371,7 @@ export default function PortalUsers() {
         breadcrumbs={[{ label: 'Users' }]}
         liveLabel={pendingCount > 0 ? `${pendingCount} pending approval` : null}
         accentColor="blue"
-        actions={isAdmin ? (
+        actions={
           <Button
             size="sm"
             onClick={() => { setCreateForm({ username: '', password: '', role: 'supervisor' }); setCreateOpen(true); }}
@@ -380,7 +381,7 @@ export default function PortalUsers() {
             <UserPlus className="w-4 h-4 mr-1.5" />
             Add User
           </Button>
-        ) : null}
+        }
       />
 
       {/* Stats Row */}
@@ -513,7 +514,7 @@ export default function PortalUsers() {
 
                       {/* Role */}
                       <td className="px-6 py-4">
-                        {(!isAdmin || isCurrentUser || isDefaultAdmin) ? (
+                        {(isCurrentUser || isDefaultAdmin) ? (
                           <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                             userIsAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
                           }`}>
@@ -563,15 +564,11 @@ export default function PortalUsers() {
                         {formatDate(user.created_at)}
                       </td>
 
-                      {/* Actions - admin-only; supervisors see read-only state */}
+                      {/* Actions — open to every logged-in user; your own row and
+                          the default admin stay protected. */}
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2" data-testid={`user-actions-${user.username}`}>
-                          {!isAdmin && (
-                            <span className="text-xs text-slate-400 italic" data-testid={`user-actions-readonly-${user.username}`}>
-                              Read-only
-                            </span>
-                          )}
-                          {isAdmin && isPending && (
+                          {isPending && (
                             <>
                               <Button
                                 size="sm"
@@ -596,7 +593,7 @@ export default function PortalUsers() {
                           )}
 
                           {/* Active/Disabled user actions */}
-                          {isAdmin && !isPending && !isCurrentUser && !isDefaultAdmin && (
+                          {!isPending && !isCurrentUser && !isDefaultAdmin && (
                             <>
                               {isDisabled ? (
                                 <Button
@@ -621,8 +618,8 @@ export default function PortalUsers() {
                             </>
                           )}
 
-                          {/* Delete - admin only, non-self, non-default */}
-                          {isAdmin && !isCurrentUser && !isDefaultAdmin && (
+                          {/* Delete — non-self, non-default */}
+                          {!isCurrentUser && !isDefaultAdmin && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -635,7 +632,7 @@ export default function PortalUsers() {
                           )}
 
                           {/* Protected user - no actions */}
-                          {isAdmin && (isCurrentUser || isDefaultAdmin) && !isPending && (
+                          {(isCurrentUser || isDefaultAdmin) && !isPending && (
                             <span className="text-xs text-gray-400 italic">Protected</span>
                           )}
                         </div>

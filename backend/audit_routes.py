@@ -26,7 +26,6 @@ from shared.audit_log_helper import (
 )
 from shared.auth_middleware import (
     get_current_user,
-    require_admin,
     ADMIN_ROLE,
     SUPERVISOR_ROLE,
 )
@@ -568,15 +567,17 @@ async def get_portal_users():
 
 @portal_router.post("/users")
 async def create_portal_user(payload: PortalUserCreate, request: Request):
-    """Create a portal user directly (admin-only).
+    """Create a portal user directly. Any logged-in portal user may do this.
 
     Self-registration was the only way an account could come into existence, and
-    it lands unapproved — so an admin had to walk every new supervisor through
+    it lands unapproved — so somebody had to walk every new supervisor through
     the login page before they could be picked as an assignee. A user created
     here is approved and active straight away.
+
+    Deliberately not admin-only: when the admin is away, the supervisor running
+    the count still has to be able to add someone and get the reco done.
     """
     actor = await get_current_user(request, db)
-    require_admin(actor)
 
     username = (payload.username or "").strip()
     if not username:
@@ -621,9 +622,8 @@ async def create_portal_user(payload: PortalUserCreate, request: Request):
 
 @portal_router.put("/users/{user_id}/approve")
 async def approve_user(user_id: str, request: Request):
-    """Approve a pending user (admin-only)."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Approve a pending user. Open to any logged-in portal user."""
+    await get_current_user(request, db)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": True}}
@@ -634,9 +634,8 @@ async def approve_user(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/reject")
 async def reject_user(user_id: str, request: Request):
-    """Reject/unapprove a user (admin-only)."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Reject/unapprove a user. Open to any logged-in portal user."""
+    await get_current_user(request, db)
     result = await db.portal_users.update_one(
         {"id": user_id},
         {"$set": {"is_approved": False}}
@@ -647,12 +646,14 @@ async def reject_user(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/toggle-active")
 async def toggle_user_active(user_id: str, request: Request):
-    """Enable/disable a user (admin-only)."""
+    """Enable/disable a user. Open to any logged-in portal user."""
     actor = await get_current_user(request, db)
-    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Disabling yourself logs you straight out with no way back in.
+    if user["id"] == actor["id"]:
+        raise HTTPException(status_code=400, detail="You cannot disable your own account")
 
     new_status = not user.get("is_active", True)
     await db.portal_users.update_one(
@@ -663,9 +664,8 @@ async def toggle_user_active(user_id: str, request: Request):
 
 @portal_router.put("/users/{user_id}/role")
 async def change_user_role(user_id: str, role_data: dict, request: Request):
-    """Change user role (admin / supervisor) — admin-only."""
-    actor = await get_current_user(request, db)
-    require_admin(actor)
+    """Change user role (admin / supervisor). Open to any logged-in portal user."""
+    await get_current_user(request, db)
     role = role_data.get("role", SUPERVISOR_ROLE)
     # Backwards compat: accept legacy "viewer" as "supervisor".
     if role == "viewer":
@@ -683,14 +683,16 @@ async def change_user_role(user_id: str, role_data: dict, request: Request):
 
 @portal_router.delete("/users/{user_id}")
 async def delete_portal_user(user_id: str, request: Request):
-    """Delete a portal user (admin-only)."""
+    """Delete a portal user. Open to any logged-in portal user."""
     actor = await get_current_user(request, db)
-    require_admin(actor)
     user = await db.portal_users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user.get("username") == "admin":
         raise HTTPException(status_code=400, detail="Cannot delete the default admin user")
+    # Deleting yourself mid-session leaves the portal with a logged-in ghost.
+    if user["id"] == actor["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
 
     await db.portal_users.delete_one({"id": user_id})
     return {"message": "User deleted successfully"}
