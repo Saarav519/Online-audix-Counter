@@ -9,6 +9,7 @@ import pytest
 import requests
 import os
 import io
+from pathlib import Path
 
 # Use public URL from environment
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
@@ -17,7 +18,7 @@ if not BASE_URL:
 
 # Test client ID with master data
 TEST_CLIENT_ID = "7239e3ca-fc59-48c1-831c-6210a7fa301d"
-TEST_CSV_PATH = "/tmp/master_test.csv"
+TEST_CSV_PATH = Path(__file__).resolve().parent / "fixtures" / "master_test.csv"
 
 
 class TestHealthEndpoints:

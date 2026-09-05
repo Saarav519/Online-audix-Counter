@@ -55,7 +55,7 @@ def test_no_hardcoded_app_paths_in_backend():
     offenders = []
     for pattern in ("*.py", "shared/*.py"):
         for f in sorted(BACKEND_DIR.glob(pattern)):
-            for i, line in enumerate(f.read_text().splitlines(), 1):
+            for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
                 if "/app/" in line:
                     offenders.append(f"{f.relative_to(BACKEND_DIR)}:{i}: {line.strip()}")
     assert not offenders, "hardcoded /app/ paths remain:\n" + "\n".join(offenders)

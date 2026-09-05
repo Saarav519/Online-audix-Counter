@@ -39,8 +39,10 @@ assert BASE_URL, "REACT_APP_BACKEND_URL must be set"
 API = f"{BASE_URL}/api/audit/portal"
 CC_API = f"{BASE_URL}/api/audit/portal/cycle-count"
 
+from conftest import get_admin_password
+
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = get_admin_password()
 
 
 # ─────────────────────────────────────── Helpers / fixtures

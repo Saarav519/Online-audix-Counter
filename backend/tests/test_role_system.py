@@ -26,8 +26,10 @@ if _BACKEND_DIR not in sys.path:
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://counter-app-demo-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api/audit/portal"
 
+from conftest import get_admin_password
+
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = get_admin_password()
 
 # ---------- module-level helpers (sync, using requests) ----------
 

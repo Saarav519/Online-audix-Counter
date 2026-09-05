@@ -25,6 +25,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 import requests
@@ -351,14 +352,16 @@ class TestFrontendSourceStatic:
     """Per review_request: validate the FE source contains the
     expected wiring (saves a Playwright session for the next agent)."""
 
-    POPUP_PATH = "/app/frontend/src/components/LastEditedPopup.jsx"
-    HOOK_PATH = "/app/frontend/src/hooks/useLastEditPopup.js"
-    BARCODE_PATH = "/app/frontend/src/components/BarcodeEditCell.jsx"
-    REPORTS_PATH = "/app/frontend/src/pages/portal/PortalReports.jsx"
-    FULLSCREEN_PATH = "/app/frontend/src/components/FullScreenReport.jsx"
+    _FE_SRC = Path(__file__).resolve().parents[2] / "frontend" / "src"
+
+    POPUP_PATH = _FE_SRC / "components" / "LastEditedPopup.jsx"
+    HOOK_PATH = _FE_SRC / "hooks" / "useLastEditPopup.js"
+    BARCODE_PATH = _FE_SRC / "components" / "BarcodeEditCell.jsx"
+    REPORTS_PATH = _FE_SRC / "pages" / "portal" / "PortalReports.jsx"
+    FULLSCREEN_PATH = _FE_SRC / "components" / "FullScreenReport.jsx"
 
     def _read(self, p):
-        with open(p) as f:
+        with open(p, encoding="utf-8") as f:
             return f.read()
 
     def test_popup_file_present_and_contracted(self):

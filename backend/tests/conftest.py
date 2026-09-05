@@ -35,6 +35,21 @@ def get_base_url() -> str:
     return url
 
 
+def get_admin_password() -> str:
+    """Portal admin password for live-server tests.
+
+    The server seeds the admin from ADMIN_INITIAL_PASSWORD, so the credential is
+    per-deployment. ADMIN_PASSWORD overrides it here; the default keeps local
+    runs against a seeded dev backend unchanged.
+    """
+    return os.environ.get("ADMIN_PASSWORD") or "admin123"
+
+
 @pytest.fixture(scope="session")
 def base_url():
     return get_base_url()
+
+
+@pytest.fixture(scope="session")
+def admin_password():
+    return get_admin_password()

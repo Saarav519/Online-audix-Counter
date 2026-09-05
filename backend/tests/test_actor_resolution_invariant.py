@@ -18,12 +18,12 @@ import requests
 import pytest
 
 
-from conftest import get_base_url
+from conftest import get_base_url, get_admin_password
 
 BASE_URL = get_base_url()
 API = f"{BASE_URL}/api/audit/portal"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = get_admin_password()
 
 
 def _hdr(uid, uname=""):

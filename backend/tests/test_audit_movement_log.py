@@ -14,9 +14,12 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 import pytest
 import requests
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://counter-app-demo-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api/audit/portal"
@@ -392,7 +395,7 @@ class TestFiltersOnRealData:
 class TestNonBlockingCodeReview:
     def test_log_audit_entry_wrapped_in_try_except(self):
         """Static code check: helper must swallow exceptions."""
-        with open("/app/backend/shared/audit_log_helper.py") as f:
+        with open(REPO_ROOT / "backend" / "shared" / "audit_log_helper.py", encoding="utf-8") as f:
             src = f.read()
         assert "try:" in src and "except Exception" in src
         assert "NEVER raise" in src or "non-fatal" in src
