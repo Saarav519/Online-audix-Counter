@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback, memo } from '
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import RecoEditGuard from '../../components/RecoEditGuard';
 import { 
   FileBarChart, 
   Download,
@@ -603,6 +604,9 @@ export default function PortalReports() {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [reportType, setReportType] = useState('');
   const [reportData, setReportData] = useState(null);
+  // Set when a reco save is refused because another user already entered a
+  // value; holds the original params so the retry can carry the reason.
+  const [recoGuard, setRecoGuard] = useState({ open: false, barcode: '', qty: null, overwritingOther: false, params: null });
   const [loading, setLoading] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [varianceCategory, setVarianceCategory] = useState('all');
@@ -1321,7 +1325,26 @@ export default function PortalReports() {
       } else {
         body.module = isStoreClient ? 'warehouse' : 'warehouse';
       }
-      const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const _recoHeaders = { 'Content-Type': 'application/json' };
+      if (body.user_id) _recoHeaders['X-User-Id'] = body.user_id;
+      if (body.username) _recoHeaders['X-Username'] = body.username;
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/reco-adjustments`, { method: 'POST', headers: _recoHeaders, body: JSON.stringify(body) });
+      // Someone else already set a Reco here — show that item's recent history
+      // and take a reason, then retry the same save with it attached.
+      if (response.status === 400 && !params.reason) {
+        let code = '', detail = null;
+        try { detail = (await response.clone().json())?.detail; code = detail?.code || ''; } catch { /* not our shape */ }
+        if (code === 'reason_required') {
+          setRecoGuard({
+            open: true,
+            barcode: params.barcode || params.article_code || '',
+            qty: params.reco_qty,
+            overwritingOther: !!detail?.overwriting_other_user,
+            params,
+          });
+          return;
+        }
+      }
       if (response.ok) {
         // Invalidate all cached reports for this client — reco propagates
         // across every day-wise + consolidated cycle-count report and across
@@ -1395,7 +1418,13 @@ export default function PortalReports() {
         });
         toast.success('Reco saved');
       } else {
-        toast.error('Failed to save Reco adjustment');
+        let msg = 'Failed to save Reco adjustment';
+        try {
+          const d = (await response.clone().json())?.detail;
+          if (typeof d === 'string') msg = d;
+          else if (d?.message) msg = d.message;
+        } catch { /* keep the generic message */ }
+        toast.error(msg);
       }
     } catch (error) {
       console.error('Failed to save reco:', error);
@@ -2201,7 +2230,7 @@ export default function PortalReports() {
             <p>
               <span className="font-bold">Assigned access.</span>{' '}
               {assignmentAssigner ? <>by <span className="font-semibold">{assignmentAssigner.slice(0, 8)}…</span> · </> : null}
-              You can <span className="font-semibold">VIEW</span> these reports and <span className="font-semibold">edit RECO only in the Detailed report</span>.
+              You can <span className="font-semibold">VIEW</span> these reports and <span className="font-semibold">edit RECO</span>. Changing a Reco somebody else entered asks you for a reason first.
               Barcode / article edits and other changes are restricted to the client owner.
             </p>
           </div>
@@ -2444,6 +2473,20 @@ export default function PortalReports() {
           {reportType === 'pending-locations' && <PendingLocationsView data={reportData} clientId={selectedClient} />}
         </>
       )}
+
+      <RecoEditGuard
+        isOpen={recoGuard.open}
+        barcode={recoGuard.barcode}
+        clientId={selectedClient}
+        pendingQty={recoGuard.qty}
+        overwritingOther={recoGuard.overwritingOther}
+        onCancel={() => setRecoGuard({ open: false, barcode: '', qty: null, overwritingOther: false, params: null })}
+        onProceed={(reason) => {
+          const retry = recoGuard.params;
+          setRecoGuard({ open: false, barcode: '', qty: null, overwritingOther: false, params: null });
+          if (retry) saveRecoAdjustment({ ...retry, reason });
+        }}
+      />
 
       {/* Full Screen Report View */}
       <FullScreenReport
@@ -2943,7 +2986,7 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row._original_value || row.barcode, location: row.location, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-detailed-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'detailed', barcode: row._original_value || row.barcode, location: row.location, reco_qty: val, physical_qty: row.physical_qty || 0 })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -3104,7 +3147,7 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                 {isCC && <td className="py-2 px-3 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.post_pick_qty || 0}</td>}
                 {isRecoEditable && (
                   <td className="py-1 px-2 bg-blue-50/30">
-                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row._original_value || row.barcode, reco_qty: val })} />
+                    <RecoInput dataTestId={`reco-input-barcode-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.barcode} onSave={(val) => onSaveReco({ reco_type: 'barcode', barcode: row._original_value || row.barcode, reco_qty: val, physical_qty: row.physical_qty || 0 })} />
                   </td>
                 )}
                 {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}
@@ -3263,7 +3306,7 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                   <td className="py-2 px-3 text-right text-gray-500">{(row.physical_value_cost || 0).toFixed(2)}</td>
                   {isRecoEditable && (
                     <td className="py-1 px-2 bg-blue-50/30" onClick={e => e.stopPropagation()}>
-                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.article_code} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row._original_value || row.article_code, reco_qty: val })} />
+                      <RecoInput dataTestId={`reco-input-article-${i}`} value={row.reco_qty || 0} clientId={clientId} recoBarcode={row._original_value || row.article_code} onSave={(val) => onSaveReco({ reco_type: 'article', article_code: row._original_value || row.article_code, reco_qty: val, physical_qty: row.physical_qty || 0 })} />
                     </td>
                   )}
                   {isConsolidated && !isRecoEditable && <td className="py-2 px-3 text-right text-blue-600">{row.reco_qty || 0}</td>}

@@ -350,6 +350,9 @@ class Alert(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_id: str
     session_id: str
+    # Empty = a client/session-wide alert everyone sees. Set = addressed to one
+    # portal user, and only that user's bell shows it.
+    user_id: str = ""
     alert_type: str  # variance_high, sync_issue, device_inactive
     message: str
     severity: str = "warning"  # info, warning, critical
@@ -389,6 +392,12 @@ class RecoAdjustmentCreate(BaseModel):
     session_id: Optional[str] = None
     cycle_day: Optional[int] = None
     module: Optional[str] = None  # auto-detected from client_type if not set
+    # Why this value is being set. Mandatory only when overwriting a reco that
+    # somebody else already entered — see save_reco_adjustment.
+    reason: Optional[str] = None
+    # The row's Physical Qty, sent by the portal so the Movement Log can record
+    # the resulting Final Qty (physical + reco) alongside the change.
+    physical_qty: Optional[float] = None
 
 # ==================== HELPER FUNCTIONS ====================
 
@@ -4053,39 +4062,16 @@ def _compute_validated_reco(reco_maps, expected_results, synced_results):
 
 @portal_router.post("/reco-adjustments")
 async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
-    """Save or update a reconciliation adjustment (client-level for consolidated reports)."""
-    # Prompt 4 — assignees may edit reco ONLY on the detailed report.
-    # Owners may edit reco everywhere.
+    """Save or update a reconciliation adjustment (client-level for consolidated reports).
+
+    Reco is no longer gated on ownership/assignment. Blocking a second
+    supervisor left them with a dead cell and no way forward; accountability
+    now comes from the audit trail instead: overwriting a value somebody else
+    entered requires an explicit reason, which the portal collects after
+    showing that item's recent history.
+    """
     # Actor strictly from header — body user_id is audit-trail only.
-    # Gate only enforced when X-User-Id matches a real portal_users row.
     actor_id = (request.headers.get("x-user-id", "") or "").strip()
-    if actor_id:
-        real_user = await db.portal_users.find_one({"id": actor_id}, {"_id": 0, "id": 1})
-    else:
-        real_user = None
-    if actor_id and real_user:
-        rt_for_check = {
-            "detailed": "detailed",
-            "barcode":  "barcode-wise",
-            "article":  "article-wise",
-        }.get(adj.reco_type, adj.reco_type)
-        acl = await _h_check_assignment_access(
-            db, user_id=actor_id, client_id=adj.client_id,
-            session_id=adj.session_id or "",
-            report_type=rt_for_check,
-            cycle_day=adj.cycle_day,
-        )
-        if not acl.get("is_owner") and not acl.get("can_edit_reco"):
-            raise HTTPException(
-                status_code=403,
-                detail="You don't have permission to edit reco for this session.",
-            )
-        # Assignees can ONLY touch reco_qty in the detailed report.
-        if not acl.get("is_owner") and adj.reco_type != "detailed":
-            raise HTTPException(
-                status_code=403,
-                detail="Assigned users can edit reco only in the Detailed report.",
-            )
     filter_key = {"client_id": adj.client_id, "reco_type": adj.reco_type}
     if adj.reco_type == "detailed":
         filter_key["barcode"] = adj.barcode
@@ -4094,12 +4080,41 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
         filter_key["barcode"] = adj.barcode
     elif adj.reco_type == "article":
         filter_key["article_code"] = adj.article_code
-    # Capture previous reco qty for the audit log diff
-    prev = await db.reco_adjustments.find_one(filter_key, {"_id": 0, "reco_qty": 1})
+    # Capture the previous reco for the audit log diff and to decide whether a
+    # reason is required.
+    prev = await db.reco_adjustments.find_one(
+        filter_key, {"_id": 0, "reco_qty": 1, "updated_by": 1})
     prev_qty = (prev or {}).get("reco_qty", 0) or 0
+    reason = (adj.reason or "").strip()
+    # Every reco edit needs a justification so the Movement Log says WHY, not
+    # just what changed. Only enforced for an identified caller — a request
+    # with no X-User-Id is the script/legacy path the rest of this module also
+    # leaves ungated.
+    # When the value being replaced belongs to somebody else the portal also
+    # shows that item's recent history before asking, hence the separate flag.
+    if actor_id and not reason:
+        overwriting_other = bool(prev) and (prev.get("updated_by") or "") != actor_id
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "reason_required",
+                "overwriting_other_user": overwriting_other,
+                "message": (
+                    "This item already has a reco entered by another user — a reason is required to change it."
+                    if overwriting_other else
+                    "A reason is required for every reco change."
+                ),
+            },
+        )
     module = adj.module or await resolve_module_for_client(db, adj.client_id)
     field_name = "reco_qty"
     audit_barcode = adj.barcode or adj.article_code
+    # Final Qty the row ends up showing after this edit. Only derivable when
+    # the portal sent the row's physical qty.
+    def _final_after(new_reco):
+        if adj.physical_qty is None:
+            return None
+        return adj.physical_qty + new_reco
     if adj.reco_qty == 0:
         await db.reco_adjustments.delete_one(filter_key)
         _reco_cache.invalidate(f"reco_{adj.client_id}")
@@ -4117,9 +4132,14 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
             "username": adj.username or "",
             "report_type": adj.reco_type,
             "location": adj.location or "",
+            "reason": reason,
+            "final_qty": _final_after(0),
         })
         return {"status": "deleted"}
-    doc = {**filter_key, "reco_qty": adj.reco_qty, "updated_at": datetime.now(timezone.utc).isoformat()}
+    doc = {**filter_key, "reco_qty": adj.reco_qty,
+           "updated_at": datetime.now(timezone.utc).isoformat(),
+           "updated_by": actor_id or (adj.user_id or ""),
+           "updated_by_username": adj.username or ""}
     await db.reco_adjustments.update_one(filter_key, {"$set": doc}, upsert=True)
     _reco_cache.invalidate(f"reco_{adj.client_id}")
     await log_audit_entry(db, {
@@ -4136,6 +4156,8 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
         "username": adj.username or "",
         "report_type": adj.reco_type,
         "location": adj.location or "",
+        "reason": reason,
+        "final_qty": _final_after(adj.reco_qty),
     })
     return {"status": "saved", "reco_qty": adj.reco_qty}
 
@@ -4285,6 +4307,23 @@ async def create_report_assignment(payload: AssignmentCreate, request: Request):
         "cycle_day": payload.cycle_day,
         "notes": payload.notes or "",
     })
+    # Tell the assignee. Fire-and-forget: a notification failure must never
+    # cost the assignment itself.
+    try:
+        alert = Alert(
+            client_id=client.get("id", ""),
+            session_id=payload.session_id or "",
+            user_id=payload.assigned_to,
+            alert_type="assignment",
+            message=f"{client.get('name', 'A client')} — a report has been assigned to you"
+                    + (f": {payload.notes.strip()}" if (payload.notes or "").strip() else ""),
+            severity="info",
+        )
+        adoc = alert.model_dump()
+        adoc["created_at"] = adoc["created_at"].isoformat()
+        await db.alerts.insert_one(adoc)
+    except Exception as e:
+        logger.warning(f"Assignment notification skipped: {e}")
     return {"message": "Assignment created", "assignment": doc}
 
 
@@ -6735,7 +6774,8 @@ async def check_and_generate_alerts(session_id: str, client_id: str):
         await db.alerts.insert_one(doc)
 
 @portal_router.get("/alerts")
-async def get_alerts(client_id: Optional[str] = None, session_id: Optional[str] = None, unread_only: bool = False):
+async def get_alerts(client_id: Optional[str] = None, session_id: Optional[str] = None,
+                     unread_only: bool = False, user_id: Optional[str] = None):
     query = {}
     if client_id:
         query["client_id"] = client_id
@@ -6743,6 +6783,9 @@ async def get_alerts(client_id: Optional[str] = None, session_id: Optional[str] 
         query["session_id"] = session_id
     if unread_only:
         query["is_read"] = False
+    if user_id:
+        # This user's own alerts plus the ones addressed to nobody in particular.
+        query["$or"] = [{"user_id": user_id}, {"user_id": ""}, {"user_id": {"$exists": False}}]
     
     alerts = await db.alerts.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return alerts

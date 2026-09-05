@@ -8,7 +8,9 @@ owner/assignee → 403.
 
 Four explicit scenarios:
   1) POST /reco-adjustments  — NO X-User-Id, body user_id=synthetic → 200
-  2) POST /reco-adjustments  — X-User-Id of real non-owner non-assignee → 403
+  2) POST /reco-adjustments  — X-User-Id of real non-owner non-assignee → 200
+     (reco ownership gate removed; overwriting someone else's value needs a
+      reason instead — covered by test_reco_concurrent_edit.py)
   3) POST /cycle-count/days/{id}/close — X-User-Id=synthetic id → bypass (not 403)
   4) Same — X-User-Id of real non-owner portal_user → 403
 """
@@ -119,19 +121,28 @@ def test_1_reco_no_header_synthetic_body_userid_is_legacy_200(http, owner_client
     assert r.status_code == 200, f"got {r.status_code}: {r.text}"
 
 
-def test_2_reco_real_non_owner_xuserid_is_403(http, stranger, owner_client, owner_session):
+def test_2_reco_real_non_owner_xuserid_is_allowed(http, stranger, owner_client, owner_session):
+    """Reco is no longer gated on ownership.
+
+    This asserted 403 under the original Prompt-4 spec. That gate was removed
+    deliberately: blocking a second supervisor left them with a dead cell and
+    no way forward. Accountability now comes from the audit trail — overwriting
+    every reco change requires a reason (test_reco_concurrent_edit).
+    Every reco change carries a reason now, so one is supplied here.
+    """
     payload = {
         "client_id": owner_client["id"],
         "reco_type": "detailed",
         "barcode": f"INVBC_{uuid.uuid4().hex[:6]}",
         "location": "LOC",
         "reco_qty": 1,
+        "reason": "Counted during joint verification",
     }
     if owner_session:
         payload["session_id"] = owner_session["id"]
     r = http.post(f"{API}/reco-adjustments", json=payload,
                   headers=_hdr(stranger["id"], stranger.get("username", "")), timeout=15)
-    assert r.status_code == 403, f"got {r.status_code}: {r.text}"
+    assert r.status_code == 200, f"got {r.status_code}: {r.text}"
 
 
 def test_3_cc_close_day_synthetic_xuserid_is_bypassed(http, admin, cc_day):

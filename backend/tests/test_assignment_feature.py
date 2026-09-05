@@ -464,6 +464,7 @@ class TestEditGates:
                 "barcode": "TESTBC1",
                 "location": "LOC1",
                 "reco_qty": 5,
+                "reason": "test",
                 "session_id": owner_session["id"],
                 "user_id": assignee_user["id"],
                 "username": assignee_user["username"],
@@ -473,9 +474,14 @@ class TestEditGates:
         assert r.status_code == 200, r.text
         assert r.json().get("status") == "saved"
 
-    def test_reco_barcode_assignee_blocked(
+    def test_reco_barcode_assignee_now_allowed(
         self, http, assignee_user, owner_client, owner_session
     ):
+        """Asserted 403 under the original Prompt-4 spec ("assignees may edit
+        reco only on the detailed report"). That restriction was removed
+        deliberately — reco is open to any user now, and overwriting somebody
+        else's value requires a reason instead (test_reco_concurrent_edit).
+        """
         r = http.post(
             f"{API}/reco-adjustments",
             json={
@@ -483,13 +489,14 @@ class TestEditGates:
                 "reco_type": "barcode",
                 "barcode": "TESTBC2",
                 "reco_qty": 5,
+                "reason": "test",
                 "session_id": owner_session["id"],
             },
             headers=_hdr(assignee_user["id"], assignee_user["username"]),
         )
-        assert r.status_code == 403, r.text
+        assert r.status_code == 200, r.text
 
-    def test_reco_article_assignee_blocked(
+    def test_reco_article_assignee_now_allowed(
         self, http, assignee_user, owner_client, owner_session
     ):
         r = http.post(
@@ -499,11 +506,12 @@ class TestEditGates:
                 "reco_type": "article",
                 "article_code": "ART1",
                 "reco_qty": 5,
+                "reason": "test",
                 "session_id": owner_session["id"],
             },
             headers=_hdr(assignee_user["id"], assignee_user["username"]),
         )
-        assert r.status_code == 403, r.text
+        assert r.status_code == 200, r.text
 
     def test_owner_reco_any_type_allowed(self, http, admin, owner_client, owner_session):
         for reco_type, extra in [
@@ -517,6 +525,7 @@ class TestEditGates:
                     "client_id": owner_client["id"],
                     "reco_type": reco_type,
                     "reco_qty": 3,
+                    "reason": "test",
                     "session_id": owner_session["id"],
                     **extra,
                 },
@@ -534,6 +543,7 @@ class TestEditGates:
                 "barcode": "LEGACYBC",
                 "location": "LEGLOC",
                 "reco_qty": 1,
+                "reason": "test",
                 "session_id": owner_session["id"],
             },
         )

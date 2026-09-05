@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Bell, CheckCheck, AlertTriangle, Info, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -12,13 +13,37 @@ export default function NotificationBell() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const ref = useRef(null);
+  // Alert ids already surfaced, so a poll doesn't re-toast the same thing.
+  const seenRef = useRef(null);
 
   const load = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/audit/portal/alerts?limit=20`);
+      // Scope to this user so an assignment addressed to them actually reaches
+      // their bell and nobody else's.
+      let uid = '';
+      try {
+        const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+        uid = u?.id || '';
+      } catch { /* not logged in yet */ }
+      const qs = uid ? `?limit=20&user_id=${encodeURIComponent(uid)}` : '?limit=20';
+      const res = await fetch(`${API_URL}/api/audit/portal/alerts${qs}`);
       if (!res.ok) return;
       const data = await res.json();
-      setAlerts(Array.isArray(data) ? data : (data.alerts || []));
+      const list = Array.isArray(data) ? data : (data.alerts || []);
+      // Pop a toast for assignments that arrived since the last poll. The first
+      // load only seeds the baseline — no toast storm on page open.
+      if (seenRef.current === null) {
+        seenRef.current = new Set(list.map(a => a.id));
+      } else {
+        list
+          .filter(a => a.alert_type === 'assignment' && !a.is_read && !seenRef.current.has(a.id))
+          .forEach(a => {
+            seenRef.current.add(a.id);
+            toast.info('Assigned to you', { description: a.message });
+          });
+        list.forEach(a => seenRef.current.add(a.id));
+      }
+      setAlerts(list);
     } catch {
       // silent
     } finally {
