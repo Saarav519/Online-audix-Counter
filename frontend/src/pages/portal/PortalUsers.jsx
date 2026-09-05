@@ -11,7 +11,8 @@ import {
   XCircle,
   AlertCircle,
   Lock,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -35,6 +36,11 @@ export default function PortalUsers() {
   const [authDialog, setAuthDialog] = useState(null); // { action, userId, username, label }
   const [authPassword, setAuthPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+
+  // Create-user state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ username: '', password: '', role: 'supervisor' });
+  const [createLoading, setCreateLoading] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -104,6 +110,43 @@ export default function PortalUsers() {
       toast.error('Action failed');
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  // ---- Create a user outright, so an admin does not have to walk every new
+  // supervisor through the self-registration + approval flow before they can
+  // be picked as an assignee. ----
+  const handleCreateUser = async () => {
+    const username = createForm.username.trim();
+    if (!username) {
+      toast.error('Enter a username');
+      return;
+    }
+    if (createForm.password.length < 4) {
+      toast.error('Password must be at least 4 characters');
+      return;
+    }
+
+    setCreateLoading(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/audit/portal/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ username, password: createForm.password, role: createForm.role })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        toast.success(data.message || 'User created');
+        setCreateOpen(false);
+        setCreateForm({ username: '', password: '', role: 'supervisor' });
+        fetchUsers();
+      } else {
+        toast.error(data.detail || 'Failed to create user');
+      }
+    } catch (error) {
+      toast.error('Failed to create user');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -246,6 +289,80 @@ export default function PortalUsers() {
         </div>
       )}
 
+      {/* Create User Dialog */}
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Add User</h3>
+                  <p className="text-xs text-gray-500">Created users are approved and can be assigned right away</p>
+                </div>
+              </div>
+              <button onClick={() => setCreateOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="new-username" className="text-xs">Username</Label>
+                <Input
+                  id="new-username"
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="e.g. ravi.supervisor"
+                  autoComplete="off"
+                  data-testid="new-user-username"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-password" className="text-xs">Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="At least 4 characters"
+                  autoComplete="new-password"
+                  data-testid="new-user-password"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Share this with the user — they can change it from the login page.</p>
+              </div>
+              <div>
+                <Label htmlFor="new-role" className="text-xs">Role</Label>
+                <select
+                  id="new-role"
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, role: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  data-testid="new-user-role"
+                >
+                  <option value="supervisor">Supervisor</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <Button variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleCreateUser}
+                disabled={createLoading}
+                data-testid="create-user-submit"
+              >
+                {createLoading ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <PageHeader
         title="User Management"
@@ -253,6 +370,17 @@ export default function PortalUsers() {
         breadcrumbs={[{ label: 'Users' }]}
         liveLabel={pendingCount > 0 ? `${pendingCount} pending approval` : null}
         accentColor="blue"
+        actions={isAdmin ? (
+          <Button
+            size="sm"
+            onClick={() => { setCreateForm({ username: '', password: '', role: 'supervisor' }); setCreateOpen(true); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            data-testid="add-user-btn"
+          >
+            <UserPlus className="w-4 h-4 mr-1.5" />
+            Add User
+          </Button>
+        ) : null}
       />
 
       {/* Stats Row */}

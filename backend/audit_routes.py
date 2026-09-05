@@ -566,6 +566,59 @@ async def get_portal_users():
     users = await db.portal_users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
+@portal_router.post("/users")
+async def create_portal_user(payload: PortalUserCreate, request: Request):
+    """Create a portal user directly (admin-only).
+
+    Self-registration was the only way an account could come into existence, and
+    it lands unapproved — so an admin had to walk every new supervisor through
+    the login page before they could be picked as an assignee. A user created
+    here is approved and active straight away.
+    """
+    actor = await get_current_user(request, db)
+    require_admin(actor)
+
+    username = (payload.username or "").strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+    # Same minimum the reset-password endpoint enforces.
+    if len(payload.password or "") < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+
+    role = payload.role or SUPERVISOR_ROLE
+    if role == "viewer":  # legacy alias, handled the same way by /users/{id}/role
+        role = SUPERVISOR_ROLE
+    if role not in (ADMIN_ROLE, SUPERVISOR_ROLE):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'supervisor'")
+
+    # Case-insensitive so "Ravi" and "ravi" cannot become two accounts nobody
+    # can tell apart in the assignee list.
+    existing = await db.portal_users.find_one(
+        {"username": {"$regex": f"^{re.escape(username)}$", "$options": "i"}}
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    portal_user = PortalUser(
+        username=username,
+        password_hash=hash_password(payload.password),
+        role=role,
+        is_active=True,
+        is_approved=True,  # an admin created it; a second approval step adds nothing
+    )
+    doc = portal_user.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['created_by'] = actor["id"]
+    # Build the response before inserting: insert_one stamps a BSON _id onto the
+    # dict in place, which does not survive JSON encoding.
+    public = {k: v for k, v in doc.items() if k != "password_hash"}
+    await db.portal_users.insert_one(doc)
+
+    return {
+        "message": f"User '{username}' created — they can log in and be assigned now",
+        "user": public,
+    }
+
 @portal_router.put("/users/{user_id}/approve")
 async def approve_user(user_id: str, request: Request):
     """Approve a pending user (admin-only)."""
