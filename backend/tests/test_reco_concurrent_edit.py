@@ -201,3 +201,46 @@ def test_assignment_notifies_the_assignee(portal, admin, stranger, owned_client)
                          params={"user_id": admin["id"]}, timeout=30).json()
     assert not [a for a in other if a.get("id") == assigned[0]["id"]], \
         "an assignment addressed to one user leaked into another user's bell"
+
+
+def test_alert_stream_pushes_without_polling(portal, admin, stranger, owned_client):
+    """The bell used to wait up to 30s for a poll. The stream must deliver an
+    assignment within a second or two, and must not be swallowed by the gzip
+    middleware (which buffers small responses and silently broke this)."""
+    import threading
+    import time as _t
+
+    r = requests.post(f"{portal}/sessions", json={
+        "client_id": owned_client, "name": "TEST stream session",
+        "variance_mode": "bin-wise", "start_date": "2026-01-01T00:00:00+00:00"},
+        headers=_hdr(admin["id"], admin["username"]), timeout=30)
+    assert r.status_code == 200, r.text
+    sid = r.json()["session"]["id"]
+
+    got = []
+
+    def listen():
+        # plain requests sends "Accept-Encoding: gzip" exactly like a browser
+        s = requests.get(f"{portal}/alerts/stream",
+                         params={"user_id": stranger["id"]}, stream=True, timeout=20)
+        assert s.headers.get("content-type", "").startswith("text/event-stream")
+        for line in s.iter_lines():
+            if line and line.decode().startswith("data:") and "assignment" in line.decode():
+                got.append(_t.time())
+                return
+
+    th = threading.Thread(target=listen, daemon=True)
+    th.start()
+    _t.sleep(2)  # let the stream connect
+
+    sent = _t.time()
+    r = requests.post(f"{portal}/assignments", json={
+        "module": "warehouse", "assigned_to": stranger["id"], "session_id": sid,
+        "assignment_type": "full_session", "notes": "stream test"},
+        headers=_hdr(admin["id"], admin["username"]), timeout=30)
+    assert r.status_code == 200, r.text
+
+    th.join(timeout=15)
+    assert got, "assignment never arrived on the stream"
+    delay = got[0] - sent
+    assert delay < 10, f"stream took {delay:.1f}s — that is polling, not pushing"
