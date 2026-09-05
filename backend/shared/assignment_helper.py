@@ -50,10 +50,18 @@ VALID_REPORT_TYPES = {
     "detailed", "bin_wise", "bin-wise",
     "barcode_wise", "barcode-wise",
     "article_wise", "article-wise",
+    "category_summary", "category-summary",
+    "empty_bins", "empty-bins",
+    "pending_locations", "pending-locations",
     "variance", "category", "summary",
 }
 
 VALID_MODULES = {"warehouse", "cycle_count"}
+
+# The consolidated (all-sessions) view of a client is picked in the Reports page
+# with this sentinel in place of a session id. An assignment can name it too, so
+# a client's roll-up can be delegated the same way a single session is.
+CONSOLIDATED_SESSION = "__consolidated__"
 
 
 def _now_iso() -> str:
@@ -70,7 +78,8 @@ def _normalize_report_type(rt: str) -> str:
 async def _resolve_client_id_from_session(db, session_id: str) -> Optional[str]:
     """Find the owning client_id for either a warehouse audit_session
     or a cycle_count project (cycle_projects.audit_session_id)."""
-    if not session_id:
+    if not session_id or session_id == CONSOLIDATED_SESSION:
+        # The consolidated view is not a session — its client is passed in.
         return None
     # Try warehouse audit_session first.
     sess = await db.audit_sessions.find_one(

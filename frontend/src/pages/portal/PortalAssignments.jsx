@@ -14,13 +14,27 @@ import { useAudit } from '../AuditApp';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal`;
 
+// Keys match the Report Type values the Reports page uses, so an assignment can
+// be filtered against what the assignee actually picks there.
 const REPORT_TYPES = [
-  { key: 'detailed',     label: 'Detailed',     desc: 'Per-bin × per-barcode' },
-  { key: 'bin-wise',     label: 'Bin Wise',     desc: 'Per-bin summary' },
-  { key: 'barcode-wise', label: 'Barcode Wise', desc: 'Per-barcode roll-up' },
-  { key: 'article-wise', label: 'Article Wise', desc: 'Per-article roll-up' },
-  { key: 'variance',     label: 'Variance',     desc: 'Variance dashboard' },
+  { key: 'detailed',          label: 'Detailed',      desc: 'Per-bin × per-barcode' },
+  { key: 'bin-wise',          label: 'Bin Wise',      desc: 'Per-bin summary' },
+  { key: 'barcode-wise',      label: 'Barcode Wise',  desc: 'Per-barcode roll-up' },
+  { key: 'article-wise',      label: 'Article Wise',  desc: 'Per-article roll-up' },
+  { key: 'category-summary',  label: 'Category Wise', desc: 'Per-category summary' },
+  { key: 'empty-bins',        label: 'Empty Bins',    desc: 'Bins found empty' },
+  { key: 'pending-locations', label: 'Pending Locs',  desc: 'Not yet counted' },
 ];
+
+// The Reports page picks the all-sessions roll-up with this sentinel instead of
+// a session id; an assignment can name it the same way.
+const CONSOLIDATED = '__consolidated__';
+
+const sessionLabel = (sessionId, sessions = []) => {
+  if (sessionId === CONSOLIDATED) return 'All Sessions (Consolidated)';
+  const found = sessions.find(s => s.id === sessionId);
+  return found ? found.name : `${(sessionId || '').slice(0, 8)}…`;
+};
 
 const MOD = {
   warehouse:   { label: 'Warehouse',   cls: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',       Icon: Warehouse },
@@ -155,6 +169,9 @@ function AssignTab({ authHeaders, portalUser }) {
           module,
           assigned_to: uid,
           session_id: sessionId,
+          // The consolidated view spans every session, so the backend has no
+          // session to resolve the client from — name it explicitly.
+          client_id: clientId,
           assignment_type: assignmentType,
           report_types: assignmentType === 'specific_reports' ? reportTypes : [],
           cycle_day: cycleDay ? Number(cycleDay) : null,
@@ -240,6 +257,11 @@ function AssignTab({ authHeaders, portalUser }) {
             className="mt-1 w-full h-9 px-2 rounded-md border border-slate-200 bg-white text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200"
           >
             <option value="">— pick a session —</option>
+            {/* The client's roll-up across every session. Cycle-count clients
+                have their own per-project consolidated day instead. */}
+            {module !== 'cycle_count' && (
+              <option value={CONSOLIDATED}>All Sessions (Consolidated)</option>
+            )}
             {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
@@ -442,7 +464,7 @@ function MyAssignmentsTab({ authHeaders, navigate }) {
               <span className="text-[10px] text-slate-400">{_fmtDate(r.assigned_at)}</span>
             </div>
             <p className="text-sm font-semibold text-slate-800 truncate">{cli?.name || r.client_id?.slice(0, 8)}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Session: <span className="font-mono">{r.session_id.slice(0, 8)}…</span></p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Session: <span className="font-mono">{sessionLabel(r.session_id)}</span></p>
             <div className="mt-2 flex items-center gap-1 flex-wrap">
               {r.assignment_type === 'full_session' ? (
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Full Session</span>

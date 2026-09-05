@@ -37,6 +37,7 @@ from shared.assignment_helper import (
     check_assignment_access as _h_check_assignment_access,
     get_visible_client_ids as _h_get_visible_client_ids,
     FULL_SESSION, SPECIFIC_REPORTS, VALID_TYPES, VALID_MODULES,
+    CONSOLIDATED_SESSION,
 )
 
 ROOT_DIR = Path(__file__).parent
@@ -4206,7 +4207,8 @@ async def audit_logs_export(filters: dict, request: Request):
 class AssignmentCreate(BaseModel):
     module: str = "warehouse"            # warehouse | cycle_count
     assigned_to: str                     # portal_users.id
-    session_id: str                      # warehouse session OR cycle audit_session_id
+    session_id: str                      # session id, or CONSOLIDATED_SESSION for the roll-up
+    client_id: Optional[str] = None      # required when session_id is CONSOLIDATED_SESSION
     assignment_type: str = FULL_SESSION  # full_session | specific_reports
     report_types: Optional[List[str]] = None
     cycle_day: Optional[int] = None
@@ -4245,9 +4247,21 @@ async def create_report_assignment(payload: AssignmentCreate, request: Request):
     if payload.assignment_type == SPECIFIC_REPORTS and not (payload.report_types or []):
         raise HTTPException(status_code=400, detail="report_types is required for specific_reports")
 
-    client = await _resolve_client_for_session(payload.session_id)
-    if not client:
-        raise HTTPException(status_code=404, detail="Session not found")
+    if payload.session_id == CONSOLIDATED_SESSION:
+        # The consolidated roll-up spans every session, so it has no session to
+        # resolve a client from — the caller names the client directly.
+        if not (payload.client_id or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="client_id is required when assigning the consolidated view",
+            )
+        client = await db.clients.find_one({"id": payload.client_id.strip()}, {"_id": 0})
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+    else:
+        client = await _resolve_client_for_session(payload.session_id)
+        if not client:
+            raise HTTPException(status_code=404, detail="Session not found")
     if (client.get("created_by") or "") != actor["id"]:
         raise HTTPException(status_code=403, detail="Only the client owner can assign this session")
 
