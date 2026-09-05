@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import PageHeader from '../../components/portal/PageHeader';
+import useLiveActivity, { describeActivity } from '../../hooks/useLiveActivity';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api/audit/portal`;
 
@@ -109,6 +110,31 @@ export default function PortalMovement() {
 
   // First load: pull most recent across all modules
   useEffect(() => { runSearch(1); /* eslint-disable-next-line */ }, []);
+
+  // ──────────── Live tail
+  // The log is a live record, so an edit made elsewhere should land here on its
+  // own. Only refresh while sitting on page 1 — pulling the newest rows in
+  // under someone reading page 4 would shuffle the page out from under them.
+  const pageRef = React.useRef(page);
+  useEffect(() => { pageRef.current = page; }, [page]);
+
+  const handleLiveActivity = useCallback((entries) => {
+    if (pageRef.current !== 1) return;
+    const first = entries[0];
+    toast.info(
+      entries.length === 1
+        ? describeActivity(first)
+        : `${describeActivity(first)} · +${entries.length - 1} more`,
+      { duration: 6000 }
+    );
+    runSearch(1);
+  }, [runSearch]);
+
+  useLiveActivity({
+    clientId: filters.client_id || '',
+    sessionId: filters.session_id || '',
+    onActivity: handleLiveActivity,
+  });
 
   // Switching tab is a search on its own — don't make the user hit Apply.
   const tabsMounted = React.useRef(false);

@@ -4210,6 +4210,68 @@ async def audit_logs_recent(barcode: str, client_id: Optional[str] = None, limit
     return {"logs": logs}
 
 
+@portal_router.get("/audit-logs/activity")
+async def audit_logs_activity(
+    request: Request,
+    client_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    since: Optional[str] = None,
+    limit: int = 50,
+):
+    """Audit entries written after `since` — the feed an open report polls so a
+    reco another user just entered shows up without a manual refresh.
+
+    Always returns `server_time`; the caller advances its cursor with that
+    rather than its own clock, because a browser running a few seconds fast
+    would otherwise ask for a window that skips entries it never saw.
+
+    Omitting `since` primes that cursor: no entries, just the current server
+    time, so opening a report does not replay the whole day's history at you.
+    """
+    now = datetime.now(timezone.utc)
+    payload = {"entries": [], "count": 0, "server_time": now.isoformat()}
+    if not since:
+        return payload
+
+    query: Dict[str, Any] = {"timestamp_dt": {"$gt": _parse_activity_since(since)}}
+    visible = await _visible_client_ids(request)
+    if client_id:
+        # Asking about a client you cannot see returns nothing, same rule the
+        # movement log follows.
+        if visible is not None and client_id not in visible:
+            return payload
+        query["client_id"] = client_id
+    elif visible is not None:
+        query["client_id"] = {"$in": visible}
+    if session_id:
+        query["session_id"] = session_id
+
+    limit = max(1, min(int(limit or 50), 200))
+    entries = await db.audit_logs.find(
+        query, {"_id": 0, "timestamp_dt": 0}
+    ).sort("timestamp_dt", -1).to_list(limit)
+
+    # Tag the caller's own edits rather than dropping them: the report still has
+    # to refresh for them, it just should not announce their own change back.
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
+    for e in entries:
+        e["is_self"] = bool(actor_id) and (e.get("user_id") or "") == actor_id
+
+    payload["entries"] = entries
+    payload["count"] = len(entries)
+    return payload
+
+
+def _parse_activity_since(value: str) -> datetime:
+    """Parse the cursor an activity poll sends back. An unreadable one means
+    'just now' — better a missed beat than replaying the whole collection."""
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return datetime.now(timezone.utc)
+
+
 @portal_router.post("/audit-logs/export")
 async def audit_logs_export(filters: dict, request: Request):
     """Excel export of every audit-log entry matching the given filters.
