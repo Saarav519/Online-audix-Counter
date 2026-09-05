@@ -110,6 +110,14 @@ export default function PortalMovement() {
   // First load: pull most recent across all modules
   useEffect(() => { runSearch(1); /* eslint-disable-next-line */ }, []);
 
+  // Switching tab is a search on its own — don't make the user hit Apply.
+  const tabsMounted = React.useRef(false);
+  useEffect(() => {
+    if (!tabsMounted.current) { tabsMounted.current = true; return; }
+    runSearch(1);
+    /* eslint-disable-next-line */
+  }, [filters.action_type]);
+
   const handleApply = () => runSearch(1);
   const handleReset = () => { setFilters(initialFilters); setTimeout(() => runSearch(1), 0); };
 
@@ -169,6 +177,29 @@ export default function PortalMovement() {
         </div>
         {filtersOpen ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
       </button>
+      {/* Barcode edits and Reco adjustments are two different kinds of change —
+          keep them apart by default instead of interleaving them. */}
+      <div className="px-4 pt-3 flex flex-wrap gap-1.5" data-testid="movement-tabs">
+        {[
+          { key: '', label: 'All changes' },
+          { key: 'edit', label: 'Barcode / Article edits' },
+          { key: 'reco_adjust', label: 'Reco adjustments' },
+        ].map(t => (
+          <button
+            key={t.key || 'all'}
+            onClick={() => setFilters(f => ({ ...f, action_type: t.key }))}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              (filters.action_type || '') === t.key
+                ? 'bg-emerald-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            data-testid={`movement-tab-${t.key || 'all'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {filtersOpen && (
         <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-t border-slate-100 pt-3">
           {/* Module */}
@@ -347,21 +378,24 @@ export default function PortalMovement() {
                 <th className="text-left px-3 py-2 font-semibold">Session</th>
                 <th className="text-left px-3 py-2 font-semibold">Day</th>
                 <th className="text-left px-3 py-2 font-semibold">Barcode</th>
+                <th className="text-left px-3 py-2 font-semibold">Location</th>
                 <th className="text-left px-3 py-2 font-semibold">Field</th>
                 <th className="text-left px-3 py-2 font-semibold">Old → New</th>
+                <th className="text-left px-3 py-2 font-semibold">Final Qty</th>
+                <th className="text-left px-3 py-2 font-semibold">Reason</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading && (
                 <tr>
-                  <td colSpan={10} className="text-center py-10 text-slate-400">
+                  <td colSpan={13} className="text-center py-10 text-slate-400">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto" />
                   </td>
                 </tr>
               )}
               {!loading && logs.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-slate-400 text-sm">
+                  <td colSpan={13} className="text-center py-12 text-slate-400 text-sm">
                     No audit-log entries match the current filters.
                   </td>
                 </tr>
@@ -388,12 +422,15 @@ export default function PortalMovement() {
                     <td className="px-3 py-2 text-xs text-slate-500">{sessionNameById[l.session_id] || (l.session_id ? <span className="font-mono text-[10px]">{l.session_id.slice(0, 8)}…</span> : <span className="text-slate-300">—</span>)}</td>
                     <td className="px-3 py-2 text-xs text-slate-700">{l.cycle_day != null && l.cycle_day !== '' ? `Day ${l.cycle_day}` : <span className="text-slate-300">—</span>}</td>
                     <td className="px-3 py-2 text-xs text-slate-700 font-mono">{l.barcode || <span className="text-slate-300">—</span>}</td>
+                    <td className="px-3 py-2 text-xs text-slate-700">{l.location || <span className="text-slate-300">—</span>}</td>
                     <td className="px-3 py-2 text-xs text-slate-500">{l.field_name || <span className="text-slate-300">—</span>}</td>
                     <td className="px-3 py-2 text-xs">
                       <span className="text-rose-600 line-through">{l.old_value || '—'}</span>
                       <span className="mx-1 text-slate-400">→</span>
                       <span className="text-emerald-700 font-medium">{l.new_value || '—'}</span>
                     </td>
+                    <td className="px-3 py-2 text-xs font-semibold text-slate-800">{l.final_qty !== null && l.final_qty !== undefined ? l.final_qty : <span className="text-slate-300">—</span>}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600 max-w-[220px] truncate" title={l.reason || ''}>{l.reason || <span className="text-slate-300">—</span>}</td>
                   </tr>
                 );
               })}

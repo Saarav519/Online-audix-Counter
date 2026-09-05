@@ -501,7 +501,7 @@ function RecoCell({ value, onSave, rowData, recoType, clientId = '' }) {
       onKeyDown={(e) => {
         e.stopPropagation();
         if (e.key === 'Enter') {
-          const params = { reco_type: recoType, reco_qty: Number(val) };
+          const params = { reco_type: recoType, reco_qty: Number(val), physical_qty: rowData.physical_qty || 0 };
           // Anchor reco to the ORIGINAL value when row is edited so the
           // adjustment survives barcode/article renames + undo cycles.
           if (recoType === 'barcode') { params.barcode = rowData._original_value || rowData.barcode; params.article_code = rowData.article_code; }

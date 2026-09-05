@@ -60,7 +60,7 @@ async def log_audit_entry(db, entry_data: Dict[str, Any]) -> None:
       module, action_type, barcode, client_id, old_value, new_value
     Optional:
       session_id, cycle_day, field_name, user_id, username, report_type,
-      location
+      location, reason, final_qty
     """
     try:
         now = datetime.now(timezone.utc)
@@ -79,6 +79,12 @@ async def log_audit_entry(db, entry_data: Dict[str, Any]) -> None:
             "username": entry_data.get("username") or "",
             "report_type": entry_data.get("report_type") or "",
             "location": entry_data.get("location") or "",
+            # Why the edit was made. Required by the reco flow when overwriting
+            # someone else's value; empty for edits that need no justification.
+            "reason": entry_data.get("reason") or "",
+            # Reco only: what the item's Final Qty (physical + reco) became
+            # after this edit. None for edits where it does not apply.
+            "final_qty": entry_data.get("final_qty"),
             "timestamp": _iso(now),
             # Keep a true datetime as well so we can $gte/$lte by date
             # directly without ISO-string lexicographic gotchas.
