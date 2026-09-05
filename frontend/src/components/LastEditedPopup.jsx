@@ -48,12 +48,17 @@ export default function LastEditedPopup({ barcode, clientId, isOpen, onProceed, 
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
   const [decided, setDecided] = useState(false);   // proceeded or cancelled
+  // Only true once the fetch has been slow enough to be worth a spinner. A
+  // fast "no history" answer must leave nothing on screen at all — rendering
+  // the dialog while every lookup is in flight is what made the popup flash
+  // open and shut before an edit.
+  const [slow, setSlow] = useState(false);
   // Track the in-flight fetch so a fast re-open doesn't race a stale result.
   const reqIdRef = useRef(0);
 
   useEffect(() => {
     if (!isOpen) {
-      setLogs([]); setDecided(false); setLoading(false);
+      setLogs([]); setDecided(false); setLoading(false); setSlow(false);
       return;
     }
     if (!barcode) {
@@ -64,6 +69,10 @@ export default function LastEditedPopup({ barcode, clientId, isOpen, onProceed, 
     }
     const myId = ++reqIdRef.current;
     setLoading(true);
+    setSlow(false);
+    const slowTimer = setTimeout(() => {
+      if (myId === reqIdRef.current) setSlow(true);
+    }, 400);
     const params = new URLSearchParams({ barcode: String(barcode), limit: '5' });
     if (clientId) params.set('client_id', String(clientId));
     fetch(`${BACKEND_URL}/api/audit/portal/audit-logs/recent?${params.toString()}`)
@@ -92,15 +101,15 @@ export default function LastEditedPopup({ barcode, clientId, isOpen, onProceed, 
         setDecided(true);
         try { onProceed?.(); } catch { /* noop */ }
         try { onClose?.(); } catch { /* noop */ }
-      });
+      })
+      .finally(() => clearTimeout(slowTimer));
+    return () => clearTimeout(slowTimer);
   }, [isOpen, barcode, clientId, onProceed, onClose]);
 
-  // While we're waiting for the first response we DON'T want to render
-  // anything visible — if there's no history, the popup is supposed to
-  // never appear at all. The Dialog stays mounted but transparent until
-  // we know we have history to show. We use a small loading state in
-  // case the round-trip is >100ms.
-  const shouldShowDialog = isOpen && !decided && (loading || logs.length > 0);
+  // Nothing renders until we know there IS history — a lookup that comes back
+  // empty must leave the screen untouched, not blink a dialog open and shut.
+  // The spinner is only for a fetch slow enough that silence would look broken.
+  const shouldShowDialog = isOpen && !decided && (logs.length > 0 || (loading && slow));
 
   const handleProceed = () => {
     if (decided) return;
@@ -124,7 +133,13 @@ export default function LastEditedPopup({ barcode, clientId, isOpen, onProceed, 
         if (!open && !decided) handleCancel();
       }}
     >
-      <DialogContent className="max-w-2xl" data-testid="last-edited-popup">
+      {/* Above the full-screen report's z-[9999] shell and its own popovers,
+          so the history shows in Full View and not behind it. */}
+      <DialogContent
+        className="max-w-2xl z-[10050]"
+        overlayClassName="z-[10040]"
+        data-testid="last-edited-popup"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
             <Clock className="w-4 h-4 text-emerald-600" />

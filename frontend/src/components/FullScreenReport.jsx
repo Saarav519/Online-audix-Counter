@@ -480,7 +480,9 @@ function RecoCell({ value, onSave, rowData, recoType, clientId = '' }) {
     e?.stopPropagation?.();
     const _bc = rowData?._original_value || rowData?.barcode || rowData?.article_code || '';
     const _go = () => { setEditing(true); setVal(value || 0); };
-    if (_bc) lastEdit.openPopup(_bc, clientId, _go); else _go();
+    // Same rule as the normal view: the history popup is for a cell that
+    // already carries a reco value. A blank one opens straight into the editor.
+    if (_bc && value) lastEdit.openPopup(_bc, clientId, _go); else _go();
   };
   if (!editing) {
     return (
