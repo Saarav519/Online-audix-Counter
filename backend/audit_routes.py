@@ -1379,7 +1379,11 @@ async def refresh_session_stock(session_id: str):
         {"id": session_id},
         {"$set": {"expected_stock_imported": snapshot_count > 0, "stock_snapshot": True, "stock_refreshed_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
+    # Reports read expected stock through _expected_cache (10 min TTL) — drop the
+    # stale entry so the refreshed snapshot is visible immediately
+    _expected_cache.invalidate(f"expected_{session_id}")
+
     return {
         "message": f"Stock refreshed — {snapshot_count} records re-imported from warehouse",
         "previous_count": del_result.deleted_count,
@@ -1529,7 +1533,11 @@ async def import_expected_stock(session_id: str, file: UploadFile = File(...)):
         {"id": session_id},
         {"$set": {"expected_stock_imported": True}}
     )
-    
+
+    # Reports read expected stock through _expected_cache (10 min TTL) — drop the
+    # stale entry (an empty list may already be cached) so the import is visible immediately
+    _expected_cache.invalidate(f"expected_{session_id}")
+
     return {
         "message": f"Imported {len(records)} expected stock records",
         "variance_mode": variance_mode,

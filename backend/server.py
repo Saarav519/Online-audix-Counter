@@ -17,7 +17,7 @@ import uuid
 import json
 import math
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -205,27 +205,71 @@ async def _startup_maintenance():
         logger.warning(f"Startup maintenance failed (server keeps running): {e}")
 
 
+# Orphan purge safety rails: never delete records younger than the grace window
+# (protects against the boot-time snapshot race with concurrent session creation),
+# and refuse to run at all when the session-id set looks wrong (empty collection,
+# e.g. a partial restore or wrong DB_NAME) or a collection's orphan count is
+# implausibly large for routine cascade cleanup.
+PURGE_GRACE_HOURS = 24
+PURGE_MAX_ORPHAN_SESSIONS = 50
+
+
 async def purge_orphan_session_data():
-    """Remove any session-scoped records (sync_inbox, sync_raw_logs, synced_locations,
-    forward_batches, conflict_locations, devices, alerts, expected_stock) whose
-    session_id no longer corresponds to an existing audit_session.
+    """Remove session-scoped records whose session_id no longer corresponds to an
+    existing audit_session. Only the collections listed below are touched, each
+    filtered by its own timestamp so nothing newer than PURGE_GRACE_HOURS is ever
+    deleted (records missing the timestamp field are kept too). `devices` is
+    deliberately NOT purged: device registrations are durable and merely carry
+    the last-synced session_id.
     """
     try:
-        existing_ids = {s["id"] for s in await db.audit_sessions.find({}, {"id": 1, "_id": 0}).to_list(100000)}
-        collections = [
-            "sync_inbox", "sync_raw_logs", "synced_locations", "forward_batches",
-            "conflict_locations", "devices", "alerts", "expected_stock"
-        ]
+        existing_ids = set()
+        async for s in db.audit_sessions.find({}, {"id": 1, "_id": 0}):
+            sid = s.get("id")
+            if sid:
+                existing_ids.add(sid)
+        if not existing_ids:
+            logger.error(
+                "Orphan purge aborted: audit_sessions has no ids — refusing to treat "
+                "every record as orphaned (possible partial restore or wrong DB_NAME)"
+            )
+            return
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=PURGE_GRACE_HOURS)).isoformat()
+        # collection -> its own timestamp field; a collection without a known
+        # timestamp field must be left out rather than purged unfiltered
+        collections = {
+            "sync_inbox": "synced_at",
+            "sync_raw_logs": "synced_at",
+            "synced_locations": "synced_at",
+            "forward_batches": "forwarded_at",
+            "conflict_locations": "created_at",
+            "alerts": "created_at",
+            "expected_stock": "imported_at",
+        }
         total = 0
-        for col in collections:
+        for col, ts_field in collections.items():
             referenced = await db[col].distinct("session_id")
             orphans = [sid for sid in referenced if sid and sid not in existing_ids]
-            if orphans:
-                r = await db[col].delete_many({"session_id": {"$in": orphans}})
+            if not orphans:
+                continue
+            if len(orphans) > PURGE_MAX_ORPHAN_SESSIONS:
+                logger.error(
+                    f"Orphan purge skipped for {col}: {len(orphans)} orphan session ids "
+                    f"exceeds guard ({PURGE_MAX_ORPHAN_SESSIONS}) — refusing mass deletion"
+                )
+                continue
+            r = await db[col].delete_many({
+                "session_id": {"$in": orphans},
+                ts_field: {"$lt": cutoff},
+            })
+            if r.deleted_count:
                 total += r.deleted_count
-                logger.info(f"Purged {r.deleted_count} orphans from {col}")
+                logger.warning(
+                    f"Orphan purge: deleted {r.deleted_count} records from {col} "
+                    f"({len(orphans)} orphan session id(s))"
+                )
         if total:
-            logger.info(f"Orphan purge complete — removed {total} records across {len(collections)} collections")
+            logger.warning(f"Orphan purge complete — removed {total} records across {len(collections)} collections")
     except Exception as e:
         logger.warning(f"Orphan purge skipped due to error: {e}")
 
