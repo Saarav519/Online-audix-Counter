@@ -400,3 +400,10 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# ...except the two Let's Encrypt PUBLIC root certificates the Android app
+# ships so Android 7.0 handhelds can verify the portal's TLS chain. These are
+# published trust anchors, not secrets — the *.pem rule above stays in force
+# for everything else.
+!frontend/android/app/src/main/res/raw/isrg_root_x1.pem
+!frontend/android/app/src/main/res/raw/isrg_root_x2.pem
