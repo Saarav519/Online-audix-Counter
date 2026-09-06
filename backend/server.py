@@ -339,6 +339,10 @@ async def create_indexes():
         except Exception as e:
             logger.warning(f"failed_login_attempts TTL index skipped: {e}")
 
+        # Bin verification remarks are looked up per client when a bin-wise
+        # report is built, and written per (client, location).
+        await db.verified_remarks.create_index([("client_id", 1)])
+        await db.verified_remarks.create_index([("client_id", 1), ("location", 1)], unique=True)
         # Alerts: the notification bell's live stream polls by created_at, and
         # the bell itself filters by the user an alert is addressed to.
         await db.alerts.create_index([("created_at", 1)])

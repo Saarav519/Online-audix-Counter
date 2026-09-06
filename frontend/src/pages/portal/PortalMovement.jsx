@@ -24,6 +24,7 @@ const ACTION_BADGE = {
   delete: 'bg-slate-200 text-slate-800 ring-1 ring-slate-300',
   assign: 'bg-cyan-100 text-cyan-800 ring-1 ring-cyan-200',
   revoke: 'bg-orange-100 text-orange-800 ring-1 ring-orange-200',
+  verify: 'bg-teal-100 text-teal-800 ring-1 ring-teal-200',
 };
 
 const PAGE_SIZE = 50;
@@ -210,6 +211,7 @@ export default function PortalMovement() {
           { key: '', label: 'All changes' },
           { key: 'edit', label: 'Barcode / Article edits' },
           { key: 'reco_adjust', label: 'Reco adjustments' },
+          { key: 'verify', label: 'Bin verifications' },
         ].map(t => (
           <button
             key={t.key || 'all'}

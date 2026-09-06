@@ -1297,6 +1297,42 @@ export default function PortalReports() {
     }
   }, [selectedSession, selectedDay, reportType, fetchReport]);
 
+  // Bin verification: a supervisor or admin cross-checks the bin and picks the
+  // outcome from the fixed list the backend serves with the report. Stored per
+  // client + location, so it shows on every session's sheet, in the
+  // consolidated view, on an assignee's copy, and in the Excel export.
+  const saveVerifiedRemark = async (location, remark) => {
+    if (!selectedClient || !location) return;
+    const prev = reportData;
+    // Optimistic: the dropdown should not lag behind the click.
+    setReportData(cur => (cur?.report ? {
+      ...cur,
+      report: cur.report.map(r => (r.location === location ? { ...r, verified_remark: remark } : r)),
+    } : cur));
+    try {
+      const body = { client_id: selectedClient, location, remark };
+      if (selectedSession && selectedSession !== '__consolidated__') body.session_id = selectedSession;
+      try {
+        const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+        if (u?.id) body.user_id = u.id;
+        if (u?.username) body.username = u.username;
+      } catch { /* ignore */ }
+      const headers = { 'Content-Type': 'application/json' };
+      if (body.user_id) headers['X-User-Id'] = body.user_id;
+      if (body.username) headers['X-Username'] = body.username;
+      const res = await fetch(`${BACKEND_URL}/api/audit/portal/reports/verified-remark`, {
+        method: 'POST', headers, body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('save failed');
+      // The remark is client-wide, so any cached report for this client is stale.
+      reportCache.current = {};
+      toast.success(remark ? 'Bin verified' : 'Verification cleared');
+    } catch {
+      setReportData(prev);
+      toast.error('Could not save the verified remark');
+    }
+  };
+
   const saveRecoAdjustment = async (params) => {
     try {
       // Reco is allowed in:
@@ -1692,6 +1728,7 @@ export default function PortalReports() {
           { key: 'difference_qty', label: 'Difference' },
           { key: 'accuracy_pct', label: 'Accuracy %' },
           { key: 'remark', label: 'Remarks' },
+          { key: 'verified_remark', label: 'Verified Remark' },
         ];
       case 'detailed':
         return [
@@ -1981,7 +2018,7 @@ export default function PortalReports() {
     };
 
     // Text/non-formula columns
-    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark']);
+    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark']);
 
     // Build worksheet
     const wb = XLSX.utils.book_new();
@@ -2478,7 +2515,7 @@ export default function PortalReports() {
           {/* Report Table — Reco editing only on the primary report type for the session's variance mode */}
           {columnStyleCSS && <style>{columnStyleCSS}</style>}
           <div ref={tableContainerRef} id="report-table-area">
-          {reportType === 'bin-wise' && <BinWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
+          {reportType === 'bin-wise' && <BinWiseTable onSaveVerified={saveVerifiedRemark} verifiedOptions={reportData?.verified_remark_options || []} data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} isConsolidated={showRecoFinalCols} />}
           {reportType === 'detailed' && <DetailedTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isConsolidated={showRecoFinalCols} isRecoEditable={canEditReco && (isCycleCountClient ? isCcDayView : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'bin-wise'))} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
           {reportType === 'barcode-wise' && <BarcodeWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={canEditReco && (isCycleCountClient ? false : ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'barcode-wise'))} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
           {reportType === 'article-wise' && <ArticleWiseTable data={displayData} getVarianceIcon={getVarianceIcon} getVarianceClass={getVarianceClass} getAccuracyClass={getAccuracyClass} getRemarkIcon={getRemarkIcon} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} onSaveReco={saveRecoAdjustment} isRecoEditable={canEditReco && ((isConsolidatedView || isStoreClient) && sessionInfo?.variance_mode === 'article-wise')} isConsolidated={showRecoFinalCols} extraColumns={reportData?.extra_columns || []} clientId={selectedClient} onRefresh={refreshReport} schemaValueFields={schemaValueFields} barcodeReadOnly={ccBarcodeReadOnly || !canEditBarcode} auditSessionId={selectedSession} auditCycleDay={selectedDayNo} auditModule={isCycleCountClient ? 'cycle_count' : 'warehouse'} />}
@@ -2528,6 +2565,8 @@ export default function PortalReports() {
         gridData={filteredData?.report || []}
         gridTotals={filteredData?.totals || null}
         gridColumns={columnConfig}
+        onSaveVerified={reportType === 'bin-wise' ? saveVerifiedRemark : undefined}
+        verifiedOptions={reportData?.verified_remark_options || []}
         sortConfig={sortConfig}
         onSort={handleSort}
         activeFilters={columnFilters}
@@ -2739,7 +2778,7 @@ function SubtotalCell({ value, isVariance, isAccuracy, className = '' }) {
 }
 
 // ============ Bin-wise Table ============
-function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated }) {
+function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClass, getRemarkIcon, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues, isConsolidated, onSaveVerified, verifiedOptions = [] }) {
   const summary = data.summary || {};
   const t = data.totals || {};
   const isCC = !!(data?.session_info?.is_cycle_count) || (data.report?.[0]?._is_cycle_count === true);
@@ -2783,6 +2822,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <SubtotalCell value={t.difference_qty} isVariance />
               <SubtotalCell value={`${t.accuracy_pct || 0}%`} isAccuracy />
               <th data-col="remark" className="py-1.5 px-4"></th>
+              <th data-col="verified_remark" className="py-1.5 px-4"></th>
             </tr>
             <tr>
               <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
@@ -2796,6 +2836,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
               <SortableHeader column="difference_qty" label="Difference" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('difference_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy %" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[250px]" />
+              <SortableHeader column="verified_remark" label="Verified Remark" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('verified_remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[200px]" />
             </tr>
           </thead>
           <tbody>
@@ -2848,6 +2889,19 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
                       {getRemarkIcon(row.remark)}
                       <span className="truncate" title={row.remark}>{row.remark}</span>
                     </div>
+                  </td>
+                  <td className="py-2 px-4">
+                    <select
+                      value={row.verified_remark || ''}
+                      onChange={(e) => onSaveVerified && onSaveVerified(row.location, e.target.value)}
+                      disabled={!onSaveVerified}
+                      className={`w-full text-xs px-2 py-1 rounded-md border ${row.verified_remark ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium' : 'border-gray-200 bg-white text-gray-500'} focus:ring-2 focus:ring-emerald-400 disabled:opacity-60`}
+                      data-testid={`verified-remark-${i}`}
+                      title={row.verified_remark || 'Not verified'}
+                    >
+                      <option value="">— Select —</option>
+                      {verifiedOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
                   </td>
                 </tr>
               );

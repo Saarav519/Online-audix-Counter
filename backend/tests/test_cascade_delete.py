@@ -34,6 +34,7 @@ needs_db = pytest.mark.skipif(
 CLIENT_SCOPED = [
     "master_products", "client_stock", "client_schemas", "barcode_edits",
     "location_master", "reco_adjustments", "cycle_projects", "audit_sessions",
+    "verified_remarks",
 ]
 SESSION_SCOPED = [
     "expected_stock", "synced_locations", "sync_inbox", "forward_batches",
