@@ -80,6 +80,11 @@ const Settings = () => {
   });
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
+  // Why the client list is empty. Silently failing here used to look
+  // identical to "portal has no clients yet", which is what made a CORS
+  // block impossible to spot from the device.
+  const [configError, setConfigError] = useState('');
+  const [configLoading, setConfigLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, phase: '' });
   const [showSyncPasswordModal, setShowSyncPasswordModal] = useState(false);
@@ -126,31 +131,52 @@ const Settings = () => {
     }
   }, [syncConfig.clientId]);
 
+  // Only worth naming when the build actually baked one in; the portal's own
+  // web build talks to itself with relative URLs and has nothing to show here.
+  const serverLabel = BACKEND_URL ? ` (${BACKEND_URL})` : '';
+
   const fetchSyncConfig = async () => {
+    setConfigLoading(true);
     try {
       const response = await fetch(`${BACKEND_URL}/api/audit/sync/config`);
-      if (response.ok) {
-        const data = await response.json();
-        setClients(data.clients || []);
-        if (syncConfig.clientId) {
-          const clientSessions = (data.sessions || []).filter(s => s.client_id === syncConfig.clientId);
-          setSessions(clientSessions);
-        }
+      if (!response.ok) {
+        setConfigError(`Server ne ${response.status} return kiya. Portal chal raha hai?${serverLabel}`);
+        return;
       }
+      const data = await response.json();
+      setClients(data.clients || []);
+      if (syncConfig.clientId) {
+        const clientSessions = (data.sessions || []).filter(s => s.client_id === syncConfig.clientId);
+        setSessions(clientSessions);
+      }
+      setConfigError('');
     } catch (error) {
       console.error('Failed to fetch sync config:', error);
+      // fetch() only throws like this when the request never completed —
+      // no network, wrong host, or the response was blocked (CORS).
+      setConfigError(
+        navigator.onLine
+          ? `Server se connect nahi ho paya${serverLabel}. Internet chal raha hai, to server down hai ya usne is app ko block kiya hai.`
+          : 'Device offline hai. Internet on karke dobara koshish karo.'
+      );
+    } finally {
+      setConfigLoading(false);
     }
   };
 
   const fetchSessions = async (clientId) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/audit/portal/sessions?client_id=${clientId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSessions(data.filter(s => s.status === 'active'));
+      if (!response.ok) {
+        setConfigError(`Sessions load nahi hue — server ne ${response.status} return kiya.`);
+        return;
       }
+      const data = await response.json();
+      setSessions(data.filter(s => s.status === 'active'));
+      setConfigError('');
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
+      setConfigError(`Sessions load nahi hue — server se connect nahi ho paya${serverLabel}.`);
     }
   };
 
@@ -968,6 +994,31 @@ const Settings = () => {
             <p className="text-xs text-slate-500">Unique name to identify this device in the portal</p>
           </div>
 
+          {/* Connection problem — an empty client list on its own says nothing
+              about whether the portal is unreachable or simply has no clients. */}
+          {configError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2" data-testid="sync-config-error">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-red-800 leading-relaxed">
+                  <p className="font-semibold mb-0.5">Portal se connect nahi ho paya</p>
+                  <p className="break-words">{configError}</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={fetchSyncConfig}
+                disabled={configLoading}
+                className="h-7 text-xs gap-1 border-red-300 text-red-700 hover:bg-red-100"
+                data-testid="sync-config-retry"
+              >
+                <RefreshCw className={`w-3 h-3 ${configLoading ? 'animate-spin' : ''}`} />
+                Dobara koshish karo
+              </Button>
+            </div>
+          )}
+
           {/* Client Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -987,6 +1038,12 @@ const Settings = () => {
                 <option key={client.id} value={client.id}>{client.name}</option>
               ))}
             </select>
+            {/* Reached the portal fine, it just has nothing to offer yet. */}
+            {!configLoading && !configError && clients.length === 0 && (
+              <p className="text-xs text-amber-700" data-testid="sync-no-clients">
+                Portal se connection theek hai, lekin abhi koi active client nahi mila. Pehle portal me client banao.
+              </p>
+            )}
           </div>
 
           {/* Session Selection */}
