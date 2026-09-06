@@ -2257,6 +2257,8 @@ export default function PortalReports() {
 
     const meta = {
       'Client': client?.name || '—',
+      // The firm that actually did the audit — several use this portal.
+      ...(client?.audit_firm ? { 'Audited By': client.audit_firm } : {}),
       'Session': session?.name || '—',
       'Report Type': reportLabel,
       'Variance Mode': session?.variance_mode || '—',
@@ -2276,6 +2278,8 @@ export default function PortalReports() {
         tableBody: body,
         columnsMeta,
         filename,
+        // Blank falls back to the portal's own brand inside generatePDF.
+        ...(client?.audit_firm ? { brandName: client.audit_firm } : {}),
       });
       toast.success('PDF downloaded');
     } catch (e) {
