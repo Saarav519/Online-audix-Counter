@@ -193,6 +193,10 @@ class Client(BaseModel):
     address: Optional[str] = None
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
+    # The firm conducting this client's audit. The portal is shared by several
+    # firms, so reports must carry the one that did the work, not the portal's
+    # own name. Blank falls back to the built-in brand at render time.
+    audit_firm: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = None  # portal_users.id of the creator
     is_active: bool = True
@@ -208,6 +212,7 @@ class ClientCreate(BaseModel):
     address: Optional[str] = None
     contact_person: Optional[str] = None
     contact_phone: Optional[str] = None
+    audit_firm: Optional[str] = None
 
 # Audit Session Model
 class AuditSession(BaseModel):

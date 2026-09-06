@@ -49,7 +49,8 @@ export default function PortalClients() {
     client_type: 'store',
     address: '',
     contact_person: '',
-    contact_phone: ''
+    contact_phone: '',
+    audit_firm: ''
   });
 
   // Master upload state
@@ -147,7 +148,7 @@ export default function PortalClients() {
       toast.success(editingClient ? 'Client updated!' : 'Client created!');
       setShowDialog(false);
       setEditingClient(null);
-      setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
+      setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '', audit_firm: '' });
       fetchClients();
     } catch (error) {
       toast.error(error.message);
@@ -162,7 +163,8 @@ export default function PortalClients() {
       client_type: client.client_type || 'store',
       address: client.address || '',
       contact_person: client.contact_person || '',
-      contact_phone: client.contact_phone || ''
+      contact_phone: client.contact_phone || '',
+      audit_firm: client.audit_firm || ''
     });
     setShowDialog(true);
   };
@@ -606,7 +608,7 @@ export default function PortalClients() {
           <Button 
             onClick={() => {
               setEditingClient(null);
-              setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
+              setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '', audit_firm: '' });
               setShowDialog(true);
             }}
             className="bg-emerald-500 hover:bg-emerald-600 gap-1"
@@ -652,7 +654,7 @@ export default function PortalClients() {
               <Button
                 onClick={() => {
                   setEditingClient(null);
-                  setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '' });
+                  setFormData({ name: '', code: '', client_type: 'store', address: '', contact_person: '', contact_phone: '', audit_firm: '' });
                   setShowDialog(true);
                 }}
                 className="bg-emerald-500 hover:bg-emerald-600 gap-1"
@@ -728,7 +730,13 @@ export default function PortalClients() {
                       <span className="truncate">{client.contact_phone}</span>
                     </div>
                   )}
-                  {!client.contact_person && !client.contact_phone && (
+                  {client.audit_firm && (
+                    <div className="flex items-center gap-1 truncate text-[11px] text-emerald-700" title={`Audited by ${client.audit_firm}`}>
+                      <Building2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                      <span className="truncate">{client.audit_firm}</span>
+                    </div>
+                  )}
+                  {!client.contact_person && !client.contact_phone && !client.audit_firm && (
                     <span className="text-[11px] text-slate-300 italic">No contact</span>
                   )}
                 </div>
@@ -895,6 +903,20 @@ export default function PortalClients() {
                   : formData.client_type === 'cycle_count'
                   ? 'Projects (treated as Sessions internally) are managed from the Cycle Count module. Each project supports daily morning stock + pre/post pick uploads.'
                   : 'Stock is uploaded individually inside each session.'}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="audit_firm">Auditing Company</Label>
+              <Input
+                id="audit_firm"
+                value={formData.audit_firm}
+                onChange={(e) => setFormData({ ...formData, audit_firm: e.target.value })}
+                placeholder="AudiX Solutions & Co."
+                data-testid="client-audit-firm"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Jo firm is client ka audit kar rahi hai. Yahi naam is client ki PDF reports par
+                chhapega. Khali chhoda to default brand lagega.
               </p>
             </div>
             <div>

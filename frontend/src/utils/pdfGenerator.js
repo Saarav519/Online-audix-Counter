@@ -29,8 +29,17 @@ export function generatePDF({
   filename = 'audix-report.pdf',
   orientation = 'landscape',
   brandName = 'AudiX Solutions & Co.',
-  brandTag = 'Chartered Accountants · Audit Data Management',
+  // "Chartered Accountants" belongs to the portal's own firm — another firm
+  // running an audit here should not be labelled as one, so the tag drops to
+  // the neutral half whenever the brand name is overridden.
+  brandTag = null,
 }) {
+  const isDefaultBrand = brandName === 'AudiX Solutions & Co.';
+  const tagLine = brandTag ?? (isDefaultBrand
+    ? 'Chartered Accountants · Audit Data Management'
+    : 'Audit Data Management');
+  // Monogram follows the brand, not a hardcoded 'A'.
+  const monogram = (brandName || 'A').trim().charAt(0).toUpperCase() || 'A';
   const doc = new jsPDF({ orientation, unit: 'pt', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -45,7 +54,7 @@ export function generatePDF({
   doc.setTextColor(16, 185, 129);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('A', 46, 38, { align: 'center' });
+  doc.text(monogram, 46, 38, { align: 'center' });
 
   // Brand text
   doc.setTextColor(255, 255, 255);
@@ -54,7 +63,7 @@ export function generatePDF({
   doc.text(brandName, 72, 30);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(brandTag, 72, 44);
+  doc.text(tagLine, 72, 44);
 
   // Right side: generated timestamp
   doc.setFontSize(8);
