@@ -535,6 +535,7 @@ function GridRenderer({
   topSpacerHeight, bottomSpacerHeight,
   scrollRef,
   onSaveReco, isConsolidated, isRecoEditable, recoType,
+  onSaveVerified, verifiedOptions = [],
   handleScroll, setSelStart, setSelEnd,
   clientId, reportType, onRefresh, barcodeReadOnly = false
 }) {
@@ -699,6 +700,29 @@ function GridRenderer({
                     );
                   }
 
+                  // Verified Remark — supervisor/admin cross-check, dropdown only.
+                  // Full View has to stay editable too; the last complaint about
+                  // Reco was precisely that it worked only in the normal view.
+                  if (col.key === 'verified_remark' && onSaveVerified) {
+                    return (
+                      <td key={col.key} data-fsrow={rowIdx} data-fscol={globalIdx}
+                        style={{ width: getColWidth(col.key), minWidth: getColWidth(col.key), overflow: 'visible' }}
+                        className={cellClass}
+                        onClick={() => handleCellClick(rowIdx, globalIdx)}>
+                        <select
+                          value={row.verified_remark || ''}
+                          onChange={(e) => onSaveVerified(row.location, e.target.value)}
+                          className={`w-full text-[11px] px-1 py-0.5 rounded border ${row.verified_remark ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-medium' : 'border-gray-200 bg-white text-gray-500'}`}
+                          data-testid={`fs-verified-remark-${rowIdx}`}
+                          title={row.verified_remark || 'Not verified'}
+                        >
+                          <option value="">— Select —</option>
+                          {verifiedOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      </td>
+                    );
+                  }
+
                   // Barcode/Article edit for extra scanned items
                   const isBarcodeCol = col.key === 'barcode' && reportType !== 'article-wise';
                   const isArticleCol = col.key === 'article_code' && reportType === 'article-wise';
@@ -773,6 +797,7 @@ export function FullScreenReport({
   frozenColumns = new Set(), hiddenColumns = new Set(),
   onToggleFreeze, onToggleVisibility, onShowAllColumns, onResetColumns,
   onSaveReco, isConsolidated, isRecoEditable, reportType,
+  onSaveVerified, verifiedOptions = [],
   children, totalRows = 0, clientId, onRefresh, barcodeReadOnly = false
 }) {
   const scrollRef = useRef(null);
@@ -1252,6 +1277,8 @@ export function FullScreenReport({
           isConsolidated={isConsolidated}
           isRecoEditable={isRecoEditable}
           recoType={recoType}
+          onSaveVerified={onSaveVerified}
+          verifiedOptions={verifiedOptions}
           handleScroll={handleScroll}
           setSelStart={setSelStart}
           setSelEnd={setSelEnd}

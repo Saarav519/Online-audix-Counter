@@ -1016,7 +1016,8 @@ async def delete_client(client_id: str):
 
     # 1. Client-scoped only
     for col in ("master_products", "client_stock", "client_schemas",
-                "barcode_edits", "location_master", "reco_adjustments"):
+                "barcode_edits", "location_master", "reco_adjustments",
+                "verified_remarks"):
         await _purge(col, by_client)
 
     # 2. Session-scoped only
@@ -4061,6 +4062,90 @@ def _compute_validated_reco(reco_maps, expected_results, synced_results):
 
 
 
+# ==================== BIN VERIFICATION ====================
+# A supervisor or admin cross-checks a bin against the report and records the
+# outcome here. Picked from this fixed list rather than typed, so the same
+# wording appears on every sheet and groups cleanly in exports.
+VERIFIED_REMARK_OPTIONS = [
+    "Verified – Correct",
+    "Verified – Recount Done",
+    "Verified – Stock Misplaced",
+    "Verified – Damaged",
+    "Verified – Location Mismatch",
+    "Verified – Short Found",
+    "Verified – Excess Found",
+    "Not Verified",
+]
+
+
+class VerifiedRemarkCreate(BaseModel):
+    client_id: str
+    location: str
+    # One of VERIFIED_REMARK_OPTIONS. "Not Verified" (or empty) clears it.
+    remark: str = ""
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    module: Optional[str] = None
+
+
+async def _verified_remarks_for_client(client_id: str) -> Dict[str, str]:
+    """location -> remark, for stamping onto bin-wise rows."""
+    out: Dict[str, str] = {}
+    async for r in db.verified_remarks.find({"client_id": client_id}, {"_id": 0, "location": 1, "remark": 1}):
+        loc = r.get("location")
+        if loc:
+            out[loc] = r.get("remark") or ""
+    return out
+
+
+@portal_router.post("/reports/verified-remark")
+async def save_verified_remark(body: VerifiedRemarkCreate, request: Request):
+    """Record a bin's verification outcome. Scoped to the client, so one check
+    shows on every session's bin-wise sheet and in the consolidated view."""
+    remark = (body.remark or "").strip()
+    if remark and remark not in VERIFIED_REMARK_OPTIONS:
+        raise HTTPException(status_code=400, detail="Unknown verified remark")
+    location = (body.location or "").strip()
+    if not location:
+        raise HTTPException(status_code=400, detail="location is required")
+
+    actor_id = (request.headers.get("x-user-id", "") or "").strip() or (body.user_id or "")
+    key = {"client_id": body.client_id, "location": location}
+    prev = await db.verified_remarks.find_one(key, {"_id": 0, "remark": 1})
+    prev_remark = (prev or {}).get("remark", "")
+
+    if not remark or remark == "Not Verified":
+        await db.verified_remarks.delete_one(key)
+        new_remark = ""
+    else:
+        await db.verified_remarks.update_one(key, {"$set": {
+            **key,
+            "remark": remark,
+            "verified_by": actor_id,
+            "verified_by_username": body.username or "",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        }}, upsert=True)
+        new_remark = remark
+
+    _report_cache.invalidate_all()
+    await log_audit_entry(db, {
+        "module": body.module or await resolve_module_for_client(db, body.client_id),
+        "action_type": "verify",
+        "barcode": "",
+        "client_id": body.client_id,
+        "session_id": body.session_id or "",
+        "field_name": "verified_remark",
+        "old_value": prev_remark,
+        "new_value": new_remark,
+        "user_id": actor_id,
+        "username": body.username or "",
+        "report_type": "bin-wise",
+        "location": location,
+    })
+    return {"status": "saved", "location": location, "remark": new_remark}
+
+
 @portal_router.post("/reco-adjustments")
 async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
     """Save or update a reconciliation adjustment (client-level for consolidated reports).
@@ -4759,10 +4844,15 @@ async def get_consolidated_bin_wise(client_id: str):
         })
     
     total_accuracy = calc_accuracy(total_stock, total_final)
+    vmap = await _verified_remarks_for_client(client_id)
+    for r in report:
+        r["verified_remark"] = vmap.get(r.get("location", ""), "")
+
     return {
         "report": report,
         "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "reco_qty": total_reco, "final_qty": total_final, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
-        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending}
+        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending},
+        "verified_remark_options": VERIFIED_REMARK_OPTIONS
     }
 
 @portal_router.get("/reports/consolidated/{client_id}/detailed")
@@ -5337,10 +5427,16 @@ async def get_bin_wise_report(session_id: str):
         report.append({"location": loc, "stock_qty": stock_qty, "physical_qty": physical_qty, "reco_qty": reco_qty, "final_qty": final_qty, "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark, "status": status, "is_empty": is_empty_bin, "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""})
     
     total_accuracy = calc_accuracy(total_stock, total_final)
+    # Bin verification is client-scoped, so it rides along on every session's sheet.
+    vmap = await _verified_remarks_for_client(session.get("client_id", ""))
+    for r in report:
+        r["verified_remark"] = vmap.get(r.get("location", ""), "")
+
     return {
         "report": report,
         "totals": {"stock_qty": total_stock, "physical_qty": total_physical, "reco_qty": total_reco, "final_qty": total_final, "difference_qty": total_diff, "accuracy_pct": total_accuracy},
-        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending, "conflicts": count_conflict}
+        "summary": {"total_locations": len(report), "completed": count_completed, "empty_bins": count_empty, "pending": count_pending, "conflicts": count_conflict},
+        "verified_remark_options": VERIFIED_REMARK_OPTIONS
     }
 
 @portal_router.get("/reports/{session_id}/detailed")
