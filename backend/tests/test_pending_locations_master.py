@@ -166,3 +166,71 @@ def test_client_without_a_location_master_is_unchanged(portal, admin):
         assert s["total_no_stock"] == 0
     finally:
         requests.delete(f"{portal}/clients/{cid}", timeout=60)
+
+
+@needs_db
+def test_a_scan_with_a_blank_location_is_not_a_location(site, portal):
+    """A synced row carrying no location name used to become a nameless entry
+    on the sheet, inflating the total by one."""
+    sid = site["session_id"]
+    before = _pending(portal, sid)["summary"]["total_expected"]
+
+    async def scan(db):
+        await db.synced_locations.insert_one({
+            "session_id": sid, "location_name": "", "device_name": "TEST-DEV",
+            "items": [], "total_items": 0, "total_quantity": 0, "is_empty": False,
+            "synced_at": datetime.now(timezone.utc).isoformat()})
+    _run(scan)
+
+    data = _pending(portal, sid)
+    names = ([r["location_name"] for r in data["pending"]]
+             + [r["location_name"] for r in data["completed"]]
+             + [r["location_name"] for r in data["empty_bins"]])
+    assert "" not in names, "a blank location name reached the sheet"
+    assert data["summary"]["total_expected"] == before
+
+
+@needs_db
+def test_a_padded_scan_matches_its_master_location(site, portal):
+    """Expected stock and the Location Master are both stripped; a scan that
+    arrives as " BIN-01" must land on BIN-01, not beside it."""
+    sid = site["session_id"]
+    target = WITH_STOCK[0]
+    before = _pending(portal, sid)["summary"]["total_expected"]
+
+    async def scan(db):
+        await db.synced_locations.insert_one({
+            "session_id": sid, "location_name": f"  {target}  ", "device_name": "TEST-DEV",
+            "items": [{"barcode": "8900000000", "quantity": 3, "product_name": "x"}],
+            "total_items": 1, "total_quantity": 3, "is_empty": False,
+            "synced_at": datetime.now(timezone.utc).isoformat()})
+    _run(scan)
+
+    data = _pending(portal, sid)
+    assert data["summary"]["total_expected"] == before, "the padded name was counted as a new location"
+    assert target in {r["location_name"] for r in data["completed"]}
+    assert target not in {r["location_name"] for r in data["pending"]}
+
+
+@needs_db
+def test_the_consolidated_view_normalises_too(site, portal):
+    sid, cid = site["session_id"], site["client_id"]
+
+    async def scan(db):
+        await db.synced_locations.insert_many([
+            {"session_id": sid, "location_name": "", "device_name": "D",
+             "items": [], "total_items": 0, "total_quantity": 0, "is_empty": False,
+             "synced_at": datetime.now(timezone.utc).isoformat()},
+            {"session_id": sid, "location_name": f" {WITH_STOCK[1]} ", "device_name": "D",
+             "items": [], "total_items": 0, "total_quantity": 0, "is_empty": True,
+             "synced_at": datetime.now(timezone.utc).isoformat()},
+        ])
+    _run(scan)
+
+    data = requests.get(f"{portal}/reports/consolidated/{cid}/pending-locations", timeout=30).json()
+    assert data["summary"]["total_expected"] == len(MASTER)
+    all_names = ([r["location_name"] for r in data["pending"]]
+                 + [r["location_name"] for r in data["completed"]]
+                 + [r["location_name"] for r in data["empty_bins"]])
+    assert "" not in all_names
+    assert set(all_names) == set(MASTER)

@@ -6432,7 +6432,13 @@ async def get_pending_locations(session_id: str):
     synced_location_names = set()
     synced_map = {}
     for s in synced:
-        name = s.get("location_name", "")
+        # Stripped and blank-guarded so scans are read the same way expected
+        # stock and the Location Master already are. Without it a scan of
+        # " BIN-01" counts as a location of its own, and a row that carries no
+        # location name at all becomes a nameless entry on the sheet.
+        name = (s.get("location_name") or "").strip()
+        if not name:
+            continue
         synced_location_names.add(name)
         synced_map[name] = {
             "location_name": name,
@@ -6539,7 +6545,10 @@ async def get_consolidated_pending_locations(client_id: str):
         
         synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for s in synced:
-            name = s.get("location_name", "")
+            # Same normalisation as the session view — see the note there.
+            name = (s.get("location_name") or "").strip()
+            if not name:
+                continue
             synced_location_names.add(name)
             if name not in synced_map or not synced_map[name].get("is_empty", False):
                 synced_map[name] = {
