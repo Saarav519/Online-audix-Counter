@@ -6388,10 +6388,33 @@ async def get_empty_bins(session_id: str):
         "all_empty_locations": empty_locations
     }
 
+async def _location_master_names(client_id: str) -> set:
+    """Every location the scanner is handed for this client.
+
+    Deliberately mirrors get_location_master_for_scanner — same collection,
+    same is_active filter, same location_code identity — so the Pending sheet
+    and the handheld can never disagree about how many locations exist.
+    """
+    names = set()
+    if not client_id:
+        return names
+    async for r in db.location_master.find(
+            {"client_id": client_id, "is_active": True},
+            {"_id": 0, "location_code": 1}):
+        code = (r.get("location_code") or "").strip()
+        if code:
+            names.add(code)
+    return names
+
+
 @portal_router.get("/reports/{session_id}/pending-locations")
 async def get_pending_locations(session_id: str):
     """Get pending (not yet scanned) locations for a session.
-    Compares expected stock locations with synced locations to find remaining work."""
+
+    The work list is every location the auditor is meant to visit: the Location
+    Master plus anything the stock file or a scan mentions. Counting only the
+    stock file used to hide bins that hold no expected stock — the sheet read
+    100% complete while nobody had walked to them."""
     session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -6423,8 +6446,10 @@ async def get_pending_locations(session_id: str):
             "status": "empty" if s.get("is_empty", False) else "completed"
         }
     
-    # Build location status list
-    all_locations = sorted(expected_locations | synced_location_names)
+    # Build location status list. Location Master is the roll call of bins that
+    # exist; expected stock only says which of them should hold something.
+    master_locations = await _location_master_names(session.get("client_id", ""))
+    all_locations = sorted(expected_locations | master_locations | synced_location_names)
     
     completed = []
     empty_bins = []
@@ -6448,11 +6473,12 @@ async def get_pending_locations(session_id: str):
                     **info
                 })
         else:
-            # Location is in expected but not synced = pending
+            # Not scanned yet. in_expected says whether any stock is booked
+            # here — false means "walk there and confirm it is empty".
             pending.append({
                 "location_name": loc_name,
                 "status": "pending",
-                "in_expected": True,
+                "in_expected": loc_name in expected_locations,
                 "total_items": 0,
                 "total_quantity": 0,
                 "is_empty": False,
@@ -6462,11 +6488,14 @@ async def get_pending_locations(session_id: str):
                 "sync_date": ""
             })
     
-    total_expected = len(expected_locations)
-    total_synced = len(synced_location_names & expected_locations)  # Only count expected that are synced
+    # completed + empty + pending == total_expected exactly, so the tiles, the
+    # progress bar and the percentage all read off one number.
+    total_expected = len(all_locations)
     total_completed = len(completed)
     total_empty = len(empty_bins)
     total_pending = len(pending)
+    total_no_stock = len([l for l in all_locations if l not in expected_locations])
+    total_synced = total_completed + total_empty
     completion_pct = round((total_synced / total_expected * 100), 1) if total_expected > 0 else 0
     
     # Group pending by day (using session start date + sequence)
@@ -6478,7 +6507,8 @@ async def get_pending_locations(session_id: str):
             "total_completed": total_completed,
             "total_empty": total_empty,
             "total_pending": total_pending,
-            "total_synced": total_synced + total_empty,
+            "total_no_stock": total_no_stock,
+            "total_synced": total_synced,
             "completion_pct": completion_pct
         },
         "completed": completed,
@@ -6488,11 +6518,13 @@ async def get_pending_locations(session_id: str):
 
 @portal_router.get("/reports/consolidated/{client_id}/pending-locations")
 async def get_consolidated_pending_locations(client_id: str):
-    """Get pending locations across all sessions for a client. 
-    Compares expected stock locations with synced locations across all sessions."""
+    """Get pending locations across all sessions for a client.
+
+    Same work list as the session view: Location Master plus whatever the stock
+    files and scans mention."""
     session_ids = await _get_all_session_ids_for_client(client_id)
     if not session_ids:
-        return {"summary": {"total_expected": 0, "total_completed": 0, "total_empty": 0, "total_pending": 0, "total_synced": 0, "completion_pct": 0}, "completed": [], "empty_bins": [], "pending": []}
+        return {"summary": {"total_expected": 0, "total_completed": 0, "total_empty": 0, "total_pending": 0, "total_no_stock": 0, "total_synced": 0, "completion_pct": 0}, "completed": [], "empty_bins": [], "pending": []}
     
     expected_locations = set()
     synced_location_names = set()
@@ -6522,7 +6554,8 @@ async def get_consolidated_pending_locations(client_id: str):
                     "status": "empty" if s.get("is_empty", False) else "completed"
                 }
     
-    all_locations = sorted(expected_locations | synced_location_names)
+    master_locations = await _location_master_names(client_id)
+    all_locations = sorted(expected_locations | master_locations | synced_location_names)
     completed = []
     empty_bins = []
     pending = []
@@ -6535,19 +6568,21 @@ async def get_consolidated_pending_locations(client_id: str):
             else:
                 completed.append({"location_name": loc_name, "status": "completed", "in_expected": loc_name in expected_locations, **info})
         else:
-            pending.append({"location_name": loc_name, "status": "pending", "in_expected": True, "total_items": 0, "total_quantity": 0, "is_empty": False, "empty_remarks": "", "device_name": "", "synced_at": "", "sync_date": ""})
+            pending.append({"location_name": loc_name, "status": "pending", "in_expected": loc_name in expected_locations, "total_items": 0, "total_quantity": 0, "is_empty": False, "empty_remarks": "", "device_name": "", "synced_at": "", "sync_date": ""})
     
-    total_expected = len(expected_locations)
-    total_synced = len(synced_location_names & expected_locations)
+    total_expected = len(all_locations)
+    total_no_stock = len([l for l in all_locations if l not in expected_locations])
+    total_synced = len(completed) + len(empty_bins)
     completion_pct = round((total_synced / total_expected * 100), 1) if total_expected > 0 else 0
-    
+
     return {
         "summary": {
             "total_expected": total_expected,
             "total_completed": len(completed),
             "total_empty": len(empty_bins),
             "total_pending": len(pending),
-            "total_synced": total_synced + len(empty_bins),
+            "total_no_stock": total_no_stock,
+            "total_synced": total_synced,
             "completion_pct": completion_pct
         },
         "completed": completed,

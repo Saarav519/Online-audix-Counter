@@ -3728,7 +3728,10 @@ function PendingLocationsView({ data, clientId }) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
           <p className="text-2xl font-bold text-blue-700">{summary.total_expected || 0}</p>
-          <p className="text-xs text-blue-600">Total Expected</p>
+          <p className="text-xs text-blue-600">Total Locations</p>
+          {(summary.total_no_stock || 0) > 0 && (
+            <p className="text-[10px] text-blue-500 mt-0.5">{summary.total_no_stock} without stock</p>
+          )}
         </div>
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
           <p className="text-2xl font-bold text-emerald-700">{summary.total_completed || 0}</p>
@@ -3833,7 +3836,15 @@ function PendingLocationsView({ data, clientId }) {
                         <input type="checkbox" checked={isSelected} onChange={() => toggleLoc(loc.location_name)} className="rounded border-gray-300 text-indigo-500 focus:ring-indigo-400 w-4 h-4" />
                       </td>
                       <td className="py-2 px-3 text-sm text-gray-500">{idx + 1}</td>
-                      <td className="py-2 px-3 text-sm font-medium text-gray-900">{loc.location_name}</td>
+                      <td className="py-2 px-3 text-sm font-medium text-gray-900">
+                        {loc.location_name}
+                        {loc.in_expected === false && (
+                          <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-normal align-middle"
+                                title="Location Master me hai, lekin stock file me iska koi stock nahi — jaakar khali confirm karna hai">
+                            no expected stock
+                          </span>
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-center">
                         <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700 font-medium">Pending</span>
                       </td>
