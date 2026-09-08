@@ -6,6 +6,7 @@ import RecoEditGuard from '../../components/RecoEditGuard';
 import { 
   FileBarChart, 
   Download,
+  Upload,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -1301,6 +1302,52 @@ export default function PortalReports() {
   // outcome from the fixed list the backend serves with the report. Stored per
   // client + location, so it shows on every session's sheet, in the
   // consolidated view, on an assignee's copy, and in the Excel export.
+  // Bulk verification: a two-column sheet instead of hundreds of dropdowns.
+  const verifiedFileInputRef = useRef(null);
+  const [verifiedImporting, setVerifiedImporting] = useState(false);
+
+  const handleVerifiedRemarksImport = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedClient) { event.target.value = ''; return; }
+    setVerifiedImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const headers = {};
+      try {
+        const u = JSON.parse(localStorage.getItem('auditPortalUser') || localStorage.getItem('portalUser') || '{}');
+        if (u?.id) headers['X-User-Id'] = u.id;
+        if (u?.username) headers['X-Username'] = u.username;
+      } catch { /* ignore */ }
+      const res = await fetch(
+        `${BACKEND_URL}/api/audit/portal/clients/${selectedClient}/verified-remarks/import`,
+        { method: 'POST', headers, body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Failed (${res.status})`);
+      }
+      const r = await res.json();
+      const bits = [`${r.applied} set`];
+      if (r.cleared) bits.push(`${r.cleared} cleared`);
+      if (r.rejected_remarks) bits.push(`${r.rejected_remarks} rejected`);
+      if (r.unknown_locations) bits.push(`${r.unknown_locations} unknown location${r.unknown_locations === 1 ? '' : 's'}`);
+      toast.success(bits.join(' · '));
+      // Surface the rows that did NOT apply — a silent partial import is worse
+      // than none, because the sheet then looks finished when it is not.
+      if (r.rejected_remarks) {
+        toast.error(`Not a valid remark: ${(r.rejected_examples || []).slice(0, 3).join(' | ')}`,
+                    { duration: 8000 });
+      }
+      reportCache.current = {};
+      refreshReport();
+    } catch (e) {
+      toast.error(e.message || 'Import failed');
+    } finally {
+      setVerifiedImporting(false);
+      event.target.value = '';
+    }
+  }, [selectedClient, refreshReport]);
+
   const saveVerifiedRemark = async (location, remark) => {
     if (!selectedClient || !location) return;
     const prev = reportData;
@@ -2359,6 +2406,45 @@ export default function PortalReports() {
             )}
             {filteredData && reportType !== 'pending-locations' && reportType !== 'empty-bins' && (
               <FullScreenButton onClick={() => setIsFullScreen(true)} />
+            )}
+            {/* Bulk bin verification — a location + remark sheet instead of
+                ticking hundreds of dropdowns one at a time. */}
+            {reportType === 'bin-wise' && selectedClient && (
+              <>
+                <input
+                  ref={verifiedFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={handleVerifiedRemarksImport}
+                  data-testid="verified-remarks-file-input"
+                />
+                <Button
+                  onClick={() => window.open(
+                    `${BACKEND_URL}/api/audit/portal/clients/${selectedClient}/verified-remarks/template`,
+                    '_blank')}
+                  variant="outline"
+                  size="sm"
+                  title="Download a sheet with every location already listed and a dropdown of the allowed remarks"
+                  className="h-8 text-xs gap-1 text-slate-700 border-slate-300 hover:bg-slate-50"
+                  data-testid="verified-remarks-template-btn"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Remarks Template
+                </Button>
+                <Button
+                  onClick={() => verifiedFileInputRef.current?.click()}
+                  variant="outline"
+                  size="sm"
+                  disabled={verifiedImporting}
+                  title="Upload the filled template (or any sheet with Location and Remark columns)"
+                  className="h-8 text-xs gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                  data-testid="verified-remarks-import-btn"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {verifiedImporting ? 'Uploading…' : 'Upload Verified Remarks'}
+                </Button>
+              </>
             )}
             {/* Invalid Codes — Store clients only, requires a selected session */}
             {isStoreClient && selectedSession && (
