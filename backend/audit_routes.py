@@ -4123,6 +4123,168 @@ async def _verified_remarks_for_client(client_id: str) -> Dict[str, str]:
     return out
 
 
+def _parse_tabular_upload(filename: str, content: bytes) -> List[Dict[str, str]]:
+    """Read a .csv/.xlsx upload into normalised header -> value dicts.
+
+    Headers are lowercased with spaces turned into underscores, so "Location"
+    and "location" both arrive as `location`.
+    """
+    from openpyxl import load_workbook  # lazy import, matches the other importer
+
+    rows: List[Dict[str, str]] = []
+    if (filename or "").lower().endswith(".csv"):
+        try:
+            decoded = content.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = content.decode("latin-1")
+        for r in csv.DictReader(io.StringIO(decoded)):
+            rows.append({
+                (k or "").strip().lower().replace(" ", "_"):
+                    (v.strip() if isinstance(v, str) else ("" if v is None else str(v)))
+                for k, v in r.items()
+            })
+        return rows
+
+    wb = load_workbook(io.BytesIO(content), data_only=True)
+    ws = wb.active
+    try:
+        header_cells = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+    except StopIteration:
+        return rows
+    headers = [(str(h).strip().lower().replace(" ", "_") if h is not None else "")
+               for h in header_cells]
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not any(c not in (None, "") for c in row):
+            continue
+        r = {}
+        for idx, h in enumerate(headers):
+            if not h:
+                continue
+            val = row[idx] if idx < len(row) else None
+            r[h] = str(val).strip() if val is not None else ""
+        rows.append(r)
+    return rows
+
+
+def _canonical_remark(text: str) -> Optional[str]:
+    """Match a typed remark to one of VERIFIED_REMARK_OPTIONS, leniently.
+
+    The options contain an en-dash. Nobody types that in Excel, and case and
+    spacing drift too — so matching ignores case, collapses whitespace and
+    treats -, – and — as the same character. Returns None if it still matches
+    nothing, so the caller can report the row instead of guessing.
+    """
+    if not text:
+        return None
+    def norm(t):
+        t = t.replace("\u2013", "-").replace("\u2014", "-")
+        return " ".join(t.lower().split())
+    wanted = norm(text)
+    for opt in VERIFIED_REMARK_OPTIONS:
+        if norm(opt) == wanted:
+            return opt
+    return None
+
+
+@portal_router.post("/clients/{client_id}/verified-remarks/import")
+async def import_verified_remarks(client_id: str, request: Request,
+                                  file: UploadFile = File(...)):
+    """Set bin verification remarks in bulk from a location + remark sheet.
+
+    Ticking hundreds of bins one dropdown at a time is not realistic on a real
+    audit, so the same remarks can be uploaded as a two-column file.
+
+    Only the fixed options are accepted, exactly as the dropdown enforces —
+    but matched leniently, since a plain hyphen typed in Excel should not
+    silently fail against the en-dash in the option list. A row whose remark
+    matches nothing is reported back and NOT applied, so a typo can never
+    invent a new remark.
+
+    Unlike the single-cell path this writes ONE movement-log entry for the
+    whole import rather than thousands. Per-bin attribution is not lost: each
+    verified_remarks row still records who set it and when.
+    """
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "id": 1})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    content = await file.read()
+    try:
+        rows = _parse_tabular_upload(file.filename or "", content)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {e}")
+
+    actor_id = (request.headers.get("x-user-id", "") or "").strip()
+    username = (request.headers.get("x-username", "") or "").strip()
+    now = datetime.now(timezone.utc).isoformat()
+
+    known = await _location_master_names(client_id)
+
+    applied = cleared = 0
+    bad_remarks: List[str] = []
+    unknown_locations: List[str] = []
+    skipped_no_location = 0
+
+    for row in rows:
+        location = (row.get("location") or row.get("location_code")
+                    or row.get("bin") or "").strip()
+        if not location:
+            skipped_no_location += 1
+            continue
+        raw = (row.get("verified_remark") or row.get("remark")
+               or row.get("remarks") or "").strip()
+        if known and location not in known:
+            unknown_locations.append(location)
+
+        key = {"client_id": client_id, "location": location}
+        if not raw:
+            continue  # blank cell means "leave this bin alone", not "clear it"
+        remark = _canonical_remark(raw)
+        if remark is None:
+            if len(bad_remarks) < 20:
+                bad_remarks.append(f"{location}: {raw}")
+            continue
+        if remark == "Not Verified":
+            await db.verified_remarks.delete_one(key)
+            cleared += 1
+        else:
+            await db.verified_remarks.update_one(key, {"$set": {
+                **key, "remark": remark, "verified_by": actor_id,
+                "verified_by_username": username, "verified_at": now,
+            }}, upsert=True)
+            applied += 1
+
+    if applied or cleared:
+        _report_cache.invalidate_all()
+        await log_audit_entry(db, {
+            "module": await resolve_module_for_client(db, client_id),
+            "action_type": "verify",
+            "barcode": "",
+            "client_id": client_id,
+            "session_id": "",
+            "field_name": "verified_remark_bulk",
+            "old_value": "",
+            "new_value": f"{applied} set, {cleared} cleared",
+            "user_id": actor_id,
+            "username": username,
+            "report_type": "bin-wise",
+            "location": "",
+        })
+
+    return {
+        "status": "imported",
+        "rows_read": len(rows),
+        "applied": applied,
+        "cleared": cleared,
+        "rejected_remarks": len(bad_remarks),
+        "rejected_examples": bad_remarks,
+        "unknown_locations": len(unknown_locations),
+        "unknown_examples": unknown_locations[:20],
+        "skipped_no_location": skipped_no_location,
+        "valid_remarks": VERIFIED_REMARK_OPTIONS,
+    }
+
+
 @portal_router.post("/reports/verified-remark")
 async def save_verified_remark(body: VerifiedRemarkCreate, request: Request):
     """Record a bin's verification outcome. Scoped to the client, so one check
