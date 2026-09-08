@@ -188,3 +188,71 @@ def test_the_import_is_logged_once_not_per_row(portal, admin, site):
     assert "3 set" in logs[0]["new_value"]
     assert row["verified_by_username"] == admin["username"]
     assert row["verified_at"]
+
+
+def test_the_template_lists_every_bin_and_its_current_remark(portal, admin, site):
+    """An empty two-column file would just move the guesswork elsewhere."""
+    from openpyxl import load_workbook
+    cid = site["client_id"]
+    _upload(portal, admin, cid, b"location,remark\nBIN-02,Verified - Damaged\n")
+
+    r = requests.get(f"{portal}/clients/{cid}/verified-remarks/template", timeout=30)
+    assert r.status_code == 200, r.text
+    assert "attachment" in r.headers.get("Content-Disposition", "")
+
+    wb = load_workbook(io.BytesIO(r.content))
+    ws = wb["Verified Remarks"]
+    rows = list(ws.iter_rows(values_only=True))
+    assert rows[0] == ("Location", "Remark")
+    filled = {loc: (rem or "") for loc, rem in rows[1:]}
+    for b in BINS:
+        assert b in filled, f"{b} missing from the template"
+    assert filled["BIN-02"] == "Verified – Damaged", "an existing remark was not carried in"
+
+
+def test_the_template_carries_an_excel_dropdown_of_the_valid_options(portal, admin, site):
+    """The options carry an en-dash nobody types. A dropdown inside the sheet
+    is what stops a hand-filled file failing on every row."""
+    from openpyxl import load_workbook
+    r = requests.get(f"{portal}/clients/{site['client_id']}/verified-remarks/template", timeout=30)
+    wb = load_workbook(io.BytesIO(r.content))
+
+    listed = [c[0] for c in wb["Valid Remarks"].iter_rows(min_row=2, values_only=True)]
+    served = requests.get(f"{portal}/reports/{site['session_id']}/bin-wise",
+                          timeout=30).json()["verified_remark_options"]
+    assert listed == served, "template options drifted from what the report serves"
+
+    dvs = wb["Verified Remarks"].data_validations.dataValidation
+    assert dvs, "no dropdown on the Remark column"
+    assert dvs[0].type == "list"
+    assert "Valid Remarks" in dvs[0].formula1
+
+
+def test_a_filled_in_template_uploads_back_cleanly(portal, admin, site):
+    """The round trip is the whole point: download, fill, upload, done."""
+    from openpyxl import load_workbook
+    cid = site["client_id"]
+    r = requests.get(f"{portal}/clients/{cid}/verified-remarks/template", timeout=30)
+    wb = load_workbook(io.BytesIO(r.content))
+    ws = wb["Verified Remarks"]
+
+    wanted = {"BIN-01": "Verified – Correct", "BIN-03": "Verified – Short Found"}
+    for row in ws.iter_rows(min_row=2):
+        loc = row[0].value
+        if loc in wanted:
+            row[1].value = wanted[loc]
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    up = requests.post(f"{portal}/clients/{cid}/verified-remarks/import",
+                       files={"file": ("filled.xlsx", buf.getvalue(),
+                                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+                       headers=_hdr(admin), timeout=30)
+    assert up.status_code == 200, up.text
+    body = up.json()
+    assert body["rejected_remarks"] == 0, body["rejected_examples"]
+    assert body["unknown_locations"] == 0
+
+    sheet = _sheet(portal, site["session_id"])
+    assert sheet["BIN-01"] == "Verified – Correct"
+    assert sheet["BIN-03"] == "Verified – Short Found"

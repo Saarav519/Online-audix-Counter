@@ -4186,6 +4186,77 @@ def _canonical_remark(text: str) -> Optional[str]:
     return None
 
 
+@portal_router.get("/clients/{client_id}/verified-remarks/template")
+async def download_verified_remarks_template(client_id: str):
+    """The sheet to fill in and upload back.
+
+    Handing over an empty two-column file would just move the guesswork: the
+    options carry an en-dash and there is no way to know them from outside. So
+    the template ships every location already listed, any remark already set
+    already filled, and an Excel dropdown on the Remark column limited to the
+    exact options the importer accepts — the same list, from the same constant.
+    """
+    from openpyxl import Workbook
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "code": 1, "name": 1})
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    # Every bin the auditor could verify: the master, plus anything the stock
+    # files or the scans mention — the same set the Bin-wise sheet can show.
+    locations = await _location_master_names(client_id)
+    session_ids = await _get_all_session_ids_for_client(client_id)
+    for sid in session_ids:
+        async for e in db.expected_stock.find({"session_id": sid}, {"_id": 0, "location": 1}):
+            loc = (e.get("location") or "").strip()
+            if loc:
+                locations.add(loc)
+        async for sl in db.synced_locations.find({"session_id": sid}, {"_id": 0, "location_name": 1}):
+            loc = (sl.get("location_name") or "").strip()
+            if loc:
+                locations.add(loc)
+
+    existing = await _verified_remarks_for_client(client_id)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Verified Remarks"
+    ws.append(["Location", "Remark"])
+    for loc in sorted(locations):
+        ws.append([loc, existing.get(loc, "")])
+    ws.column_dimensions["A"].width = 24
+    ws.column_dimensions["B"].width = 32
+
+    ref = wb.create_sheet("Valid Remarks")
+    ref.append(["Pick one of these in the Remark column"])
+    for opt in VERIFIED_REMARK_OPTIONS:
+        ref.append([opt])
+    ref.column_dimensions["A"].width = 32
+
+    last = len(VERIFIED_REMARK_OPTIONS) + 1
+    dv = DataValidation(
+        type="list",
+        formula1=f"='Valid Remarks'!$A$2:$A${last}",
+        allow_blank=True,
+        showDropDown=False,   # openpyxl: False means DO show the in-cell arrow
+    )
+    dv.error = "Pick a remark from the list — anything else is rejected on upload."
+    dv.errorTitle = "Not a valid remark"
+    ws.add_data_validation(dv)
+    dv.add(f"B2:B{max(len(locations) + 1, 2)}")
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    code = (client.get("code") or client_id[:8]).replace(" ", "_")
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=verified_remarks_{code}.xlsx"},
+    )
+
+
 @portal_router.post("/clients/{client_id}/verified-remarks/import")
 async def import_verified_remarks(client_id: str, request: Request,
                                   file: UploadFile = File(...)):

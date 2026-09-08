@@ -2420,11 +2420,24 @@ export default function PortalReports() {
                   data-testid="verified-remarks-file-input"
                 />
                 <Button
+                  onClick={() => window.open(
+                    `${BACKEND_URL}/api/audit/portal/clients/${selectedClient}/verified-remarks/template`,
+                    '_blank')}
+                  variant="outline"
+                  size="sm"
+                  title="Download a sheet with every location already listed and a dropdown of the allowed remarks"
+                  className="h-8 text-xs gap-1 text-slate-700 border-slate-300 hover:bg-slate-50"
+                  data-testid="verified-remarks-template-btn"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Remarks Template
+                </Button>
+                <Button
                   onClick={() => verifiedFileInputRef.current?.click()}
                   variant="outline"
                   size="sm"
                   disabled={verifiedImporting}
-                  title="Upload a sheet with Location and Remark columns to set verified remarks in bulk"
+                  title="Upload the filled template (or any sheet with Location and Remark columns)"
                   className="h-8 text-xs gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
                   data-testid="verified-remarks-import-btn"
                 >
