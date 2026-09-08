@@ -991,6 +991,17 @@ async def _build_cc_reco_maps(client_id: str,
     detailed_map: Dict[str, float] = {}
     barcode_map: Dict[str, float] = {}
     article_map: Dict[str, float] = {}
+    # The note the auditor typed when setting the reco, on the same keys as the
+    # quantities. Mirrors the warehouse builder so both modules explain a reco
+    # the same way.
+    remarks: Dict[str, Dict[str, str]] = {"detailed": {}, "barcode": {}, "article": {}}
+
+    def _note(bucket: str, key: str, text: str) -> None:
+        text = (text or "").strip()
+        if not text:
+            return
+        prev = remarks[bucket].get(key)
+        remarks[bucket][key] = f"{prev}; {text}" if prev and text not in prev else (prev or text)
 
     # Build remap tables from active barcode edits
     loc_remap: Dict[tuple, str] = {}
@@ -1007,6 +1018,7 @@ async def _build_cc_reco_maps(client_id: str,
     for a in adjs:
         rt = a.get("reco_type", "")
         qty = _to_float(a.get("reco_qty"))
+        note = a.get("reco_remark", "")
         if rt == "detailed":
             loc = a.get("location", "") or ""
             bc = a.get("barcode", "") or ""
@@ -1017,14 +1029,19 @@ async def _build_cc_reco_maps(client_id: str,
             # same ORIGINAL barcode at OTHER locations don't pick it up.
             target = loc_remap.get((loc, bc)) or global_remap.get(bc) or bc
             barcode_map[target] = barcode_map.get(target, 0) + qty
+            _note("detailed", key, note)
+            _note("barcode", target, note)
         elif rt == "barcode":
             bc = a.get("barcode", "") or ""
             target = global_remap.get(bc) or bc
             barcode_map[target] = barcode_map.get(target, 0) + qty
+            _note("barcode", target, note)
         elif rt == "article":
             ac = a.get("article_code", "") or ""
             article_map[ac] = article_map.get(ac, 0) + qty
-    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+            _note("article", ac, note)
+    return {"detailed": detailed_map, "barcode": barcode_map,
+            "article": article_map, "remarks": remarks}
 
 
 async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
@@ -1130,7 +1147,22 @@ async def _apply_cc_reco(report: List[Dict[str, Any]], totals: Dict[str, Any],
         else:
             reco_qty = 0
 
+        rmk = reco_maps.get("remarks", {})
+        if report_type == "detailed":
+            reco_remark = (rmk.get("detailed", {}).get(f"{loc}|{orig_bc}", "")
+                           if is_edited else "") or rmk.get("detailed", {}).get(f"{loc}|{bc}", "")
+        elif report_type == "barcode-wise":
+            reco_remark = (rmk.get("barcode", {}).get(orig_bc, "")
+                           if is_edited else "") or rmk.get("barcode", {}).get(bc, "")
+        elif report_type == "bin-wise":
+            # One bin, several recos — join their notes the way the qty is summed.
+            reco_remark = "; ".join(
+                v for k, v in rmk.get("detailed", {}).items() if k.startswith(f"{loc}|") and v)
+        else:
+            reco_remark = ""
+
         row["reco_qty"] = reco_qty
+        row["reco_remark"] = reco_remark
         # effective_qty already reflects physical + pre-pick. Add reco on top.
         physical_qty = _to_float(row.get("physical_qty"))
         effective = _to_float(row.get("effective_qty", physical_qty))

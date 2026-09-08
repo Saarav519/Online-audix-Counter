@@ -3992,24 +3992,42 @@ async def _build_reco_maps(client_id: str,
     detailed_map = {}
     barcode_map = {}
     article_map = {}
+    # Remarks travel on the same keys as the quantities, and follow a reco
+    # through a barcode remap exactly as its qty does. Two recos landing on one
+    # key are joined rather than one silently winning.
+    remarks = {"detailed": {}, "barcode": {}, "article": {}}
+
+    def _note(bucket, key, text):
+        text = (text or "").strip()
+        if not text:
+            return
+        prev = remarks[bucket].get(key)
+        remarks[bucket][key] = f"{prev}; {text}" if prev and text not in prev else (prev or text)
+
     for a in adjs:
         rt = a.get("reco_type", "")
         qty = a["reco_qty"]
+        note = a.get("reco_remark", "")
         if rt == "detailed":
             loc = a.get("location", "") or ""
             bc = a.get("barcode", "") or ""
             key = f"{loc}|{bc}"
             detailed_map[key] = detailed_map.get(key, 0) + qty
+            _note("detailed", key, note)
             target = loc_remap.get((loc, bc)) or global_remap.get(bc) or bc
             barcode_map[target] = barcode_map.get(target, 0) + qty
+            _note("barcode", target, note)
         elif rt == "barcode":
             bc = a.get("barcode", "") or ""
             target = global_remap.get(bc) or bc
             barcode_map[target] = barcode_map.get(target, 0) + qty
+            _note("barcode", target, note)
         elif rt == "article":
             ac = a.get("article_code", "") or ""
             article_map[ac] = article_map.get(ac, 0) + qty
-    return {"detailed": detailed_map, "barcode": barcode_map, "article": article_map}
+            _note("article", ac, note)
+    return {"detailed": detailed_map, "barcode": barcode_map,
+            "article": article_map, "remarks": remarks}
 
 
 async def _get_session_reco_maps(session_doc: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
@@ -4034,7 +4052,8 @@ async def _get_session_reco_maps(session_doc: Optional[Dict[str, Any]]) -> Dict[
     ).to_list(10000)
     return await _build_reco_maps(client_id, edits=edits)
 
-EMPTY_RECO_MAPS = {"detailed": {}, "barcode": {}, "article": {}}
+EMPTY_RECO_MAPS = {"detailed": {}, "barcode": {}, "article": {},
+                   "remarks": {"detailed": {}, "barcode": {}, "article": {}}}
 
 def _compute_validated_reco(reco_maps, expected_results, synced_results):
     """Compute validated reco aggregated by location, barcode, and total.
@@ -4228,6 +4247,10 @@ async def save_reco_adjustment(adj: RecoAdjustmentCreate, request: Request):
         })
         return {"status": "deleted"}
     doc = {**filter_key, "reco_qty": adj.reco_qty,
+           # The reason typed in the reco popup is the row's remark. It used to
+           # land only in the movement log, which no report reads — so the
+           # auditor's note never reached the variance sheet.
+           "reco_remark": reason,
            "updated_at": datetime.now(timezone.utc).isoformat(),
            "updated_by": actor_id or (adj.user_id or ""),
            "updated_by_username": adj.username or ""}
@@ -4554,6 +4577,41 @@ async def _get_all_session_ids_for_client(client_id: str):
     sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(1000)
     return [s["id"] for s in sessions]
 
+
+async def _dedupe_expected_across_sessions(client_id: str, expected_results):
+    """Collapse per-session expected stock into one list — WAREHOUSE ONLY.
+
+    Warehouse stock is a client-level upload. create_session copies the SAME
+    client_stock into every new session's expected_stock, so N sessions hold N
+    identical copies of one book stock; adding them up made a second session
+    read as twice the stock on hand and a third as three times.
+
+    Store stock is imported per session, by hand, which is a deliberate part of
+    that flow — so store clients are returned untouched and keep summing
+    exactly as before. Cycle Count has its own pipeline and never gets here.
+
+    For warehouse, rows are keyed by (location, barcode) and the most recently
+    imported one wins, so refreshing a corrected stock into a newer session
+    updates the figure instead of inflating it. Sessions covering different
+    locations share no keys and are unaffected.
+
+    Returns a single-element list of lists so the callers' existing
+    ``for expected in expected_results: for e in expected:`` loops still read
+    naturally over what is now one deduplicated pass.
+    """
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "client_type": 1})
+    if (client or {}).get("client_type") != "warehouse":
+        return expected_results
+
+    best = {}
+    for expected in expected_results:
+        for e in expected:
+            key = (e.get("location", "") or "", e.get("barcode", "") or "")
+            prev = best.get(key)
+            if prev is None or (e.get("imported_at") or "") >= (prev.get("imported_at") or ""):
+                best[key] = e
+    return [list(best.values())]
+
 async def _load_master_for_client(client_id: str):
     """Load master products indexed by barcode for a client. Merges master_products + expected_stock."""
     master_by_barcode = await get_master_by_barcode(client_id)
@@ -4627,7 +4685,8 @@ async def compare_report_totals(client_id: str):
         expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
         synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
         all_data = await asyncio.gather(*expected_tasks, *synced_tasks)
-        expected_results = list(all_data[:len(session_ids)])
+        # Warehouse copies one client stock into every session — see the helper.
+        expected_results = await _dedupe_expected_across_sessions(client_id, all_data[:len(session_ids)])
         synced_results = list(all_data[len(session_ids):])
         
         # Direct call to shared function
@@ -4695,7 +4754,8 @@ async def get_reco_diagnostic(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     # Build all_item_keys (exactly as detailed report does)
@@ -4770,7 +4830,8 @@ async def get_consolidated_bin_wise(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     # Build item-level maps (same convention as detailed report: empty string for missing location)
@@ -4879,7 +4940,8 @@ async def get_consolidated_detailed(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -4918,6 +4980,7 @@ async def get_consolidated_detailed(client_id: str):
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("qty", 0)
         reco_qty = reco_maps["detailed"].get(key, 0)
+        reco_remark = reco_maps.get("remarks", {}).get("detailed", {}).get(key, "")
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
         sv = calc_values(stock_qty, mrp, cost)
@@ -4941,7 +5004,7 @@ async def get_consolidated_detailed(client_id: str):
             "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty,
             "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty,
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty,
             "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty,
             "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
@@ -5003,7 +5066,8 @@ async def get_consolidated_barcode_wise(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5058,6 +5122,7 @@ async def get_consolidated_barcode_wise(client_id: str):
         stock_qty = exp.get("qty", 0) if exp else 0
         physical_qty = physical_by_barcode.get(bc, 0)
         reco_qty = valid_barcode_reco.get(bc, 0)
+        reco_remark = reco_maps.get("remarks", {}).get("barcode", {}).get(bc, "")
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
         sv = calc_values(stock_qty, mrp, cost)
@@ -5080,7 +5145,7 @@ async def get_consolidated_barcode_wise(client_id: str):
             "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
             "accuracy_pct": accuracy, "remark": remark
         }
@@ -5142,7 +5207,8 @@ async def get_consolidated_article_wise(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5191,6 +5257,7 @@ async def get_consolidated_article_wise(client_id: str):
         cost = g["cost"]
         mrp = g["mrp"]
         reco_qty = g["reco_qty"]
+        reco_remark = reco_maps.get("remarks", {}).get("article", {}).get(code, "")
         final_qty = g["physical_qty"] + reco_qty
         diff_qty = final_qty - g["stock_qty"]
         sv = calc_values(g["stock_qty"], mrp, cost)
@@ -5210,7 +5277,7 @@ async def get_consolidated_article_wise(client_id: str):
             "mrp": mrp, "cost": cost,
             "stock_qty": g["stock_qty"], "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": g["physical_qty"], "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
             "accuracy_pct": accuracy, "remark": remark
         }
@@ -5257,7 +5324,8 @@ async def get_consolidated_category_summary(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # Warehouse copies one client stock into every session — see the helper.
+    expected_results = await _dedupe_expected_across_sessions(client_id, all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5507,6 +5575,7 @@ async def get_detailed_report(session_id: str):
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
         reco_qty = reco_maps["detailed"].get(key, 0)
+        reco_remark = reco_maps.get("remarks", {}).get("detailed", {}).get(key, "")
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
         sv = calc_values(stock_qty, mrp, cost)
@@ -5529,7 +5598,7 @@ async def get_detailed_report(session_id: str):
             "mrp": mrp, "cost": cost, "stock_qty": stock_qty,
             "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
             "accuracy_pct": accuracy, "remark": remark,
             "in_master": barcode in master_by_barcode, "in_expected_stock": key in expected_map
@@ -5643,6 +5712,7 @@ async def get_barcode_wise_report(session_id: str):
         stock_qty = exp.get("qty", 0)
         physical_qty = phy.get("quantity", 0)
         reco_qty = reco_maps["barcode"].get(bc, 0)
+        reco_remark = reco_maps.get("remarks", {}).get("barcode", {}).get(bc, "")
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
         sv = calc_values(stock_qty, mrp, cost)
@@ -5666,7 +5736,7 @@ async def get_barcode_wise_report(session_id: str):
             "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
             "accuracy_pct": accuracy, "remark": remark,
             "in_master": master_key in master_by_barcode, "in_expected_stock": bc in expected_by_barcode
@@ -5823,6 +5893,7 @@ async def get_article_wise_report(session_id: str):
         stock_qty = exp.get("qty", 0)
         physical_qty = physical_by_article.get(ac, 0)
         reco_qty = reco_maps["article"].get(ac, 0)
+        reco_remark = reco_maps.get("remarks", {}).get("article", {}).get(ac, "")
         final_qty = physical_qty + reco_qty
         diff_qty = final_qty - stock_qty
         sv = calc_values(stock_qty, mrp, cost)
@@ -5844,7 +5915,7 @@ async def get_article_wise_report(session_id: str):
             "barcodes": barcodes, "barcode_count": len(barcodes), "mrp": mrp, "cost": cost,
             "stock_qty": stock_qty, "stock_value_mrp": sv["mrp"], "stock_value_cost": sv["cost"],
             "physical_qty": physical_qty, "physical_value_mrp": pv["mrp"], "physical_value_cost": pv["cost"],
-            "reco_qty": reco_qty, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
+            "reco_qty": reco_qty, "reco_remark": reco_remark, "final_qty": final_qty, "final_value_mrp": fv["mrp"], "final_value_cost": fv["cost"],
             "diff_qty": diff_qty, "diff_value_mrp": round(dv_mrp, 2), "diff_value_cost": round(dv_cost, 2),
             "accuracy_pct": accuracy, "remark": remark
         }
@@ -6432,7 +6503,13 @@ async def get_pending_locations(session_id: str):
     synced_location_names = set()
     synced_map = {}
     for s in synced:
-        name = s.get("location_name", "")
+        # Stripped and blank-guarded so scans are read the same way expected
+        # stock and the Location Master already are. Without it a scan of
+        # " BIN-01" counts as a location of its own, and a row that carries no
+        # location name at all becomes a nameless entry on the sheet.
+        name = (s.get("location_name") or "").strip()
+        if not name:
+            continue
         synced_location_names.add(name)
         synced_map[name] = {
             "location_name": name,
@@ -6539,7 +6616,10 @@ async def get_consolidated_pending_locations(client_id: str):
         
         synced = await db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000)
         for s in synced:
-            name = s.get("location_name", "")
+            # Same normalisation as the session view — see the note there.
+            name = (s.get("location_name") or "").strip()
+            if not name:
+                continue
             synced_location_names.add(name)
             if name not in synced_map or not synced_map[name].get("is_empty", False):
                 synced_map[name] = {
