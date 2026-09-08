@@ -1791,7 +1791,6 @@ export default function PortalReports() {
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...ccCols,
           ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(showRecoFinalCols ? [{ key: 'reco_remark', label: 'Reco Remark' }] : []),
           ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -1814,7 +1813,6 @@ export default function PortalReports() {
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...ccCols,
           ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(showRecoFinalCols ? [{ key: 'reco_remark', label: 'Reco Remark' }] : []),
           ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -1838,7 +1836,6 @@ export default function PortalReports() {
           { key: 'physical_qty', label: 'Physical' },
           ...valCols('physical_value', 'Phys Val(MRP)', 'Phys Val(Cost)'),
           ...(showRecoFinalCols ? [{ key: 'reco_qty', label: 'Reco Qty' }] : []),
-          ...(showRecoFinalCols ? [{ key: 'reco_remark', label: 'Reco Remark' }] : []),
           ...(showRecoFinalCols ? [
             { key: 'final_qty', label: 'Final Qty' },
             ...valCols('final_value', 'Final Val(MRP)', 'Final Val(Cost)'),
@@ -2068,7 +2065,7 @@ export default function PortalReports() {
     };
 
     // Text/non-formula columns
-    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark', 'reco_remark']);
+    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark']);
 
     // Build worksheet
     const wb = XLSX.utils.book_new();
@@ -3136,7 +3133,6 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
               <SortableHeader column="diff_value_cost" label="Diff Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[200px]" />
-              {(isRecoEditable || isConsolidated) && <SortableHeader column="reco_remark" label="Reco Remark" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[180px]" />}
             </tr>
           </thead>
           <tbody>
@@ -3200,13 +3196,6 @@ function DetailedTable({ data, getVarianceIcon, getVarianceClass, getAccuracyCla
                     <span className="truncate" title={row.remark}>{row.remark}</span>
                   </div>
                 </td>
-                {(isRecoEditable || isConsolidated) && (
-                  <td className="py-2 px-3 remark-cell">
-                    <span className="truncate text-xs text-blue-700" title={row.reco_remark || ''}>
-                      {row.reco_remark || ''}
-                    </span>
-                  </td>
-                )}
               </tr>
               );
             })}
@@ -3302,7 +3291,6 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="diff_value_cost" label="Diff Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[220px]" />
-              {(isRecoEditable || isConsolidated) && <SortableHeader column="reco_remark" label="Reco Remark" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[180px]" />}
             </tr>
           </thead>
           <tbody>
@@ -3370,13 +3358,6 @@ function BarcodeWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                     <span className="truncate" title={row.remark}>{row.remark}</span>
                   </div>
                 </td>
-                {(isRecoEditable || isConsolidated) && (
-                  <td className="py-2 px-3 remark-cell">
-                    <span className="truncate text-xs text-blue-700" title={row.reco_remark || ''}>
-                      {row.reco_remark || ''}
-                    </span>
-                  </td>
-                )}
               </tr>
               );
             })}
@@ -3474,7 +3455,6 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
               <SortableHeader column="diff_value_cost" label="Diff Val(Cost)" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('diff_value_cost')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="accuracy_pct" label="Accuracy" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('accuracy_pct')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="remark" label="Remarks" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[220px]" />
-              {(isRecoEditable || isConsolidated) && <SortableHeader column="reco_remark" label="Reco Remark" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('reco_remark')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[180px]" />}
             </tr>
           </thead>
           <tbody>
@@ -3535,13 +3515,6 @@ function ArticleWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracy
                       <span className="truncate" title={row.remark}>{row.remark}</span>
                     </div>
                   </td>
-                  {(isRecoEditable || isConsolidated) && (
-                    <td className="py-2 px-3 remark-cell">
-                      <span className="truncate text-xs text-blue-700" title={row.reco_remark || ''}>
-                        {row.reco_remark || ''}
-                      </span>
-                    </td>
-                  )}
                 </tr>
                 {expandedRows.has(i) && (
                   <tr className="bg-purple-50/50">
