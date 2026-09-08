@@ -4577,6 +4577,32 @@ async def _get_all_session_ids_for_client(client_id: str):
     sessions = await db.audit_sessions.find({"client_id": client_id}, {"id": 1, "_id": 0}).to_list(1000)
     return [s["id"] for s in sessions]
 
+
+def _dedupe_expected_across_sessions(expected_results):
+    """Collapse per-session expected stock into one list, one row per item.
+
+    A client has ONE book stock. Sessions are passes over that same stock, so
+    the same stock file usually goes into each of them — and adding the rows up
+    made a second session read as twice the stock, a third as three times.
+
+    Rows are keyed by (location, barcode) and the most recently imported one
+    wins, so re-uploading a corrected stock file into a newer session updates
+    the figure instead of inflating it. Sessions that cover different locations
+    share no keys and are unaffected.
+
+    Returns a single-element list of lists so the callers' existing
+    ``for expected in expected_results: for e in expected:`` loops still read
+    naturally over what is now one deduplicated pass.
+    """
+    best = {}
+    for expected in expected_results:
+        for e in expected:
+            key = (e.get("location", "") or "", e.get("barcode", "") or "")
+            prev = best.get(key)
+            if prev is None or (e.get("imported_at") or "") >= (prev.get("imported_at") or ""):
+                best[key] = e
+    return [list(best.values())]
+
 async def _load_master_for_client(client_id: str):
     """Load master products indexed by barcode for a client. Merges master_products + expected_stock."""
     master_by_barcode = await get_master_by_barcode(client_id)
@@ -4650,7 +4676,8 @@ async def compare_report_totals(client_id: str):
         expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
         synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
         all_data = await asyncio.gather(*expected_tasks, *synced_tasks)
-        expected_results = list(all_data[:len(session_ids)])
+        # One client, one book stock — see _dedupe_expected_across_sessions.
+        expected_results = _dedupe_expected_across_sessions(all_data[:len(session_ids)])
         synced_results = list(all_data[len(session_ids):])
         
         # Direct call to shared function
@@ -4718,7 +4745,8 @@ async def get_reco_diagnostic(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     # Build all_item_keys (exactly as detailed report does)
@@ -4793,7 +4821,8 @@ async def get_consolidated_bin_wise(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     # Build item-level maps (same convention as detailed report: empty string for missing location)
@@ -4902,7 +4931,8 @@ async def get_consolidated_detailed(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5027,7 +5057,8 @@ async def get_consolidated_barcode_wise(client_id: str):
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
     
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5167,7 +5198,8 @@ async def get_consolidated_article_wise(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
@@ -5283,7 +5315,8 @@ async def get_consolidated_category_summary(client_id: str):
     expected_tasks = [db.expected_stock.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     synced_tasks = [db.synced_locations.find({"session_id": sid}, {"_id": 0}).to_list(100000) for sid in session_ids]
     all_results = await asyncio.gather(*expected_tasks, *synced_tasks)
-    expected_results = all_results[:len(session_ids)]
+    # One client, one book stock — sessions are passes over it, not extra stock.
+    expected_results = _dedupe_expected_across_sessions(all_results[:len(session_ids)])
     synced_results = all_results[len(session_ids):]
     
     for expected in expected_results:
