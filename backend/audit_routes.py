@@ -4590,10 +4590,12 @@ async def _dedupe_expected_across_sessions(client_id: str, expected_results):
     that flow — so store clients are returned untouched and keep summing
     exactly as before. Cycle Count has its own pipeline and never gets here.
 
-    For warehouse, rows are keyed by (location, barcode) and the most recently
-    imported one wins, so refreshing a corrected stock into a newer session
-    updates the figure instead of inflating it. Sessions covering different
-    locations share no keys and are unaffected.
+    What is dropped is a whole session's COPY of an item, never a line of the
+    stock file. A real stock file often carries the same barcode at the same
+    location on several rows — different pallets, batches or line items — and
+    those rows are all genuine quantity that must still add up. So for each
+    (location, barcode) the most recently imported SESSION wins and every row
+    that session holds for that item is kept together.
 
     Returns a single-element list of lists so the callers' existing
     ``for expected in expected_results: for e in expected:`` loops still read
@@ -4603,14 +4605,23 @@ async def _dedupe_expected_across_sessions(client_id: str, expected_results):
     if (client or {}).get("client_type") != "warehouse":
         return expected_results
 
-    best = {}
+    # key -> (import stamp of the winning session, every row it holds for the key)
+    best: Dict[tuple, tuple] = {}
     for expected in expected_results:
+        grouped: Dict[tuple, List[Dict[str, Any]]] = {}
         for e in expected:
             key = (e.get("location", "") or "", e.get("barcode", "") or "")
+            grouped.setdefault(key, []).append(e)
+        for key, rows in grouped.items():
+            stamp = max((r.get("imported_at") or "") for r in rows)
             prev = best.get(key)
-            if prev is None or (e.get("imported_at") or "") >= (prev.get("imported_at") or ""):
-                best[key] = e
-    return [list(best.values())]
+            if prev is None or stamp >= prev[0]:
+                best[key] = (stamp, rows)
+
+    out: List[Dict[str, Any]] = []
+    for _stamp, rows in best.values():
+        out.extend(rows)
+    return [out]
 
 async def _load_master_for_client(client_id: str):
     """Load master products indexed by barcode for a client. Merges master_products + expected_stock."""
