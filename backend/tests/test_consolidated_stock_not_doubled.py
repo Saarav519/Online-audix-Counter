@@ -1,8 +1,14 @@
-"""A client has one book stock, however many sessions it is counted in.
+"""A warehouse has one book stock, however many sessions it is counted in.
 
-Consolidated reports used to add each session's expected stock together, so a
-second pass over the same warehouse read as twice the stock on hand and a third
-as three times — every variance and accuracy figure on the sheet was wrong.
+Warehouse stock is uploaded once at client level, and create_session copies
+that SAME client_stock into every new session. Consolidated reports then added
+those identical copies together, so a second pass read as twice the stock on
+hand and a third as three times — every variance and accuracy figure moved
+with it.
+
+Store stock is imported per session, by hand, which is a deliberate part of
+that flow. These tests pin BOTH sides: warehouse stops multiplying, and store
+keeps summing exactly as it always did.
 """
 import asyncio
 import io
@@ -143,3 +149,44 @@ def test_physical_counts_still_add_across_sessions(portal, admin, client_id):
     assert totals["stock_qty"] == 140
     assert totals["physical_qty"] == 140
     assert totals["diff_qty"] == 0
+
+
+def _store_client(portal, admin):
+    code = f"ST{uuid.uuid4().hex[:6].upper()}"
+    return requests.post(f"{portal}/clients", json={
+        "name": f"TEST store {code}", "code": code, "client_type": "store"},
+        headers=_hdr(admin), timeout=30).json()["client"]["id"]
+
+
+def test_store_clients_are_left_exactly_as_they_were(portal, admin):
+    """Store stock is a per-session upload by design. Deduping it would be a
+    guess about intent, so this pins the old behaviour: it still sums."""
+    cid = _store_client(portal, admin)
+    try:
+        _new_session(portal, admin, cid, "Visit 1")
+        assert _stock(portal, cid, "detailed") == 140
+        _new_session(portal, admin, cid, "Visit 2")
+        assert _stock(portal, cid, "detailed") == 280, "store behaviour changed"
+        _new_session(portal, admin, cid, "Visit 3")
+        assert _stock(portal, cid, "detailed") == 420
+    finally:
+        requests.delete(f"{portal}/clients/{cid}", timeout=60)
+
+
+@needs_db
+def test_the_warehouse_snapshot_is_what_gets_deduped(portal, admin, client_id):
+    """Not a hand-uploaded file — the copies create_session makes of the one
+    client-level stock. This is the exact path the doubling came from."""
+    csv = b"location,barcode,qty\nBIN-D1,8903333300001,100\n"
+    r = requests.post(f"{portal}/clients/{client_id}/import-stock",
+                      files={"file": ("s.csv", io.BytesIO(csv), "text/csv")},
+                      headers=_hdr(admin), timeout=30)
+    assert r.status_code == 200, r.text
+
+    for i in (1, 2, 3):
+        made = requests.post(f"{portal}/sessions", json={
+            "client_id": client_id, "name": f"Pass {i}", "variance_mode": "bin-wise",
+            "start_date": "2026-01-01T00:00:00+00:00"},
+            headers=_hdr(admin), timeout=30).json()
+        assert "snapshot" in made, "warehouse session did not auto-snapshot client stock"
+        assert _stock(portal, client_id, "detailed") == 100, f"multiplied at session {i}"
