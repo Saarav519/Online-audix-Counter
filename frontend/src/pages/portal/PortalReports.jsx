@@ -1775,6 +1775,7 @@ export default function PortalReports() {
           { key: 'difference_qty', label: 'Difference' },
           { key: 'accuracy_pct', label: 'Accuracy %' },
           { key: 'remark', label: 'Remarks' },
+          ...(showRecoFinalCols ? [{ key: 'session_name', label: 'Session' }] : []),
           { key: 'verified_remark', label: 'Verified Remark' },
         ];
       case 'detailed':
@@ -2065,7 +2066,7 @@ export default function PortalReports() {
     };
 
     // Text/non-formula columns
-    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark']);
+    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark', 'session_name']);
 
     // Build worksheet
     const wb = XLSX.utils.book_new();
@@ -2903,6 +2904,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
             <tr>
               <th data-col="status" className="py-1.5 px-4 text-left text-[11px] font-bold text-emerald-800">Subtotals</th>
               <th data-col="location" className="py-1.5 px-4"></th>
+              {isConsolidated && <th data-col="session_name" className="py-1.5 px-4"></th>}
               <SubtotalCell value={t.stock_qty} />
               <SubtotalCell value={t.physical_qty} />
               {isCC && <SubtotalCell value={t.pre_pick_qty || 0} />}
@@ -2917,6 +2919,7 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
             <tr>
               <SortableHeader column="status" label="Status" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('status')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="location" label="Location" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('location')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
+              {isConsolidated && <SortableHeader column="session_name" label="Session" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('session_name')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="min-w-[160px]" />}
               <SortableHeader column="stock_qty" label="Stock Qty" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('stock_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               <SortableHeader column="physical_qty" label="Physical" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('physical_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} />
               {isCC && <SortableHeader column="pre_pick_qty" label="Pre-Audit Picks" align="right" sortConfig={sortConfig} onSort={onSort} allValues={getColumnValues('pre_pick_qty')} activeFilters={columnFilters} onFilterChange={onFilterChange} numericFilters={numericFilters} onNumericFilterChange={onNumericFilterChange} className="text-fuchsia-700 bg-fuchsia-50/50" />}
@@ -2957,6 +2960,17 @@ function BinWiseTable({ data, getVarianceIcon, getVarianceClass, getAccuracyClas
                     )}
                   </td>
                   <td className="py-3 px-4 font-medium">{row.location || '-'}</td>
+                  {isConsolidated && (
+                    <td className="py-3 px-4">
+                      {row.session_name ? (
+                        <span className="text-xs text-slate-700" title={row.session_name}>
+                          {row.session_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300 italic">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="py-3 px-4 text-right">{row.stock_qty}</td>
                   <td className="py-3 px-4 text-right">{row.physical_qty}</td>
                   {isCC && <td className="py-3 px-4 text-right text-fuchsia-700 bg-fuchsia-50/30">{row.pre_pick_qty || 0}</td>}

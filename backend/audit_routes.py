@@ -5044,6 +5044,15 @@ async def get_consolidated_bin_wise(client_id: str):
     expected_by_location = {}
     physical_by_location = {}
     empty_bin_map = {}
+    # Which session a location's scan came from. The consolidated sheet merges
+    # every session, so without this there is no way to tell where a bin was
+    # counted. Names, because ids mean nothing to the person reading the sheet.
+    session_names = {}
+    async for sdoc in db.audit_sessions.find(
+            {"client_id": client_id}, {"_id": 0, "id": 1, "name": 1, "session_name": 1}):
+        session_names[sdoc.get("id")] = (
+            sdoc.get("name") or sdoc.get("session_name") or "")
+    sessions_by_location = {}
     
 
     # Parallel: fetch all sessions' data at once
@@ -5063,9 +5072,15 @@ async def get_consolidated_bin_wise(client_id: str):
             expected_by_location[loc] = expected_by_location.get(loc, 0) + e.get("qty", 0)
             all_item_keys.add(f"{loc}|{e['barcode']}")
     
-    for synced in synced_results:
+    for idx, synced in enumerate(synced_results):
+        # synced_results is built in the same order as session_ids
+        sname = session_names.get(session_ids[idx], "") if idx < len(session_ids) else ""
         for s in synced:
             loc = s["location_name"]
+            if sname:
+                sessions_by_location.setdefault(loc, [])
+                if sname not in sessions_by_location[loc]:
+                    sessions_by_location[loc].append(sname)
             physical_by_location[loc] = physical_by_location.get(loc, 0) + s["total_quantity"]
             if s.get("is_empty", False):
                 empty_bin_map[loc] = {
@@ -5127,6 +5142,9 @@ async def get_consolidated_bin_wise(client_id: str):
             "reco_qty": reco_qty, "final_qty": final_qty,
             "difference_qty": diff_qty, "accuracy_pct": accuracy, "remark": remark,
             "status": status, "is_empty": is_empty_bin,
+            # Blank for a pending bin — nothing was ever forwarded for it, so
+            # naming a session would be a guess.
+            "session_name": ", ".join(sessions_by_location.get(loc, [])),
             "empty_remarks": empty_bin_map.get(loc, {}).get("empty_remarks", "") if is_empty_bin else ""
         })
     
