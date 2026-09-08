@@ -190,3 +190,43 @@ def test_the_warehouse_snapshot_is_what_gets_deduped(portal, admin, client_id):
             headers=_hdr(admin), timeout=30).json()
         assert "snapshot" in made, "warehouse session did not auto-snapshot client stock"
         assert _stock(portal, client_id, "detailed") == 100, f"multiplied at session {i}"
+
+
+@needs_db
+def test_repeated_rows_for_one_item_are_not_thrown_away(portal, admin, client_id):
+    """A real stock file carries the same barcode at the same location on
+    several rows — different pallets, batches or line items. Those are genuine
+    quantity. Deduplication must drop a whole session's COPY of an item, never
+    a line of the file: an earlier version of this collapsed them and quietly
+    lost stock from live reports.
+    """
+    csv = (b"location,barcode,qty\n"
+           b"BIN-01,8901111100001,100\n"
+           b"BIN-01,8901111100001,50\n"     # same item, second line
+           b"BIN-02,8901111100002,73\n")
+    r = requests.post(f"{portal}/clients/{client_id}/import-stock",
+                      files={"file": ("s.csv", io.BytesIO(csv), "text/csv")},
+                      headers=_hdr(admin), timeout=30)
+    assert r.status_code == 200, r.text
+
+    _new_session(portal, admin, client_id, "Pass 1", csv=None)
+    assert _stock(portal, client_id, "detailed") == 223, "a stock line was dropped"
+
+    # and it still must not multiply when more sessions are added
+    _new_session(portal, admin, client_id, "Pass 2", csv=None)
+    _new_session(portal, admin, client_id, "Pass 3", csv=None)
+    assert _stock(portal, client_id, "detailed") == 223
+
+
+@needs_db
+def test_repeated_rows_survive_on_every_consolidated_report(portal, admin, client_id):
+    csv = (b"location,barcode,qty\n"
+           b"BIN-01,8901111100001,100\n"
+           b"BIN-01,8901111100001,50\n")
+    requests.post(f"{portal}/clients/{client_id}/import-stock",
+                  files={"file": ("s.csv", io.BytesIO(csv), "text/csv")},
+                  headers=_hdr(admin), timeout=30)
+    _new_session(portal, admin, client_id, "Pass 1", csv=None)
+    _new_session(portal, admin, client_id, "Pass 2", csv=None)
+    for report in REPORTS:
+        assert _stock(portal, client_id, report) == 150, f"{report} lost or multiplied stock"
