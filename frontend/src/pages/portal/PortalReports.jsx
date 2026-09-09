@@ -1989,6 +1989,53 @@ export default function PortalReports() {
   const exportReport = () => {
     if (!filteredData) return;
 
+    // Empty Bins and Pending Locations are plain lists, not variance rows: they
+    // come back as all_empty_locations / pending and carry no `report` array at
+    // all. The formula-driven path below reads `report`, found nothing and bailed
+    // with "No data to export" even while the screen was full of rows. Export
+    // what that screen actually shows instead.
+    if (reportType === 'empty-bins' || reportType === 'pending-locations') {
+      const isEmptyBins = reportType === 'empty-bins';
+      const listRows = isEmptyBins
+        ? (filteredData.all_empty_locations || [])
+        : (filteredData.pending || []);
+      if (listRows.length === 0) { toast.error('No data to export'); return; }
+
+      const cols = isEmptyBins
+        ? [
+            { key: 'location_name', label: 'Location' },
+            { key: 'empty_remarks', label: 'Remarks' },
+            { key: 'device_name', label: 'Device' },
+            { key: 'sync_date', label: 'Sync Date' },
+            { key: 'synced_at', label: 'Synced At' },
+          ]
+        : [
+            { key: 'location_name', label: 'Location' },
+            { key: 'status', label: 'Status' },
+            { key: 'in_expected', label: 'Has Expected Stock' },
+          ];
+
+      const aoa = [cols.map(c => c.label)];
+      listRows.forEach(r => {
+        aoa.push(cols.map(c => {
+          const v = r[c.key];
+          if (c.key === 'in_expected') return v === false ? 'No' : 'Yes';
+          if (v === null || v === undefined || v === '') return '';
+          return String(v);
+        }));
+      });
+
+      const wbList = XLSX.utils.book_new();
+      const wsList = XLSX.utils.aoa_to_sheet(aoa);
+      wsList['!cols'] = cols.map(c => ({ wch: c.key === 'empty_remarks' ? 34 : 20 }));
+      XLSX.utils.book_append_sheet(wbList, wsList,
+        isEmptyBins ? 'Empty Bins' : 'Pending Locations');
+      XLSX.writeFile(wbList,
+        `${reportType}_${selectedSession}.xlsx`);
+      toast.success(`Exported ${listRows.length} rows`);
+      return;
+    }
+
     const rows = filteredData.report || [];
     if (rows.length === 0) { toast.error('No data to export'); return; }
 
