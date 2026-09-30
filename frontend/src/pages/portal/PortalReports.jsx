@@ -1548,6 +1548,7 @@ export default function PortalReports() {
         optMap.set('empty-bins', { value: 'empty-bins', label: 'Empty Bins' });
         optMap.set('pending-locations', { value: 'pending-locations', label: 'Pending Locations' });
       }
+      optMap.set('scan-data', { value: 'scan-data', label: 'Scan Data (Location-wise)' });
       return Array.from(optMap.values());
     }
     // Cycle Count clients use selectedDay to decide between day-only reports
@@ -1601,6 +1602,9 @@ export default function PortalReports() {
     if (mode === 'bin-wise') {
       options.push({ value: 'empty-bins', label: 'Empty Bins' });
     }
+
+    // Raw scan lines with master data attached — every mode has scans.
+    options.push({ value: 'scan-data', label: 'Scan Data (Location-wise)' });
     
     // Pending Locations only in consolidated view (not session-wise)
     // Session-wise only shows scanned data, pending makes sense only in consolidated
@@ -1846,6 +1850,25 @@ export default function PortalReports() {
           { key: 'accuracy_pct', label: 'Accuracy' },
           { key: 'remark', label: 'Remarks' },
         ];
+      case 'scan-data':
+        // Raw scan columns first, in the order the raw download uses, then
+        // what master fills in against the barcode.
+        return [
+          ...(isConsolidatedView ? [{ key: 'session_name', label: 'Session' }] : []),
+          { key: 'location', label: 'Location' },
+          { key: 'barcode', label: 'Barcode' },
+          { key: 'product_name', label: 'Scanned Name' },
+          { key: 'quantity', label: 'Qty' },
+          { key: 'device_name', label: 'Device' },
+          { key: 'sync_date', label: 'Sync Date' },
+          { key: 'scanned_at', label: 'Scanned At' },
+          { key: 'description', label: 'Description' },
+          { key: 'category', label: 'Category' },
+          { key: 'article_name', label: 'Article Name' },
+          ...(schemaValueFields.has_mrp ? [{ key: 'mrp', label: 'MRP' }] : []),
+          ...(schemaValueFields.has_cost ? [{ key: 'cost', label: 'Cost' }] : []),
+          ...ec,
+        ];
       case 'category-summary':
         return [
           { key: 'category', label: 'Category' },
@@ -2066,7 +2089,14 @@ export default function PortalReports() {
     };
 
     // Text/non-formula columns
-    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark', 'session_name']);
+    const textKeys = new Set(['location', 'barcode', 'description', 'category', 'article_code', 'article_name', 'status', 'remark', 'verified_remark', 'session_name', 'product_name', 'device_name', 'sync_date', 'scanned_at']);
+
+    // Scan Data is one line per scan, so MRP and Cost are unit prices and the
+    // schema's own fields are mostly text — a column total there would be a
+    // number nobody asked for. Only the scanned quantity is worth totalling.
+    if (reportType === 'scan-data') {
+      exportCols.forEach(col => { if (col.key !== 'quantity') textKeys.add(col.key); });
+    }
 
     // Build worksheet
     const wb = XLSX.utils.book_new();
@@ -2628,6 +2658,7 @@ export default function PortalReports() {
               </div>
             </div>
           )}
+          {reportType === 'scan-data' && <ScanDataTable data={displayData} columns={columnConfig} sortConfig={sortConfig} onSort={handleSort} columnFilters={columnFilters} onFilterChange={handleColumnFilter} numericFilters={numericFilters} onNumericFilterChange={handleNumericFilter} getColumnValues={getColumnValues} />}
           {reportType === 'empty-bins' && <EmptyBinsView data={reportData} />}
           {reportType === 'pending-locations' && <PendingLocationsView data={reportData} clientId={selectedClient} />}
         </>
@@ -3657,6 +3688,72 @@ function CategorySummaryTable({ data, getVarianceIcon, getVarianceClass, getAccu
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============ Scan Data (Location-wise) Table ============
+// Driven straight off columnConfig so the schema's own fields appear without
+// this table knowing their names.
+function ScanDataTable({ data, columns, sortConfig, onSort, columnFilters, onFilterChange, numericFilters, onNumericFilterChange, getColumnValues }) {
+  const rows = data?.report || [];
+  const totals = data?.totals || {};
+  const NUM = new Set(['quantity', 'mrp', 'cost']);
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="px-4 py-2.5 border-b bg-slate-50 flex flex-wrap items-center gap-3 text-xs">
+        <span className="font-semibold text-slate-700">Scan Data</span>
+        <span className="text-slate-500">{(totals.rows ?? rows.length).toLocaleString('en-IN')} scan lines</span>
+        <span className="text-slate-500">Total Qty: <span className="font-semibold text-slate-700">{(totals.quantity || 0).toLocaleString('en-IN')}</span></span>
+        <span className="text-slate-400">Exactly as scanned — nothing merged</span>
+      </div>
+      <div className="overflow-auto max-h-[70vh]">
+        <table className="min-w-full text-sm report-table">
+          <thead className="bg-gray-50">
+            <tr>
+              {columns.map(col => (
+                <SortableHeader
+                  key={col.key}
+                  column={col.key}
+                  label={col.label}
+                  align={NUM.has(col.key) ? 'right' : 'left'}
+                  sortConfig={sortConfig}
+                  onSort={onSort}
+                  allValues={getColumnValues(col.key)}
+                  activeFilters={columnFilters}
+                  onFilterChange={onFilterChange}
+                  numericFilters={numericFilters}
+                  onNumericFilterChange={onNumericFilterChange}
+                />
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.map((row, i) => (
+              <tr key={i} className="hover:bg-slate-50/60">
+                {columns.map(col => {
+                  const v = row[col.key];
+                  // A barcode the master has never heard of is a finding, not a
+                  // blank — say so instead of leaving the row looking normal.
+                  if (col.key === 'description' && !v && row.in_master === false) {
+                    return <td key={col.key} className="py-2 px-3 text-xs text-amber-700 italic">not in master</td>;
+                  }
+                  return (
+                    <td key={col.key} className={`py-2 px-3 text-xs ${NUM.has(col.key) ? 'text-right tabular-nums' : ''}`}>
+                      {v === null || v === undefined || v === '' ? '—'
+                        : (NUM.has(col.key) && typeof v === 'number' ? v.toLocaleString('en-IN') : String(v))}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={columns.length} className="py-8 text-center text-slate-400 text-sm">No scan data for this selection</td></tr>
+            )}
           </tbody>
         </table>
       </div>

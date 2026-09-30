@@ -6647,6 +6647,83 @@ async def get_daily_progress(session_id: str):
 
 # ==================== EMPTY BINS & PENDING LOCATIONS ROUTES ====================
 
+async def _build_scan_data_rows(session_ids, client_id: str, session_names: dict):
+    """One row per scan line, exactly as the raw sync download gives it, with
+    the master and schema fields for that barcode filled in alongside.
+
+    Reads sync_raw_logs — the untouched record of what each handheld sent —
+    rather than synced_locations, so this is the same data the raw export
+    produces and nothing is aggregated, merged or de-duplicated on the way.
+    """
+    master_by_barcode = await get_master_by_barcode(client_id)
+    extra_columns = await _get_extra_columns_for_client(client_id)
+
+    rows = []
+    for sid in session_ids:
+        async for log in db.sync_raw_logs.find(
+                {"session_id": sid}, {"_id": 0}).sort("synced_at", 1):
+            for loc in (log.get("raw_payload", {}) or {}).get("locations", []) or []:
+                loc_name = loc.get("name") or loc.get("location_name") or ""
+                for item in loc.get("items", []) or []:
+                    bc = item.get("barcode", "") or ""
+                    m = master_by_barcode.get(bc, {}) or {}
+                    row = {
+                        "session_name": session_names.get(sid, ""),
+                        "device_name": log.get("device_name", ""),
+                        "sync_date": log.get("sync_date", ""),
+                        "synced_at": log.get("synced_at", ""),
+                        "location": loc_name,
+                        "barcode": bc,
+                        "product_name": item.get("product_name") or item.get("productName") or "",
+                        "quantity": item.get("quantity", 0),
+                        "scanned_at": item.get("scanned_at") or item.get("scannedAt") or "",
+                        # Filled from master against the scanned barcode. Blank
+                        # when the barcode is not in master — that is a real
+                        # finding, not something to paper over.
+                        "description": m.get("description", ""),
+                        "category": m.get("category", ""),
+                        "article_code": m.get("article_code", ""),
+                        "article_name": m.get("article_name", ""),
+                        "mrp": m.get("mrp", 0) or 0,
+                        "cost": m.get("cost", 0) or 0,
+                        "in_master": bool(m),
+                    }
+                    _merge_custom_fields(row, m, extra_columns)
+                    rows.append(row)
+    return rows, extra_columns
+
+
+@portal_router.get("/reports/{session_id}/scan-data")
+async def get_scan_data_report(session_id: str):
+    """Location-wise scan data as scanned, with master fields per barcode."""
+    session = await db.audit_sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    client_id = session.get("client_id", "")
+    names = {session_id: session.get("name") or session.get("session_name") or ""}
+    rows, extra_columns = await _build_scan_data_rows([session_id], client_id, names)
+    return {
+        "report": rows,
+        "totals": {"quantity": sum(r["quantity"] for r in rows), "rows": len(rows)},
+        "extra_columns": extra_columns,
+    }
+
+
+@portal_router.get("/reports/consolidated/{client_id}/scan-data")
+async def get_consolidated_scan_data_report(client_id: str):
+    """Same, across every session of the client."""
+    names = {}
+    async for sdoc in db.audit_sessions.find(
+            {"client_id": client_id}, {"_id": 0, "id": 1, "name": 1, "session_name": 1}):
+        names[sdoc.get("id")] = sdoc.get("name") or sdoc.get("session_name") or ""
+    rows, extra_columns = await _build_scan_data_rows(list(names.keys()), client_id, names)
+    return {
+        "report": rows,
+        "totals": {"quantity": sum(r["quantity"] for r in rows), "rows": len(rows)},
+        "extra_columns": extra_columns,
+    }
+
+
 @portal_router.get("/reports/{session_id}/empty-bins")
 async def get_empty_bins(session_id: str):
     """Get all empty bins for a session"""
