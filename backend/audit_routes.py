@@ -3419,11 +3419,20 @@ async def edit_barcode(data: dict, request: Request):
     else:
         raise HTTPException(400, f"Invalid report_type: {report_type}")
 
-    # Check for duplicate edit (same original_value already edited)
-    existing = await db.barcode_edits.find_one({
+    # Check for duplicate edit (same original_value already edited).
+    # A detailed edit belongs to ONE location — the remap that applies it is
+    # keyed on (location, original_value). Leaving location out of this lookup
+    # meant correcting the same unknown barcode at a second location just
+    # overwrote the first edit, so that location was never remapped and its
+    # quantity never moved. Barcode-wise and article-wise edits are global and
+    # keep the location-free key.
+    dup_key = {
         "client_id": client_id, "report_type": report_type,
         "original_value": original_value, "is_active": True
-    }, {"_id": 0})
+    }
+    if report_type == "detailed" and location:
+        dup_key["location"] = location
+    existing = await db.barcode_edits.find_one(dup_key, {"_id": 0})
     if existing:
         # Update existing edit instead of creating new one
         await db.barcode_edits.update_one(
@@ -5877,7 +5886,7 @@ async def get_barcode_wise_report(session_id: str):
     }, {"_id": 0}).to_list(10000)
     loc_remap = {}      # (location, original_barcode) → new_barcode
     global_remap = {}   # original_barcode → new_barcode
-    edit_destinations = {}  # new_barcode → list of (original, edit_id) for annotation
+    edit_meta_by_new = {}   # new_value -> edit doc (for marking edited rows)
     for e in _early_edits:
         orig = e.get("original_value")
         new_v = e.get("new_value")
@@ -5887,9 +5896,8 @@ async def get_barcode_wise_report(session_id: str):
             loc_remap[(e["location"], orig)] = new_v
         else:
             global_remap[orig] = new_v
-        edit_destinations.setdefault(new_v, []).append({
-            "original": orig, "edit_id": e.get("id"), "location": e.get("location", "")
-        })
+        edit_meta_by_new[new_v] = e
+    remap_targets = set()  # barcodes that received remapped qty (mark these as is_edited)
 
     # Process synced — apply edit remap PER SCAN to correctly move qty
     physical_by_barcode = {}
@@ -5900,6 +5908,8 @@ async def get_barcode_wise_report(session_id: str):
         for item in s["items"]:
             raw_bc = item["barcode"]
             bc = loc_remap.get((loc, raw_bc)) or global_remap.get(raw_bc) or raw_bc
+            if bc != raw_bc:
+                remap_targets.add(bc)
             if bc not in physical_by_barcode:
                 physical_by_barcode[bc] = {"barcode": bc, "product_name": item.get("product_name", ""), "quantity": 0}
             physical_by_barcode[bc]["quantity"] += item["quantity"]
@@ -5981,8 +5991,26 @@ async def get_barcode_wise_report(session_id: str):
     
     totals["accuracy_pct"] = calc_accuracy(totals["stock_qty"], totals["final_qty"])
     s_client_id = session.get("client_id", "") if session else ""
-    edits = await db.barcode_edits.find({"client_id": s_client_id, "is_active": True}, {"_id": 0}).to_list(10000)
-    report, totals = _apply_barcode_edits(report, totals, edits, "barcode-wise", master_by_barcode)
+    # Edits are ALREADY applied above, per scan and location-aware, so the
+    # quantities have merged under the corrected barcode. Running the post-hoc
+    # rename here as well applied every edit a second time, and that pass
+    # matches on barcode alone: an identical barcode still un-edited at another
+    # location was renamed too, and its qty vanished into the corrected row.
+    # Consolidated has always done it this way — only mark the flags the UI
+    # needs, never rename again.
+    for row in report:
+        bc = row.get("barcode", "")
+        if bc and bc in remap_targets and bc in edit_meta_by_new:
+            ed = edit_meta_by_new[bc]
+            row["is_edited"] = True
+            row["_edit_id"] = ed.get("id")
+            row["_original_value"] = ed.get("original_value")
+            row["remark"] = f"Barcode Edited (was: {ed.get('original_value')})"
+            row["is_editable"] = True
+        else:
+            row["is_editable"] = (row.get("stock_qty", 0) == 0 and row.get("physical_qty", 0) > 0)
+    totals["accuracy_pct"] = calc_accuracy(totals.get("stock_qty", 0), totals.get("final_qty", 0))
+    report = _merge_barcode_wise_collisions(report)
     # Defensive merge: collapse any duplicate-barcode rows that arise when
     # an edit renamed an extra-scan into a barcode that already exists in
     # the aggregate (Store Wise relies on this for Barcode Variance reports).
