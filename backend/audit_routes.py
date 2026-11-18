@@ -121,7 +121,7 @@ async def get_cached_master(client_id):
     cached = _master_cache.get(key)
     if cached is not None:
         return cached
-    records = await db.master_products.find({"client_id": client_id}, {"_id": 0}).to_list(500000)
+    records = await db.master_products.find({"client_id": client_id}, {"_id": 0}).to_list(None)
     _master_cache.set(key, records)
     return records
 
@@ -7855,7 +7855,7 @@ async def get_master_products_for_scanner(client_id: str):
     records = await db.master_products.find(
         {"client_id": client_id},
         {"_id": 0, "barcode": 1, "description": 1, "article_name": 1, "mrp": 1, "cost": 1, "category": 1}
-    ).to_list(200000)
+    ).to_list(None)  # no cap — masters can exceed 2 lakh rows
     
     # Map to scanner-friendly format
     products = []
